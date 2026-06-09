@@ -1,0 +1,20 @@
+{
+  "name": "cloudtak-plugin-incident-manager",
+  "version": "0.1.0",
+  "description": "CloudTAK floating-pane plugin: SAR Incident Manager (Create/Open missions, Logger, Dashboard)",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "typecheck": "vue-tsc --noEmit -p tsconfig.json"
+  },
+  "peerDependencies": {
+    "vue": "^3.4.0"
+  },
+  "devDependencies": {
+    "@tak-ps/cloudtak": "file:../CloudTAK/api/web",
+    "@tabler/icons-vue": "^3.0.0",
+    "typescript": "^5.4.0",
+    "vue": "^3.4.0",
+    "vue-tsc": "^2.0.0"
+  }
+}
