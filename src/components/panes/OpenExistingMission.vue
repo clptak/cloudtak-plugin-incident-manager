@@ -75,10 +75,10 @@
 
 <script setup lang='ts'>
 import { ref, computed, onMounted } from 'vue';
-import type { Mission } from '../../../../src/types.ts';
-import { useMapStore } from '../../../../src/stores/map.ts';
-import OverlayManager from '../../../../src/base/overlay.ts';
-import Subscription from '../../../../src/base/subscription.ts';
+import type { Mission } from '../../../../../src/types.ts';
+import { useMapStore } from '../../../../../src/stores/map.ts';
+import OverlayManager from '../../../../../src/base/overlay.ts';
+import Subscription from '../../../../../src/base/subscription.ts';
 import { useIncident } from '../../composables/useIncident.ts';
 
 const mapStore = useMapStore();

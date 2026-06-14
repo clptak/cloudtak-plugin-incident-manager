@@ -179,7 +179,7 @@
 
 <script setup lang='ts'>
 import { reactive, ref, computed, onMounted, watch } from 'vue';
-import Subscription from '../../../../../src/base/subscription.ts';
+import Subscription from '../../../../../../src/base/subscription.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 
 const { activeMission } = useIncident();

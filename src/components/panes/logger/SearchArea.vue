@@ -436,8 +436,8 @@
 
 <script setup lang='ts'>
 import { ref, computed, reactive, watch, onMounted } from 'vue';
-import Subscription from '../../../../../src/base/subscription.ts';
-import type { Feature } from '../../../../../src/types.ts';
+import Subscription from '../../../../../../src/base/subscription.ts';
+import type { Feature } from '../../../../../../src/types.ts';
 import azlpb from '../../../data/azlpb_table.json';
 import { parseCoordinates } from '../../../lib/coords.ts';
 import { circleRing, milesToMeters } from '../../../lib/rings.ts';

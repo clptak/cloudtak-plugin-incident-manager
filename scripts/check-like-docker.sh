@@ -4,7 +4,7 @@
 set -euo pipefail
 
 WEB="${1:-$HOME/CloudTAK/api/web}"
-PLUGIN_SLUG="${PLUGIN_SLUG:-cloudtak-plugin-d4h}"
+PLUGIN_SLUG="${PLUGIN_SLUG:-incident-manager}"
 PLUGIN_DIR="plugins/${PLUGIN_SLUG}"
 PLUGIN_NM="$WEB/$PLUGIN_DIR/node_modules"
 BACKUP=""

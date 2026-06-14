@@ -34,7 +34,7 @@ horizontal **Main / Task / Dashboard** tabs.
 ## Dev
 
 ```sh
-ln -s "$PWD/src" ~/CloudTAK/api/web/plugins/incident-manager
+ln -sf "$PWD" ~/CloudTAK/api/web/plugins/incident-manager
 cd ~/CloudTAK/api/web && npm run serve
 ```
 

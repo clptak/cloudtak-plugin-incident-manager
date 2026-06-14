@@ -243,11 +243,11 @@
 
 <script setup lang='ts'>
 import { ref, reactive, computed } from 'vue';
-import { server } from '../../../../src/std.ts';
-import type { Mission_Create } from '../../../../src/types.ts';
-import { useMapStore } from '../../../../src/stores/map.ts';
-import OverlayManager from '../../../../src/base/overlay.ts';
-import GroupSelect from '../../../../src/components/CloudTAK/util/GroupSelect.vue';
+import { server } from '../../../../../src/std.ts';
+import type { Mission_Create } from '../../../../../src/types.ts';
+import { useMapStore } from '../../../../../src/stores/map.ts';
+import OverlayManager from '../../../../../src/base/overlay.ts';
+import GroupSelect from '../../../../../src/components/CloudTAK/util/GroupSelect.vue';
 import OpenExistingMission from './OpenExistingMission.vue';
 import { buildMissionName, parseCoordinates } from '../../lib/coords.ts';
 import { createCaltopoMap, caltopoAvailable } from '../../lib/caltopo.ts';

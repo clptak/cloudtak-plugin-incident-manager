@@ -121,8 +121,8 @@
 
 <script setup lang='ts'>
 import { ref, reactive, computed, watch, onMounted } from 'vue';
-import Subscription from '../../../../src/base/subscription.ts';
-import type { DBSubscriptionLog } from '../../../../src/database.ts';
+import Subscription from '../../../../../src/base/subscription.ts';
+import type { DBSubscriptionLog } from '../../../../../src/database.ts';
 import { useIncident } from '../../composables/useIncident.ts';
 
 const { activeMission } = useIncident();

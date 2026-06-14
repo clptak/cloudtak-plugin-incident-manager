@@ -118,7 +118,7 @@
 
 <script setup lang='ts'>
 import { ref, computed } from 'vue';
-import Subscription from '../../../../../src/base/subscription.ts';
+import Subscription from '../../../../../../src/base/subscription.ts';
 import { getMpsRows } from '../../../lib/mpsParser.ts';
 import type { MpsRow } from '../../../lib/mpsParser.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
