@@ -1,6 +1,6 @@
 import type { App } from 'vue';
 import { defineAsyncComponent, markRaw } from 'vue';
-import type { PluginAPI, PluginInstance, PluginStatic } from '@tak-ps/cloudtak';
+import type { PluginAPI, PluginInstance, PluginStatic } from '../../../plugin.ts';
 import { IconClipboardList } from '@tabler/icons-vue';
 
 const IncidentManagerPane = defineAsyncComponent(
