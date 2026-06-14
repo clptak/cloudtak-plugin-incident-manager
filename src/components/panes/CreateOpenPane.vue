@@ -457,8 +457,13 @@ function onTemplateKeydown(event: KeyboardEvent, index: number): void {
     const count = templates.value.length;
     if (!count) return;
 
-    let nextIndex: number | null = null;
+    if (event.key === ' ' || event.key === 'Enter') {
+        event.preventDefault();
+        selectTemplateByIndex(index);
+        return;
+    }
 
+    let nextIndex: number;
     switch (event.key) {
         case 'ArrowRight':
         case 'ArrowDown':
@@ -474,11 +479,6 @@ function onTemplateKeydown(event: KeyboardEvent, index: number): void {
         case 'End':
             nextIndex = count - 1;
             break;
-        case ' ':
-        case 'Enter':
-            event.preventDefault();
-            selectTemplateByIndex(index);
-            return;
         default:
             return;
     }
