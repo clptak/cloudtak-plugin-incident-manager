@@ -157,6 +157,110 @@
                     </div>
                 </div>
 
+                <div
+                    v-if='templates.length || templatesLoading'
+                    class='row g-3 mt-1'
+                >
+                    <div class='col-12'>
+                        <div class='d-flex align-items-center mb-2'>
+                            <label class='form-label mb-0'>Templates</label>
+                            <div class='ms-auto'>
+                                <button
+                                    v-if='!showTemplateSearch'
+                                    type='button'
+                                    class='btn btn-sm btn-ghost-secondary'
+                                    title='Search Templates'
+                                    @click='showTemplateSearch = true'
+                                >
+                                    <IconSearch
+                                        :size='18'
+                                        stroke='1.5'
+                                    />
+                                </button>
+                                <button
+                                    v-else
+                                    type='button'
+                                    class='btn btn-sm btn-ghost-secondary'
+                                    title='Close Search'
+                                    @click='showTemplateSearch = false; templatesPaging.filter = ""'
+                                >
+                                    <IconX
+                                        :size='18'
+                                        stroke='1.5'
+                                    />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div
+                            v-if='showTemplateSearch'
+                            class='mb-2'
+                        >
+                            <input
+                                v-model='templatesPaging.filter'
+                                type='text'
+                                class='form-control form-control-sm'
+                                placeholder='Search Templates...'
+                            >
+                        </div>
+
+                        <div
+                            v-if='templatesLoading'
+                            class='text-muted small'
+                        >
+                            <span class='spinner-border spinner-border-sm me-1' />
+                            Loading Templates…
+                        </div>
+                        <div
+                            v-else-if='templates.length'
+                            class='row g-2'
+                            role='radiogroup'
+                            aria-label='Mission templates'
+                        >
+                            <div
+                                v-for='(template, index) in templates'
+                                :key='template.id'
+                                class='col-6 col-md-3'
+                            >
+                                <div
+                                    :ref='(el) => setTemplateCardRef(el, index)'
+                                    class='card p-2 text-center cursor-pointer h-100 d-flex flex-column align-items-center justify-content-center'
+                                    :class='{ "border-primary bg-primary-lt": selectedTemplate === template.id }'
+                                    role='radio'
+                                    :aria-checked='selectedTemplate === template.id'
+                                    :tabindex='selectedTemplate === template.id ? 0 : -1'
+                                    @click='selectTemplateByIndex(index)'
+                                    @keydown='onTemplateKeydown($event, index)'
+                                >
+                                    <img
+                                        v-if='template.icon'
+                                        :src='template.icon'
+                                        class='mb-2'
+                                        style='height: 32px; width: 32px; object-fit: contain;'
+                                        :style='template.icon.includes("image/svg+xml") ? "filter: brightness(0) invert(1);" : ""'
+                                        alt=''
+                                    >
+                                    <IconLayout
+                                        v-else
+                                        :size='32'
+                                        stroke='1'
+                                        class='mb-2'
+                                    />
+                                    <div class='small lh-1'>
+                                        {{ template.name }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div
+                            v-else
+                            class='text-center fst-italic text-muted small'
+                        >
+                            No Templates Found
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Channels (TAK groups) -->
                 <div class='row g-3 mt-1'>
                     <div class='col-12'>
@@ -242,9 +346,10 @@
 </template>
 
 <script setup lang='ts'>
-import { ref, reactive, computed } from 'vue';
+import { ref, reactive, computed, watch, onMounted, nextTick } from 'vue';
+import { IconSearch, IconX, IconLayout } from '@tabler/icons-vue';
 import { server } from '../../../../../src/std.ts';
-import type { Mission_Create } from '../../../../../src/types.ts';
+import type { Mission_Create, MissionTemplateList } from '../../../../../src/types.ts';
 import { useMapStore } from '../../../../../src/stores/map.ts';
 import OverlayManager from '../../../../../src/base/overlay.ts';
 import GroupSelect from '../../../../../src/components/CloudTAK/util/GroupSelect.vue';
@@ -279,6 +384,14 @@ const loading = ref(false);
 const status = ref('');
 const statusError = ref(false);
 
+const templates = ref<MissionTemplateList['items']>([]);
+const templatesLoading = ref(false);
+const showTemplateSearch = ref(false);
+const templatesPaging = ref({ filter: '' });
+const selectedTemplate = ref<string | null>(null);
+const templateKeywords = ref<string[]>([]);
+const templateCardEls = ref<(HTMLElement | null)[]>([]);
+
 const caltopoReady = computed(() => caltopoAvailable());
 
 const showSubjectType = computed(() =>
@@ -307,7 +420,120 @@ function buildKeywords(): string[] {
     if (showSubjectType.value && form.subjectType) kw.push(`subjectType:${form.subjectType}`);
     if (form.operationalPeriod) kw.push(`operationalPeriod:${form.operationalPeriod}`);
     if (parsedCoords.value) kw.push(`coords:${parsedCoords.value.lat},${parsedCoords.value.lng}`);
+    for (const keyword of templateKeywords.value) {
+        if (!kw.includes(keyword)) kw.push(keyword);
+    }
+    if (selectedTemplate.value && selectedTemplate.value !== 'default') {
+        kw.push(`template:${selectedTemplate.value}`);
+    }
     return kw;
+}
+
+watch(selectedTemplate, (newId) => {
+    const template = templates.value.find((t) => t.id === newId);
+    templateKeywords.value = template?.keywords ? [...template.keywords] : [];
+});
+
+watch(templates, () => {
+    templateCardEls.value = [];
+});
+
+function setTemplateCardRef(el: unknown, index: number): void {
+    templateCardEls.value[index] = el instanceof HTMLElement ? el : null;
+}
+
+function selectTemplateByIndex(index: number): void {
+    const template = templates.value[index];
+    if (!template) return;
+    selectedTemplate.value = template.id;
+}
+
+async function focusTemplateByIndex(index: number): Promise<void> {
+    await nextTick();
+    templateCardEls.value[index]?.focus();
+}
+
+function onTemplateKeydown(event: KeyboardEvent, index: number): void {
+    const count = templates.value.length;
+    if (!count) return;
+
+    let nextIndex: number | null = null;
+
+    switch (event.key) {
+        case 'ArrowRight':
+        case 'ArrowDown':
+            nextIndex = (index + 1) % count;
+            break;
+        case 'ArrowLeft':
+        case 'ArrowUp':
+            nextIndex = (index - 1 + count) % count;
+            break;
+        case 'Home':
+            nextIndex = 0;
+            break;
+        case 'End':
+            nextIndex = count - 1;
+            break;
+        case ' ':
+        case 'Enter':
+            event.preventDefault();
+            selectTemplateByIndex(index);
+            return;
+        default:
+            return;
+    }
+
+    event.preventDefault();
+    selectTemplateByIndex(nextIndex);
+    void focusTemplateByIndex(nextIndex);
+}
+
+watch(templatesPaging, async () => {
+    await listTemplates();
+}, { deep: true });
+
+onMounted(async () => {
+    await listTemplates();
+});
+
+async function listTemplates(): Promise<void> {
+    templatesLoading.value = true;
+
+    try {
+        const res = await server.GET('/api/template/mission', {
+            params: {
+                query: {
+                    limit: 10,
+                    sort: 'created',
+                    page: 0,
+                    order: 'desc',
+                    filter: templatesPaging.value.filter || '',
+                },
+            },
+        });
+
+        if (res.error) throw new Error(res.error.message);
+
+        if (!res.data.items.length && !templatesPaging.value.filter) {
+            templates.value = [];
+        } else {
+            templates.value = [{
+                id: 'default',
+                name: 'Default',
+                icon: '',
+                description: '',
+                created: '',
+                updated: '',
+                keywords: [],
+            }, ...res.data.items];
+
+            if (!selectedTemplate.value) selectedTemplate.value = 'default';
+        }
+    } catch {
+        templates.value = [];
+    } finally {
+        templatesLoading.value = false;
+    }
 }
 
 async function createMission(): Promise<void> {
@@ -336,7 +562,8 @@ async function createMission(): Promise<void> {
             token: res.data.token,
             mode_id: res.data.guid,
         });
-        await mapStore.loadMission(res.data.guid);
+        const sub = await mapStore.loadMission(res.data.guid);
+        if (sub) await mapStore.makeActiveMission(sub);
 
         setActiveMission({
             guid: res.data.guid,

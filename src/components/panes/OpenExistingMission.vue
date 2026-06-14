@@ -123,7 +123,8 @@ async function openMission(mission: Mission): Promise<void> {
                 mode_id: mission.guid,
             });
         }
-        await mapStore.loadMission(mission.guid);
+        const sub = await mapStore.loadMission(mission.guid);
+        if (sub) await mapStore.makeActiveMission(sub);
 
         setActiveMission({ guid: mission.guid, name: mission.name });
     } catch (err) {
