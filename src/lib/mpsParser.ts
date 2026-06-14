@@ -61,7 +61,8 @@ function toISODate(d: string): string {
     d = d.trim();
     const p = d.split('/').map(Number);
     if (p.length !== 3) return d;
-    let [mo, dy, yr] = p;
+    const [mo, dy] = p;
+    let yr = p[2];
     if (yr < 100) yr += 2000;
     return `${yr}-${String(mo).padStart(2, '0')}-${String(dy).padStart(2, '0')}`;
 }

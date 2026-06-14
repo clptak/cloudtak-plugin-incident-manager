@@ -3,7 +3,9 @@
         <div class='col-lg-8'>
             <div class='card'>
                 <div class='card-header'>
-                    <h3 class='card-title mb-0'>CFS / Call Notes</h3>
+                    <h3 class='card-title mb-0'>
+                        CFS / Call Notes
+                    </h3>
                 </div>
                 <div class='card-body'>
                     <label class='form-label mb-1'>Paste full CFS text (header + Remarks section)</label>
@@ -15,7 +17,10 @@
                     />
 
                     <div class='mt-3 d-flex flex-wrap gap-2'>
-                        <button class='btn btn-primary' @click='parse'>
+                        <button
+                            class='btn btn-primary'
+                            @click='parse'
+                        >
                             Parse &amp; Build
                         </button>
                         <button
@@ -27,10 +32,16 @@
                         </button>
                     </div>
 
-                    <div v-if='!activeMission' class='form-text text-warning mt-2'>
+                    <div
+                        v-if='!activeMission'
+                        class='form-text text-warning mt-2'
+                    >
                         No active mission. Select one in Create | Open first.
                     </div>
-                    <div v-else class='form-text mt-2'>
+                    <div
+                        v-else
+                        class='form-text mt-2'
+                    >
                         Active DataSync: <strong>{{ activeMission.name }}</strong>
                     </div>
 
@@ -48,7 +59,9 @@
         <div class='col-lg-4'>
             <div class='card'>
                 <div class='card-header py-2 d-flex align-items-center justify-content-between'>
-                    <h3 class='card-title mb-0'>Parsed Entries ({{ selectedCount }}/{{ rows.length }})</h3>
+                    <h3 class='card-title mb-0'>
+                        Parsed Entries ({{ selectedCount }}/{{ rows.length }})
+                    </h3>
                     <button
                         v-if='rows.length'
                         type='button'
@@ -58,11 +71,22 @@
                         {{ allSelected ? 'Deselect all' : 'Select all' }}
                     </button>
                 </div>
-                <div class='card-body py-2' style='max-height: 360px; overflow:auto;'>
-                    <div v-if='eventId' class='small text-muted mb-2'>
+                <div
+                    class='card-body py-2'
+                    style='max-height: 360px; overflow:auto;'
+                >
+                    <div
+                        v-if='eventId'
+                        class='small text-muted mb-2'
+                    >
                         Event ID: <code>{{ eventId }}</code>
                     </div>
-                    <div v-if='!rows.length' class='text-muted small'>No entries parsed yet.</div>
+                    <div
+                        v-if='!rows.length'
+                        class='text-muted small'
+                    >
+                        No entries parsed yet.
+                    </div>
                     <label
                         v-for='(r, i) in rows'
                         :key='i'
@@ -78,7 +102,10 @@
                             <span class='text-muted'>{{ r.dtg }} · {{ r.uid }}</span>
                             <br>
                             {{ r.remark }}
-                            <span v-if='r.lat !== "" && r.lon !== ""' class='text-azure d-block'>
+                            <span
+                                v-if='r.lat !== "" && r.lon !== ""'
+                                class='text-azure d-block'
+                            >
                                 {{ r.lat }}, {{ r.lon }}
                             </span>
                         </span>
@@ -91,7 +118,7 @@
 
 <script setup lang='ts'>
 import { ref, computed } from 'vue';
-import Subscription from '@/base/subscription.ts';
+import Subscription from '../../../../../src/base/subscription.ts';
 import { getMpsRows } from '../../../lib/mpsParser.ts';
 import type { MpsRow } from '../../../lib/mpsParser.ts';
 import { useIncident } from '../../../composables/useIncident.ts';

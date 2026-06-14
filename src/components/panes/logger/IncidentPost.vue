@@ -6,12 +6,25 @@
             place. (Header fields and signature are filled at PDF export.)
         </p>
 
-        <div v-if='loading' class='text-muted small mb-2'>Loading existing entries…</div>
+        <div
+            v-if='loading'
+            class='text-muted small mb-2'
+        >
+            Loading existing entries…
+        </div>
 
-        <div v-for='i in visibleCount' :key='i' class='card mb-2'>
+        <div
+            v-for='i in visibleCount'
+            :key='i'
+            class='card mb-2'
+        >
             <div class='card-header py-1 d-flex align-items-center'>
                 <strong>Row {{ i }}</strong>
-                <span v-if='rowIsLegacy(i - 1)' class='badge bg-secondary ms-2' title='Originally saved under the old risk-assessment keyword'>legacy</span>
+                <span
+                    v-if='rowIsLegacy(i - 1)'
+                    class='badge bg-secondary ms-2'
+                    title='Originally saved under the old risk-assessment keyword'
+                >legacy</span>
             </div>
             <div class='card-body py-2'>
                 <div class='row g-2'>
@@ -54,7 +67,12 @@
         >
             + Add Row {{ visibleCount + 1 }}
         </button>
-        <div v-else class='form-text text-muted'>Maximum of {{ MAX_ROWS }} rows (one ICS 234-CG page).</div>
+        <div
+            v-else
+            class='form-text text-muted'
+        >
+            Maximum of {{ MAX_ROWS }} rows (one ICS 234-CG page).
+        </div>
 
         <div class='mt-3'>
             <button
@@ -64,46 +82,91 @@
             >
                 {{ saving ? 'Saving…' : `Save ${filledRowCount} row${filledRowCount === 1 ? '' : 's'} to DataSync` }}
             </button>
-            <button class='btn btn-outline-secondary btn-sm ms-2' @click='reset'>Clear</button>
+            <button
+                class='btn btn-outline-secondary btn-sm ms-2'
+                @click='reset'
+            >
+                Clear
+            </button>
         </div>
 
-        <div v-if='!activeMission' class='form-text text-warning'>
+        <div
+            v-if='!activeMission'
+            class='form-text text-warning'
+        >
             No active mission. Select one in Create | Open first.
         </div>
-        <div v-else class='form-text'>Active DataSync: <strong>{{ activeMission.name }}</strong></div>
-        <div v-if='status' class='fw-bold mt-1' :class='statusError ? "text-danger" : "text-success"'>
+        <div
+            v-else
+            class='form-text'
+        >
+            Active DataSync: <strong>{{ activeMission.name }}</strong>
+        </div>
+        <div
+            v-if='status'
+            class='fw-bold mt-1'
+            :class='statusError ? "text-danger" : "text-success"'
+        >
             {{ status }}
         </div>
 
         <!-- Running list: ICS 234-CG matrix reconstructed from DataSync -->
         <div class='card mt-4'>
             <div class='card-header py-2 d-flex align-items-center'>
-                <h3 class='card-title mb-0'>Work Analysis Matrix — on DataSync ({{ savedRows.length }})</h3>
+                <h3 class='card-title mb-0'>
+                    Work Analysis Matrix — on DataSync ({{ savedRows.length }})
+                </h3>
             </div>
             <div class='card-body py-2'>
-                <div v-if='loading' class='text-muted small'>Loading…</div>
-                <div v-else-if='!savedRows.length' class='text-muted small'>
+                <div
+                    v-if='loading'
+                    class='text-muted small'
+                >
+                    Loading…
+                </div>
+                <div
+                    v-else-if='!savedRows.length'
+                    class='text-muted small'
+                >
                     No entries on DataSync yet. Fill a row above and save.
                 </div>
-                <div v-else class='table-responsive'>
+                <div
+                    v-else
+                    class='table-responsive'
+                >
                     <table class='table table-sm table-vcenter table-bordered mb-0'>
                         <thead>
                             <tr>
-                                <th style='width:3rem;'>#</th>
+                                <th style='width:3rem;'>
+                                    #
+                                </th>
                                 <th>4 · Objective (Desired Outcome)</th>
                                 <th>5 · Strategies (How)</th>
                                 <th>6 · Tactics / Work Assignments (Who / What / Where / When)</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for='r in savedRows' :key='r.row'>
+                            <tr
+                                v-for='r in savedRows'
+                                :key='r.row'
+                            >
                                 <td>
                                     {{ r.row }}
-                                    <span v-if='r.legacy' class='badge bg-secondary' title='Originally saved under the old risk-assessment keyword'>L</span>
+                                    <span
+                                        v-if='r.legacy'
+                                        class='badge bg-secondary'
+                                        title='Originally saved under the old risk-assessment keyword'
+                                    >L</span>
                                 </td>
-                                <td style='white-space:pre-wrap;'>{{ r.objective }}</td>
-                                <td style='white-space:pre-wrap;'>{{ r.strategy }}</td>
-                                <td style='white-space:pre-wrap;'>{{ r.tactic }}</td>
+                                <td style='white-space:pre-wrap;'>
+                                    {{ r.objective }}
+                                </td>
+                                <td style='white-space:pre-wrap;'>
+                                    {{ r.strategy }}
+                                </td>
+                                <td style='white-space:pre-wrap;'>
+                                    {{ r.tactic }}
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -115,7 +178,7 @@
 
 <script setup lang='ts'>
 import { ref, computed, onMounted, watch } from 'vue';
-import Subscription from '@/base/subscription.ts';
+import Subscription from '../../../../../src/base/subscription.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 
 const { activeMission } = useIncident();
@@ -229,8 +292,8 @@ async function loadRows(): Promise<void> {
 
         for (const log of logs) {
             const kws = Array.isArray(log.keywords) ? log.keywords : [];
-            if (!kws.some((k) => POST_KEYWORDS.includes(k))) continue;
-            const tag = kws.find((k) => /^(objective|strategy|tactic):\d+$/.test(k));
+            if (!kws.some((k: string) => POST_KEYWORDS.includes(k))) continue;
+            const tag = kws.find((k: string) => /^(objective|strategy|tactic):\d+$/.test(k));
             if (!tag) continue;
             const [field, nStr] = tag.split(':') as [FieldKey, string];
             const n = Number(nStr);

@@ -1,7 +1,9 @@
 <template>
     <div>
         <div class='d-flex flex-wrap align-items-center gap-2 mb-2'>
-            <h3 class='mb-0'>Dashboard</h3>
+            <h3 class='mb-0'>
+                Dashboard
+            </h3>
             <button
                 class='btn btn-outline-primary btn-sm ms-auto'
                 :disabled='!activeMission || loading'
@@ -11,7 +13,10 @@
             </button>
         </div>
 
-        <div v-if='!activeMission' class='text-muted small'>
+        <div
+            v-if='!activeMission'
+            class='text-muted small'
+        >
             Select a mission in Create | Open to load the combined log table.
         </div>
 
@@ -24,38 +29,73 @@
                     :key='f.id'
                     class='form-check form-check-inline mb-0 me-2'
                 >
-                    <input v-model='selected[f.id]' type='checkbox' class='form-check-input'>
+                    <input
+                        v-model='selected[f.id]'
+                        type='checkbox'
+                        class='form-check-input'
+                    >
                     <span class='form-check-label small'>{{ f.label }}</span>
                 </label>
                 <label class='form-check form-check-inline mb-0 me-2'>
-                    <input v-model='selected.other' type='checkbox' class='form-check-input'>
+                    <input
+                        v-model='selected.other'
+                        type='checkbox'
+                        class='form-check-input'
+                    >
                     <span class='form-check-label small'>Other</span>
                 </label>
-                <button class='btn btn-link btn-sm p-0 ms-1' @click='setAll(true)'>Select all</button>
+                <button
+                    class='btn btn-link btn-sm p-0 ms-1'
+                    @click='setAll(true)'
+                >
+                    Select all
+                </button>
                 <span class='text-muted'>·</span>
-                <button class='btn btn-link btn-sm p-0' @click='setAll(false)'>Deselect all</button>
+                <button
+                    class='btn btn-link btn-sm p-0'
+                    @click='setAll(false)'
+                >
+                    Deselect all
+                </button>
             </div>
 
             <div class='small text-muted mb-2'>
                 {{ activeMission.name }} — showing {{ displayRows.length }} of {{ rows.length }} entr{{ rows.length === 1 ? 'y' : 'ies' }}
             </div>
-            <div v-if='error' class='text-danger small mb-2'>{{ error }}</div>
+            <div
+                v-if='error'
+                class='text-danger small mb-2'
+            >
+                {{ error }}
+            </div>
 
             <div class='table-responsive'>
                 <table class='table table-sm table-vcenter table-striped table-hover mb-0'>
                     <thead>
                         <tr>
-                            <th class='cursor-pointer' @click='sortBy("time")'>Time {{ sortIndicator('time') }}</th>
+                            <th
+                                class='cursor-pointer'
+                                @click='sortBy()'
+                            >
+                                Time {{ sortIndicator() }}
+                            </th>
                             <th>Entry</th>
                             <th>Source</th>
                             <th>Keywords</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for='(r, i) in displayRows' :key='i'>
-                            <td class='text-nowrap'>{{ r.time }}</td>
+                        <tr
+                            v-for='(r, i) in displayRows'
+                            :key='i'
+                        >
+                            <td class='text-nowrap'>
+                                {{ r.time }}
+                            </td>
                             <td>{{ r.content }}</td>
-                            <td class='text-nowrap'>{{ displaySource(r.source) }}</td>
+                            <td class='text-nowrap'>
+                                {{ displaySource(r.source) }}
+                            </td>
                             <td>
                                 <span
                                     v-for='k in r.keywords'
@@ -65,7 +105,12 @@
                             </td>
                         </tr>
                         <tr v-if='!displayRows.length'>
-                            <td colspan='4' class='text-muted text-center'>No matching log entries.</td>
+                            <td
+                                colspan='4'
+                                class='text-muted text-center'
+                            >
+                                No matching log entries.
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -76,7 +121,8 @@
 
 <script setup lang='ts'>
 import { ref, reactive, computed, watch, onMounted } from 'vue';
-import Subscription from '@/base/subscription.ts';
+import Subscription from '../../../../src/base/subscription.ts';
+import type { DBSubscriptionLog } from '../../../../src/database.ts';
 import { useIncident } from '../../composables/useIncident.ts';
 
 const { activeMission } = useIncident();
@@ -141,10 +187,10 @@ const sortedRows = computed(() => {
 
 const displayRows = computed(() => sortedRows.value.filter((r) => rowMatches(r.keywords)));
 
-function sortBy(_key: 'time'): void {
+function sortBy(): void {
     sortAsc.value = !sortAsc.value;
 }
-function sortIndicator(_key: 'time'): string {
+function sortIndicator(): string {
     return sortAsc.value ? '▲' : '▼';
 }
 
@@ -232,7 +278,7 @@ async function refresh(): Promise<void> {
             token: activeMission.value.token ?? '',
         });
         const logs = await sub.log.list({ refresh: true });
-        rows.value = logs.map((log) => {
+        rows.value = logs.map((log: DBSubscriptionLog) => {
             const f = fmt(log.dtg || log.created);
             return {
                 time: f.time,

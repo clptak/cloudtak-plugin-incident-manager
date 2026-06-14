@@ -6,9 +6,9 @@
  * Mirrors the convention documented for SubscriptionFeature.update and the
  * feature shape produced by the host BufferInput.vue.
  */
-import { useMapStore } from '@/stores/map.ts';
-import { server } from '@/std.ts';
-import type { Feature } from '@/types.ts';
+import { useMapStore } from '../../../src/stores/map.ts';
+import { server } from '../../../src/std.ts';
+import type { Feature } from '../../../src/types.ts';
 
 export interface RingStyle {
     stroke?: string;

@@ -30,7 +30,10 @@
         </div>
 
         <!-- ── Right: horizontal tabs + content ── -->
-        <div class='flex-fill' style='min-width: 0;'>
+        <div
+            class='flex-fill'
+            style='min-width: 0;'
+        >
             <ul class='nav nav-tabs mb-3'>
                 <li
                     v-for='tab in hTabs'
@@ -54,7 +57,10 @@
                     <CreateOpenPane v-if='activeKey === "create-open"' />
                     <CasiePane v-else-if='activeKey === "casie"' />
                     <WrapUpPane v-else-if='activeKey === "wrapup"' />
-                    <LoggerPane v-else :sub='activeKey' />
+                    <LoggerPane
+                        v-else
+                        :sub='activeKey'
+                    />
                 </div>
 
                 <TaskTab v-show='activeHTab === "task"' />

@@ -17,9 +17,17 @@
             </button>
         </div>
 
-        <div v-if='error' class='text-danger small mb-2'>{{ error }}</div>
+        <div
+            v-if='error'
+            class='text-danger small mb-2'
+        >
+            {{ error }}
+        </div>
 
-        <div v-if='!loading && !filtered.length' class='text-muted small'>
+        <div
+            v-if='!loading && !filtered.length'
+            class='text-muted small'
+        >
             No missions found.
         </div>
 
@@ -30,11 +38,22 @@
                 class='list-group-item d-flex align-items-center'
             >
                 <div class='me-2'>
-                    <span v-if='mission.passwordProtected' title='Password protected'>🔒</span>
+                    <span
+                        v-if='mission.passwordProtected'
+                        title='Password protected'
+                    >🔒</span>
                 </div>
-                <div class='flex-fill' style='min-width: 0;'>
-                    <div class='text-truncate fw-bold'>{{ mission.name }}</div>
-                    <div v-if='mission.description' class='text-muted small text-truncate'>
+                <div
+                    class='flex-fill'
+                    style='min-width: 0;'
+                >
+                    <div class='text-truncate fw-bold'>
+                        {{ mission.name }}
+                    </div>
+                    <div
+                        v-if='mission.description'
+                        class='text-muted small text-truncate'
+                    >
                         {{ mission.description }}
                     </div>
                 </div>
@@ -56,10 +75,10 @@
 
 <script setup lang='ts'>
 import { ref, computed, onMounted } from 'vue';
-import type { Mission } from '@/types.ts';
-import { useMapStore } from '@/stores/map.ts';
-import OverlayManager from '@/base/overlay.ts';
-import Subscription from '@/base/subscription.ts';
+import type { Mission } from '../../../../src/types.ts';
+import { useMapStore } from '../../../../src/stores/map.ts';
+import OverlayManager from '../../../../src/base/overlay.ts';
+import Subscription from '../../../../src/base/subscription.ts';
 import { useIncident } from '../../composables/useIncident.ts';
 
 const mapStore = useMapStore();

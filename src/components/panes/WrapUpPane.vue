@@ -1,7 +1,9 @@
 <template>
     <div class='card'>
         <div class='card-header d-flex align-items-center'>
-            <h3 class='card-title mb-0'>Generate Report Template</h3>
+            <h3 class='card-title mb-0'>
+                Generate Report Template
+            </h3>
             <span class='badge bg-blue-lt ms-auto'>CCSO Patrol Report</span>
         </div>
         <div class='card-body'>
@@ -17,18 +19,46 @@
                 {{ loading ? 'Generating…' : 'Generate from active mission' }}
             </button>
 
-            <div v-if='!activeMission' class='form-text text-warning'>
+            <div
+                v-if='!activeMission'
+                class='form-text text-warning'
+            >
                 No active mission. Select one in Create | Open first.
             </div>
-            <div v-else class='form-text'>Active DataSync: <strong>{{ activeMission.name }}</strong></div>
-            <div v-if='error' class='text-danger small mt-1'>{{ error }}</div>
+            <div
+                v-else
+                class='form-text'
+            >
+                Active DataSync: <strong>{{ activeMission.name }}</strong>
+            </div>
+            <div
+                v-if='error'
+                class='text-danger small mt-1'
+            >
+                {{ error }}
+            </div>
 
-            <div v-if='report' class='mt-3'>
+            <div
+                v-if='report'
+                class='mt-3'
+            >
                 <div class='d-flex align-items-center mb-2'>
-                    <h4 class='mb-0'>Report Preview</h4>
+                    <h4 class='mb-0'>
+                        Report Preview
+                    </h4>
                     <div class='ms-auto btn-list'>
-                        <button class='btn btn-success btn-sm' @click='download'>Download .md</button>
-                        <button class='btn btn-outline-secondary btn-sm' @click='copy'>{{ copied ? 'Copied' : 'Copy' }}</button>
+                        <button
+                            class='btn btn-success btn-sm'
+                            @click='download'
+                        >
+                            Download .md
+                        </button>
+                        <button
+                            class='btn btn-outline-secondary btn-sm'
+                            @click='copy'
+                        >
+                            {{ copied ? 'Copied' : 'Copy' }}
+                        </button>
                     </div>
                 </div>
                 <textarea
@@ -44,7 +74,7 @@
 
 <script setup lang='ts'>
 import { ref } from 'vue';
-import Subscription from '@/base/subscription.ts';
+import Subscription from '../../../../src/base/subscription.ts';
 import { useIncident } from '../../composables/useIncident.ts';
 
 const { activeMission } = useIncident();

@@ -1,11 +1,15 @@
 <template>
     <div>
-        <h3 class='mb-3'>Create | Open</h3>
+        <h3 class='mb-3'>
+            Create | Open
+        </h3>
 
         <!-- ══ Create Mission ══ -->
         <div class='card mb-3'>
             <div class='card-header'>
-                <h4 class='card-title mb-0'>Create Mission</h4>
+                <h4 class='card-title mb-0'>
+                    Create Mission
+                </h4>
             </div>
             <div class='card-body'>
                 <p class='text-muted small mb-3'>
@@ -37,13 +41,27 @@
                             v-model='form.incidentType'
                             class='form-select'
                         >
-                            <option value=''>— Select —</option>
-                            <option value='search'>Search</option>
-                            <option value='rescue'>Rescue</option>
-                            <option value='recovery'>Recovery</option>
-                            <option value='evidence'>Evidence</option>
-                            <option value='wildland-fire'>Wildland Fire</option>
-                            <option value='other'>Other</option>
+                            <option value=''>
+                                — Select —
+                            </option>
+                            <option value='search'>
+                                Search
+                            </option>
+                            <option value='rescue'>
+                                Rescue
+                            </option>
+                            <option value='recovery'>
+                                Recovery
+                            </option>
+                            <option value='evidence'>
+                                Evidence
+                            </option>
+                            <option value='wildland-fire'>
+                                Wildland Fire
+                            </option>
+                            <option value='other'>
+                                Other
+                            </option>
                         </select>
                     </div>
                     <div
@@ -55,8 +73,16 @@
                             v-model='form.subjectType'
                             class='form-select'
                         >
-                            <option value=''>— Select —</option>
-                            <option v-for='s in subjectTypes' :key='s' :value='s'>{{ s }}</option>
+                            <option value=''>
+                                — Select —
+                            </option>
+                            <option
+                                v-for='s in subjectTypes'
+                                :key='s'
+                                :value='s'
+                            >
+                                {{ s }}
+                            </option>
                         </select>
                     </div>
                 </div>
@@ -84,10 +110,16 @@
                         >
                         <div class='form-text'>
                             Supports decimal degrees, DMS, DM, and MPS.
-                            <span v-if='parsedCoords' class='text-success'>
+                            <span
+                                v-if='parsedCoords'
+                                class='text-success'
+                            >
                                 → {{ parsedCoords.lat.toFixed(5) }}, {{ parsedCoords.lng.toFixed(5) }}
                             </span>
-                            <span v-else-if='form.coords' class='text-danger'>→ unrecognized format</span>
+                            <span
+                                v-else-if='form.coords'
+                                class='text-danger'
+                            >→ unrecognized format</span>
                         </div>
                     </div>
                     <div class='col-md-4'>
@@ -96,9 +128,17 @@
                             v-model='form.operationalPeriod'
                             class='form-select'
                         >
-                            <option value=''>— Select —</option>
-                            <option value='OP-00'>OP-0 | Initial Response</option>
-                            <option v-for='n in 14' :key='n' :value='`OP-${String(n).padStart(2, "0")}`'>
+                            <option value=''>
+                                — Select —
+                            </option>
+                            <option value='OP-00'>
+                                OP-0 | Initial Response
+                            </option>
+                            <option
+                                v-for='n in 14'
+                                :key='n'
+                                :value='`OP-${String(n).padStart(2, "0")}`'
+                            >
                                 OP-{{ n }}
                             </option>
                         </select>
@@ -153,12 +193,18 @@
                         class='form-check-input'
                         type='checkbox'
                     >
-                    <label class='form-check-label' for='chk-create-caltopo'>
+                    <label
+                        class='form-check-label'
+                        for='chk-create-caltopo'
+                    >
                         Create Caltopo map
                     </label>
                     <div class='form-text'>
                         Delegates to the caltopo-sync plugin.
-                        <span v-if='!caltopoReady' class='text-warning'>(provider not detected — will be skipped)</span>
+                        <span
+                            v-if='!caltopoReady'
+                            class='text-warning'
+                        >(provider not detected — will be skipped)</span>
                     </div>
                 </div>
 
@@ -184,7 +230,9 @@
         <!-- ══ Open Existing Mission ══ -->
         <div class='card'>
             <div class='card-header'>
-                <h4 class='card-title mb-0'>Open Existing Mission</h4>
+                <h4 class='card-title mb-0'>
+                    Open Existing Mission
+                </h4>
             </div>
             <div class='card-body'>
                 <OpenExistingMission />
@@ -195,11 +243,11 @@
 
 <script setup lang='ts'>
 import { ref, reactive, computed } from 'vue';
-import { server } from '@/std.ts';
-import type { Mission_Create } from '@/types.ts';
-import { useMapStore } from '@/stores/map.ts';
-import OverlayManager from '@/base/overlay.ts';
-import GroupSelect from '@/components/CloudTAK/util/GroupSelect.vue';
+import { server } from '../../../../src/std.ts';
+import type { Mission_Create } from '../../../../src/types.ts';
+import { useMapStore } from '../../../../src/stores/map.ts';
+import OverlayManager from '../../../../src/base/overlay.ts';
+import GroupSelect from '../../../../src/components/CloudTAK/util/GroupSelect.vue';
 import OpenExistingMission from './OpenExistingMission.vue';
 import { buildMissionName, parseCoordinates } from '../../lib/coords.ts';
 import { createCaltopoMap, caltopoAvailable } from '../../lib/caltopo.ts';

@@ -1,6 +1,10 @@
 <template>
     <div class='card'>
-        <div class='card-header'><h3 class='card-title mb-0'>Search Scenarios Worksheet</h3></div>
+        <div class='card-header'>
+            <h3 class='card-title mb-0'>
+                Search Scenarios Worksheet
+            </h3>
+        </div>
         <div class='card-body'>
             <p class='text-muted small mb-3'>
                 Describe likely scenarios. Each scenario is stored as a single DataSync log entry keyed by
@@ -8,8 +12,16 @@
             </p>
 
             <!-- Recalled (already sent) scenarios -->
-            <div v-if='loadingSent' class='text-muted small mb-2'>Loading sent scenarios…</div>
-            <div v-else-if='visibleSent.length' class='mb-3'>
+            <div
+                v-if='loadingSent'
+                class='text-muted small mb-2'
+            >
+                Loading sent scenarios…
+            </div>
+            <div
+                v-else-if='visibleSent.length'
+                class='mb-3'
+            >
                 <div class='fw-bold small text-muted mb-1'>
                     Already sent ({{ visibleSent.length }})
                 </div>
@@ -31,12 +43,18 @@
                             Edit
                         </button>
                     </div>
-                    <div class='small'>{{ s.content }}</div>
+                    <div class='small'>
+                        {{ s.content }}
+                    </div>
                 </div>
             </div>
 
             <!-- Editable drafts: reopened letters first, then the next free letters -->
-            <div v-for='letter in editorLetters' :key='letter' class='border rounded p-2 mb-2'>
+            <div
+                v-for='letter in editorLetters'
+                :key='letter'
+                class='border rounded p-2 mb-2'
+            >
                 <div class='fw-bold mb-2 d-flex align-items-center justify-content-between'>
                     <span>Scenario {{ letter }}</span>
                     <span v-if='drafts[letter].logId'>
@@ -59,23 +77,47 @@
                 <div class='row g-2'>
                     <div class='col-md-4'>
                         <label class='form-label small mb-1'>Mobility</label>
-                        <select v-model='drafts[letter].mobility' class='form-select form-select-sm'>
-                            <option value=''>—</option>
-                            <option value='mobile'>Mobile</option>
-                            <option value='immobile'>Immobile</option>
+                        <select
+                            v-model='drafts[letter].mobility'
+                            class='form-select form-select-sm'
+                        >
+                            <option value=''>
+                                —
+                            </option>
+                            <option value='mobile'>
+                                Mobile
+                            </option>
+                            <option value='immobile'>
+                                Immobile
+                            </option>
                         </select>
                     </div>
                     <div class='col-md-4'>
                         <label class='form-label small mb-1'>Responsiveness</label>
-                        <select v-model='drafts[letter].responsiveness' class='form-select form-select-sm'>
-                            <option value=''>—</option>
-                            <option value='responsive'>Responsive</option>
-                            <option value='unresponsive'>Unresponsive</option>
+                        <select
+                            v-model='drafts[letter].responsiveness'
+                            class='form-select form-select-sm'
+                        >
+                            <option value=''>
+                                —
+                            </option>
+                            <option value='responsive'>
+                                Responsive
+                            </option>
+                            <option value='unresponsive'>
+                                Unresponsive
+                            </option>
                         </select>
                     </div>
                     <div class='col-md-4'>
                         <label class='form-label small mb-1'>Priority</label>
-                        <input v-model.number='drafts[letter].priority' type='number' min='1' max='5' class='form-control form-control-sm'>
+                        <input
+                            v-model.number='drafts[letter].priority'
+                            type='number'
+                            min='1'
+                            max='5'
+                            class='form-control form-control-sm'
+                        >
                     </div>
                 </div>
             </div>
@@ -89,7 +131,10 @@
                 + Add Scenario {{ availableLetters[newLetters.length] }}
             </button>
 
-            <div v-if='!availableLetters.length && !editingKeys.length' class='form-text text-muted'>
+            <div
+                v-if='!availableLetters.length && !editingKeys.length'
+                class='form-text text-muted'
+            >
                 All scenarios A–F have been sent for this mission. Use Edit above to revise one.
             </div>
 
@@ -101,14 +146,31 @@
                 >
                     {{ posting ? 'Saving…' : `Save ${filledCount} scenario${filledCount === 1 ? "" : "s"} to DataSync` }}
                 </button>
-                <button class='btn btn-outline-secondary btn-sm ms-2' @click='reset'>Clear</button>
+                <button
+                    class='btn btn-outline-secondary btn-sm ms-2'
+                    @click='reset'
+                >
+                    Clear
+                </button>
             </div>
 
-            <div v-if='!activeMission' class='form-text text-warning'>
+            <div
+                v-if='!activeMission'
+                class='form-text text-warning'
+            >
                 No active mission. Select one in Create | Open first.
             </div>
-            <div v-else class='form-text'>Active DataSync: <strong>{{ activeMission.name }}</strong></div>
-            <div v-if='status' class='fw-bold mt-1' :class='statusError ? "text-danger" : "text-success"'>
+            <div
+                v-else
+                class='form-text'
+            >
+                Active DataSync: <strong>{{ activeMission.name }}</strong>
+            </div>
+            <div
+                v-if='status'
+                class='fw-bold mt-1'
+                :class='statusError ? "text-danger" : "text-success"'
+            >
                 {{ status }}
             </div>
         </div>
@@ -117,7 +179,7 @@
 
 <script setup lang='ts'>
 import { reactive, ref, computed, onMounted, watch } from 'vue';
-import Subscription from '@/base/subscription.ts';
+import Subscription from '../../../../../src/base/subscription.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 
 const { activeMission } = useIncident();
@@ -315,7 +377,11 @@ async function send(): Promise<void> {
         });
         for (const key of filled.value) {
             const d = drafts[key];
-            const body = { content: summarize(key, d), keywords: buildKeywords(key, d) };
+            const body = {
+                dtg: new Date().toISOString(),
+                content: summarize(key, d),
+                keywords: buildKeywords(key, d),
+            };
             try {
                 if (d.logId) {
                     await sub.log.update(d.logId, body);

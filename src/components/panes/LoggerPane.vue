@@ -1,6 +1,8 @@
 <template>
     <div>
-        <h3 class='mb-3'>{{ subLabel }}</h3>
+        <h3 class='mb-3'>
+            {{ subLabel }}
+        </h3>
 
         <AddCallnotes v-if='sub === "addcallnotes"' />
         <SearchArea v-else-if='sub === "search-area"' />
@@ -9,7 +11,10 @@
         <RiskAssessment v-else-if='sub === "risk-assessment"' />
         <IncidentPost v-else-if='sub === "incident-post"' />
 
-        <div v-else class='card'>
+        <div
+            v-else
+            class='card'
+        >
             <div class='card-body'>
                 <p class='text-muted mb-0'>
                     Stub for the "{{ subLabel }}" logger sub-pane.

@@ -1,16 +1,29 @@
 <template>
     <div class='card'>
-        <div class='card-header'><h3 class='card-title mb-0'>Search Urgency Rating</h3></div>
+        <div class='card-header'>
+            <h3 class='card-title mb-0'>
+                Search Urgency Rating
+            </h3>
+        </div>
         <div class='card-body'>
-            <p class='text-muted small mb-3'>Score each factor 1 (most urgent) to 3 (least urgent).</p>
+            <p class='text-muted small mb-3'>
+                Score each factor 1 (most urgent) to 3 (least urgent).
+            </p>
 
             <div class='table-responsive'>
                 <table class='table table-sm table-vcenter mb-0'>
                     <thead>
-                        <tr><th>Factor</th><th style='width:90px;'>Rating (1–3)</th></tr>
+                        <tr>
+                            <th>Factor</th><th style='width:90px;'>
+                                Rating (1–3)
+                            </th>
+                        </tr>
                     </thead>
                     <tbody>
-                        <tr v-for='f in factors' :key='f.key'>
+                        <tr
+                            v-for='f in factors'
+                            :key='f.key'
+                        >
                             <td>{{ f.label }}</td>
                             <td>
                                 <input
@@ -25,16 +38,27 @@
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td class='text-end fw-bold'>Total</td>
-                            <td class='fw-bold'>{{ total }}</td>
+                            <td class='text-end fw-bold'>
+                                Total
+                            </td>
+                            <td class='fw-bold'>
+                                {{ total }}
+                            </td>
                         </tr>
                     </tfoot>
                 </table>
             </div>
 
             <div class='d-flex align-items-center gap-2 mt-2'>
-                <progress :value='Math.max(7, Math.min(21, total))' max='21' style='flex:1;' />
-                <span class='badge' :class='level.cls'>{{ level.label }}</span>
+                <progress
+                    :value='Math.max(7, Math.min(21, total))'
+                    max='21'
+                    style='flex:1;'
+                />
+                <span
+                    class='badge'
+                    :class='level.cls'
+                >{{ level.label }}</span>
             </div>
 
             <div class='mt-3'>
@@ -45,15 +69,37 @@
                 >
                     {{ posting ? 'Sending…' : 'Send to DataSync' }}
                 </button>
-                <button class='btn btn-outline-secondary btn-sm ms-2' @click='reset'>Clear</button>
+                <button
+                    class='btn btn-outline-secondary btn-sm ms-2'
+                    @click='reset'
+                >
+                    Clear
+                </button>
             </div>
 
-            <div v-if='!valid' class='form-text text-danger'>Each rating must be 1, 2, or 3.</div>
-            <div v-if='!activeMission' class='form-text text-warning'>
+            <div
+                v-if='!valid'
+                class='form-text text-danger'
+            >
+                Each rating must be 1, 2, or 3.
+            </div>
+            <div
+                v-if='!activeMission'
+                class='form-text text-warning'
+            >
                 No active mission. Select one in Create | Open first.
             </div>
-            <div v-else class='form-text'>Active DataSync: <strong>{{ activeMission.name }}</strong></div>
-            <div v-if='status' class='fw-bold mt-1' :class='statusError ? "text-danger" : "text-success"'>
+            <div
+                v-else
+                class='form-text'
+            >
+                Active DataSync: <strong>{{ activeMission.name }}</strong>
+            </div>
+            <div
+                v-if='status'
+                class='fw-bold mt-1'
+                :class='statusError ? "text-danger" : "text-success"'
+            >
                 {{ status }}
             </div>
         </div>
@@ -62,7 +108,7 @@
 
 <script setup lang='ts'>
 import { reactive, ref, computed } from 'vue';
-import Subscription from '@/base/subscription.ts';
+import Subscription from '../../../../../src/base/subscription.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 
 const { activeMission } = useIncident();

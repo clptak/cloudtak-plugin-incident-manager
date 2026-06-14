@@ -12,11 +12,20 @@
                     <h3 class='card-title mb-0 d-flex align-items-center'>
                         <span class='me-2'>{{ expanded === 'ipp' ? '▾' : '▸' }}</span>
                         Initial Planning Point (IPP)
-                        <span v-if='stepDone.ipp' class='badge bg-success ms-2'>set</span>
-                        <span v-else-if='!openable(0)' class='ms-2'>🔒</span>
+                        <span
+                            v-if='stepDone.ipp'
+                            class='badge bg-success ms-2'
+                        >set</span>
+                        <span
+                            v-else-if='!openable(0)'
+                            class='ms-2'
+                        >🔒</span>
                     </h3>
                 </div>
-                <div v-show='expanded === "ipp"' class='card-body'>
+                <div
+                    v-show='expanded === "ipp"'
+                    class='card-body'
+                >
                     <label class='form-label'>IPP Coordinates</label>
                     <div class='input-group'>
                         <input
@@ -35,28 +44,61 @@
                         </button>
                     </div>
                     <div class='form-text'>
-                        <span v-if='selectedObjectUid' class='text-muted'>Using selected DataSync object.</span>
-                        <span v-else-if='ipp' class='text-success'>→ {{ ipp.lat.toFixed(5) }}, {{ ipp.lng.toFixed(5) }}</span>
-                        <span v-else-if='ippInput' class='text-danger'>→ unrecognized format</span>
+                        <span
+                            v-if='selectedObjectUid'
+                            class='text-muted'
+                        >Using selected DataSync object.</span>
+                        <span
+                            v-else-if='ipp'
+                            class='text-success'
+                        >→ {{ ipp.lat.toFixed(5) }}, {{ ipp.lng.toFixed(5) }}</span>
+                        <span
+                            v-else-if='ippInput'
+                            class='text-danger'
+                        >→ unrecognized format</span>
                         <span v-else>Supports decimal degrees, DMS, DM, and MPS.</span>
                     </div>
 
                     <label class='form-label mt-2'>OR Choose DataSync Object</label>
-                    <select v-model='selectedObjectUid' class='form-select form-select-sm'>
-                        <option value=''>— none (use coordinates above) —</option>
-                        <option v-for='m in missionMarkers' :key='m.uid' :value='m.uid'>
+                    <select
+                        v-model='selectedObjectUid'
+                        class='form-select form-select-sm'
+                    >
+                        <option value=''>
+                            — none (use coordinates above) —
+                        </option>
+                        <option
+                            v-for='m in missionMarkers'
+                            :key='m.uid'
+                            :value='m.uid'
+                        >
                             {{ m.callsign }}
                         </option>
                     </select>
-                    <div v-if='loadingFeatures' class='form-text'>Loading mission objects…</div>
-                    <div v-else-if='!missionMarkers.length' class='form-text text-muted'>
+                    <div
+                        v-if='loadingFeatures'
+                        class='form-text'
+                    >
+                        Loading mission objects…
+                    </div>
+                    <div
+                        v-else-if='!missionMarkers.length'
+                        class='form-text text-muted'
+                    >
                         No point markers in the active DataSync.
                     </div>
 
                     <label class='form-label mt-2'>IPP Type</label>
-                    <select v-model='ippType' class='form-select form-select-sm'>
-                        <option value='LKP'>LKP — Last Known Position</option>
-                        <option value='PLS'>PLS — Point Last Seen</option>
+                    <select
+                        v-model='ippType'
+                        class='form-select form-select-sm'
+                    >
+                        <option value='LKP'>
+                            LKP — Last Known Position
+                        </option>
+                        <option value='PLS'>
+                            PLS — Point Last Seen
+                        </option>
                     </select>
                 </div>
             </div>
@@ -72,16 +114,39 @@
                     <h3 class='card-title mb-0 d-flex align-items-center'>
                         <span class='me-2'>{{ expanded === 'theoretical' ? '▾' : '▸' }}</span>
                         Theoretical Search Area
-                        <span v-if='stepDone.theoretical' class='badge bg-success ms-2'>added</span>
-                        <span v-else-if='!openable(1)' class='ms-2'>🔒</span>
+                        <span
+                            v-if='stepDone.theoretical'
+                            class='badge bg-success ms-2'
+                        >added</span>
+                        <span
+                            v-else-if='!openable(1)'
+                            class='ms-2'
+                        >🔒</span>
                     </h3>
                 </div>
-                <div v-show='expanded === "theoretical"' class='card-body'>
+                <div
+                    v-show='expanded === "theoretical"'
+                    class='card-body'
+                >
                     <label class='form-label'>Time Missing</label>
-                    <input v-model='timeMissing' type='datetime-local' class='form-control mb-2'>
+                    <input
+                        v-model='timeMissing'
+                        type='datetime-local'
+                        class='form-control mb-2'
+                    >
                     <label class='form-label'>Travel Speed (mph)</label>
-                    <input v-model.number='travelSpeed' type='number' min='0' step='0.1' class='form-control' placeholder='e.g. 2.5'>
-                    <div v-if='theoreticalMiles' class='form-text'>
+                    <input
+                        v-model.number='travelSpeed'
+                        type='number'
+                        min='0'
+                        step='0.1'
+                        class='form-control'
+                        placeholder='e.g. 2.5'
+                    >
+                    <div
+                        v-if='theoreticalMiles'
+                        class='form-text'
+                    >
                         Radius: <strong>{{ theoreticalMiles.toFixed(2) }} mi</strong>
                         ({{ elapsedHours.toFixed(1) }} h × {{ travelSpeed }} mph)
                     </div>
@@ -106,14 +171,32 @@
                     <h3 class='card-title mb-0 d-flex align-items-center'>
                         <span class='me-2'>{{ expanded === 'statistical' ? '▾' : '▸' }}</span>
                         Statistical Search Area (LPB)
-                        <span v-if='stepDone.statistical' class='badge bg-success ms-2'>added</span>
-                        <span v-else-if='!openable(2)' class='ms-2'>🔒</span>
+                        <span
+                            v-if='stepDone.statistical'
+                            class='badge bg-success ms-2'
+                        >added</span>
+                        <span
+                            v-else-if='!openable(2)'
+                            class='ms-2'
+                        >🔒</span>
                     </h3>
                 </div>
-                <div v-show='expanded === "statistical"' class='card-body'>
+                <div
+                    v-show='expanded === "statistical"'
+                    class='card-body'
+                >
                     <label class='form-label'>Subject LPB Category</label>
-                    <select v-model='category' class='form-select form-select-sm mb-2'>
-                        <option v-for='c in categories' :key='c' :value='c'>{{ c }}</option>
+                    <select
+                        v-model='category'
+                        class='form-select form-select-sm mb-2'
+                    >
+                        <option
+                            v-for='c in categories'
+                            :key='c'
+                            :value='c'
+                        >
+                            {{ c }}
+                        </option>
                     </select>
 
                     <div class='table-responsive'>
@@ -124,7 +207,10 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for='q in quartiles' :key='q.key'>
+                                <tr
+                                    v-for='q in quartiles'
+                                    :key='q.key'
+                                >
                                     <td>
                                         <span :style='`color:${q.color}`'>●</span> {{ q.key }}
                                     </td>
@@ -163,19 +249,40 @@
                     <h3 class='card-title mb-0 d-flex align-items-center'>
                         <span class='me-2'>{{ expanded === 'subjective' ? '▾' : '▸' }}</span>
                         Subjective Search Area
-                        <span v-if='stepDone.subjective' class='badge bg-success ms-2'>added</span>
-                        <span v-else-if='!openable(3)' class='ms-2'>🔒</span>
+                        <span
+                            v-if='stepDone.subjective'
+                            class='badge bg-success ms-2'
+                        >added</span>
+                        <span
+                            v-else-if='!openable(3)'
+                            class='ms-2'
+                        >🔒</span>
                     </h3>
                 </div>
-                <div v-show='expanded === "subjective"' class='card-body'>
+                <div
+                    v-show='expanded === "subjective"'
+                    class='card-body'
+                >
                     <label class='form-label'>Choose a polygon from the active DataSync</label>
-                    <select v-model='subjectiveUid' class='form-select form-select-sm'>
-                        <option value=''>— select a polygon —</option>
-                        <option v-for='p in missionPolygons' :key='p.uid' :value='p.uid'>
+                    <select
+                        v-model='subjectiveUid'
+                        class='form-select form-select-sm'
+                    >
+                        <option value=''>
+                            — select a polygon —
+                        </option>
+                        <option
+                            v-for='p in missionPolygons'
+                            :key='p.uid'
+                            :value='p.uid'
+                        >
                             {{ p.callsign }}
                         </option>
                     </select>
-                    <div v-if='!missionPolygons.length' class='form-text text-muted'>
+                    <div
+                        v-if='!missionPolygons.length'
+                        class='form-text text-muted'
+                    >
                         No polygons in the active DataSync.
                     </div>
                     <button
@@ -199,14 +306,29 @@
                     <h3 class='card-title mb-0 d-flex align-items-center'>
                         <span class='me-2'>{{ expanded === 'segments' ? '▾' : '▸' }}</span>
                         Segments
-                        <span v-if='stepDone.segments' class='badge bg-success ms-2'>added</span>
-                        <span v-else-if='!openable(4)' class='ms-2'>🔒</span>
+                        <span
+                            v-if='stepDone.segments'
+                            class='badge bg-success ms-2'
+                        >added</span>
+                        <span
+                            v-else-if='!openable(4)'
+                            class='ms-2'
+                        >🔒</span>
                     </h3>
                 </div>
-                <div v-show='expanded === "segments"' class='card-body'>
+                <div
+                    v-show='expanded === "segments"'
+                    class='card-body'
+                >
                     <label class='form-label'>Select segments from the active DataSync (multiple)</label>
-                    <div class='border rounded p-2' style='max-height: 240px; overflow:auto;'>
-                        <div v-if='!missionPolygons.length' class='text-muted small'>
+                    <div
+                        class='border rounded p-2'
+                        style='max-height: 240px; overflow:auto;'
+                    >
+                        <div
+                            v-if='!missionPolygons.length'
+                            class='text-muted small'
+                        >
                             No polygons in the active DataSync.
                         </div>
                         <label
@@ -239,19 +361,35 @@
         <div class='col-12'>
             <div class='card'>
                 <div class='card-header py-2'>
-                    <h3 class='card-title mb-0'>Search Areas on DataSync ({{ sentAreas.length }})</h3>
+                    <h3 class='card-title mb-0'>
+                        Search Areas on DataSync ({{ sentAreas.length }})
+                    </h3>
                 </div>
                 <div class='card-body py-2'>
-                    <div v-if='loadingAreas' class='text-muted small'>Loading…</div>
-                    <div v-else-if='!sentAreas.length' class='text-muted small'>
+                    <div
+                        v-if='loadingAreas'
+                        class='text-muted small'
+                    >
+                        Loading…
+                    </div>
+                    <div
+                        v-else-if='!sentAreas.length'
+                        class='text-muted small'
+                    >
                         No search areas sent yet. Set the IPP to begin.
                     </div>
-                    <table v-else class='table table-sm table-vcenter mb-0'>
+                    <table
+                        v-else
+                        class='table table-sm table-vcenter mb-0'
+                    >
                         <thead>
-                            <tr><th>Area</th><th>CoT UID</th><th class='text-end'></th></tr>
+                            <tr><th>Area</th><th>CoT UID</th><th class='text-end' /></tr>
                         </thead>
                         <tbody>
-                            <tr v-for='a in sentAreas' :key='a.key'>
+                            <tr
+                                v-for='a in sentAreas'
+                                :key='a.key'
+                            >
                                 <td>{{ a.label }}</td>
                                 <td><code class='small'>{{ a.uuid }}</code></td>
                                 <td class='text-end'>
@@ -273,11 +411,23 @@
 
         <!-- shared status -->
         <div class='col-12'>
-            <div v-if='!activeMission' class='form-text text-warning'>
+            <div
+                v-if='!activeMission'
+                class='form-text text-warning'
+            >
                 No active mission. Select one in Create | Open first.
             </div>
-            <div v-else class='form-text'>Active DataSync: <strong>{{ activeMission.name }}</strong></div>
-            <div v-if='status' class='fw-bold mt-1' :class='statusError ? "text-danger" : "text-success"'>
+            <div
+                v-else
+                class='form-text'
+            >
+                Active DataSync: <strong>{{ activeMission.name }}</strong>
+            </div>
+            <div
+                v-if='status'
+                class='fw-bold mt-1'
+                :class='statusError ? "text-danger" : "text-success"'
+            >
                 {{ status }}
             </div>
         </div>
@@ -286,7 +436,8 @@
 
 <script setup lang='ts'>
 import { ref, computed, reactive, watch, onMounted } from 'vue';
-import Subscription from '@/base/subscription.ts';
+import Subscription from '../../../../../src/base/subscription.ts';
+import type { Feature } from '../../../../../src/types.ts';
 import azlpb from '../../../data/azlpb_table.json';
 import { parseCoordinates } from '../../../lib/coords.ts';
 import { circleRing, milesToMeters } from '../../../lib/rings.ts';
@@ -507,9 +658,9 @@ async function loadFeatures(sub?: LoadedSub): Promise<void> {
             }
             return ref;
         };
-        missionMarkers.value = feats.filter((f) => (f.geometry as { type?: string })?.type === 'Point').map(toRef);
+        missionMarkers.value = feats.filter((f: Feature) => (f.geometry as { type?: string })?.type === 'Point').map(toRef);
         missionPolygons.value = feats
-            .filter((f) => {
+            .filter((f: Feature) => {
                 const t = (f.geometry as { type?: string })?.type;
                 return t === 'Polygon' || t === 'MultiPolygon';
             })
