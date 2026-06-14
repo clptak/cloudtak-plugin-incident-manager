@@ -7,6 +7,7 @@
  * feature shape produced by the host BufferInput.vue.
  */
 import { useMapStore } from '@/stores/map.ts';
+import { server } from '@/std.ts';
 import type { Feature } from '@/types.ts';
 
 export interface RingStyle {
@@ -27,6 +28,10 @@ function uuid(): string {
 /**
  * Send a single closed polygon ring to a mission. `ring` is a closed array of
  * [lng, lat] (first == last). Returns the feature id sent.
+ *
+ * Pass `id` to reuse an existing CoT uuid: TAK treats a repeat uid as an update,
+ * so the polygon is replaced in place rather than duplicated. Omit it for a new
+ * ring (a uuid is generated and returned).
  */
 export async function pushPolygonToMission(opts: {
     missionGuid: string;
@@ -34,10 +39,11 @@ export async function pushPolygonToMission(opts: {
     ring: [number, number][];
     center: [number, number];
     style?: RingStyle;
+    id?: string;
 }): Promise<string> {
     const mapStore = useMapStore();
     const now = new Date().toISOString();
-    const id = uuid();
+    const id = opts.id ?? uuid();
     const style = opts.style ?? {};
 
     const feat: Feature = {
@@ -68,4 +74,66 @@ export async function pushPolygonToMission(opts: {
 
     await mapStore.worker.conn.sendCOT(feat);
     return id;
+}
+
+/**
+ * Send a single point marker to a mission. `point` is [lng, lat]. Returns the
+ * feature id sent. Pass `id` to update an existing marker in place.
+ */
+export async function pushPointToMission(opts: {
+    missionGuid: string;
+    callsign: string;
+    point: [number, number];
+    type?: string;
+    icon?: string;
+    id?: string;
+}): Promise<string> {
+    const mapStore = useMapStore();
+    const now = new Date().toISOString();
+    const id = opts.id ?? uuid();
+
+    const feat: Feature = {
+        id,
+        type: 'Feature',
+        path: '/',
+        properties: {
+            id,
+            type: opts.type ?? 'a-f-G',
+            how: 'h-g-i-g-o',
+            callsign: opts.callsign,
+            icon: opts.icon,
+            time: now,
+            start: now,
+            stale: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365).toISOString(),
+            dest: [{ 'mission-guid': opts.missionGuid }],
+        },
+        geometry: {
+            type: 'Point',
+            coordinates: opts.point,
+        },
+    } as unknown as Feature;
+
+    await mapStore.worker.conn.sendCOT(feat);
+    return id;
+}
+
+/**
+ * Delete a feature from a mission by its CoT uuid via the REST endpoint
+ * (DELETE /api/marti/missions/:guid/cot/:uid). Used to drop a ring polygon when
+ * its search-area log entry is removed.
+ */
+export async function deletePolygonFromMission(opts: {
+    missionGuid: string;
+    uid: string;
+    missiontoken?: string;
+}): Promise<void> {
+    const headers: Record<string, string> = {};
+    if (opts.missiontoken) headers.MissionAuthorization = opts.missiontoken;
+
+    const { error } = await server.DELETE('/api/marti/missions/{:guid}/cot/{:uid}', {
+        params: { path: { ':guid': opts.missionGuid, ':uid': opts.uid } },
+        headers,
+    });
+
+    if (error) throw new Error('Failed to delete mission feature');
 }

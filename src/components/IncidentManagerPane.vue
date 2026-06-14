@@ -6,35 +6,26 @@
             style='min-width: 160px;'
         >
             <template
-                v-for='item in vNav'
+                v-for='item in navItems'
                 :key='item.key'
             >
+                <div
+                    v-if='item.kind === "header"'
+                    class='text-muted text-uppercase fw-bold px-2 mt-3 mb-1'
+                    style='font-size: 0.72rem; letter-spacing: 0.04em;'
+                >
+                    {{ item.label }}
+                </div>
                 <button
+                    v-else
                     type='button'
                     class='nav-link text-start'
-                    :class='{ active: activeVPane === item.key && activeHTab === "main" }'
-                    @click='selectVPane(item.key)'
+                    :class='{ active: activeKey === item.key && activeHTab === "main", "py-1": item.kind === "sub" }'
+                    :style='item.kind === "sub" ? "padding-left: 1.25rem;" : ""'
+                    @click='selectKey(item.key)'
                 >
                     {{ item.label }}
                 </button>
-
-                <!-- Logger sub-nav (sibling, not nested in a button) -->
-                <div
-                    v-if='item.key === "logger" && activeVPane === "logger"'
-                    class='ms-2 mt-1 mb-1 d-flex flex-column'
-                >
-                    <button
-                        v-for='sub in loggerSubs'
-                        :key='sub.key'
-                        type='button'
-                        class='nav-link text-start py-1'
-                        :class='{ active: activeLoggerSub === sub.key && activeHTab === "main" }'
-                        style='padding-left: 0.75rem;'
-                        @click='selectLoggerSub(sub.key)'
-                    >
-                        {{ sub.label }}
-                    </button>
-                </div>
             </template>
         </div>
 
@@ -60,13 +51,10 @@
             <div class='tab-content'>
                 <!-- Main: shows the active vertical pane -->
                 <div v-show='activeHTab === "main"'>
-                    <CreateOpenPane v-if='activeVPane === "create-open"' />
-                    <LoggerPane
-                        v-else-if='activeVPane === "logger"'
-                        :sub='activeLoggerSub'
-                    />
-                    <CasiePane v-else-if='activeVPane === "casie"' />
-                    <WrapUpPane v-else-if='activeVPane === "wrapup"' />
+                    <CreateOpenPane v-if='activeKey === "create-open"' />
+                    <CasiePane v-else-if='activeKey === "casie"' />
+                    <WrapUpPane v-else-if='activeKey === "wrapup"' />
+                    <LoggerPane v-else :sub='activeKey' />
                 </div>
 
                 <TaskTab v-show='activeHTab === "task"' />
@@ -86,21 +74,28 @@ const WrapUpPane = defineAsyncComponent(() => import('./panes/WrapUpPane.vue'));
 const TaskTab = defineAsyncComponent(() => import('./panes/TaskTab.vue'));
 const DashboardTab = defineAsyncComponent(() => import('./panes/DashboardTab.vue'));
 
-const vNav = [
-    { key: 'create-open', label: 'Create | Open' },
-    { key: 'logger', label: 'Logger' },
-    { key: 'casie', label: 'CASIE' },
-    { key: 'wrapup', label: 'Wrap Up' },
-] as const;
+interface NavEntry {
+    kind: 'item' | 'header' | 'sub';
+    key: string;
+    label: string;
+}
 
-const loggerSubs = [
-    { key: 'addcallnotes', label: 'Add Callnotes' },
-    { key: 'search-area', label: 'Search Area' },
-    { key: 'search-urgency', label: 'Search Urgency' },
-    { key: 'search-scenarios', label: 'Search Scenarios' },
-    { key: 'risk-assessment', label: 'Risk Assessment' },
-    { key: 'incident-post', label: 'Incident POST' },
-] as const;
+const navItems: NavEntry[] = [
+    { kind: 'item', key: 'create-open', label: 'Create | Open' },
+
+    { kind: 'header', key: 'h-initial', label: 'Initial Response' },
+    { kind: 'sub', key: 'addcallnotes', label: 'Add Callnotes' },
+    { kind: 'sub', key: 'search-urgency', label: 'Search Urgency' },
+
+    { kind: 'header', key: 'h-area', label: 'Area Search' },
+    { kind: 'sub', key: 'search-scenarios', label: 'Search Scenarios' },
+    { kind: 'sub', key: 'search-area', label: 'Search Area' },
+    { kind: 'sub', key: 'risk-assessment', label: 'Risk Assessment' },
+    { kind: 'sub', key: 'incident-post', label: 'Incident POST' },
+    { kind: 'sub', key: 'casie', label: 'CASIE' },
+
+    { kind: 'item', key: 'wrapup', label: 'Wrap Up' },
+];
 
 const hTabs = [
     { key: 'main', label: 'Main' },
@@ -108,19 +103,12 @@ const hTabs = [
     { key: 'dashboard', label: 'Dashboard' },
 ] as const;
 
-const activeVPane = ref<string>('create-open');
-const activeLoggerSub = ref<string>('addcallnotes');
+const activeKey = ref<string>('create-open');
 const activeHTab = ref<string>('main');
 
-function selectVPane(key: string): void {
-    activeVPane.value = key;
-    // match reference behavior: choosing a vertical pane returns you to Main
-    activeHTab.value = 'main';
-}
-
-function selectLoggerSub(key: string): void {
-    activeVPane.value = 'logger';
-    activeLoggerSub.value = key;
+function selectKey(key: string): void {
+    activeKey.value = key;
+    // match reference behavior: choosing a pane returns you to Main
     activeHTab.value = 'main';
 }
 </script>

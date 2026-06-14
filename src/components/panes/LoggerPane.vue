@@ -1,6 +1,6 @@
 <template>
     <div>
-        <h3 class='mb-3'>Logger — {{ subLabel }}</h3>
+        <h3 class='mb-3'>{{ subLabel }}</h3>
 
         <AddCallnotes v-if='sub === "addcallnotes"' />
         <SearchArea v-else-if='sub === "search-area"' />
