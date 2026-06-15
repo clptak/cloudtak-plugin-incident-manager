@@ -30,14 +30,14 @@ export default class IncidentManagerPlugin implements PluginInstance {
     }
 
     async enable(): Promise<void> {
-        // Route is required for a menu entry; it simply triggers the float pane.
+        // Route is required for a menu entry; redirect opens the float pane and
+        // returns to the map so the right-side menu panel never appears.
         this.api.routes.add({
             path: '/menu/incident-manager',
             name: 'home-menu-incident-manager',
-            component: {
-                // minimal component: opens the pane then returns to the map
-                render: () => null,
-                mounted: () => this.open(),
+            redirect: () => {
+                this.open();
+                return { name: 'home' };
             },
         }, 'home-menu');
 
