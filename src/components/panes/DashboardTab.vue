@@ -6,14 +6,14 @@
             </h3>
             <button
                 class='btn btn-outline-secondary btn-sm ms-auto'
-                :disabled='!displayRows.length'
+                :disabled='!canExport'
                 @click='exportCsv'
             >
                 Export CSV
             </button>
             <button
                 class='btn btn-outline-secondary btn-sm'
-                :disabled='!displayRows.length'
+                :disabled='!canExport'
                 @click='exportPdf'
             >
                 Export PDF
@@ -83,6 +83,43 @@
                 {{ error }}
             </div>
 
+            <div
+                v-if='subjects.length'
+                class='mb-3'
+            >
+                <h4 class='h5 mb-2'>
+                    Subject Information
+                </h4>
+                <div
+                    v-for='s in subjects'
+                    :key='s.subjectCaseID'
+                    class='card mb-2'
+                >
+                    <div class='card-header py-2'>
+                        <strong>Subject {{ displaySubjectNumber(s.subjectCaseID) }}</strong>
+                        <span
+                            v-if='s.subjectName'
+                            class='text-muted ms-2'
+                        >{{ s.subjectName }}</span>
+                    </div>
+                    <div class='card-body py-2'>
+                        <dl class='row mb-0 small'>
+                            <template
+                                v-for='row in subjectDetailRows(s)'
+                                :key='row.label'
+                            >
+                                <dt class='col-sm-3 col-md-2 text-muted'>
+                                    {{ row.label }}
+                                </dt>
+                                <dd class='col-sm-9 col-md-10 mb-1'>
+                                    {{ row.value }}
+                                </dd>
+                            </template>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+
             <div class='table-responsive'>
                 <table class='table table-sm table-vcenter table-striped table-hover mb-0'>
                     <thead>
@@ -143,6 +180,13 @@ import {
     exportDashboardPdf,
     formatLocalTime,
 } from '../../lib/dashboardExport.ts';
+import {
+    displaySubjectNumber,
+    parseSubjectsFromLogs,
+    subjectDetailRows,
+    SUBJECT_KEYWORD,
+    type ParsedSubject,
+} from '../../lib/subjectInfo.ts';
 
 const { activeMission } = useIncident();
 
@@ -155,6 +199,7 @@ interface Row {
 }
 
 const rows = ref<Row[]>([]);
+const subjects = ref<ParsedSubject[]>([]);
 const loading = ref(false);
 const error = ref('');
 const sortAsc = ref(true);
@@ -169,7 +214,6 @@ interface KeywordFilter {
 
 const FILTERS: KeywordFilter[] = [
     { id: 'cad', label: 'CAD', test: (k) => k.includes('source:CAD') },
-    { id: 'subject', label: 'Subject Information', test: (k) => k.includes('subject-information') },
     { id: 'urgency', label: 'Search Urgency', test: (k) => k.includes('search-urgency') },
     { id: 'area', label: 'Search Area', test: (k) => k.includes('search-area') },
     { id: 'segment', label: 'Area Segment', test: (k) => k.some((w) => /^area:segment:/.test(w)) },
@@ -206,6 +250,8 @@ const sortedRows = computed(() => {
 });
 
 const displayRows = computed(() => sortedRows.value.filter((r) => rowMatches(r.keywords)));
+
+const canExport = computed(() => subjects.value.length > 0 || displayRows.value.length > 0);
 
 function sortBy(): void {
     sortAsc.value = !sortAsc.value;
@@ -300,13 +346,13 @@ function exportRows() {
 }
 
 function exportCsv(): void {
-    if (!activeMission.value || !displayRows.value.length) return;
-    exportDashboardCsv(exportRows(), activeMission.value.name);
+    if (!activeMission.value || !canExport.value) return;
+    exportDashboardCsv(exportRows(), activeMission.value.name, subjects.value);
 }
 
 function exportPdf(): void {
-    if (!activeMission.value || !displayRows.value.length) return;
-    exportDashboardPdf(exportRows(), activeMission.value.name);
+    if (!activeMission.value || !canExport.value) return;
+    exportDashboardPdf(exportRows(), activeMission.value.name, subjects.value);
 }
 
 async function refresh(): Promise<void> {
@@ -317,7 +363,13 @@ async function refresh(): Promise<void> {
             token: activeMission.value.token ?? '',
         });
         const logs = await sub.log.list({ refresh: true });
-        rows.value = logs.map((log: DBSubscriptionLog) => {
+        subjects.value = parseSubjectsFromLogs(logs);
+        rows.value = logs
+            .filter((log: DBSubscriptionLog) => {
+                const kws = Array.isArray(log.keywords) ? log.keywords : [];
+                return !kws.includes(SUBJECT_KEYWORD);
+            })
+            .map((log: DBSubscriptionLog) => {
             const f = parseTime(log.dtg || log.created);
             return {
                 rawTime: f.rawTime,
@@ -339,6 +391,9 @@ onMounted(loadDirectory);
 // Auto-load when an active mission appears / changes.
 watch(activeMission, (m) => {
     if (m) refresh();
-    else rows.value = [];
+    else {
+        rows.value = [];
+        subjects.value = [];
+    }
 }, { immediate: true });
 </script>

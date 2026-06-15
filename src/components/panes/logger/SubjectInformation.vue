@@ -331,23 +331,22 @@ import { ref, computed, onMounted, watch } from 'vue';
 import Subscription from '../../../../../../src/base/subscription.ts';
 import type { Feature } from '../../../../../../src/types.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
+import {
+    SUBJECT_NUMBERS,
+    SUBJECT_CATEGORIES as CATEGORIES,
+    blankSubjectForm,
+    buildSubjectContent,
+    buildSubjectKeywords,
+    displaySubjectNumber,
+    fieldsFromLog,
+    hasFilledSubjectFields,
+    subjectNumberFromLog,
+    type SubjectForm,
+} from '../../../lib/subjectInfo.ts';
 
 const { activeMission } = useIncident();
 
-const SUBJECT_KEYWORD = 'subject-information';
-const SUBJECT_NUMBERS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10'] as const;
 const MAX_SUBJECTS = SUBJECT_NUMBERS.length;
-
-const CATEGORIES = [
-    { value: 'hiker', label: 'Hiker' },
-    { value: 'hunter', label: 'Hunter' },
-    { value: 'child', label: 'Child' },
-    { value: 'elderly', label: 'Elderly' },
-    { value: 'mental_illness', label: 'Mental Illness' },
-    { value: 'alzheimer_dementia', label: "Alzheimer's/Dementia" },
-    { value: 'substance_abuse', label: 'Substance Abuse' },
-    { value: 'other', label: 'Other' },
-] as const;
 
 const REPORTED_BY = [
     'Boyfriend or Girlfriend',
@@ -362,25 +361,6 @@ const REPORTED_BY = [
     'ARFCC',
     'Other',
 ] as const;
-
-interface SubjectForm {
-    subjectCaseID: string;
-    subjectName: string;
-    subjectAge: string;
-    subjectGender: string;
-    subjectCategory: string;
-    subjectDescription: string;
-    subjectMedicalConditions: string;
-    subjectExperience: string;
-    subjectEquipment: string;
-    subjectPhoto: string;
-    subjectIppFromTak: string;
-    subjectIpp: string;
-    subjectTimeWentMissing: string;
-    subjectTimeReportedMissing: string;
-    subjectReportedMissingBy: string;
-    logId?: string;
-}
 
 interface SubjectDraft {
     id: string;
@@ -410,24 +390,7 @@ interface SentSubject {
 let nextDraftId = 1;
 
 function blankForm(subjectCaseID = '01'): SubjectForm {
-    return {
-        subjectCaseID,
-        subjectName: '',
-        subjectAge: '',
-        subjectGender: '',
-        subjectCategory: '',
-        subjectDescription: '',
-        subjectMedicalConditions: '',
-        subjectExperience: '',
-        subjectEquipment: '',
-        subjectPhoto: '',
-        subjectIppFromTak: '',
-        subjectIpp: '',
-        subjectTimeWentMissing: '',
-        subjectTimeReportedMissing: '',
-        subjectReportedMissingBy: '',
-        logId: undefined,
-    };
+    return blankSubjectForm(subjectCaseID);
 }
 
 function newDraft(form?: SubjectForm, expanded = true): SubjectDraft {
@@ -450,7 +413,7 @@ const status = ref('');
 const statusError = ref(false);
 
 function displayNumber(n: string): string {
-    return String(Number.parseInt(n, 10));
+    return displaySubjectNumber(n);
 }
 
 function hasValue(value: string | undefined): value is string {
@@ -458,22 +421,7 @@ function hasValue(value: string | undefined): value is string {
 }
 
 function hasFilledFields(f: SubjectForm): boolean {
-    return [
-        f.subjectName,
-        f.subjectAge,
-        f.subjectGender,
-        f.subjectCategory,
-        f.subjectDescription,
-        f.subjectMedicalConditions,
-        f.subjectExperience,
-        f.subjectEquipment,
-        f.subjectPhoto,
-        f.subjectIppFromTak,
-        f.subjectIpp,
-        f.subjectTimeWentMissing,
-        f.subjectTimeReportedMissing,
-        f.subjectReportedMissingBy,
-    ].some((v) => hasValue(v));
+    return hasFilledSubjectFields(f);
 }
 
 const filledDrafts = computed(() => drafts.value.filter((d) => hasFilledFields(d.form)));
@@ -541,87 +489,6 @@ function markerLabel(m: MissionMarker): string {
         return `${m.callsign} (${m.coords[1].toFixed(5)}, ${m.coords[0].toFixed(5)})`;
     }
     return m.callsign;
-}
-
-function categoryLabel(value: string): string {
-    return CATEGORIES.find((c) => c.value === value)?.label ?? value;
-}
-
-function subjectNumberFromLog(keywords?: string[]): string | null {
-    if (!keywords?.includes(SUBJECT_KEYWORD)) return null;
-    const tag = keywords.find((k) => k.startsWith('subject:'));
-    if (!tag) return null;
-    const num = tag.slice('subject:'.length);
-    return (SUBJECT_NUMBERS as readonly string[]).includes(num) ? num : null;
-}
-
-function kwValue(keywords: string[] | undefined, prefix: string): string {
-    const tag = keywords?.find((k) => k.startsWith(prefix));
-    return tag ? tag.slice(prefix.length) : '';
-}
-
-function fieldsFromLog(keywords?: string[]): SubjectForm {
-    return {
-        subjectCaseID: kwValue(keywords, 'subject:') || '01',
-        subjectName: kwValue(keywords, 'name:'),
-        subjectAge: kwValue(keywords, 'age:'),
-        subjectGender: kwValue(keywords, 'gender:'),
-        subjectCategory: kwValue(keywords, 'category:'),
-        subjectDescription: kwValue(keywords, 'description:'),
-        subjectMedicalConditions: kwValue(keywords, 'medical:'),
-        subjectExperience: kwValue(keywords, 'experience:'),
-        subjectEquipment: kwValue(keywords, 'equipment:'),
-        subjectPhoto: kwValue(keywords, 'photo:'),
-        subjectIppFromTak: kwValue(keywords, 'ippFromTak:'),
-        subjectIpp: kwValue(keywords, 'ipp:'),
-        subjectTimeWentMissing: kwValue(keywords, 'missing:'),
-        subjectTimeReportedMissing: kwValue(keywords, 'reported:'),
-        subjectReportedMissingBy: kwValue(keywords, 'reportedBy:'),
-        logId: undefined,
-    };
-}
-
-function buildParts(f: SubjectForm): string[] {
-    const parts: string[] = [];
-    if (hasValue(f.subjectName)) parts.push(`Name: ${f.subjectName.trim()}`);
-    if (hasValue(f.subjectAge)) parts.push(`Age: ${f.subjectAge.trim()}`);
-    if (hasValue(f.subjectGender)) parts.push(`Gender: ${f.subjectGender}`);
-    if (hasValue(f.subjectCategory)) parts.push(`Category: ${categoryLabel(f.subjectCategory)}`);
-    if (hasValue(f.subjectDescription)) parts.push(`Description: ${f.subjectDescription.trim()}`);
-    if (hasValue(f.subjectMedicalConditions)) parts.push(`Medical: ${f.subjectMedicalConditions.trim()}`);
-    if (hasValue(f.subjectExperience)) parts.push(`Experience: ${f.subjectExperience.trim()}`);
-    if (hasValue(f.subjectEquipment)) parts.push(`Equipment: ${f.subjectEquipment.trim()}`);
-    if (hasValue(f.subjectPhoto)) parts.push(`Photo: ${f.subjectPhoto.trim()}`);
-    if (hasValue(f.subjectIppFromTak)) parts.push(`IPP (DataSync): ${f.subjectIppFromTak.trim()}`);
-    else if (hasValue(f.subjectIpp)) parts.push(`IPP: ${f.subjectIpp.trim()}`);
-    if (hasValue(f.subjectTimeWentMissing)) parts.push(`Missing: ${f.subjectTimeWentMissing}`);
-    if (hasValue(f.subjectTimeReportedMissing)) parts.push(`Reported: ${f.subjectTimeReportedMissing}`);
-    if (hasValue(f.subjectReportedMissingBy)) parts.push(`Reported by: ${f.subjectReportedMissingBy}`);
-    return parts;
-}
-
-function buildContent(f: SubjectForm): string {
-    const parts = buildParts(f);
-    return `Subject ${displayNumber(f.subjectCaseID)} — ${parts.join('; ')}`;
-}
-
-function buildKeywords(f: SubjectForm): string[] {
-    const kws = [SUBJECT_KEYWORD, `subject:${f.subjectCaseID}`];
-    if (hasValue(f.subjectName)) kws.push(`name:${f.subjectName.trim()}`);
-    if (hasValue(f.subjectAge)) kws.push(`age:${f.subjectAge.trim()}`);
-    if (hasValue(f.subjectGender)) kws.push(`gender:${f.subjectGender}`);
-    if (hasValue(f.subjectCategory)) kws.push(`category:${f.subjectCategory}`);
-    if (hasValue(f.subjectDescription)) kws.push(`description:${f.subjectDescription.trim()}`);
-    if (hasValue(f.subjectMedicalConditions)) kws.push(`medical:${f.subjectMedicalConditions.trim()}`);
-    if (hasValue(f.subjectExperience)) kws.push(`experience:${f.subjectExperience.trim()}`);
-    if (hasValue(f.subjectEquipment)) kws.push(`equipment:${f.subjectEquipment.trim()}`);
-    if (hasValue(f.subjectPhoto)) kws.push(`photo:${f.subjectPhoto.trim()}`);
-    if (hasValue(f.subjectIppFromTak)) kws.push(`ippFromTak:${f.subjectIppFromTak.trim()}`);
-    else if (hasValue(f.subjectIpp)) kws.push(`ipp:${f.subjectIpp.trim()}`);
-    if (hasValue(f.subjectTimeWentMissing)) kws.push(`missing:${f.subjectTimeWentMissing}`);
-    if (hasValue(f.subjectTimeReportedMissing)) kws.push(`reported:${f.subjectTimeReportedMissing}`);
-    if (hasValue(f.subjectReportedMissingBy)) kws.push(`reportedBy:${f.subjectReportedMissingBy}`);
-    return kws;
 }
 
 function rebuildDraftsFromSent(): void {
@@ -747,8 +614,8 @@ async function send(): Promise<void> {
             const existing = sentSubjects.value.find((s) => s.number === f.subjectCaseID);
             const body = {
                 dtg: new Date().toISOString(),
-                content: buildContent(f),
-                keywords: buildKeywords(f),
+                content: buildSubjectContent(f),
+                keywords: buildSubjectKeywords(f),
             };
             try {
                 if (f.logId || existing?.id) {

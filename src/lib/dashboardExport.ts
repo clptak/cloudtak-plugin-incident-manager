@@ -1,3 +1,9 @@
+import {
+    displaySubjectNumber,
+    subjectDetailRows,
+    type ParsedSubject,
+} from './subjectInfo.ts';
+
 /** Rows exported from the Dashboard log table. */
 export interface DashboardExportRow {
     epoch: number;
@@ -43,17 +49,30 @@ function csvEscape(value: string): string {
 export function exportDashboardCsv(
     rows: DashboardExportRow[],
     missionName: string,
+    subjects: ParsedSubject[] = [],
 ): void {
+    const lines: string[] = [];
+
+    if (subjects.length) {
+        lines.push(csvEscape('Subject Information'));
+        for (const s of subjects) {
+            lines.push(csvEscape(`Subject ${displaySubjectNumber(s.subjectCaseID)}`));
+            for (const row of subjectDetailRows(s)) {
+                lines.push([csvEscape(row.label), csvEscape(row.value)].join(','));
+            }
+            lines.push('');
+        }
+    }
+
     const header = ['Time', 'Entry', 'Source', 'Keywords'];
-    const lines = [
-        header.map(csvEscape).join(','),
-        ...rows.map((r) => [
-            formatLocalTime(r.epoch),
-            r.content,
-            r.source,
-            r.keywords.join('; '),
-        ].map(csvEscape).join(',')),
-    ];
+    lines.push(header.map(csvEscape).join(','));
+    lines.push(...rows.map((r) => [
+        formatLocalTime(r.epoch),
+        r.content,
+        r.source,
+        r.keywords.join('; '),
+    ].map(csvEscape).join(',')));
+
     const blob = new Blob([lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
     downloadBlob(blob, `${safeFilename(missionName)}-dashboard.csv`);
 }
@@ -124,7 +143,12 @@ function layoutRow(
     return { cells, rowHeight };
 }
 
-function buildPdf(rows: DashboardExportRow[], missionName: string, exportedAt: string): string {
+function buildPdf(
+    rows: DashboardExportRow[],
+    missionName: string,
+    exportedAt: string,
+    subjects: ParsedSubject[] = [],
+): string {
     const contentW = PAGE_W - MARGIN * 2;
     const colWidths = [
         contentW * 0.12,  // Time
@@ -173,6 +197,24 @@ function buildPdf(rows: DashboardExportRow[], missionName: string, exportedAt: s
         );
     }
 
+    function addWrappedBlock(
+        text: string,
+        indent: number,
+        size = FONT_SIZE,
+        bold = false,
+        maxWidth = contentW - indent,
+    ): void {
+        const wrapped = wrapText(text, maxWidth, size);
+        const blockH = wrapped.length * LINE_H + ROW_VPAD;
+        ensureSpace(blockH);
+        let lineY = y - ROW_VPAD - FONT_ASCENT;
+        for (const line of wrapped) {
+            addText(MARGIN + indent, lineY, line, size, bold);
+            lineY -= LINE_H;
+        }
+        y = lineY - ROW_VPAD + FONT_ASCENT;
+    }
+
     // Title block on first page
     addText(MARGIN, y, `Dashboard — ${missionName}`, 11, true);
     y -= 14;
@@ -181,31 +223,54 @@ function buildPdf(rows: DashboardExportRow[], missionName: string, exportedAt: s
     addLine(MARGIN, y, PAGE_W - MARGIN, y);
     y -= 12;
 
-    // Table header row
-    ensureSpace(HEADER_H);
-    const headerBottom = y - HEADER_H;
-    const headerBaseline = y - ROW_VPAD - FONT_ASCENT;
-    for (let c = 0; c < headerLabels.length; c++) {
-        addText(colX[c] + 2, headerBaseline, headerLabels[c], FONT_SIZE, true);
-    }
-    addLine(MARGIN, headerBottom, PAGE_W - MARGIN, headerBottom);
-    y = headerBottom;
-
-    for (const cols of bodyRows) {
-        const { cells, rowHeight: contentHeight } = layoutRow(cols, colWidths);
-        const rowHeight = contentHeight + ROW_VPAD * 2;
-        ensureSpace(rowHeight);
-        const rowBottom = y - rowHeight;
-        const firstBaseline = y - ROW_VPAD - FONT_ASCENT;
-        for (let c = 0; c < cells.length; c++) {
-            let lineY = firstBaseline;
-            for (const line of cells[c].lines) {
-                addText(colX[c] + 2, lineY, line);
-                lineY -= LINE_H;
+    if (subjects.length) {
+        addWrappedBlock('Subject Information', 0, 10, true);
+        y -= 4;
+        for (const s of subjects) {
+            const details = subjectDetailRows(s);
+            if (!details.length) continue;
+            addWrappedBlock(`Subject ${displaySubjectNumber(s.subjectCaseID)}`, 0, 9, true);
+            for (const row of details) {
+                addWrappedBlock(`${row.label}: ${row.value}`, 12);
             }
+            y -= 4;
         }
-        addLine(MARGIN, rowBottom, PAGE_W - MARGIN, rowBottom);
-        y = rowBottom;
+        addLine(MARGIN, y, PAGE_W - MARGIN, y);
+        y -= 12;
+    }
+
+    if (rows.length) {
+        if (subjects.length) {
+            addWrappedBlock('Mission Log', 0, 10, true);
+            y -= 4;
+        }
+
+        // Table header row
+        ensureSpace(HEADER_H);
+        const headerBottom = y - HEADER_H;
+        const headerBaseline = y - ROW_VPAD - FONT_ASCENT;
+        for (let c = 0; c < headerLabels.length; c++) {
+            addText(colX[c] + 2, headerBaseline, headerLabels[c], FONT_SIZE, true);
+        }
+        addLine(MARGIN, headerBottom, PAGE_W - MARGIN, headerBottom);
+        y = headerBottom;
+
+        for (const cols of bodyRows) {
+            const { cells, rowHeight: contentHeight } = layoutRow(cols, colWidths);
+            const rowHeight = contentHeight + ROW_VPAD * 2;
+            ensureSpace(rowHeight);
+            const rowBottom = y - rowHeight;
+            const firstBaseline = y - ROW_VPAD - FONT_ASCENT;
+            for (let c = 0; c < cells.length; c++) {
+                let lineY = firstBaseline;
+                for (const line of cells[c].lines) {
+                    addText(colX[c] + 2, lineY, line);
+                    lineY -= LINE_H;
+                }
+            }
+            addLine(MARGIN, rowBottom, PAGE_W - MARGIN, rowBottom);
+            y = rowBottom;
+        }
     }
 
     // Serialize PDF objects
@@ -270,9 +335,10 @@ function buildPdf(rows: DashboardExportRow[], missionName: string, exportedAt: s
 export function exportDashboardPdf(
     rows: DashboardExportRow[],
     missionName: string,
+    subjects: ParsedSubject[] = [],
 ): void {
     const exportedAt = new Date().toLocaleString(undefined, LOCAL_TIME_OPTS);
-    const pdf = buildPdf(rows, missionName, exportedAt);
+    const pdf = buildPdf(rows, missionName, exportedAt, subjects);
     const blob = new Blob([pdf], { type: 'application/pdf' });
     downloadBlob(blob, `${safeFilename(missionName)}-dashboard.pdf`);
 }
