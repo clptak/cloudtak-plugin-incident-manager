@@ -169,6 +169,7 @@ interface KeywordFilter {
 
 const FILTERS: KeywordFilter[] = [
     { id: 'cad', label: 'CAD', test: (k) => k.includes('source:CAD') },
+    { id: 'subject', label: 'Subject Information', test: (k) => k.includes('subject-information') },
     { id: 'urgency', label: 'Search Urgency', test: (k) => k.includes('search-urgency') },
     { id: 'area', label: 'Search Area', test: (k) => k.includes('search-area') },
     { id: 'segment', label: 'Area Segment', test: (k) => k.some((w) => /^area:segment:/.test(w)) },

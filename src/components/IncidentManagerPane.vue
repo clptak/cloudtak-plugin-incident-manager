@@ -91,6 +91,7 @@ const navItems: NavEntry[] = [
 
     { kind: 'header', key: 'h-initial', label: 'Initial Response' },
     { kind: 'sub', key: 'addcallnotes', label: 'Add Callnotes' },
+    { kind: 'sub', key: 'subject-info', label: 'Subject Information' },
     { kind: 'sub', key: 'search-urgency', label: 'Search Urgency' },
 
     { kind: 'header', key: 'h-area', label: 'Area Search' },
