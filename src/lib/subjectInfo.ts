@@ -18,6 +18,7 @@ export const SUBJECT_CATEGORIES = [
 export interface SubjectForm {
     subjectCaseID: string;
     subjectName: string;
+    subjectDateOfBirth: string;
     subjectAge: string;
     subjectGender: string;
     subjectCategory: string;
@@ -53,6 +54,38 @@ export function categoryLabel(value: string): string {
     return SUBJECT_CATEGORIES.find((c) => c.value === value)?.label ?? value;
 }
 
+/** Age in whole years from a `YYYY-MM-DD` date-of-birth string (browser-local calendar). */
+export function calculateAgeFromDateOfBirth(dob: string, asOf: Date = new Date()): string | null {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dob.trim());
+    if (!match) return null;
+    const birth = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    if (Number.isNaN(birth.getTime())) return null;
+
+    let age = asOf.getFullYear() - birth.getFullYear();
+    const monthDiff = asOf.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && asOf.getDate() < birth.getDate())) {
+        age--;
+    }
+    if (age < 0) return null;
+    return String(age);
+}
+
+export function formatDateOfBirth(dob: string): string {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dob.trim());
+    if (!match) return dob.trim();
+    const dt = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    if (Number.isNaN(dt.getTime())) return dob.trim();
+    return dt.toLocaleDateString(undefined, { dateStyle: 'medium' });
+}
+
+/** Manual age when DOB is blank; otherwise age computed from DOB at submit/display time. */
+export function effectiveSubjectAge(f: SubjectForm): string {
+    if (hasValue(f.subjectDateOfBirth)) {
+        return calculateAgeFromDateOfBirth(f.subjectDateOfBirth) ?? '';
+    }
+    return f.subjectAge?.trim() ?? '';
+}
+
 function hasValue(value: string | undefined): value is string {
     return !!value?.trim();
 }
@@ -61,6 +94,7 @@ export function blankSubjectForm(subjectCaseID = '01'): SubjectForm {
     return {
         subjectCaseID,
         subjectName: '',
+        subjectDateOfBirth: '',
         subjectAge: '',
         subjectGender: '',
         subjectCategory: '',
@@ -95,6 +129,7 @@ export function fieldsFromLog(keywords?: string[]): SubjectForm {
     return {
         subjectCaseID: kwValue(keywords, 'subject:') || '01',
         subjectName: kwValue(keywords, 'name:'),
+        subjectDateOfBirth: kwValue(keywords, 'dob:'),
         subjectAge: kwValue(keywords, 'age:'),
         subjectGender: kwValue(keywords, 'gender:'),
         subjectCategory: kwValue(keywords, 'category:'),
@@ -115,6 +150,7 @@ export function fieldsFromLog(keywords?: string[]): SubjectForm {
 export function hasFilledSubjectFields(f: SubjectForm): boolean {
     return [
         f.subjectName,
+        f.subjectDateOfBirth,
         f.subjectAge,
         f.subjectGender,
         f.subjectCategory,
@@ -134,7 +170,11 @@ export function hasFilledSubjectFields(f: SubjectForm): boolean {
 function buildParts(f: SubjectForm): string[] {
     const parts: string[] = [];
     if (hasValue(f.subjectName)) parts.push(`Name: ${f.subjectName.trim()}`);
-    if (hasValue(f.subjectAge)) parts.push(`Age: ${f.subjectAge.trim()}`);
+    if (hasValue(f.subjectDateOfBirth)) {
+        parts.push(`Date of Birth: ${formatDateOfBirth(f.subjectDateOfBirth)}`);
+    }
+    const age = effectiveSubjectAge(f);
+    if (age) parts.push(`Age: ${age}`);
     if (hasValue(f.subjectGender)) parts.push(`Gender: ${f.subjectGender}`);
     if (hasValue(f.subjectCategory)) parts.push(`Category: ${categoryLabel(f.subjectCategory)}`);
     if (hasValue(f.subjectDescription)) parts.push(`Description: ${f.subjectDescription.trim()}`);
@@ -158,7 +198,9 @@ export function buildSubjectContent(f: SubjectForm): string {
 export function buildSubjectKeywords(f: SubjectForm): string[] {
     const kws = [SUBJECT_KEYWORD, `subject:${f.subjectCaseID}`];
     if (hasValue(f.subjectName)) kws.push(`name:${f.subjectName.trim()}`);
-    if (hasValue(f.subjectAge)) kws.push(`age:${f.subjectAge.trim()}`);
+    if (hasValue(f.subjectDateOfBirth)) kws.push(`dob:${f.subjectDateOfBirth.trim()}`);
+    const age = effectiveSubjectAge(f);
+    if (age) kws.push(`age:${age}`);
     if (hasValue(f.subjectGender)) kws.push(`gender:${f.subjectGender}`);
     if (hasValue(f.subjectCategory)) kws.push(`category:${f.subjectCategory}`);
     if (hasValue(f.subjectDescription)) kws.push(`description:${f.subjectDescription.trim()}`);
@@ -212,7 +254,11 @@ export interface SubjectDetailRow {
 export function subjectDetailRows(s: SubjectForm): SubjectDetailRow[] {
     const rows: SubjectDetailRow[] = [];
     if (hasValue(s.subjectName)) rows.push({ label: 'Name', value: s.subjectName.trim() });
-    if (hasValue(s.subjectAge)) rows.push({ label: 'Age', value: s.subjectAge.trim() });
+    if (hasValue(s.subjectDateOfBirth)) {
+        rows.push({ label: 'Date of Birth', value: formatDateOfBirth(s.subjectDateOfBirth) });
+    }
+    const age = effectiveSubjectAge(s);
+    if (age) rows.push({ label: 'Age', value: age });
     if (hasValue(s.subjectGender)) rows.push({ label: 'Gender', value: s.subjectGender });
     if (hasValue(s.subjectCategory)) {
         rows.push({ label: 'Category', value: categoryLabel(s.subjectCategory) });

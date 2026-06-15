@@ -94,13 +94,36 @@
                         </div>
 
                         <div class='col-md-4'>
+                            <label class='form-label'>Date of Birth</label>
+                            <input
+                                v-model='draft.form.subjectDateOfBirth'
+                                type='date'
+                                class='form-control'
+                                @change='onDobChange(draft.form)'
+                            >
+                        </div>
+                        <div class='col-md-4'>
                             <label class='form-label'>Age</label>
                             <input
                                 v-model='draft.form.subjectAge'
                                 type='text'
                                 class='form-control'
-                                placeholder='Subject Age'
+                                :disabled='!!draft.form.subjectDateOfBirth'
+                                :placeholder='draft.form.subjectDateOfBirth ? "Calculated from date of birth" : "Subject Age"'
                             >
+                            <div
+                                v-if='draft.form.subjectDateOfBirth'
+                                class='form-text'
+                            >
+                                <span
+                                    v-if='effectiveAge(draft.form)'
+                                    class='text-success'
+                                >→ {{ effectiveAge(draft.form) }} years (from DOB)</span>
+                                <span
+                                    v-else
+                                    class='text-danger'
+                                >Invalid date of birth</span>
+                            </div>
                         </div>
                         <div class='col-md-4'>
                             <label class='form-label'>Gender</label>
@@ -337,7 +360,9 @@ import {
     blankSubjectForm,
     buildSubjectContent,
     buildSubjectKeywords,
+    calculateAgeFromDateOfBirth,
     displaySubjectNumber,
+    effectiveSubjectAge,
     fieldsFromLog,
     hasFilledSubjectFields,
     subjectNumberFromLog,
@@ -443,11 +468,22 @@ function isSent(number: string): boolean {
 
 function draftSummary(f: SubjectForm): string {
     if (hasValue(f.subjectName)) return f.subjectName.trim();
-    if (hasValue(f.subjectAge)) return `Age ${f.subjectAge.trim()}`;
+    const age = effectiveAge(f);
+    if (age) return `Age ${age}`;
     if (hasValue(f.subjectCategory)) {
         return CATEGORIES.find((c) => c.value === f.subjectCategory)?.label ?? f.subjectCategory;
     }
     return '';
+}
+
+function effectiveAge(f: SubjectForm): string {
+    return effectiveSubjectAge(f);
+}
+
+function onDobChange(form: SubjectForm): void {
+    if (form.subjectDateOfBirth) {
+        form.subjectAge = calculateAgeFromDateOfBirth(form.subjectDateOfBirth) ?? '';
+    }
 }
 
 function toggleDraft(id: string): void {
