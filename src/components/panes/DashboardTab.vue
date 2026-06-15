@@ -5,7 +5,21 @@
                 Dashboard
             </h3>
             <button
-                class='btn btn-outline-primary btn-sm ms-auto'
+                class='btn btn-outline-secondary btn-sm ms-auto'
+                :disabled='!displayRows.length'
+                @click='exportCsv'
+            >
+                Export CSV
+            </button>
+            <button
+                class='btn btn-outline-secondary btn-sm'
+                :disabled='!displayRows.length'
+                @click='exportPdf'
+            >
+                Export PDF
+            </button>
+            <button
+                class='btn btn-outline-primary btn-sm'
                 :disabled='!activeMission || loading'
                 @click='refresh'
             >
@@ -90,7 +104,7 @@
                             :key='i'
                         >
                             <td class='text-nowrap'>
-                                {{ r.time }}
+                                {{ formatLocalTime(r.epoch, r.rawTime) }}
                             </td>
                             <td>{{ r.content }}</td>
                             <td class='text-nowrap'>
@@ -124,11 +138,16 @@ import { ref, reactive, computed, watch, onMounted } from 'vue';
 import Subscription from '../../../../../src/base/subscription.ts';
 import type { DBSubscriptionLog } from '../../../../../src/database.ts';
 import { useIncident } from '../../composables/useIncident.ts';
+import {
+    exportDashboardCsv,
+    exportDashboardPdf,
+    formatLocalTime,
+} from '../../lib/dashboardExport.ts';
 
 const { activeMission } = useIncident();
 
 interface Row {
-    time: string;
+    rawTime: string;
     epoch: number;
     content: string;
     source: string;   // raw creatorUid; resolved to a person at render time
@@ -263,11 +282,30 @@ async function loadDirectory(): Promise<void> {
 
 // ---- Mission log load ------------------------------------------------------
 
-function fmt(raw?: string): { time: string; epoch: number } {
-    if (!raw) return { time: '', epoch: 0 };
+function parseTime(raw?: string): { rawTime: string; epoch: number } {
+    if (!raw) return { rawTime: '', epoch: 0 };
     const ms = Date.parse(raw);
-    if (Number.isNaN(ms)) return { time: raw, epoch: 0 };
-    return { time: new Date(ms).toISOString().replace('T', ' ').slice(0, 19) + 'Z', epoch: ms };
+    if (Number.isNaN(ms)) return { rawTime: raw, epoch: 0 };
+    return { rawTime: raw, epoch: ms };
+}
+
+function exportRows() {
+    return displayRows.value.map((r) => ({
+        epoch: r.epoch,
+        content: r.content,
+        source: displaySource(r.source),
+        keywords: r.keywords,
+    }));
+}
+
+function exportCsv(): void {
+    if (!activeMission.value || !displayRows.value.length) return;
+    exportDashboardCsv(exportRows(), activeMission.value.name);
+}
+
+function exportPdf(): void {
+    if (!activeMission.value || !displayRows.value.length) return;
+    exportDashboardPdf(exportRows(), activeMission.value.name);
 }
 
 async function refresh(): Promise<void> {
@@ -279,9 +317,9 @@ async function refresh(): Promise<void> {
         });
         const logs = await sub.log.list({ refresh: true });
         rows.value = logs.map((log: DBSubscriptionLog) => {
-            const f = fmt(log.dtg || log.created);
+            const f = parseTime(log.dtg || log.created);
             return {
-                time: f.time,
+                rawTime: f.rawTime,
                 epoch: f.epoch,
                 content: log.content || '',
                 source: log.creatorUid || '',
