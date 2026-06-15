@@ -64,8 +64,10 @@ const PAGE_W = 792;  // landscape letter
 const PAGE_H = 612;
 const MARGIN = 36;
 const FONT_SIZE = 8;
-const LINE_H = 10;
-const HEADER_H = 14;
+const LINE_H = 11;
+const ROW_VPAD = 5;       // gap between horizontal rule and text
+const FONT_ASCENT = 7;    // ~cap height for 8pt Helvetica (baseline → top of glyphs)
+const HEADER_H = LINE_H + ROW_VPAD * 2;
 
 /** Approximate average glyph width for Helvetica at a given size (pt). */
 function charWidth(size: number): number {
@@ -177,29 +179,33 @@ function buildPdf(rows: DashboardExportRow[], missionName: string, exportedAt: s
     addText(MARGIN, y, `Exported ${exportedAt} (local time)`, 8, false);
     y -= 18;
     addLine(MARGIN, y, PAGE_W - MARGIN, y);
-    y -= 10;
+    y -= 12;
 
-    // Table header
+    // Table header row
     ensureSpace(HEADER_H);
+    const headerBottom = y - HEADER_H;
+    const headerBaseline = y - ROW_VPAD - FONT_ASCENT;
     for (let c = 0; c < headerLabels.length; c++) {
-        addText(colX[c] + 2, y, headerLabels[c], FONT_SIZE, true);
+        addText(colX[c] + 2, headerBaseline, headerLabels[c], FONT_SIZE, true);
     }
-    y -= HEADER_H;
-    addLine(MARGIN, y + 4, PAGE_W - MARGIN, y + 4);
+    addLine(MARGIN, headerBottom, PAGE_W - MARGIN, headerBottom);
+    y = headerBottom;
 
     for (const cols of bodyRows) {
-        const { cells, rowHeight } = layoutRow(cols, colWidths);
-        ensureSpace(rowHeight + 4);
-        const rowTop = y;
+        const { cells, rowHeight: contentHeight } = layoutRow(cols, colWidths);
+        const rowHeight = contentHeight + ROW_VPAD * 2;
+        ensureSpace(rowHeight);
+        const rowBottom = y - rowHeight;
+        const firstBaseline = y - ROW_VPAD - FONT_ASCENT;
         for (let c = 0; c < cells.length; c++) {
-            let lineY = rowTop;
+            let lineY = firstBaseline;
             for (const line of cells[c].lines) {
                 addText(colX[c] + 2, lineY, line);
                 lineY -= LINE_H;
             }
         }
-        y -= rowHeight + 2;
-        addLine(MARGIN, y + 2, PAGE_W - MARGIN, y + 2);
+        addLine(MARGIN, rowBottom, PAGE_W - MARGIN, rowBottom);
+        y = rowBottom;
     }
 
     // Serialize PDF objects
