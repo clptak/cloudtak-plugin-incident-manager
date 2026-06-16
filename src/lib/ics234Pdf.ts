@@ -29,6 +29,8 @@ const PAGE_H = 792;
 const FONT_SIZE = 9;
 const LINE_HEIGHT = 11;
 const CELL_PAD = 3;
+const GRID_LINE = rgb(0, 0, 0);
+const GRID_THICKNESS = 0.75;
 
 interface Rect {
     x: number;
@@ -46,13 +48,28 @@ const LAYOUT = {
         periodTo: { x: 500.72, y: 681.78, w: 72.36, h: 20.16 },
     },
     matrix: {
-        top: 640,
-        bottom: 72,
+        /** Template AcroForm row bottoms (row 1 = top). */
+        rows: [
+            { y: 573.48, h: 66.96 },
+            { y: 504.36, h: 67.2 },
+            { y: 435.6, h: 66.96 },
+            { y: 366.6, h: 67.2 },
+            { y: 297.6, h: 67.2 },
+            { y: 228.84, h: 66.96 },
+            { y: 159.84, h: 67.2 },
+            { y: 91.08, h: 66.96 },
+        ] as const,
         columns: [
             { x: 37.68, w: 176.88 },
             { x: 217.32, w: 177 },
             { x: 397.08, w: 176.88 },
         ] as const,
+        /** Horizontal rule under boxes 1–3 / above column headers 4–6. */
+        headerRuleY: 680.28,
+        /** Horizontal rule under column headers / above row 1 data. */
+        columnHeaderRuleY: 573.48 + 66.96,
+        /** Horizontal rule above footer box 7. */
+        footerRuleY: 91.08,
     },
     footer: {
         name: { x: 37.2, y: 36, w: 145.32, h: 20.16 },
@@ -69,13 +86,9 @@ const WHITE_OUT_RECTS: Rect[] = [
     ...Object.values(LAYOUT.footer),
     LAYOUT.pageNumber,
     // Original matrix form fields (rows 1–8 × 3 columns)
-    ...Array.from({ length: 8 }, (_, i) => {
-        const h = 67;
-        const y = 573.48 - i * 69.12;
-        return LAYOUT.matrix.columns.flatMap((col) => ([
-            { x: col.x, y, w: col.w, h },
-        ]));
-    }).flat(),
+    ...LAYOUT.matrix.rows.flatMap((row) => (
+        LAYOUT.matrix.columns.map((col) => ({ x: col.x, y: row.y, w: col.w, h: row.h }))
+    )),
 ];
 
 let templateBytesPromise: Promise<ArrayBuffer> | null = null;
@@ -91,14 +104,79 @@ function loadTemplateBytes(): Promise<ArrayBuffer> {
 }
 
 function matrixRowRect(rowIndex: number): { objective: Rect; strategy: Rect; tactic: Rect } {
-    const rowH = (LAYOUT.matrix.top - LAYOUT.matrix.bottom) / MAX_OBJECTIVES;
-    const y = LAYOUT.matrix.bottom + rowH * (MAX_OBJECTIVES - rowIndex - 1);
+    const row = LAYOUT.matrix.rows[rowIndex];
     const [obj, strat, tac] = LAYOUT.matrix.columns;
     return {
-        objective: { x: obj.x, y, w: obj.w, h: rowH },
-        strategy: { x: strat.x, y, w: strat.w, h: rowH },
-        tactic: { x: tac.x, y, w: tac.w, h: rowH },
+        objective: { x: obj.x, y: row.y, w: obj.w, h: row.h },
+        strategy: { x: strat.x, y: row.y, w: strat.w, h: row.h },
+        tactic: { x: tac.x, y: row.y, w: tac.w, h: row.h },
     };
+}
+
+function matrixGridBounds(): { left: number; right: number; bottom: number; top: number } {
+    const [firstCol, , lastCol] = LAYOUT.matrix.columns;
+    const firstRow = LAYOUT.matrix.rows[0];
+    const lastRow = LAYOUT.matrix.rows[LAYOUT.matrix.rows.length - 1];
+    return {
+        left: firstCol.x,
+        right: lastCol.x + lastCol.w,
+        bottom: lastRow.y,
+        top: firstRow.y + firstRow.h,
+    };
+}
+
+function drawHLine(page: PDFPage, x1: number, x2: number, y: number): void {
+    page.drawLine({
+        start: { x: x1, y },
+        end: { x: x2, y },
+        thickness: GRID_THICKNESS,
+        color: GRID_LINE,
+    });
+}
+
+function drawVLine(page: PDFPage, x: number, y1: number, y2: number): void {
+    page.drawLine({
+        start: { x, y: y1 },
+        end: { x, y: y2 },
+        thickness: GRID_THICKNESS,
+        color: GRID_LINE,
+    });
+}
+
+/** Redraw grid lines covered by white-out over AcroForm fields. */
+function drawGridLines(page: PDFPage): void {
+    const { left, right, bottom, top } = matrixGridBounds();
+    const [col1, col2] = LAYOUT.matrix.columns;
+    const colDivider1 = col1.x + col1.w;
+    const colDivider2 = col2.x + col2.w;
+
+    // Between boxes 1–3 and column headers 4–6.
+    drawHLine(page, left, right, LAYOUT.matrix.headerRuleY);
+    // Under column headers, above objective row 1.
+    drawHLine(page, left, right, LAYOUT.matrix.columnHeaderRuleY);
+
+    // Between each objective row (template row bottom edges).
+    for (const row of LAYOUT.matrix.rows) {
+        drawHLine(page, left, right, row.y);
+    }
+
+    // Between boxes 1/4 and 2/5, and 2/5 and 3/6 (full matrix height).
+    drawVLine(page, colDivider1, bottom, top);
+    drawVLine(page, colDivider2, bottom, top);
+    drawVLine(page, left, bottom, top);
+    drawVLine(page, right, bottom, top);
+
+    // Vertical separator between boxes 1/2 and 2/5 in the header row.
+    const headerTop = LAYOUT.header.incidentName.y + LAYOUT.header.incidentName.h;
+    drawVLine(page, colDivider1, LAYOUT.matrix.headerRuleY, headerTop);
+
+    // Above footer box 7 (same as bottom matrix rule; one draw is enough).
+
+    const footerTop = LAYOUT.footer.name.y + LAYOUT.footer.name.h;
+    drawHLine(page, LAYOUT.footer.name.x, LAYOUT.footer.dateTime.x + LAYOUT.footer.dateTime.w, LAYOUT.footer.name.y);
+    drawVLine(page, LAYOUT.footer.title.x, LAYOUT.footer.name.y, footerTop);
+    drawVLine(page, LAYOUT.footer.signature.x, LAYOUT.footer.name.y, footerTop);
+    drawVLine(page, LAYOUT.footer.dateTime.x, LAYOUT.footer.name.y, footerTop);
 }
 
 function wrapLines(text: string, font: PDFFont, maxWidth: number): string[] {
@@ -230,6 +308,7 @@ async function buildFormPage(
     const page = outDoc.addPage([PAGE_W, PAGE_H]);
     page.drawPage(embedded, { x: 0, y: 0, width: PAGE_W, height: PAGE_H });
     whiteOut(page);
+    drawGridLines(page);
     drawFormContent(page, font, header, rows, visibleCount, pageNum, pageCount);
 }
 

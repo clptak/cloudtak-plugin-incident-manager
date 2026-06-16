@@ -33,6 +33,12 @@ export interface PDFPage {
         embeddedPage: PDFEmbeddedPage,
         options: { x: number; y: number; width: number; height: number },
     ): void;
+    drawLine(options: {
+        start: { x: number; y: number };
+        end: { x: number; y: number };
+        thickness?: number;
+        color?: RGB;
+    }): void;
 }
 
 export type PDFEmbeddedPage = object;
