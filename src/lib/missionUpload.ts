@@ -1,6 +1,10 @@
 import { Preferences } from '@capacitor/preferences';
 import { stdurl } from '../../../../src/std.ts';
 
+function bytesToArrayBuffer(data: Uint8Array): ArrayBuffer {
+    return data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
+}
+
 /** Upload raw bytes as a mission file (DataSync contents). */
 export async function uploadMissionFile(
     missionGuid: string,
@@ -14,10 +18,11 @@ export async function uploadMissionFile(
     const { value: token } = await Preferences.get({ key: 'token' });
     const url = stdurl(`/api/marti/missions/${missionGuid}/upload`);
     url.searchParams.set('name', filename);
+    const mimeType = opts?.mimeType ?? 'application/pdf';
 
     const headers: Record<string, string> = {
         'X-Requested-With': 'XMLHttpRequest',
-        'Content-Type': opts?.mimeType ?? 'application/pdf',
+        'Content-Type': mimeType,
     };
     if (token) headers.Authorization = `Bearer ${token}`;
     if (opts?.missionToken) headers.MissionAuthorization = opts.missionToken;
@@ -25,7 +30,7 @@ export async function uploadMissionFile(
     const res = await fetch(url.toString(), {
         method: 'POST',
         headers,
-        body: data,
+        body: bytesToArrayBuffer(data),
     });
 
     if (!res.ok) {
@@ -39,7 +44,7 @@ export function safeMissionFilename(name: string): string {
 }
 
 export function downloadPdfBytes(data: Uint8Array, filename: string): void {
-    const blob = new Blob([data], { type: 'application/pdf' });
+    const blob = new Blob([bytesToArrayBuffer(data)], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;

@@ -16,5 +16,5 @@
       "@tak-ps/cloudtak": ["../CloudTAK/api/web/plugin.ts"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.vue"]
+  "include": ["src/**/*.ts", "src/**/*.vue", "src/**/*.d.ts"]
 }
