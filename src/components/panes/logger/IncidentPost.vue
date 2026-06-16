@@ -1,10 +1,89 @@
 <template>
     <div>
         <p class='text-muted small mb-3'>
-            ICS 234-CG Work Analysis Matrix — each row is one objective with numbered strategies
-            and tactics nested under each strategy. Saved to the active DataSync and recalled here;
-            re-saving updates entries in place. (Header fields and signature are filled at PDF export.)
+            ICS 234-CG Work Analysis Matrix — each objective has numbered strategies and tactics.
+            Saved to DataSync as log entries; export fills the official ICS 234-CG PDF template.
         </p>
+
+        <div class='card mb-3'>
+            <div class='card-header py-2'>
+                <h4 class='card-title mb-0 fs-6'>
+                    PDF header (items 1–3, 7)
+                </h4>
+            </div>
+            <div class='card-body py-2'>
+                <div class='row g-2'>
+                    <div class='col-md-6'>
+                        <label class='form-label small mb-1'>1 · Incident Name</label>
+                        <input
+                            v-model='pdfHeader.incidentName'
+                            type='text'
+                            class='form-control form-control-sm'
+                        >
+                    </div>
+                    <div class='col-md-6'>
+                        <label class='form-label small mb-1'>2 · Incident Location</label>
+                        <input
+                            v-model='pdfHeader.incidentLocation'
+                            type='text'
+                            class='form-control form-control-sm'
+                            placeholder='City and State or Country'
+                        >
+                    </div>
+                    <div class='col-md-6'>
+                        <label class='form-label small mb-1'>3 · Operational Period — From</label>
+                        <input
+                            v-model='pdfHeader.operationalPeriodFrom'
+                            type='text'
+                            class='form-control form-control-sm'
+                            placeholder='MM/DD/YYYY HHmm'
+                        >
+                    </div>
+                    <div class='col-md-6'>
+                        <label class='form-label small mb-1'>3 · Operational Period — To</label>
+                        <input
+                            v-model='pdfHeader.operationalPeriodTo'
+                            type='text'
+                            class='form-control form-control-sm'
+                            placeholder='MM/DD/YYYY HHmm'
+                        >
+                    </div>
+                    <div class='col-md-3'>
+                        <label class='form-label small mb-1'>7 · Prepared by — Name</label>
+                        <input
+                            v-model='pdfHeader.preparedByName'
+                            type='text'
+                            class='form-control form-control-sm'
+                        >
+                    </div>
+                    <div class='col-md-3'>
+                        <label class='form-label small mb-1'>Position / Title</label>
+                        <input
+                            v-model='pdfHeader.preparedByTitle'
+                            type='text'
+                            class='form-control form-control-sm'
+                        >
+                    </div>
+                    <div class='col-md-3'>
+                        <label class='form-label small mb-1'>Signature</label>
+                        <input
+                            v-model='pdfHeader.preparedBySignature'
+                            type='text'
+                            class='form-control form-control-sm'
+                        >
+                    </div>
+                    <div class='col-md-3'>
+                        <label class='form-label small mb-1'>Date / Time</label>
+                        <input
+                            v-model='pdfHeader.preparedByDateTime'
+                            type='text'
+                            class='form-control form-control-sm'
+                            placeholder='MM/DD/YYYY HHmm'
+                        >
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <div
             v-if='loading'
@@ -60,7 +139,7 @@
             Maximum of {{ MAX_OBJECTIVES }} objectives (one ICS 234-CG page).
         </div>
 
-        <div class='mt-3'>
+        <div class='mt-3 d-flex flex-wrap align-items-center gap-2'>
             <button
                 class='btn btn-primary btn-sm'
                 :disabled='!activeMission || saving || (!filledRowCount && !pendingDeletions)'
@@ -69,11 +148,29 @@
                 {{ saving ? 'Saving…' : `Save ${filledRowCount} objective${filledRowCount === 1 ? '' : 's'} to DataSync` }}
             </button>
             <button
-                class='btn btn-outline-secondary btn-sm ms-2'
+                class='btn btn-outline-secondary btn-sm'
                 @click='reset'
             >
                 Clear
             </button>
+            <button
+                class='btn btn-outline-primary btn-sm'
+                :disabled='exporting || !filledRowCount'
+                @click='exportPdf'
+            >
+                {{ exporting ? 'Generating PDF…' : 'Download ICS 234 PDF' }}
+            </button>
+            <label
+                v-if='activeMission'
+                class='form-check form-check-inline mb-0 ms-1'
+            >
+                <input
+                    v-model='uploadPdfToMission'
+                    class='form-check-input'
+                    type='checkbox'
+                >
+                <span class='form-check-label small'>Also add PDF to DataSync</span>
+            </label>
         </div>
 
         <div
@@ -163,13 +260,15 @@
 </template>
 
 <script setup lang='ts'>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, reactive, onMounted, watch } from 'vue';
 import Subscription from '../../../../../../src/base/subscription.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import ObjectiveStrategies from './ObjectiveStrategies.vue';
+import { buildIcs234Pdf, defaultIcs234Filename } from '../../../lib/ics234Pdf.ts';
+import { downloadPdfBytes, uploadMissionFile } from '../../../lib/missionUpload.ts';
 import {
     MAX_OBJECTIVES,
-    POST_KEYWORDS,
+    hasPostKeyword,
     blankObjectiveRows,
     countEmptySavedCells,
     ensureStrategy,
@@ -197,8 +296,25 @@ const pendingDeleteIds = ref<string[]>([]);
 
 const loading = ref(false);
 const saving = ref(false);
+const exporting = ref(false);
+const uploadPdfToMission = ref(true);
 const status = ref('');
 const statusError = ref(false);
+
+const pdfHeader = reactive({
+    incidentName: '',
+    incidentLocation: '',
+    operationalPeriodFrom: '',
+    operationalPeriodTo: '',
+    preparedByName: '',
+    preparedByTitle: 'OPERATIONS SECTION CHIEF',
+    preparedBySignature: '',
+    preparedByDateTime: '',
+});
+
+watch(activeMission, (mission) => {
+    if (mission?.name) pdfHeader.incidentName = mission.name;
+}, { immediate: true });
 
 const filledRowCount = computed(() => {
     let n = 0;
@@ -293,7 +409,7 @@ async function loadRows(): Promise<void> {
 
         for (const log of logs) {
             const kws = Array.isArray(log.keywords) ? log.keywords : [];
-            if (!kws.some((k: string) => POST_KEYWORDS.includes(k))) continue;
+            if (!hasPostKeyword(kws)) continue;
 
             const tag = kws.find((k: string) => /^(objective|strategy|tactic):/.test(k));
             if (!tag) continue;
@@ -495,6 +611,42 @@ async function save(): Promise<void> {
         status.value = err instanceof Error ? err.message : String(err);
     } finally {
         saving.value = false;
+    }
+}
+
+async function exportPdf(): Promise<void> {
+    if (!filledRowCount.value) return;
+    exporting.value = true;
+    status.value = '';
+    statusError.value = false;
+
+    try {
+        const bytes = await buildIcs234Pdf(rows.value, { ...pdfHeader }, visibleCount.value);
+        const filename = defaultIcs234Filename(
+            pdfHeader.incidentName || activeMission.value?.name || 'incident',
+        );
+        downloadPdfBytes(bytes, filename);
+
+        if (uploadPdfToMission.value && activeMission.value) {
+            await uploadMissionFile(
+                activeMission.value.guid,
+                filename,
+                bytes,
+                { missionToken: activeMission.value.token },
+            );
+            const sub = await Subscription.load(activeMission.value.guid, {
+                token: activeMission.value.token ?? '',
+            });
+            await sub.fetch();
+            status.value = `PDF downloaded and added to ${activeMission.value.name}.`;
+        } else {
+            status.value = 'PDF downloaded.';
+        }
+    } catch (err) {
+        statusError.value = true;
+        status.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        exporting.value = false;
     }
 }
 </script>

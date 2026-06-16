@@ -8,6 +8,10 @@ export const DEFAULT_OBJECTIVE = 'Provide for safety of incident personnel and p
 
 export const POST_KEYWORDS = ['incident-post', 'risk-assessment'] as const;
 
+export function hasPostKeyword(keywords: string[]): boolean {
+    return keywords.some((k) => (POST_KEYWORDS as readonly string[]).includes(k));
+}
+
 export interface TacticCell {
     text: string;
     id?: string;
@@ -71,6 +75,28 @@ export function formatNumberedList(entries: string[]): string {
 
 export function formatStrategiesForDisplay(strategies: StrategyCell[]): string {
     return formatNumberedList(strategies.map((s) => s.text));
+}
+
+/** One numbered strategy per line for ICS 234 PDF column 5. */
+export function formatStrategiesForPdf(strategies: StrategyCell[]): string {
+    const lines: string[] = [];
+    for (let i = 0; i < strategies.length; i++) {
+        const text = strategies[i].text.trim();
+        if (text) lines.push(`${i + 1}. ${text}`);
+    }
+    return lines.join('\n');
+}
+
+/** One tactic per line (strategy.tactic prefix) for ICS 234 PDF column 6. */
+export function formatTacticsForPdf(strategies: StrategyCell[]): string {
+    const lines: string[] = [];
+    for (let si = 0; si < strategies.length; si++) {
+        for (let ti = 0; ti < strategies[si].tactics.length; ti++) {
+            const text = strategies[si].tactics[ti].text.trim();
+            if (text) lines.push(`${si + 1}.${ti + 1} ${text}`);
+        }
+    }
+    return lines.join('\n');
 }
 
 /** Tactics grouped by parent strategy for the running-list table. */
