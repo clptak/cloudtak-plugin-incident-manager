@@ -26,6 +26,19 @@ function uuid(): string {
         });
 }
 
+/** Strip Vue reactive proxies before IndexedDB / Comlink structured clone. */
+function toPlainFeature(feat: Feature): Feature {
+    return JSON.parse(JSON.stringify(feat)) as Feature;
+}
+
+function plainRing(ring: [number, number][]): [number, number][] {
+    return ring.map(([lng, lat]) => [lng, lat] as [number, number]);
+}
+
+function plainCenter(center: [number, number]): [number, number] {
+    return [center[0], center[1]];
+}
+
 async function sessionToken(): Promise<string> {
     const { value } = await Preferences.get({ key: 'token' });
     return value || '';
@@ -53,7 +66,7 @@ async function pushFeatureToMission(
         subscribed: true,
     });
 
-    const cot = await COT.load(feat, {
+    const cot = await COT.load(toPlainFeature(feat), {
         mode: OriginMode.MISSION,
         mode_id: missionGuid,
     }, { skipSave: true });
@@ -83,6 +96,9 @@ export async function pushPolygonToMission(opts: {
     const id = opts.id ?? uuid();
     const style = opts.style ?? {};
 
+    const center = plainCenter(opts.center);
+    const ring = plainRing(opts.ring);
+
     const feat: Feature = {
         id,
         type: 'Feature',
@@ -92,7 +108,7 @@ export async function pushPolygonToMission(opts: {
             type: 'u-d-f',
             how: 'h-g-i-g-o',
             callsign: opts.callsign,
-            center: opts.center,
+            center,
             time: now,
             start: now,
             stale: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365).toISOString(),
@@ -104,7 +120,7 @@ export async function pushPolygonToMission(opts: {
         },
         geometry: {
             type: 'Polygon',
-            coordinates: [opts.ring],
+            coordinates: [ring],
         },
     } as unknown as Feature;
 
@@ -143,7 +159,7 @@ export async function pushPointToMission(opts: {
         },
         geometry: {
             type: 'Point',
-            coordinates: opts.point,
+            coordinates: plainCenter(opts.point),
         },
     } as unknown as Feature;
 

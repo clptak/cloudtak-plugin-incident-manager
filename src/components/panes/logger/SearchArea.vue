@@ -684,15 +684,17 @@ const canSetIpp = computed(
 
 /** Center for ring math: selected object, typed coordinates, or recalled IPP marker. */
 const ippCenter = computed<[number, number] | null>(() => {
+    const asTuple = (coords: [number, number]): [number, number] => [coords[0], coords[1]];
+
     if (selectedObjectUid.value) {
         const selected = missionMarkers.value.find((m) => m.uid === selectedObjectUid.value);
-        if (selected?.coords) return selected.coords;
+        if (selected?.coords) return asTuple(selected.coords);
     }
     if (ipp.value && !selectedObjectUid.value) return [ipp.value.lng, ipp.value.lat];
     const ippArea = sentAreas.value.find((a) => a.key === IPP_KEY);
     if (ippArea) {
         const marker = missionMarkers.value.find((m) => m.uid === ippArea.uuid);
-        if (marker?.coords) return marker.coords;
+        if (marker?.coords) return asTuple(marker.coords);
     }
     if (ipp.value) return [ipp.value.lng, ipp.value.lat];
     return null;
