@@ -63,7 +63,7 @@ export function parseCoordinates(input: string): LatLng | null {
     return null;
 }
 
-/** Build the mission name the way ccsosar did: activity_date_incident[_subject][_location]. */
+/** Build the mission name: date_incident[_subject][_location][_activityNumber]. */
 export function buildMissionName(opts: {
     activityNumber?: string;
     date?: string;
@@ -78,8 +78,9 @@ export function buildMissionName(opts: {
     let location = (opts.locationInfo || '').trim();
     if (location) location = location.replace(/\s+/g, '_').slice(0, 80);
 
-    const parts = [activity || 'mission', date, incident];
+    const parts = [date, incident];
     if (subject) parts.push(subject);
     if (location) parts.push(location);
+    if (activity) parts.push(activity);
     return parts.join('_').replace(/[^a-z0-9_.-]/gi, '_');
 }
