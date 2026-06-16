@@ -6,12 +6,29 @@
 
         <!-- ══ Create Mission ══ -->
         <div class='card mb-3'>
-            <div class='card-header'>
+            <div
+                class='card-header d-flex align-items-center cursor-pointer user-select-none'
+                role='button'
+                tabindex='0'
+                :aria-expanded='expandedCard === "create"'
+                @click='toggleCard("create")'
+                @keydown.enter.prevent='toggleCard("create")'
+                @keydown.space.prevent='toggleCard("create")'
+            >
                 <h4 class='card-title mb-0'>
                     Create Mission
                 </h4>
+                <IconChevronDown
+                    class='ms-auto transition-transform'
+                    :class='{ "rotate-180": expandedCard !== "create" }'
+                    :size='20'
+                    stroke='1.5'
+                />
             </div>
-            <div class='card-body'>
+            <div
+                v-show='expandedCard === "create"'
+                class='card-body'
+            >
                 <p class='text-muted small mb-3'>
                     Creates a DataSync (TAK Mission) via the CloudTAK API. Optionally creates a paired Caltopo map.
                 </p>
@@ -333,12 +350,29 @@
 
         <!-- ══ Open Existing Mission ══ -->
         <div class='card'>
-            <div class='card-header'>
+            <div
+                class='card-header d-flex align-items-center cursor-pointer user-select-none'
+                role='button'
+                tabindex='0'
+                :aria-expanded='expandedCard === "open"'
+                @click='toggleCard("open")'
+                @keydown.enter.prevent='toggleCard("open")'
+                @keydown.space.prevent='toggleCard("open")'
+            >
                 <h4 class='card-title mb-0'>
                     Open Existing Mission
                 </h4>
+                <IconChevronDown
+                    class='ms-auto transition-transform'
+                    :class='{ "rotate-180": expandedCard !== "open" }'
+                    :size='20'
+                    stroke='1.5'
+                />
             </div>
-            <div class='card-body'>
+            <div
+                v-show='expandedCard === "open"'
+                class='card-body'
+            >
                 <OpenExistingMission />
             </div>
         </div>
@@ -347,7 +381,7 @@
 
 <script setup lang='ts'>
 import { ref, reactive, computed, watch, onMounted, nextTick } from 'vue';
-import { IconSearch, IconX, IconLayout } from '@tabler/icons-vue';
+import { IconSearch, IconX, IconLayout, IconChevronDown } from '@tabler/icons-vue';
 import { server } from '../../../../../src/std.ts';
 import type { Mission_Create, MissionTemplateList } from '../../../../../src/types.ts';
 import { useMapStore } from '../../../../../src/stores/map.ts';
@@ -360,6 +394,13 @@ import { useIncident } from '../../composables/useIncident.ts';
 
 const mapStore = useMapStore();
 const { setActiveMission } = useIncident();
+
+type CreateOpenCard = 'create' | 'open';
+const expandedCard = ref<CreateOpenCard | null>(null);
+
+function toggleCard(card: CreateOpenCard): void {
+    expandedCard.value = expandedCard.value === card ? null : card;
+}
 
 const subjectTypes = [
     'Hiker', 'Hunter', 'Climber', 'Canyoneering', 'Camper',
@@ -596,3 +637,13 @@ async function createMission(): Promise<void> {
     }
 }
 </script>
+
+<style scoped>
+.rotate-180 {
+    transform: rotate(-90deg);
+}
+
+.transition-transform {
+    transition: transform 0.2s ease-out;
+}
+</style>
