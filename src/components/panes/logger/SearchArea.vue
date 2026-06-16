@@ -682,8 +682,12 @@ const canSetIpp = computed(
     () => !!activeMission.value && (!!ipp.value || !!selectedObjectUid.value),
 );
 
-/** Center for ring math: typed coordinates, else the recalled IPP marker's location. */
+/** Center for ring math: selected object, typed coordinates, or recalled IPP marker. */
 const ippCenter = computed<[number, number] | null>(() => {
+    if (selectedObjectUid.value) {
+        const selected = missionMarkers.value.find((m) => m.uid === selectedObjectUid.value);
+        if (selected?.coords) return selected.coords;
+    }
     if (ipp.value && !selectedObjectUid.value) return [ipp.value.lng, ipp.value.lat];
     const ippArea = sentAreas.value.find((a) => a.key === IPP_KEY);
     if (ippArea) {
@@ -722,6 +726,7 @@ async function setIpp(): Promise<void> {
         } else {
             uuid = await pushPointToMission({
                 missionGuid: activeMission.value.guid,
+                missionToken: activeMission.value.token,
                 callsign: label,
                 point: [ipp.value!.lng, ipp.value!.lat],
                 type: 'a-f-G',
@@ -761,6 +766,7 @@ async function upsertRing(
 
     const uuid = await pushPolygonToMission({
         missionGuid: activeMission.value!.guid,
+        missionToken: activeMission.value!.token,
         callsign: label,
         ring,
         center,

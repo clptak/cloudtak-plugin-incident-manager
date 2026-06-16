@@ -126,7 +126,11 @@ async function openMission(mission: Mission): Promise<void> {
         const sub = await mapStore.loadMission(mission.guid);
         if (sub) await mapStore.makeActiveMission(sub);
 
-        setActiveMission({ guid: mission.guid, name: mission.name });
+        setActiveMission({
+            guid: mission.guid,
+            name: mission.name,
+            token: sub?.token || undefined,
+        });
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
     } finally {

@@ -1,14 +1,15 @@
 /**
- * Push GeoJSON features into a TAK mission (DataSync) the native CloudTAK way:
- * a `u-d-f` Feature with properties.dest = [{ 'mission-guid': guid }] sent as
- * CoT over the Atlas worker's WebSocket connection (mapStore.worker.conn.sendCOT).
- *
- * Mirrors the convention documented for SubscriptionFeature.update and the
- * feature shape produced by the host BufferInput.vue.
+ * Push GeoJSON features into a TAK mission (DataSync) via SubscriptionFeature.update
+ * (same path as CloudTAK draw/buffer). Raw sendCOT can silently no-op when the
+ * Atlas websocket is closed and does not refresh the mission overlay cache.
  */
+import { Preferences } from '@capacitor/preferences';
+import COT, { OriginMode } from '../../../../src/base/cot.ts';
+import Subscription from '../../../../src/base/subscription.ts';
 import { useMapStore } from '../../../../src/stores/map.ts';
 import { server } from '../../../../src/std.ts';
 import type { Feature } from '../../../../src/types.ts';
+import type Atlas from '../../../../src/workers/atlas.ts';
 
 export interface RingStyle {
     stroke?: string;
@@ -25,6 +26,42 @@ function uuid(): string {
         });
 }
 
+async function sessionToken(): Promise<string> {
+    const { value } = await Preferences.get({ key: 'token' });
+    return value || '';
+}
+
+async function ensureConnOpen(worker: ReturnType<typeof useMapStore>['worker']): Promise<void> {
+    if (await worker.conn.isOpen) return;
+    await worker.conn.reconnect(await worker.username);
+    if (!(await worker.conn.isOpen)) {
+        throw new Error('TAK connection is not open. Connect to the map and try again.');
+    }
+}
+
+async function pushFeatureToMission(
+    missionGuid: string,
+    feat: Feature,
+    missionToken?: string,
+): Promise<string> {
+    const mapStore = useMapStore();
+    await ensureConnOpen(mapStore.worker);
+
+    const sub = await Subscription.load(missionGuid, {
+        token: await sessionToken(),
+        missiontoken: missionToken,
+        subscribed: true,
+    });
+
+    const cot = await COT.load(feat, {
+        mode: OriginMode.MISSION,
+        mode_id: missionGuid,
+    }, { skipSave: true });
+
+    await sub.feature.update(mapStore.worker as unknown as Atlas, cot);
+    return String(feat.id);
+}
+
 /**
  * Send a single closed polygon ring to a mission. `ring` is a closed array of
  * [lng, lat] (first == last). Returns the feature id sent.
@@ -35,13 +72,13 @@ function uuid(): string {
  */
 export async function pushPolygonToMission(opts: {
     missionGuid: string;
+    missionToken?: string;
     callsign: string;
     ring: [number, number][];
     center: [number, number];
     style?: RingStyle;
     id?: string;
 }): Promise<string> {
-    const mapStore = useMapStore();
     const now = new Date().toISOString();
     const id = opts.id ?? uuid();
     const style = opts.style ?? {};
@@ -64,7 +101,6 @@ export async function pushPolygonToMission(opts: {
             'stroke-width': 3,
             fill: style.fill ?? style.stroke ?? '#ff9900',
             'fill-opacity': style.fillOpacity ?? 0.15,
-            dest: [{ 'mission-guid': opts.missionGuid }],
         },
         geometry: {
             type: 'Polygon',
@@ -72,8 +108,7 @@ export async function pushPolygonToMission(opts: {
         },
     } as unknown as Feature;
 
-    await mapStore.worker.conn.sendCOT(feat);
-    return id;
+    return pushFeatureToMission(opts.missionGuid, feat, opts.missionToken);
 }
 
 /**
@@ -82,13 +117,13 @@ export async function pushPolygonToMission(opts: {
  */
 export async function pushPointToMission(opts: {
     missionGuid: string;
+    missionToken?: string;
     callsign: string;
     point: [number, number];
     type?: string;
     icon?: string;
     id?: string;
 }): Promise<string> {
-    const mapStore = useMapStore();
     const now = new Date().toISOString();
     const id = opts.id ?? uuid();
 
@@ -105,7 +140,6 @@ export async function pushPointToMission(opts: {
             time: now,
             start: now,
             stale: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365).toISOString(),
-            dest: [{ 'mission-guid': opts.missionGuid }],
         },
         geometry: {
             type: 'Point',
@@ -113,8 +147,7 @@ export async function pushPointToMission(opts: {
         },
     } as unknown as Feature;
 
-    await mapStore.worker.conn.sendCOT(feat);
-    return id;
+    return pushFeatureToMission(opts.missionGuid, feat, opts.missionToken);
 }
 
 /**
