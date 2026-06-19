@@ -7,6 +7,8 @@
  * original is intentionally omitted (mission folders are out of scope here).
  */
 
+import { parseCadIdentifiers } from './incidentInfo.ts';
+
 export interface MpsRow {
     source: 'CAD';
     missionName: string;
@@ -20,7 +22,10 @@ export interface MpsRow {
 }
 
 export interface MpsParseResult {
+    /** @deprecated use activityNumber — kept for callers that read eventId */
     eventId: string | null;
+    activityNumber: string | null;
+    reportNumber: string | null;
     rows: MpsRow[];
 }
 
@@ -117,9 +122,17 @@ function annotateRemarks(
 }
 
 export function getMpsRows(cadText: string): MpsParseResult {
-    const eventId = getEventId(cadText);
+    const cadIds = parseCadIdentifiers(cadText);
+    const eventId = cadIds.activityNumber ?? getEventId(cadText);
     const rawRemarks = getRemarksSection(cadText);
-    if (!rawRemarks) return { eventId, rows: [] };
+    if (!rawRemarks) {
+        return {
+            eventId,
+            activityNumber: cadIds.activityNumber,
+            reportNumber: cadIds.reportNumber,
+            rows: [],
+        };
+    }
 
     const callCreated = cadText.match(MPS_CALL_CREATED);
     const dates = getRemarksDates(rawRemarks, callCreated ? [callCreated[1]] : []);
@@ -130,5 +143,10 @@ export function getMpsRows(cadText: string): MpsParseResult {
     for (let i = 0; i < isoDates.length && i < blocks.length; i++) {
         parseLogBlock(blocks[i], isoDates[i]).forEach((r) => allRows.push(r));
     }
-    return { eventId, rows: annotateRemarks(allRows, eventId) };
+    return {
+        eventId,
+        activityNumber: cadIds.activityNumber,
+        reportNumber: cadIds.reportNumber,
+        rows: annotateRemarks(allRows, eventId),
+    };
 }

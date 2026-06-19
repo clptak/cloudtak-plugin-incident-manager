@@ -17,7 +17,7 @@ horizontal **Main / Task / Dashboard** tabs.
     with SAR detail fields, multi-format coordinate parsing, and an optional
     "Create Caltopo map" checkbox (delegated to the caltopo-sync plugin).
   - **Open Existing Mission** — lists missions and activates the selected one.
-- **Logger** — Add Callnotes (MPS/CFS parse → mission logs), Search Area (LPB
+- **Logger** — Initial Information (incident details + MPS/CFS parse → mission logs), Search Area (LPB
   rings → mission features over CoT), Search Urgency, Search Scenarios, Risk
   Assessment (Objectives/Strategies/Tactics), Incident POST (patrol report .md).
 - **Dashboard** — sortable combined log table for the active mission.

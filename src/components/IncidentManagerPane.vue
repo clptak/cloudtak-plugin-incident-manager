@@ -90,7 +90,7 @@ const navItems: NavEntry[] = [
     { kind: 'item', key: 'create-open', label: 'Create | Open' },
 
     { kind: 'header', key: 'h-initial', label: 'Initial Response' },
-    { kind: 'sub', key: 'addcallnotes', label: 'Add Callnotes' },
+    { kind: 'sub', key: 'initial-information', label: 'Initial Information' },
     { kind: 'sub', key: 'subject-info', label: 'Subject Information' },
     { kind: 'sub', key: 'search-urgency', label: 'Search Urgency' },
 

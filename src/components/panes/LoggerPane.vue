@@ -4,7 +4,7 @@
             {{ subLabel }}
         </h3>
 
-        <AddCallnotes v-if='sub === "addcallnotes"' />
+        <InitialInformation v-if='sub === "initial-information"' />
         <SubjectInformation v-else-if='sub === "subject-info"' />
         <SearchArea v-else-if='sub === "search-area"' />
         <SearchUrgency v-else-if='sub === "search-urgency"' />
@@ -28,7 +28,7 @@
 <script setup lang='ts'>
 import { computed, defineAsyncComponent } from 'vue';
 
-const AddCallnotes = defineAsyncComponent(() => import('./logger/AddCallnotes.vue'));
+const InitialInformation = defineAsyncComponent(() => import('./logger/InitialInformation.vue'));
 const SubjectInformation = defineAsyncComponent(() => import('./logger/SubjectInformation.vue'));
 const SearchArea = defineAsyncComponent(() => import('./logger/SearchArea.vue'));
 const SearchUrgency = defineAsyncComponent(() => import('./logger/SearchUrgency.vue'));
@@ -39,7 +39,7 @@ const IncidentPost = defineAsyncComponent(() => import('./logger/IncidentPost.vu
 const props = defineProps<{ sub: string }>();
 
 const labels: Record<string, string> = {
-    'addcallnotes': 'Add Callnotes',
+    'initial-information': 'Initial Information',
     'subject-info': 'Subject Information',
     'search-area': 'Search Area',
     'search-urgency': 'Search Urgency',
