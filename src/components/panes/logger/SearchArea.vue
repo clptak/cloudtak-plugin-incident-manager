@@ -134,6 +134,12 @@
                         type='datetime-local'
                         class='form-control mb-2'
                     >
+                    <label class='form-label'>Time Reported Missing</label>
+                    <input
+                        v-model='timeReportedMissing'
+                        type='datetime-local'
+                        class='form-control mb-2'
+                    >
                     <label class='form-label'>Travel Speed (mph)</label>
                     <input
                         v-model.number='travelSpeed'
@@ -148,7 +154,7 @@
                         class='form-text'
                     >
                         Radius: <strong>{{ theoreticalMiles.toFixed(2) }} mi</strong>
-                        ({{ elapsedHours.toFixed(1) }} h × {{ travelSpeed }} mph)
+                        ({{ elapsedHours.toFixed(1) }} h elapsed × {{ travelSpeed }} mph)
                     </div>
                     <button
                         class='btn btn-orange text-white btn-sm mt-2'
@@ -197,9 +203,68 @@
                         >
                             {{ c }}
                         </option>
+                        <option value='Other'>
+                            Other
+                        </option>
                     </select>
 
-                    <div class='table-responsive'>
+                    <template v-if='category === "Other"'>
+                        <label class='form-label'>Source and Type</label>
+                        <input
+                            v-model='otherSourceType'
+                            type='text'
+                            class='form-control form-control-sm mb-2'
+                            placeholder='e.g. Regional SAR stats — adult hiker'
+                        >
+                        <label class='form-label'>Ring Distances</label>
+                        <div class='input-group input-group-sm mb-2'>
+                            <input
+                                v-model='otherRingsInput'
+                                type='text'
+                                class='form-control'
+                                placeholder='e.g. 0.5, 1.2, 3.0'
+                            >
+                            <select
+                                v-model='otherRingsUnit'
+                                class='form-select'
+                                style='max-width: 6rem'
+                            >
+                                <option value='mi'>
+                                    mi
+                                </option>
+                                <option value='m'>
+                                    m
+                                </option>
+                            </select>
+                        </div>
+                        <div
+                            v-if='otherRingsInput && !otherRingMiles.length'
+                            class='form-text text-danger'
+                        >
+                            Enter one or more positive numbers, separated by commas or spaces.
+                        </div>
+                        <div
+                            v-else-if='otherRingMiles.length'
+                            class='form-text'
+                        >
+                            {{ otherRingMiles.length }} ring{{ otherRingMiles.length === 1 ? '' : 's' }}:
+                            <span
+                                v-for='(mi, i) in otherRingMiles'
+                                :key='i'
+                            >
+                                <span
+                                    v-if='i'
+                                    class='text-muted'
+                                > · </span>
+                                <span style='color:#ff0000'>●</span> {{ mi.toFixed(2) }} mi
+                            </span>
+                        </div>
+                    </template>
+
+                    <div
+                        v-else
+                        class='table-responsive'
+                    >
                         <table class='table table-sm table-vcenter mb-0'>
                             <thead>
                                 <tr>
@@ -233,7 +298,7 @@
                         :disabled='!canPushLpb || pushing'
                         @click='pushLpb'
                     >
-                        {{ pushing ? 'Sending…' : 'Add selected rings to DataSync' }}
+                        {{ pushing ? 'Sending…' : (category === 'Other' ? 'Add rings to DataSync' : 'Add selected rings to DataSync') }}
                     </button>
                 </div>
             </div>
@@ -419,9 +484,18 @@
             </div>
             <div
                 v-else
-                class='form-text'
+                class='form-text d-flex flex-wrap align-items-center gap-2'
             >
-                Active DataSync: <strong>{{ activeMission.name }}</strong>
+                <span>Active DataSync: <strong>{{ activeMission.name }}</strong></span>
+                <button
+                    type='button'
+                    class='btn btn-outline-primary btn-sm'
+                    :disabled='loadingFeatures'
+                    title='Reload markers and polygons from the active DataSync mission'
+                    @click='refreshFeatures'
+                >
+                    {{ loadingFeatures ? 'Loading…' : 'Refresh map objects' }}
+                </button>
             </div>
             <div
                 v-if='status'
@@ -440,13 +514,21 @@ import Subscription from '../../../../../../src/base/subscription.ts';
 import type { Feature } from '../../../../../../src/types.ts';
 import azlpb from '../../../data/azlpb_table.json';
 import { parseCoordinates } from '../../../lib/coords.ts';
-import { circleRing, milesToMeters } from '../../../lib/rings.ts';
+import { circleRing, milesToMeters, MILES_TO_METERS } from '../../../lib/rings.ts';
 import { pushPolygonToMission, pushPointToMission, deletePolygonFromMission } from '../../../lib/missionFeatures.ts';
+import type { RingStyle } from '../../../lib/missionFeatures.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 
 const SEARCH_AREA_KEYWORD = 'search-area';
 const IPP_KEY = 'ipp';
 const IPP_ICON = '83198b4872a8c34eb9c549da8a4de5a28f07821185b39a2277948f66c24ac17a/Wildfire/Fire Origin.png';
+const LPB_RING_STYLE: RingStyle = {
+    stroke: '#ff0000',
+    fillOpacity: 0,
+    strokeWidth: 2,
+    strokeStyle: 'dotted',
+};
+const OTHER_CATEGORY = 'Other';
 
 interface MissionFeatureRef {
     uid: string;
@@ -499,8 +581,11 @@ const segmentUids = ref<string[]>([]);
 
 const categories = table.map((t) => t.category);
 const category = ref<string>(categories[0]);
+const otherSourceType = ref('');
+const otherRingsInput = ref('');
+const otherRingsUnit = ref<'mi' | 'm'>('mi');
 
-const QUARTILE_COLORS = { A: '#2fb344', B: '#f59f00', C: '#f76707', D: '#d63939' };
+const QUARTILE_COLORS = { A: '#ff0000', B: '#ff0000', C: '#ff0000', D: '#ff0000' };
 
 const quartiles = reactive([
     { key: 'A', pct: '25%', miField: 'qAmi', color: QUARTILE_COLORS.A, miles: 0, selected: true },
@@ -510,6 +595,7 @@ const quartiles = reactive([
 ]);
 
 function refreshQuartiles(): void {
+    if (category.value === OTHER_CATEGORY) return;
     const entry = table.find((t) => t.category === category.value);
     if (!entry) return;
     for (const q of quartiles) {
@@ -518,12 +604,26 @@ function refreshQuartiles(): void {
 }
 watch(category, refreshQuartiles, { immediate: true });
 
+function parseRingDistances(input: string): number[] {
+    return input
+        .split(/[,\s]+/)
+        .map((s) => parseFloat(s.trim()))
+        .filter((n) => Number.isFinite(n) && n > 0);
+}
+
+const otherRingMiles = computed(() => {
+    const values = parseRingDistances(otherRingsInput.value);
+    if (otherRingsUnit.value === 'mi') return values;
+    return values.map((m) => m / MILES_TO_METERS);
+});
+
 // Theoretical
 const timeMissing = ref('');
+const timeReportedMissing = ref('');
 const travelSpeed = ref<number>(0);
 const elapsedHours = computed(() => {
-    if (!timeMissing.value) return 0;
-    const ms = Date.now() - new Date(timeMissing.value).getTime();
+    if (!timeMissing.value || !timeReportedMissing.value) return 0;
+    const ms = new Date(timeReportedMissing.value).getTime() - new Date(timeMissing.value).getTime();
     return ms > 0 ? ms / 3_600_000 : 0;
 });
 const theoreticalMiles = computed(() =>
@@ -676,6 +776,13 @@ async function loadFeatures(sub?: LoadedSub): Promise<void> {
 onMounted(() => { void loadAreas(); void loadFeatures(); });
 watch(() => activeMission.value?.guid, () => { void loadAreas(); void loadFeatures(); });
 
+async function refreshFeatures(): Promise<void> {
+    if (!activeMission.value) return;
+    status.value = '';
+    statusError.value = false;
+    await loadFeatures();
+}
+
 // ---- IPP -------------------------------------------------------------------
 
 const canSetIpp = computed(
@@ -750,7 +857,11 @@ async function setIpp(): Promise<void> {
 
 // ---- Theoretical & Statistical (rings around the IPP) ----------------------
 
-const canPushLpb = computed(() => !!ippCenter.value && !!activeMission.value && quartiles.some((q) => q.selected));
+const canPushLpb = computed(() => {
+    if (!ippCenter.value || !activeMission.value) return false;
+    if (category.value === OTHER_CATEGORY) return otherRingMiles.value.length > 0;
+    return quartiles.some((q) => q.selected);
+});
 const canPushTheoretical = computed(() => !!ippCenter.value && !!activeMission.value && theoreticalMiles.value > 0);
 
 /** Push (or update) a ring feature AND its referencing log entry. */
@@ -759,7 +870,7 @@ async function upsertRing(
     key: string,
     miles: number,
     label: string,
-    color: string,
+    style: RingStyle,
 ): Promise<void> {
     const center = ippCenter.value;
     if (!center) throw new Error('No IPP center set.');
@@ -772,7 +883,7 @@ async function upsertRing(
         callsign: label,
         ring,
         center,
-        style: { stroke: color, fillOpacity: 0.1 },
+        style,
         id: existing?.uuid,
     });
 
@@ -784,7 +895,10 @@ async function pushTheoretical(): Promise<void> {
     pushing.value = true; status.value = ''; statusError.value = false;
     try {
         const sub = await loadSub();
-        await upsertRing(sub, 'theoretical', theoreticalMiles.value, `Theoretical ${theoreticalMiles.value.toFixed(1)}mi`, '#ff9900');
+        await upsertRing(sub, 'theoretical', theoreticalMiles.value, `Theoretical ${theoreticalMiles.value.toFixed(1)}mi`, {
+            stroke: '#ff9900',
+            fillOpacity: 0.1,
+        });
         await loadAreas(sub);
         status.value = `Saved theoretical ring (${theoreticalMiles.value.toFixed(1)} mi) to ${activeMission.value.name}.`;
     } catch (err) {
@@ -801,10 +915,31 @@ async function pushLpb(): Promise<void> {
     try {
         const sub = await loadSub();
         let n = 0;
-        for (const q of quartiles) {
-            if (!q.selected) continue;
-            await upsertRing(sub, `lpb:${q.key}`, q.miles, `${category.value} ${q.pct} (${q.miles.toFixed(1)}mi)`, q.color);
-            n++;
+        if (category.value === OTHER_CATEGORY) {
+            const source = otherSourceType.value.trim() || 'Other';
+            for (let i = 0; i < otherRingMiles.value.length; i++) {
+                const miles = otherRingMiles.value[i];
+                await upsertRing(
+                    sub,
+                    `lpb:other:${i}`,
+                    miles,
+                    `${source} ${miles.toFixed(1)}mi`,
+                    LPB_RING_STYLE,
+                );
+                n++;
+            }
+        } else {
+            for (const q of quartiles) {
+                if (!q.selected) continue;
+                await upsertRing(
+                    sub,
+                    `lpb:${q.key}`,
+                    q.miles,
+                    `${category.value} ${q.pct} (${q.miles.toFixed(1)}mi)`,
+                    LPB_RING_STYLE,
+                );
+                n++;
+            }
         }
         await loadAreas(sub);
         status.value = `Saved ${n} LPB ring${n === 1 ? '' : 's'} to ${activeMission.value.name}.`;

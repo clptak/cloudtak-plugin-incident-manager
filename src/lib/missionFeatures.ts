@@ -15,6 +15,8 @@ export interface RingStyle {
     stroke?: string;
     fill?: string;
     fillOpacity?: number;
+    strokeWidth?: number;
+    strokeStyle?: 'solid' | 'dashed' | 'dotted' | 'outlined';
 }
 
 function uuid(): string {
@@ -114,7 +116,8 @@ export async function pushPolygonToMission(opts: {
             stale: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365).toISOString(),
             stroke: style.stroke ?? '#ff9900',
             'stroke-opacity': 1,
-            'stroke-width': 3,
+            'stroke-width': style.strokeWidth ?? 3,
+            'stroke-style': style.strokeStyle ?? 'solid',
             fill: style.fill ?? style.stroke ?? '#ff9900',
             'fill-opacity': style.fillOpacity ?? 0.15,
         },
