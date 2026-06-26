@@ -1,5 +1,6 @@
 context/*
 skills/*
+node_modules/
 docs/build-plan.md
 docs/ICS-234-CG-Work-Analysis-Matrix.pdf
 docs/Subject_form.html
