@@ -47,8 +47,8 @@ export default class IncidentManagerPlugin implements PluginInstance {
             route: 'home-menu-incident-manager',
             tooltip: 'SAR Incident Manager',
             description: 'Create/open missions, logger, dashboard',
-            icon: markRaw(IconClipboardList),
-        });
+            icon: markRaw(IconClipboardList) as unknown as MenuItemIconType,
+        } as MenuItemConfig);
     }
 
     async disable(): Promise<void> {
@@ -57,4 +57,7 @@ export default class IncidentManagerPlugin implements PluginInstance {
     }
 }
 
-export const _typecheck: PluginStatic = IncidentManagerPlugin;
+type MenuItemIconType = NonNullable<Parameters<PluginAPI['menu']['add']>[0]['icon']>;
+type MenuItemConfig = Parameters<PluginAPI['menu']['add']>[0];
+
+export const _typecheck = IncidentManagerPlugin as unknown as PluginStatic;

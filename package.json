@@ -8,13 +8,13 @@
     "typecheck": "vue-tsc --noEmit -p tsconfig.json"
   },
   "peerDependencies": {
+    "@tabler/icons-vue": "^3.0.0",
+    "@tak-ps/cloudtak": "*",
     "vue": "^3.4.0"
   },
   "devDependencies": {
     "@tak-ps/cloudtak": "file:../CloudTAK/api/web",
-    "@tabler/icons-vue": "^3.0.0",
     "typescript": "^5.4.0",
-    "vue": "^3.4.0",
     "vue-tsc": "^2.0.0"
   }
 }
