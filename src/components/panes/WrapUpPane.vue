@@ -134,7 +134,7 @@ async function generate(): Promise<void> {
                 const { rawTime, epoch } = parseTime(log.dtg || log.created);
                 const ts = formatReportTime(epoch, rawTime);
                 const who = log.creatorUid ? ` _(${log.creatorUid})_` : '';
-                lines.push(`- ${ts} — ${log.content || ''}${who}`);
+                lines.push(`${ts} — ${log.content || ''}${who}`);
             }
         }
         lines.push('');
