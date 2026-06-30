@@ -239,7 +239,8 @@ const { activeMission } = useIncident();
 
 const incidentForm = reactive<IncidentInfoForm>(blankIncidentInfoForm());
 const missionSchema = ref<MissionSchema | null>(null);
-const schemaLogId = ref<string | undefined>();
+const schemaContentHash = ref<string | undefined>();
+const legacySchemaLogId = ref<string | undefined>();
 const savingIncident = ref(false);
 const loadingIncident = ref(false);
 
@@ -283,7 +284,8 @@ async function loadIncidentInfo(): Promise<void> {
         Object.assign(incidentForm, blankIncidentInfoForm());
         incidentForm.logId = undefined;
         missionSchema.value = null;
-        schemaLogId.value = undefined;
+        schemaContentHash.value = undefined;
+        legacySchemaLogId.value = undefined;
         return;
     }
     loadingIncident.value = true;
@@ -294,11 +296,12 @@ async function loadIncidentInfo(): Promise<void> {
         const logs = await sub.log.list({ refresh: true });
         const loaded = await loadMissionSchema(sub);
         missionSchema.value = loaded.schema;
-        schemaLogId.value = loaded.logId;
+        schemaContentHash.value = loaded.contentHash;
+        legacySchemaLogId.value = loaded.legacyLogId;
         applyMissionContextToSchema(loaded.schema, activeMission.value.name);
 
         const saved = latestIncidentInfoFromLogs(logs);
-        if (schemaLogId.value) {
+        if (schemaContentHash.value || legacySchemaLogId.value) {
             Object.assign(incidentForm, incidentFormFromSchema(loaded.schema));
             incidentForm.logId = saved?.logId;
             if (!incidentForm.incidentName.trim()) applySubjectNameSuggestion(logs);
@@ -314,7 +317,8 @@ async function loadIncidentInfo(): Promise<void> {
         Object.assign(incidentForm, blankIncidentInfoForm());
         incidentForm.logId = undefined;
         missionSchema.value = null;
-        schemaLogId.value = undefined;
+        schemaContentHash.value = undefined;
+        legacySchemaLogId.value = undefined;
     } finally {
         loadingIncident.value = false;
     }
@@ -332,7 +336,13 @@ async function saveIncidentInfo(): Promise<void> {
         const schema = missionSchema.value ?? (await loadMissionSchema(sub)).schema;
         applyIncidentFormToSchema(incidentForm, schema);
         applyMissionContextToSchema(schema, activeMission.value.name);
-        schemaLogId.value = await saveMissionSchema(sub, schema, schemaLogId.value);
+        const savedSchema = await saveMissionSchema(sub, schema, {
+            contentHash: schemaContentHash.value,
+            legacyLogId: legacySchemaLogId.value,
+            missionToken: activeMission.value.token,
+        });
+        schemaContentHash.value = savedSchema.contentHash;
+        legacySchemaLogId.value = undefined;
         missionSchema.value = schema;
 
         const body = {
@@ -346,7 +356,7 @@ async function saveIncidentInfo(): Promise<void> {
             const created = await sub.log.create(body);
             incidentForm.logId = String(created.id);
         }
-        status.value = `Saved incident information and mission schema to ${activeMission.value.name}.`;
+        status.value = `Saved incident information to ${activeMission.value.name}.`;
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);
@@ -370,7 +380,13 @@ async function syncSchemaFromForm(
         replaceMpsRowsInSchema(schema, parsedRows, activeMission.value.name);
     }
     applyMissionContextToSchema(schema, activeMission.value.name);
-    schemaLogId.value = await saveMissionSchema(sub, schema, schemaLogId.value);
+    const savedSchema = await saveMissionSchema(sub, schema, {
+        contentHash: schemaContentHash.value,
+        legacyLogId: legacySchemaLogId.value,
+        missionToken: activeMission.value.token,
+    });
+    schemaContentHash.value = savedSchema.contentHash;
+    legacySchemaLogId.value = undefined;
     missionSchema.value = schema;
 }
 
@@ -448,9 +464,14 @@ async function postLogs(): Promise<void> {
             appendMpsRowsToSchema(schema, toPost, activeMission.value.name);
             applyIncidentFormToSchema(incidentForm, schema);
             applyMissionContextToSchema(schema, activeMission.value.name);
-            schemaLogId.value = await saveMissionSchema(sub, schema, schemaLogId.value);
+            const savedSchema = await saveMissionSchema(sub, schema, {
+                contentHash: schemaContentHash.value,
+                legacyLogId: legacySchemaLogId.value,
+                missionToken: activeMission.value.token,
+            });
+            schemaContentHash.value = savedSchema.contentHash;
+            legacySchemaLogId.value = undefined;
             missionSchema.value = schema;
-            status.value += ' Mission schema updated.';
         }
     } catch (err) {
         statusError.value = true;

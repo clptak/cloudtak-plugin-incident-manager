@@ -1,5 +1,5 @@
 import { Preferences } from '@capacitor/preferences';
-import { stdurl } from '../../../../src/std.ts';
+import { server, stdurl } from '../../../../src/std.ts';
 
 function bytesToArrayBuffer(data: Uint8Array): ArrayBuffer {
     return data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
@@ -37,6 +37,19 @@ export async function uploadMissionFile(
         const detail = await res.text().catch(() => '');
         throw new Error(`Upload failed (${res.status})${detail ? `: ${detail.slice(0, 200)}` : ''}`);
     }
+}
+
+/** Download a mission content file as text (DataSync contents, not the log). */
+export async function fetchMissionFileText(hash: string, name: string): Promise<string> {
+    const res = await server.GET('/api/marti/api/files/{:hash}', {
+        params: {
+            path: { ':hash': hash },
+            query: { name },
+        },
+        parseAs: 'text',
+    });
+    if (res.error) throw new Error(res.error.message);
+    return res.data;
 }
 
 export function safeMissionFilename(name: string): string {

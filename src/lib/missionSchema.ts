@@ -1,6 +1,6 @@
 /**
  * Load, merge, and persist the incident mission JSON blob (mission_schema.json shape)
- * as a single DataSync mission log entry.
+ * as a DataSync mission content file — not a mission log entry.
  */
 
 import missionSchemaTemplate from '../data/mission_schema.json';
@@ -11,8 +11,11 @@ import {
     nowDatetimeLocal,
 } from './incidentInfo.ts';
 import type { MpsRow } from './mpsParser.ts';
+import { fetchMissionFileText, uploadMissionFile } from './missionUpload.ts';
 
+/** Legacy log keyword from earlier builds; only used when migrating stored schema. */
 export const MISSION_SCHEMA_KEYWORD = 'mission-schema';
+export const MISSION_SCHEMA_FILENAME = 'mission_schema.json';
 
 export interface MissionLogEntry {
     source: string;
@@ -79,17 +82,40 @@ interface SchemaLogLike {
     dtg?: string;
 }
 
+interface ContentLike {
+    hash?: string;
+    name?: string;
+    submissionTime?: string;
+}
+
 interface LoadedSubLike {
+    guid: string;
+    fetch?(): Promise<unknown>;
     log: {
         list(opts?: { refresh?: boolean }): Promise<SchemaLogLike[]>;
-        create(body: { content: string; keywords?: string[]; dtg?: string }): Promise<{ id: string | number }>;
-        update(logid: string, body: { content: string; keywords?: string[]; dtg?: string }): Promise<{ id: string | number }>;
+        delete?(logid: string): Promise<void>;
+    };
+    contents: {
+        list(): Promise<ContentLike[]>;
+        delete?(hash: string): Promise<void>;
     };
 }
 
 export interface LoadedMissionSchema {
     schema: MissionSchema;
-    logId?: string;
+    contentHash?: string;
+    /** Present when an older build stored schema in the mission log. */
+    legacyLogId?: string;
+}
+
+export interface SaveMissionSchemaOpts {
+    contentHash?: string;
+    legacyLogId?: string;
+    missionToken?: string;
+}
+
+export interface SavedMissionSchema {
+    contentHash?: string;
 }
 
 export function defaultMissionSchema(): MissionSchema {
@@ -199,6 +225,18 @@ export function appendMpsRowsToSchema(
     }
 }
 
+function findLatestSchemaContent(contents: ContentLike[]): ContentLike | null {
+    const matches = contents.filter(
+        (c) => c.name === MISSION_SCHEMA_FILENAME && c.hash,
+    );
+    if (!matches.length) return null;
+    matches.sort(
+        (a, b) => Date.parse(b.submissionTime || '') - Date.parse(a.submissionTime || ''),
+    );
+    return matches[0];
+}
+
+/** Legacy: schema was incorrectly stored as a mission log entry. */
 export function findLatestSchemaLog(logs: SchemaLogLike[]): { logId: string; schema: MissionSchema } | null {
     let best: { logId: string; schema: MissionSchema; created: string } | null = null;
     for (const log of logs) {
@@ -219,26 +257,62 @@ export function findLatestSchemaLog(logs: SchemaLogLike[]): { logId: string; sch
 }
 
 export async function loadMissionSchema(sub: LoadedSubLike): Promise<LoadedMissionSchema> {
+    if (sub.fetch) await sub.fetch();
+
+    const contents = await sub.contents.list();
+    const content = findLatestSchemaContent(contents);
     const logs = await sub.log.list({ refresh: true });
-    const saved = findLatestSchemaLog(logs);
-    if (saved) return { schema: saved.schema, logId: saved.logId };
+    const legacy = findLatestSchemaLog(logs);
+
+    if (content?.hash) {
+        const text = await fetchMissionFileText(content.hash, content.name || MISSION_SCHEMA_FILENAME);
+        const schema = JSON.parse(text) as MissionSchema;
+        return {
+            schema,
+            contentHash: content.hash,
+            legacyLogId: legacy?.logId,
+        };
+    }
+
+    if (legacy) {
+        return { schema: legacy.schema, legacyLogId: legacy.logId };
+    }
+
     return { schema: defaultMissionSchema() };
 }
 
 export async function saveMissionSchema(
     sub: LoadedSubLike,
     schema: MissionSchema,
-    logId?: string,
-): Promise<string> {
-    const body = {
-        dtg: new Date().toISOString(),
-        content: JSON.stringify(schema, null, 2),
-        keywords: [MISSION_SCHEMA_KEYWORD],
-    };
-    if (logId) {
-        await sub.log.update(logId, body);
-        return logId;
+    opts?: SaveMissionSchemaOpts,
+): Promise<SavedMissionSchema> {
+    const json = JSON.stringify(schema, null, 2);
+    const bytes = new TextEncoder().encode(json);
+
+    await uploadMissionFile(sub.guid, MISSION_SCHEMA_FILENAME, bytes, {
+        missionToken: opts?.missionToken,
+        mimeType: 'application/json',
+    });
+
+    if (sub.fetch) await sub.fetch();
+
+    if (opts?.contentHash && sub.contents.delete) {
+        try {
+            await sub.contents.delete(opts.contentHash);
+        } catch {
+            /* prior revision may already be detached */
+        }
     }
-    const created = await sub.log.create(body);
-    return String(created.id);
+
+    if (opts?.legacyLogId && sub.log.delete) {
+        try {
+            await sub.log.delete(opts.legacyLogId);
+        } catch {
+            /* legacy log may already be removed */
+        }
+    }
+
+    const updated = await sub.contents.list();
+    const latest = findLatestSchemaContent(updated);
+    return { contentHash: latest?.hash };
 }
