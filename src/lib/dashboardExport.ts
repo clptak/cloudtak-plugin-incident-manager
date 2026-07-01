@@ -1,4 +1,8 @@
 import {
+    initialInfoDetailRows,
+    type IncidentInfoForm,
+} from './incidentInfo.ts';
+import {
     displaySubjectNumber,
     subjectDetailRows,
     type ParsedSubject,
@@ -143,11 +147,31 @@ function layoutRow(
     return { cells, rowHeight };
 }
 
+interface PdfDetailLine {
+    text: string;
+    size: number;
+    bold: boolean;
+}
+
+function detailSectionLines(
+    title: string,
+    rows: Array<{ label: string; value: string }>,
+    titleSize = 9,
+): PdfDetailLine[] {
+    if (!rows.length) return [];
+    const lines: PdfDetailLine[] = [{ text: title, size: titleSize, bold: true }];
+    for (const row of rows) {
+        lines.push({ text: `${row.label}: ${row.value}`, size: FONT_SIZE, bold: false });
+    }
+    return lines;
+}
+
 function buildPdf(
     rows: DashboardExportRow[],
     missionName: string,
     exportedAt: string,
     subjects: ParsedSubject[] = [],
+    initialInfo?: IncidentInfoForm | null,
 ): string {
     const contentW = PAGE_W - MARGIN * 2;
     const colWidths = [
@@ -223,24 +247,71 @@ function buildPdf(
     addLine(MARGIN, y, PAGE_W - MARGIN, y);
     y -= 12;
 
-    if (subjects.length) {
-        addWrappedBlock('Subject Information', 0, 10, true);
-        y -= 4;
-        for (const s of subjects) {
-            const details = subjectDetailRows(s);
-            if (!details.length) continue;
-            addWrappedBlock(`Subject ${displaySubjectNumber(s.subjectCaseID)}`, 0, 9, true);
-            for (const row of details) {
-                addWrappedBlock(`${row.label}: ${row.value}`, 12);
+    const initialRows = initialInfo ? initialInfoDetailRows(initialInfo) : [];
+    const hasInitialInfo = initialRows.length > 0;
+    const hasSubjects = subjects.length > 0;
+
+    if (hasInitialInfo || hasSubjects) {
+        const gap = contentW * 0.04;
+        const colW = (contentW - gap) / 2;
+        const leftX = MARGIN;
+        const rightX = MARGIN + colW + gap;
+
+        const leftLines = hasInitialInfo
+            ? detailSectionLines('Initial Information', initialRows)
+            : [];
+        const rightLines: PdfDetailLine[] = [];
+        if (hasSubjects) {
+            for (const s of subjects) {
+                const details = subjectDetailRows(s);
+                if (!details.length) continue;
+                rightLines.push(
+                    ...detailSectionLines(
+                        `Subject ${displaySubjectNumber(s.subjectCaseID)}`,
+                        details,
+                    ),
+                );
+                rightLines.push({ text: '', size: FONT_SIZE, bold: false });
             }
-            y -= 4;
         }
+
+        let leftIdx = 0;
+        let rightIdx = 0;
+        while (leftIdx < leftLines.length || rightIdx < rightLines.length) {
+            const leftLine = leftLines[leftIdx];
+            const rightLine = rightLines[rightIdx];
+            const leftWrapped = leftLine
+                ? wrapText(leftLine.text, colW - 4, leftLine.size)
+                : [];
+            const rightWrapped = rightLine
+                ? wrapText(rightLine.text, colW - 4, rightLine.size)
+                : [];
+            const lineCount = Math.max(leftWrapped.length, rightWrapped.length, 1);
+            const blockH = lineCount * LINE_H + ROW_VPAD;
+            ensureSpace(blockH);
+
+            const firstBaseline = y - ROW_VPAD - FONT_ASCENT;
+            for (let i = 0; i < lineCount; i++) {
+                const lineY = firstBaseline - i * LINE_H;
+                if (leftLine && leftWrapped[i]) {
+                    addText(leftX + 2, lineY, leftWrapped[i], leftLine.size, leftLine.bold);
+                }
+                if (rightLine && rightWrapped[i]) {
+                    addText(rightX + 2, lineY, rightWrapped[i], rightLine.size, rightLine.bold);
+                }
+            }
+
+            y -= blockH;
+            if (leftLine) leftIdx++;
+            if (rightLine) rightIdx++;
+        }
+
         addLine(MARGIN, y, PAGE_W - MARGIN, y);
         y -= 12;
     }
 
     if (rows.length) {
-        if (subjects.length) {
+        if (hasInitialInfo || hasSubjects) {
             addWrappedBlock('Mission Log', 0, 10, true);
             y -= 4;
         }
@@ -336,9 +407,10 @@ export function exportDashboardPdf(
     rows: DashboardExportRow[],
     missionName: string,
     subjects: ParsedSubject[] = [],
+    initialInfo?: IncidentInfoForm | null,
 ): void {
     const exportedAt = new Date().toLocaleString(undefined, LOCAL_TIME_OPTS);
-    const pdf = buildPdf(rows, missionName, exportedAt, subjects);
+    const pdf = buildPdf(rows, missionName, exportedAt, subjects, initialInfo);
     const blob = new Blob([pdf], { type: 'application/pdf' });
     downloadBlob(blob, `${safeFilename(missionName)}-dashboard.pdf`);
 }

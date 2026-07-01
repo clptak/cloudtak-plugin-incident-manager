@@ -175,11 +175,13 @@ import { ref, reactive, computed, watch, onMounted } from 'vue';
 import Subscription from '../../../../../src/base/subscription.ts';
 import type { DBSubscriptionLog } from '../../../../../src/database.ts';
 import { useIncident } from '../../composables/useIncident.ts';
+import { loadIncidentSubscription } from '../../lib/incidentSubscription.ts';
 import {
     exportDashboardCsv,
     exportDashboardPdf,
     formatLocalTime,
 } from '../../lib/dashboardExport.ts';
+import { loadMissionSchema, resolveIncidentInfoForm } from '../../lib/missionSchema.ts';
 import {
     displaySubjectNumber,
     parseSubjectsFromLogs,
@@ -350,9 +352,17 @@ function exportCsv(): void {
     exportDashboardCsv(exportRows(), activeMission.value.name, subjects.value);
 }
 
-function exportPdf(): void {
+async function exportPdf(): Promise<void> {
     if (!activeMission.value || !canExport.value) return;
-    exportDashboardPdf(exportRows(), activeMission.value.name, subjects.value);
+    try {
+        const sub = await loadIncidentSubscription(activeMission.value);
+        const { schema } = await loadMissionSchema(sub);
+        const logs = await sub.log.list({ refresh: true });
+        const initialInfo = resolveIncidentInfoForm(schema, logs);
+        exportDashboardPdf(exportRows(), activeMission.value.name, subjects.value, initialInfo);
+    } catch (err) {
+        error.value = err instanceof Error ? err.message : String(err);
+    }
 }
 
 async function refresh(): Promise<void> {

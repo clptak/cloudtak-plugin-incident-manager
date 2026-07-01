@@ -4,7 +4,7 @@
  */
 
 import missionSchemaTemplate from '../data/mission_schema.json';
-import type { CadIdentifiers, IncidentInfoForm } from './incidentInfo.ts';
+import type { CadIdentifiers, IncidentInfoForm, MissionLogLike } from './incidentInfo.ts';
 import {
     assignmentDataFromKeywords,
     assignmentDataFromLogContent,
@@ -145,6 +145,38 @@ export function incidentFormFromSchema(schema: MissionSchema): IncidentInfoForm 
         assignmentText: assignment.text || '',
         assignmentDateTime: assignmentIso ? isoToDatetimeLocal(assignmentIso) : nowDatetimeLocal(),
     };
+}
+
+function fillIfEmpty(current: string, fallback: string): string {
+    return current.trim() ? current.trim() : fallback.trim();
+}
+
+/** Merge mission_schema.json with the latest initial-information log for display/export. */
+export function resolveIncidentInfoForm(
+    schema: MissionSchema,
+    logs: MissionLogLike[],
+): IncidentInfoForm {
+    const form = incidentFormFromSchema(schema);
+    const saved = latestIncidentInfoFromLogs(logs);
+    if (saved) {
+        const f = saved.fields;
+        form.incidentName = fillIfEmpty(form.incidentName, f.incidentName);
+        form.eventId = fillIfEmpty(form.eventId, f.eventId);
+        form.incidentId = fillIfEmpty(form.incidentId, f.incidentId);
+        form.demaMission = fillIfEmpty(form.demaMission, f.demaMission);
+        form.icCoordinator = fillIfEmpty(form.icCoordinator, f.icCoordinator);
+        if (!schema.incident_response.indicent_datetime) {
+            form.incidentConclusionTime = f.incidentConclusionTime;
+        }
+    }
+    const assignment = assignmentDataFromSchema(schema);
+    mergeAssignmentFieldsIntoForm(form, {
+        schemaText: assignment.text,
+        schemaDatetime: assignment.datetime,
+        logKeywords: saved?.keywords,
+        logContent: saved?.content,
+    });
+    return form;
 }
 
 export interface AssignmentData {

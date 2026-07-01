@@ -259,6 +259,61 @@ export function latestIncidentInfoFromLogs(
         : null;
 }
 
+export interface IncidentDetailRow {
+    label: string;
+    value: string;
+}
+
+function hasDisplayValue(value: string): boolean {
+    return !!value?.trim();
+}
+
+function formatIncidentDatetime(value: string): string {
+    if (!value.trim()) return '';
+    const ms = Date.parse(value);
+    if (Number.isNaN(ms)) return value.trim();
+    return new Date(ms).toLocaleString(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+    });
+}
+
+/** Labeled rows for Dashboard / PDF (non-empty initial-information fields only). */
+export function initialInfoDetailRows(form: IncidentInfoForm): IncidentDetailRow[] {
+    const rows: IncidentDetailRow[] = [];
+    if (hasDisplayValue(form.incidentName)) {
+        rows.push({ label: 'Incident Name', value: form.incidentName.trim() });
+    }
+    if (hasDisplayValue(form.eventId)) {
+        rows.push({ label: 'Activity Number', value: form.eventId.trim() });
+    }
+    if (hasDisplayValue(form.incidentId)) {
+        rows.push({ label: 'Department Report Number', value: form.incidentId.trim() });
+    }
+    if (hasDisplayValue(form.demaMission)) {
+        rows.push({ label: 'DEMA Mission Number', value: form.demaMission.trim() });
+    }
+    if (hasDisplayValue(form.icCoordinator)) {
+        rows.push({ label: 'IC Coordinator', value: form.icCoordinator.trim() });
+    }
+    if (hasDisplayValue(form.incidentConclusionTime)) {
+        rows.push({
+            label: 'Incident Conclusion Time',
+            value: formatIncidentDatetime(form.incidentConclusionTime),
+        });
+    }
+    if (hasDisplayValue(form.assignmentText)) {
+        rows.push({ label: 'Assignment', value: form.assignmentText.trim() });
+    }
+    if (hasDisplayValue(form.assignmentDateTime)) {
+        rows.push({
+            label: 'Assignment Date/Time',
+            value: formatIncidentDatetime(form.assignmentDateTime),
+        });
+    }
+    return rows;
+}
+
 /** Fill empty activity / report fields from parsed CFS identifiers. */
 export function applyParsedCadToForm(
     form: IncidentInfoForm,
