@@ -118,17 +118,18 @@ export function blankIncidentInfoForm(): IncidentInfoForm {
     };
 }
 
-export function fieldsFromLog(keywords?: string[]): IncidentInfoForm {
-    const conclusionIso = kwValue(keywords, 'conclusionTime:');
-    const assignmentIso = kwValue(keywords, 'assignmentDateTime:');
+export function fieldsFromLog(keywords?: unknown): IncidentInfoForm {
+    const normalized = normalizeLogKeywords(keywords);
+    const conclusionIso = kwValue(normalized, 'conclusionTime:');
+    const assignmentIso = kwValue(normalized, 'assignmentDateTime:');
     return {
-        incidentName: kwValue(keywords, 'incidentName:'),
-        eventId: kwValue(keywords, 'eventId:'),
-        incidentId: kwValue(keywords, 'incidentId:'),
-        demaMission: kwValue(keywords, 'demaMission:'),
-        icCoordinator: kwValue(keywords, 'icCoordinator:'),
+        incidentName: kwValue(normalized, 'incidentName:'),
+        eventId: kwValue(normalized, 'eventId:'),
+        incidentId: kwValue(normalized, 'incidentId:'),
+        demaMission: kwValue(normalized, 'demaMission:'),
+        icCoordinator: kwValue(normalized, 'icCoordinator:'),
         incidentConclusionTime: conclusionIso ? isoToDatetimeLocal(conclusionIso) : nowDatetimeLocal(),
-        assignmentText: kwValue(keywords, 'assignmentText:'),
+        assignmentText: kwValue(normalized, 'assignmentText:'),
         assignmentDateTime: assignmentIso ? isoToDatetimeLocal(assignmentIso) : nowDatetimeLocal(),
     };
 }
@@ -163,26 +164,66 @@ export function buildIncidentInfoKeywords(f: IncidentInfoForm): string[] {
     return kws;
 }
 
-export function assignmentDataFromKeywords(keywords?: string[]): { text: string; datetime: string } {
+/** DataSync may return keywords as a string array or a comma-separated string. */
+export function normalizeLogKeywords(keywords: unknown): string[] {
+    if (Array.isArray(keywords)) {
+        return keywords.filter((k): k is string => typeof k === 'string');
+    }
+    if (typeof keywords === 'string' && keywords.trim()) {
+        return keywords.split(',').map((k) => k.trim()).filter(Boolean);
+    }
+    return [];
+}
+
+export function assignmentDataFromKeywords(keywords?: unknown): { text: string; datetime: string } {
+    const normalized = normalizeLogKeywords(keywords);
     return {
-        text: kwValue(keywords, 'assignmentText:').trim(),
-        datetime: kwValue(keywords, 'assignmentDateTime:').trim(),
+        text: kwValue(normalized, 'assignmentText:').trim(),
+        datetime: kwValue(normalized, 'assignmentDateTime:').trim(),
     };
 }
 
 export function assignmentDataFromLogContent(content?: string): { text: string; datetime: string } {
     if (!content?.trim()) return { text: '', datetime: '' };
+
+    const textPrefix = 'Assignment:';
+    const timePrefix = 'Assignment time:';
+    const textIdx = content.indexOf(textPrefix);
+    const timeIdx = content.indexOf(timePrefix);
+
     let text = '';
-    let datetime = '';
-    for (const part of content.split(';')) {
-        const trimmed = part.trim();
-        if (trimmed.startsWith('Assignment time:')) {
-            datetime = trimmed.slice('Assignment time:'.length).trim();
-        } else if (trimmed.startsWith('Assignment:')) {
-            text = trimmed.slice('Assignment:'.length).trim();
-        }
+    if (textIdx >= 0) {
+        const valueStart = textIdx + textPrefix.length;
+        const valueEnd = timeIdx > textIdx ? timeIdx : content.length;
+        text = content.slice(valueStart, valueEnd).replace(/^;\s*/, '').replace(/\s*;?\s*$/, '').trim();
     }
+
+    let datetime = '';
+    if (timeIdx >= 0) {
+        const valueStart = timeIdx + timePrefix.length;
+        datetime = content.slice(valueStart).split(';')[0].trim();
+    }
+
     return { text, datetime };
+}
+
+export function mergeAssignmentFieldsIntoForm(
+    form: IncidentInfoForm,
+    opts?: {
+        schemaText?: string;
+        schemaDatetime?: string;
+        logKeywords?: unknown;
+        logContent?: string;
+    },
+): void {
+    const fromLog = assignmentDataFromKeywords(opts?.logKeywords);
+    const fromContent = assignmentDataFromLogContent(opts?.logContent);
+    const schemaText = (opts?.schemaText || '').trim();
+    const schemaDatetime = (opts?.schemaDatetime || '').trim();
+
+    form.assignmentText = schemaText || fromLog.text || fromContent.text;
+    const datetimeIso = schemaDatetime || fromLog.datetime || fromContent.datetime;
+    form.assignmentDateTime = datetimeIso ? isoToDatetimeLocal(datetimeIso) : nowDatetimeLocal();
 }
 
 /** Most recent saved initial-information log entry, if any. */
@@ -197,12 +238,12 @@ export function latestIncidentInfoFromLogs(
         content: string;
     } | null = null;
     for (const log of logs) {
-        if (!log.keywords?.includes(INITIAL_INFO_KEYWORD)) continue;
+        const keywords = normalizeLogKeywords(log.keywords);
+        if (!keywords.includes(INITIAL_INFO_KEYWORD)) continue;
         const created = log.created || log.dtg || '';
         const logId = String(log.id ?? '');
         if (!logId) continue;
-        const fields = fieldsFromLog(log.keywords);
-        const keywords = Array.isArray(log.keywords) ? log.keywords : [];
+        const fields = fieldsFromLog(keywords);
         if (!best || Date.parse(created) >= Date.parse(best.created)) {
             best = {
                 fields,

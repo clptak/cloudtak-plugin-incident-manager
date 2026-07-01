@@ -12,6 +12,7 @@ import {
     datetimeLocalToLocalIso,
     isoToDatetimeLocal,
     latestIncidentInfoFromLogs,
+    mergeAssignmentFieldsIntoForm,
     nowDatetimeLocal,
 } from './incidentInfo.ts';
 import type { MpsRow } from './mpsParser.ts';
@@ -186,20 +187,20 @@ function hydrateAssignmentOnSchema(schema: MissionSchema, logs: SchemaLogLike[])
     if (merged.datetime) schema.assignment.datetime = merged.datetime;
 }
 
-/** Backfill assignment form fields from log keywords when the schema file has none. */
+/** Backfill assignment form fields from log keywords/content when the schema file has none. */
 export function mergeAssignmentIntoForm(
     form: IncidentInfoForm,
     schema: MissionSchema,
-    logKeywords?: string[],
+    logKeywords?: unknown,
+    logContent?: string,
 ): void {
     const fromSchema = assignmentDataFromSchema(schema);
-    const fromLog = assignmentDataFromKeywords(logKeywords);
-    if (!fromSchema.text && fromLog.text) {
-        form.assignmentText = fromLog.text;
-    }
-    if (!fromSchema.datetime && fromLog.datetime) {
-        form.assignmentDateTime = isoToDatetimeLocal(fromLog.datetime);
-    }
+    mergeAssignmentFieldsIntoForm(form, {
+        schemaText: fromSchema.text,
+        schemaDatetime: fromSchema.datetime,
+        logKeywords,
+        logContent,
+    });
 }
 
 export function applyIncidentFormToSchema(
@@ -368,17 +369,17 @@ export async function loadMissionSchema(sub: LoadedSubLike): Promise<LoadedMissi
 
 async function waitForLatestSchemaContent(
     sub: LoadedSubLike,
-    previousHash?: string,
+    hashBeforeUpload?: string,
 ): Promise<ContentLike | null> {
-    const attempts = 5;
+    const attempts = 8;
     for (let i = 0; i < attempts; i++) {
         if (sub.fetch) await sub.fetch();
         const latest = findLatestSchemaContent(await sub.contents.list());
-        if (latest?.hash && (!previousHash || latest.hash !== previousHash)) {
+        if (latest?.hash && latest.hash !== hashBeforeUpload) {
             return latest;
         }
         if (i < attempts - 1) {
-            await new Promise((resolve) => setTimeout(resolve, 250 * (i + 1)));
+            await new Promise((resolve) => setTimeout(resolve, 300 * (i + 1)));
         }
     }
     return findLatestSchemaContent(await sub.contents.list());
@@ -391,18 +392,20 @@ export async function saveMissionSchema(
 ): Promise<SavedMissionSchema> {
     const json = JSON.stringify(schema, null, 2);
     const bytes = new TextEncoder().encode(json);
-    const previousHash = opts?.contentHash;
+    if (sub.fetch) await sub.fetch();
+    const hashBeforeUpload = findLatestSchemaContent(await sub.contents.list())?.hash;
 
     await uploadMissionFile(sub.guid, MISSION_SCHEMA_FILENAME, bytes, {
         missionToken: opts?.missionToken,
         mimeType: 'application/json',
     });
 
-    const latest = await waitForLatestSchemaContent(sub, previousHash);
+    const latest = await waitForLatestSchemaContent(sub, hashBeforeUpload);
 
-    if (previousHash && latest?.hash && latest.hash !== previousHash && sub.contents.delete) {
+    const revisionToDelete = hashBeforeUpload || opts?.contentHash;
+    if (revisionToDelete && latest?.hash && latest.hash !== revisionToDelete && sub.contents.delete) {
         try {
-            await sub.contents.delete(previousHash);
+            await sub.contents.delete(revisionToDelete);
         } catch {
             /* prior revision may already be detached */
         }
