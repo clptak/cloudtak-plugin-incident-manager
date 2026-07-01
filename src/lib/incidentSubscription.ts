@@ -14,10 +14,27 @@ export function missionAuthToken(mission: ActiveMission): string | undefined {
 }
 
 /** Load a mission subscription with correct CloudTAK + mission auth headers. */
-export async function loadIncidentSubscription(mission: ActiveMission): Promise<Subscription> {
-    return Subscription.load(mission.guid, {
+export async function loadIncidentSubscription(
+    mission: ActiveMission,
+    opts?: {
+        onMissionToken?: (missionToken: string) => void;
+    },
+): Promise<Subscription> {
+    const sub = await Subscription.load(mission.guid, {
         token: await sessionToken(),
         missiontoken: missionAuthToken(mission),
         subscribed: true,
     });
+    if (sub.missiontoken && sub.missiontoken !== missionAuthToken(mission)) {
+        opts?.onMissionToken?.(sub.missiontoken);
+    }
+    return sub;
+}
+
+/** Mission token for writes: subscription DB first, then active-mission state. */
+export function subscriptionMissionToken(
+    sub: Subscription,
+    mission: ActiveMission,
+): string | undefined {
+    return sub.missiontoken || missionAuthToken(mission);
 }

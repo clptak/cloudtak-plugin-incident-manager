@@ -307,9 +307,16 @@ export function appendMpsRowsToSchema(
     }
 }
 
+function isMissionSchemaContentName(name: string | undefined): boolean {
+    if (!name) return false;
+    return name === MISSION_SCHEMA_FILENAME
+        || name.endsWith(`/${MISSION_SCHEMA_FILENAME}`)
+        || name.endsWith(MISSION_SCHEMA_FILENAME);
+}
+
 function findLatestSchemaContent(contents: ContentLike[]): ContentLike | null {
     const matches = contents.filter(
-        (c) => c.name === MISSION_SCHEMA_FILENAME && c.hash,
+        (c) => isMissionSchemaContentName(c.name) && c.hash,
     );
     if (!matches.length) return null;
     matches.sort(
@@ -396,13 +403,22 @@ export async function saveMissionSchema(
     const hashBeforeUpload = findLatestSchemaContent(await sub.contents.list())?.hash;
 
     const missionToken = opts?.missionToken;
-    await uploadMissionFile(sub.guid, MISSION_SCHEMA_FILENAME, bytes, {
+    const uploadHash = await uploadMissionFile(sub.guid, MISSION_SCHEMA_FILENAME, bytes, {
         missionToken,
         mimeType: 'application/json',
     });
 
-    const latest = await waitForLatestSchemaContent(sub, hashBeforeUpload);
+    if (sub.fetch) await sub.fetch();
+
+    let latest = uploadHash
+        ? { hash: uploadHash, name: MISSION_SCHEMA_FILENAME }
+        : await waitForLatestSchemaContent(sub, hashBeforeUpload);
+
     if (!latest?.hash) {
+        latest = findLatestSchemaContent(await sub.contents.list());
+    }
+
+    if (!latest?.hash || !isMissionSchemaContentName(latest.name)) {
         throw new Error(
             'mission_schema.json upload did not appear in mission contents. '
             + 'Confirm you have MISSION_WRITE on this DataSync mission, then try again.',
