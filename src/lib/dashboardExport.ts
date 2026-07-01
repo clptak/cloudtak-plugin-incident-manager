@@ -166,6 +166,13 @@ function detailSectionLines(
     return lines;
 }
 
+/** PDF log table: only source:/uid: keywords in the Source column. */
+function pdfSourceKeywords(keywords: string[]): string {
+    return keywords
+        .filter((k) => k.startsWith('source:') || k.startsWith('uid:'))
+        .join(', ');
+}
+
 function buildPdf(
     rows: DashboardExportRow[],
     missionName: string,
@@ -177,8 +184,8 @@ function buildPdf(
     const colWidths = [
         contentW * 0.12,  // Time
         contentW * 0.58,  // Entry (majority)
-        contentW * 0.14,  // Source
-        contentW * 0.16,  // Keywords
+        contentW * 0.14,  // User
+        contentW * 0.16,  // Source (source:/uid: keywords)
     ];
     const colX = [
         MARGIN,
@@ -187,12 +194,12 @@ function buildPdf(
         MARGIN + colWidths[0] + colWidths[1] + colWidths[2],
     ];
 
-    const headerLabels = ['Time', 'Entry', 'Source', 'Keywords'];
+    const headerLabels = ['Time', 'Entry', 'User', 'Source'];
     const bodyRows = rows.map((r) => [
         formatLocalTime(r.epoch),
         r.content,
         r.source,
-        r.keywords.join(', '),
+        pdfSourceKeywords(r.keywords),
     ]);
 
     type PageOp = string;
