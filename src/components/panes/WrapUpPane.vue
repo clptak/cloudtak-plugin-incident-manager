@@ -74,9 +74,15 @@
 
 <script setup lang='ts'>
 import { ref } from 'vue';
+import { latestIncidentInfoFromLogs, type MissionLogLike } from '../../lib/incidentInfo.ts';
 import { useIncident } from '../../composables/useIncident.ts';
 import { loadIncidentSubscription } from '../../lib/incidentSubscription.ts';
-import { loadMissionSchema, resolveAssignmentData } from '../../lib/missionSchema.ts';
+import {
+    incidentFormFromSchema,
+    loadMissionSchema,
+    resolveAssignmentData,
+    type MissionSchema,
+} from '../../lib/missionSchema.ts';
 
 const { activeMission } = useIncident();
 
@@ -89,15 +95,60 @@ function pad2(n: number): string {
     return String(n).padStart(2, '0');
 }
 
+function formatGenerationDate(epoch: number): string {
+    const d = new Date(epoch);
+    return `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())}/${d.getFullYear()}`;
+}
+
+function resolveReportMeta(
+    schema: MissionSchema,
+    logs: MissionLogLike[],
+): { reportNumber: string; icCoordinator: string } {
+    const form = incidentFormFromSchema(schema);
+    const saved = latestIncidentInfoFromLogs(logs);
+    return {
+        reportNumber: form.incidentId.trim() || saved?.fields.incidentId.trim() || '',
+        icCoordinator: form.icCoordinator.trim() || saved?.fields.icCoordinator.trim() || '',
+    };
+}
+
+function reportHeaderLines(
+    reportNumber: string,
+    icCoordinator: string,
+    generatedAt: number,
+): string[] {
+    return [
+        `Patrol DR # ${reportNumber}`,
+        `Deputy ${icCoordinator} #`,
+        `C: ${formatGenerationDate(generatedAt)}`,
+        '',
+    ];
+}
+
+function reportFooterLines(reportNumber: string): string[] {
+    const mapFile = reportNumber
+        ? `${reportNumber}_Incident_Map.pdf`
+        : 'Incident_Map.pdf';
+    return [
+        '',
+        'ENCLOSURES:',
+        '',
+        `1. ${mapFile}`,
+        '',
+        'DISPOSITION:',
+        '',
+        'Case Closed - Non-Crime | Refer to other Agency Report # | Refer to Original Report | Investigation Continued',
+    ];
+}
 function formatReportDateTimeParts(epoch: number): { date: string; time: string } {
     const d = new Date(epoch);
     return {
-        date: `${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}-${d.getFullYear()}`,
+        date: `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())}/${d.getFullYear()}`,
         time: `${pad2(d.getHours())}${pad2(d.getMinutes())}`,
     };
 }
 
-/** Browser-local timestamp for the patrol report: MM-DD-YYYY at HHMM. */
+/** Browser-local timestamp for the patrol report: MM/DD/YYYY at HHMM. */
 function formatReportTime(epoch: number, raw?: string): string {
     if (epoch <= 0) return raw || '';
     const { date, time } = formatReportDateTimeParts(epoch);
@@ -123,10 +174,18 @@ function assignmentLines(data: { text: string; datetime: string } | null): strin
         ? formatReportDateTimeParts(epoch)
         : { date: '', time: '' };
 
+    const sentence = date && time
+        ? `On ${date} at approximately ${time} hours, ${txt}`
+        : date
+            ? `On ${date}, ${txt}`
+            : time
+                ? `At approximately ${time} hours, ${txt}`
+                : txt;
+
     return [
         '## ASSIGNMENT:',
         '',
-        `On ${date} at approximately ${time}, ${txt}`,
+        sentence,
         '',
     ];
 }
@@ -139,6 +198,8 @@ async function generate(): Promise<void> {
         const { schema } = await loadMissionSchema(sub);
         const logs = await sub.log.list({ refresh: true });
         const assignmentData = resolveAssignmentData(schema, logs);
+        const generatedAt = Date.now();
+        const { reportNumber, icCoordinator } = resolveReportMeta(schema, logs);
         const sortedLogs = [...logs].sort((a, b) => {
             const ea = parseTime(a.dtg || a.created).epoch;
             const eb = parseTime(b.dtg || b.created).epoch;
@@ -146,12 +207,7 @@ async function generate(): Promise<void> {
         });
 
         const lines: string[] = [];
-        lines.push(`# CCSO Patrol Report — ${activeMission.value.name}`);
-        lines.push('');
-        lines.push(`Generated: ${formatReportTime(Date.now())}`);
-        lines.push(`Mission GUID: ${activeMission.value.guid}`);
-        lines.push(`Log entries: ${logs.length}`);
-        lines.push('');
+        lines.push(...reportHeaderLines(reportNumber, icCoordinator, generatedAt));
         const assignment = assignmentLines(assignmentData);
         if (assignment) lines.push(...assignment);
         lines.push('## INVESTIGATION:');
@@ -166,7 +222,7 @@ async function generate(): Promise<void> {
                 lines.push(`${ts} — ${log.content || ''}${who}`);
             }
         }
-        lines.push('');
+        lines.push(...reportFooterLines(reportNumber));
         report.value = lines.join('\n');
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
