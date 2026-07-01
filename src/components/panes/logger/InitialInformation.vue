@@ -73,6 +73,23 @@
                                 class='form-control form-control-sm'
                             >
                         </div>
+                        <div class='col-md-8'>
+                            <label class='form-label'>Assignment</label>
+                            <textarea
+                                v-model='incidentForm.assignmentText'
+                                class='form-control form-control-sm'
+                                rows='3'
+                                placeholder='Assignment details'
+                            />
+                        </div>
+                        <div class='col-md-4'>
+                            <label class='form-label'>Assignment Date/Time</label>
+                            <input
+                                v-model='incidentForm.assignmentDateTime'
+                                type='datetime-local'
+                                class='form-control form-control-sm'
+                            >
+                        </div>
                     </div>
 
                     <button

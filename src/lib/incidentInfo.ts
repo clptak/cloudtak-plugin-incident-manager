@@ -19,6 +19,9 @@ export interface IncidentInfoForm {
     icCoordinator: string;
     /** datetime-local value for the form control */
     incidentConclusionTime: string;
+    assignmentText: string;
+    /** datetime-local value for assignment */
+    assignmentDateTime: string;
     logId?: string;
 }
 
@@ -48,6 +51,20 @@ export function datetimeLocalToIso(local: string): string {
     if (!local.trim()) return '';
     const ms = Date.parse(local);
     return Number.isNaN(ms) ? '' : new Date(ms).toISOString();
+}
+
+/** Local date/time as ISO 8601 with timezone offset (not UTC). */
+export function datetimeLocalToLocalIso(local: string): string {
+    if (!local.trim()) return '';
+    const ms = Date.parse(local);
+    if (Number.isNaN(ms)) return '';
+    const d = new Date(ms);
+    const tzOffset = -d.getTimezoneOffset();
+    const sign = tzOffset >= 0 ? '+' : '-';
+    const absOffset = Math.abs(tzOffset);
+    const hours = pad2(Math.floor(absOffset / 60));
+    const mins = pad2(absOffset % 60);
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}${sign}${hours}:${mins}`;
 }
 
 export function isoToDatetimeLocal(iso: string): string {
@@ -95,11 +112,14 @@ export function blankIncidentInfoForm(): IncidentInfoForm {
         demaMission: '',
         icCoordinator: '',
         incidentConclusionTime: nowDatetimeLocal(),
+        assignmentText: '',
+        assignmentDateTime: nowDatetimeLocal(),
     };
 }
 
 export function fieldsFromLog(keywords?: string[]): IncidentInfoForm {
     const conclusionIso = kwValue(keywords, 'conclusionTime:');
+    const assignmentIso = kwValue(keywords, 'assignmentDateTime:');
     return {
         incidentName: kwValue(keywords, 'incidentName:'),
         eventId: kwValue(keywords, 'eventId:'),
@@ -107,6 +127,8 @@ export function fieldsFromLog(keywords?: string[]): IncidentInfoForm {
         demaMission: kwValue(keywords, 'demaMission:'),
         icCoordinator: kwValue(keywords, 'icCoordinator:'),
         incidentConclusionTime: conclusionIso ? isoToDatetimeLocal(conclusionIso) : nowDatetimeLocal(),
+        assignmentText: kwValue(keywords, 'assignmentText:'),
+        assignmentDateTime: assignmentIso ? isoToDatetimeLocal(assignmentIso) : nowDatetimeLocal(),
     };
 }
 
@@ -119,6 +141,9 @@ export function buildIncidentInfoContent(f: IncidentInfoForm): string {
     if (f.icCoordinator.trim()) parts.push(`IC Coordinator: ${f.icCoordinator.trim()}`);
     const conclusion = datetimeLocalToIso(f.incidentConclusionTime);
     if (conclusion) parts.push(`Conclusion: ${conclusion}`);
+    if (f.assignmentText.trim()) parts.push(`Assignment: ${f.assignmentText.trim()}`);
+    const assignmentDt = datetimeLocalToLocalIso(f.assignmentDateTime);
+    if (assignmentDt) parts.push(`Assignment time: ${assignmentDt}`);
     return parts.length ? parts.join('; ') : 'Initial incident information';
 }
 
@@ -131,6 +156,9 @@ export function buildIncidentInfoKeywords(f: IncidentInfoForm): string[] {
     if (f.icCoordinator.trim()) kws.push(`icCoordinator:${f.icCoordinator.trim()}`);
     const conclusion = datetimeLocalToIso(f.incidentConclusionTime);
     if (conclusion) kws.push(`conclusionTime:${conclusion}`);
+    if (f.assignmentText.trim()) kws.push(`assignmentText:${f.assignmentText.trim()}`);
+    const assignmentDt = datetimeLocalToLocalIso(f.assignmentDateTime);
+    if (assignmentDt) kws.push(`assignmentDateTime:${assignmentDt}`);
     return kws;
 }
 

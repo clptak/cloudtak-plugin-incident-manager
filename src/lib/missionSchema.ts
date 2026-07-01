@@ -7,6 +7,7 @@ import missionSchemaTemplate from '../data/mission_schema.json';
 import type { CadIdentifiers, IncidentInfoForm } from './incidentInfo.ts';
 import {
     datetimeLocalToIso,
+    datetimeLocalToLocalIso,
     isoToDatetimeLocal,
     nowDatetimeLocal,
 } from './incidentInfo.ts';
@@ -71,6 +72,10 @@ export interface MissionSchema {
         indicent_datetime: string;
         [key: string]: unknown;
     };
+    assignment: {
+        text: string;
+        datetime: string;
+    };
     [key: string]: unknown;
 }
 
@@ -124,6 +129,8 @@ export function defaultMissionSchema(): MissionSchema {
 
 export function incidentFormFromSchema(schema: MissionSchema): IncidentInfoForm {
     const conclusionIso = schema.incident_response.indicent_datetime || '';
+    const assignment = schema.assignment ?? { text: '', datetime: '' };
+    const assignmentIso = assignment.datetime || '';
     return {
         incidentName: schema.incident_response.incident_name || '',
         eventId: schema.event_id || schema.cad_data.activity_number || '',
@@ -131,6 +138,8 @@ export function incidentFormFromSchema(schema: MissionSchema): IncidentInfoForm 
         demaMission: schema.dema_mission_number || '',
         icCoordinator: schema.sar_coordinators || '',
         incidentConclusionTime: conclusionIso ? isoToDatetimeLocal(conclusionIso) : nowDatetimeLocal(),
+        assignmentText: assignment.text || '',
+        assignmentDateTime: assignmentIso ? isoToDatetimeLocal(assignmentIso) : nowDatetimeLocal(),
     };
 }
 
@@ -148,6 +157,12 @@ export function applyIncidentFormToSchema(form: IncidentInfoForm, schema: Missio
     schema.incident_response.incident_name = form.incidentName.trim();
     schema.incident_response.incident_id = report;
     schema.incident_response.indicent_datetime = conclusion;
+
+    if (!schema.assignment) {
+        schema.assignment = { text: '', datetime: '' };
+    }
+    schema.assignment.text = form.assignmentText.trim();
+    schema.assignment.datetime = datetimeLocalToLocalIso(form.assignmentDateTime);
 }
 
 export function applyMissionContextToSchema(
