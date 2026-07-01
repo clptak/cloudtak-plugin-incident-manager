@@ -395,12 +395,19 @@ export async function saveMissionSchema(
     if (sub.fetch) await sub.fetch();
     const hashBeforeUpload = findLatestSchemaContent(await sub.contents.list())?.hash;
 
+    const missionToken = opts?.missionToken;
     await uploadMissionFile(sub.guid, MISSION_SCHEMA_FILENAME, bytes, {
-        missionToken: opts?.missionToken,
+        missionToken,
         mimeType: 'application/json',
     });
 
     const latest = await waitForLatestSchemaContent(sub, hashBeforeUpload);
+    if (!latest?.hash) {
+        throw new Error(
+            'mission_schema.json upload did not appear in mission contents. '
+            + 'Confirm you have MISSION_WRITE on this DataSync mission, then try again.',
+        );
+    }
 
     const revisionToDelete = hashBeforeUpload || opts?.contentHash;
     if (revisionToDelete && latest?.hash && latest.hash !== revisionToDelete && sub.contents.delete) {

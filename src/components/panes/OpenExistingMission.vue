@@ -129,7 +129,7 @@ async function openMission(mission: Mission): Promise<void> {
         setActiveMission({
             guid: mission.guid,
             name: mission.name,
-            token: sub?.token || undefined,
+            missionToken: sub?.missiontoken || undefined,
         });
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);

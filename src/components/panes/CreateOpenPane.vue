@@ -609,7 +609,7 @@ async function createMission(): Promise<void> {
         setActiveMission({
             guid: res.data.guid,
             name: res.data.name,
-            token: res.data.token,
+            missionToken: res.data.token,
         });
 
         status.value = `Created DataSync "${res.data.name}".`;

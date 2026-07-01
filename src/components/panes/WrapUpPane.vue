@@ -74,8 +74,8 @@
 
 <script setup lang='ts'>
 import { ref } from 'vue';
-import Subscription from '../../../../../src/base/subscription.ts';
 import { useIncident } from '../../composables/useIncident.ts';
+import { loadIncidentSubscription } from '../../lib/incidentSubscription.ts';
 import { loadMissionSchema, resolveAssignmentData } from '../../lib/missionSchema.ts';
 
 const { activeMission } = useIncident();
@@ -135,9 +135,7 @@ async function generate(): Promise<void> {
     if (!activeMission.value) return;
     loading.value = true; error.value = ''; report.value = '';
     try {
-        const sub = await Subscription.load(activeMission.value.guid, {
-            token: activeMission.value.token ?? '',
-        });
+        const sub = await loadIncidentSubscription(activeMission.value);
         const { schema } = await loadMissionSchema(sub);
         const logs = await sub.log.list({ refresh: true });
         const assignmentData = resolveAssignmentData(schema, logs);

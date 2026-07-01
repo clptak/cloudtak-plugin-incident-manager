@@ -225,7 +225,6 @@
 
 <script setup lang='ts'>
 import { ref, computed, reactive, watch, onMounted } from 'vue';
-import Subscription from '../../../../../../src/base/subscription.ts';
 import { getMpsRows } from '../../../lib/mpsParser.ts';
 import type { MpsRow } from '../../../lib/mpsParser.ts';
 import {
@@ -238,6 +237,7 @@ import {
     suggestIncidentName,
     type IncidentInfoForm,
 } from '../../../lib/incidentInfo.ts';
+import { loadIncidentSubscription } from '../../../lib/incidentSubscription.ts';
 import { SUBJECT_KEYWORD, kwValue } from '../../../lib/subjectInfo.ts';
 import {
     applyCadIdsToSchema,
@@ -308,9 +308,7 @@ async function loadIncidentInfo(): Promise<void> {
     }
     loadingIncident.value = true;
     try {
-        const sub = await Subscription.load(activeMission.value.guid, {
-            token: activeMission.value.token ?? '',
-        });
+        const sub = await loadIncidentSubscription(activeMission.value);
         const logs = await sub.log.list({ refresh: true });
         const loaded = await loadMissionSchema(sub);
         missionSchema.value = loaded.schema;
@@ -360,9 +358,7 @@ async function saveIncidentInfo(): Promise<void> {
     status.value = '';
     statusError.value = false;
     try {
-        const sub = await Subscription.load(activeMission.value.guid, {
-            token: activeMission.value.token ?? '',
-        });
+        const sub = await loadIncidentSubscription(activeMission.value);
         let schema = missionSchema.value;
         if (!schema) {
             const loaded = await loadMissionSchema(sub);
@@ -375,7 +371,7 @@ async function saveIncidentInfo(): Promise<void> {
         const savedSchema = await saveMissionSchema(sub, schema, {
             contentHash: schemaContentHash.value,
             legacyLogId: legacySchemaLogId.value,
-            missionToken: activeMission.value.token,
+            missionToken: sub.missiontoken,
         });
         schemaContentHash.value = savedSchema.contentHash;
         legacySchemaLogId.value = undefined;
@@ -406,9 +402,7 @@ async function syncSchemaFromForm(
     parsedRows?: MpsRow[],
 ): Promise<void> {
     if (!activeMission.value) return;
-    const sub = await Subscription.load(activeMission.value.guid, {
-        token: activeMission.value.token ?? '',
-    });
+    const sub = await loadIncidentSubscription(activeMission.value);
     let schema = missionSchema.value;
     if (!schema) {
         const loaded = await loadMissionSchema(sub);
@@ -426,7 +420,7 @@ async function syncSchemaFromForm(
     const savedSchema = await saveMissionSchema(sub, schema, {
         contentHash: schemaContentHash.value,
         legacyLogId: legacySchemaLogId.value,
-        missionToken: activeMission.value.token,
+        missionToken: sub.missiontoken,
     });
     schemaContentHash.value = savedSchema.contentHash;
     legacySchemaLogId.value = undefined;
@@ -477,9 +471,7 @@ async function postLogs(): Promise<void> {
     let ok = 0;
     let failed = 0;
     try {
-        const sub = await Subscription.load(activeMission.value.guid, {
-            token: activeMission.value.token ?? '',
-        });
+        const sub = await loadIncidentSubscription(activeMission.value);
 
         const toPost = rows.value.filter((_, i) => selected.value[i]);
         for (const r of toPost) {
@@ -510,7 +502,7 @@ async function postLogs(): Promise<void> {
             const savedSchema = await saveMissionSchema(sub, schema, {
                 contentHash: schemaContentHash.value,
                 legacyLogId: legacySchemaLogId.value,
-                missionToken: activeMission.value.token,
+                missionToken: sub.missiontoken,
             });
             schemaContentHash.value = savedSchema.contentHash;
             legacySchemaLogId.value = undefined;

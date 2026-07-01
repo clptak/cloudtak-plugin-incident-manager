@@ -11,6 +11,9 @@ import OverlayManager from '../../../../src/base/overlay.ts';
 export interface ActiveMission {
     guid: string;
     name: string;
+    /** Mission password/token for MissionAuthorization (DataSync writes). */
+    missionToken?: string;
+    /** @deprecated Use missionToken. Kept for older sessionStorage entries. */
     token?: string;
 }
 
@@ -33,10 +36,13 @@ function loadMissionFromSession(): ActiveMission | null {
             && typeof (parsed as ActiveMission).guid === 'string'
             && typeof (parsed as ActiveMission).name === 'string'
         ) {
-            const m = parsed as ActiveMission;
+            const m = parsed as ActiveMission & { missionToken?: string };
             return {
                 guid: m.guid,
                 name: m.name,
+                missionToken: typeof m.missionToken === 'string'
+                    ? m.missionToken
+                    : (typeof m.token === 'string' ? m.token : undefined),
                 token: typeof m.token === 'string' ? m.token : undefined,
             };
         }
@@ -78,7 +84,7 @@ export function useIncident() {
                 type: 'geojson',
                 mode: 'mission',
                 mode_id: m.guid,
-                token: m.token,
+                token: m.missionToken ?? m.token,
             });
         }
 
@@ -86,8 +92,8 @@ export function useIncident() {
         const sub = await mapStore.loadMission(m.guid);
         if (sub) await mapStore.makeActiveMission(sub);
 
-        if (sub?.token && sub.token !== m.token) {
-            setActiveMission({ ...m, token: sub.token });
+        if (sub?.missiontoken && sub.missiontoken !== m.missionToken) {
+            setActiveMission({ ...m, missionToken: sub.missiontoken });
         }
     }
 
