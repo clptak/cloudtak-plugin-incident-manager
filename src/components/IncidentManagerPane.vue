@@ -71,7 +71,12 @@
 </template>
 
 <script setup lang='ts'>
-import { ref, defineAsyncComponent } from 'vue';
+import { ref, watch, onMounted, defineAsyncComponent } from 'vue';
+import {
+    SESSION_NAV_KEY,
+    useIncident,
+    type PaneNavState,
+} from '../composables/useIncident.ts';
 
 const CreateOpenPane = defineAsyncComponent(() => import('./panes/CreateOpenPane.vue'));
 const LoggerPane = defineAsyncComponent(() => import('./panes/LoggerPane.vue'));
@@ -110,8 +115,59 @@ const hTabs = [
     { key: 'dashboard', label: 'Dashboard' },
 ] as const;
 
-const activeKey = ref<string>('create-open');
-const activeHTab = ref<string>('main');
+const navKeys = new Set(
+    navItems.filter((item) => item.kind !== 'header').map((item) => item.key),
+);
+
+type HTabKey = typeof hTabs[number]['key'];
+
+function isHTabKey(value: string): value is HTabKey {
+    return value === 'main' || value === 'task' || value === 'dashboard';
+}
+
+function loadNavFromSession(): { activeKey: string; activeHTab: HTabKey } {
+    try {
+        const raw = sessionStorage.getItem(SESSION_NAV_KEY);
+        if (!raw) return { activeKey: 'create-open', activeHTab: 'main' };
+        const parsed: unknown = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') {
+            return { activeKey: 'create-open', activeHTab: 'main' };
+        }
+        const key = (parsed as PaneNavState).activeKey;
+        const htab = (parsed as PaneNavState).activeHTab;
+        return {
+            activeKey: navKeys.has(key) ? key : 'create-open',
+            activeHTab: isHTabKey(htab) ? htab : 'main',
+        };
+    } catch {
+        return { activeKey: 'create-open', activeHTab: 'main' };
+    }
+}
+
+function saveNavToSession(activeKey: string, activeHTab: string): void {
+    try {
+        sessionStorage.setItem(
+            SESSION_NAV_KEY,
+            JSON.stringify({ activeKey, activeHTab }),
+        );
+    } catch {
+        // ignore quota / private-mode errors
+    }
+}
+
+const savedNav = loadNavFromSession();
+const activeKey = ref<string>(savedNav.activeKey);
+const activeHTab = ref<string>(savedNav.activeHTab);
+
+const { restoreActiveMissionOnMap } = useIncident();
+
+watch([activeKey, activeHTab], ([key, htab]) => {
+    saveNavToSession(key, htab);
+});
+
+onMounted(() => {
+    void restoreActiveMissionOnMap();
+});
 
 function selectKey(key: string): void {
     activeKey.value = key;
