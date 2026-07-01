@@ -7,6 +7,7 @@ import missionSchemaTemplate from '../data/mission_schema.json';
 import type { CadIdentifiers, IncidentInfoForm } from './incidentInfo.ts';
 import {
     assignmentDataFromKeywords,
+    assignmentDataFromLogContent,
     datetimeLocalToIso,
     datetimeLocalToLocalIso,
     isoToDatetimeLocal,
@@ -158,7 +159,7 @@ export function assignmentDataFromSchema(schema: MissionSchema): AssignmentData 
     };
 }
 
-/** Prefer mission_schema.json; fill gaps from the latest initial-information log keywords. */
+/** Prefer mission_schema.json; fill gaps from the latest initial-information log. */
 export function resolveAssignmentData(
     schema: MissionSchema,
     logs?: SchemaLogLike[],
@@ -166,12 +167,23 @@ export function resolveAssignmentData(
     const fromSchema = assignmentDataFromSchema(schema);
     const saved = logs ? latestIncidentInfoFromLogs(logs) : null;
     const fromLog = assignmentDataFromKeywords(saved?.keywords);
+    const fromContent = assignmentDataFromLogContent(saved?.content);
     const merged: AssignmentData = {
-        text: fromSchema.text || fromLog.text,
-        datetime: fromSchema.datetime || fromLog.datetime,
+        text: fromSchema.text || fromLog.text || fromContent.text,
+        datetime: fromSchema.datetime || fromLog.datetime || fromContent.datetime,
     };
     if (!merged.text && !merged.datetime) return null;
     return merged;
+}
+
+function hydrateAssignmentOnSchema(schema: MissionSchema, logs: SchemaLogLike[]): void {
+    const merged = resolveAssignmentData(schema, logs);
+    if (!merged) return;
+    if (!schema.assignment) {
+        schema.assignment = { text: '', datetime: '' };
+    }
+    if (merged.text) schema.assignment.text = merged.text;
+    if (merged.datetime) schema.assignment.datetime = merged.datetime;
 }
 
 /** Backfill assignment form fields from log keywords when the schema file has none. */
@@ -190,7 +202,11 @@ export function mergeAssignmentIntoForm(
     }
 }
 
-export function applyIncidentFormToSchema(form: IncidentInfoForm, schema: MissionSchema): void {
+export function applyIncidentFormToSchema(
+    form: IncidentInfoForm,
+    schema: MissionSchema,
+    opts?: { preserveEmptyAssignment?: boolean },
+): void {
     const activity = form.eventId.trim();
     const report = form.incidentId.trim();
     const conclusion = datetimeLocalToIso(form.incidentConclusionTime);
@@ -208,8 +224,11 @@ export function applyIncidentFormToSchema(form: IncidentInfoForm, schema: Missio
     if (!schema.assignment) {
         schema.assignment = { text: '', datetime: '' };
     }
-    schema.assignment.text = form.assignmentText.trim();
-    schema.assignment.datetime = datetimeLocalToLocalIso(form.assignmentDateTime);
+    const preserveAssignment = opts?.preserveEmptyAssignment && !form.assignmentText.trim();
+    if (!preserveAssignment) {
+        schema.assignment.text = form.assignmentText.trim();
+        schema.assignment.datetime = datetimeLocalToLocalIso(form.assignmentDateTime);
+    }
 }
 
 export function applyMissionContextToSchema(
@@ -329,6 +348,7 @@ export async function loadMissionSchema(sub: LoadedSubLike): Promise<LoadedMissi
     if (content?.hash) {
         const text = await fetchMissionFileText(content.hash, content.name || MISSION_SCHEMA_FILENAME);
         const schema = JSON.parse(text) as MissionSchema;
+        hydrateAssignmentOnSchema(schema, logs);
         return {
             schema,
             contentHash: content.hash,
@@ -337,10 +357,31 @@ export async function loadMissionSchema(sub: LoadedSubLike): Promise<LoadedMissi
     }
 
     if (legacy) {
+        hydrateAssignmentOnSchema(legacy.schema, logs);
         return { schema: legacy.schema, legacyLogId: legacy.logId };
     }
 
-    return { schema: defaultMissionSchema() };
+    const schema = defaultMissionSchema();
+    hydrateAssignmentOnSchema(schema, logs);
+    return { schema };
+}
+
+async function waitForLatestSchemaContent(
+    sub: LoadedSubLike,
+    previousHash?: string,
+): Promise<ContentLike | null> {
+    const attempts = 5;
+    for (let i = 0; i < attempts; i++) {
+        if (sub.fetch) await sub.fetch();
+        const latest = findLatestSchemaContent(await sub.contents.list());
+        if (latest?.hash && (!previousHash || latest.hash !== previousHash)) {
+            return latest;
+        }
+        if (i < attempts - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 250 * (i + 1)));
+        }
+    }
+    return findLatestSchemaContent(await sub.contents.list());
 }
 
 export async function saveMissionSchema(
@@ -350,17 +391,18 @@ export async function saveMissionSchema(
 ): Promise<SavedMissionSchema> {
     const json = JSON.stringify(schema, null, 2);
     const bytes = new TextEncoder().encode(json);
+    const previousHash = opts?.contentHash;
 
     await uploadMissionFile(sub.guid, MISSION_SCHEMA_FILENAME, bytes, {
         missionToken: opts?.missionToken,
         mimeType: 'application/json',
     });
 
-    if (sub.fetch) await sub.fetch();
+    const latest = await waitForLatestSchemaContent(sub, previousHash);
 
-    if (opts?.contentHash && sub.contents.delete) {
+    if (previousHash && latest?.hash && latest.hash !== previousHash && sub.contents.delete) {
         try {
-            await sub.contents.delete(opts.contentHash);
+            await sub.contents.delete(previousHash);
         } catch {
             /* prior revision may already be detached */
         }
@@ -374,7 +416,5 @@ export async function saveMissionSchema(
         }
     }
 
-    const updated = await sub.contents.list();
-    const latest = findLatestSchemaContent(updated);
     return { contentHash: latest?.hash };
 }

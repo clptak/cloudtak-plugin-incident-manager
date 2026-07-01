@@ -35,6 +35,7 @@ export interface MissionLogLike {
     keywords?: string[];
     created?: string;
     dtg?: string;
+    content?: string;
 }
 
 export function pad2(n: number): string {
@@ -169,11 +170,32 @@ export function assignmentDataFromKeywords(keywords?: string[]): { text: string;
     };
 }
 
+export function assignmentDataFromLogContent(content?: string): { text: string; datetime: string } {
+    if (!content?.trim()) return { text: '', datetime: '' };
+    let text = '';
+    let datetime = '';
+    for (const part of content.split(';')) {
+        const trimmed = part.trim();
+        if (trimmed.startsWith('Assignment time:')) {
+            datetime = trimmed.slice('Assignment time:'.length).trim();
+        } else if (trimmed.startsWith('Assignment:')) {
+            text = trimmed.slice('Assignment:'.length).trim();
+        }
+    }
+    return { text, datetime };
+}
+
 /** Most recent saved initial-information log entry, if any. */
 export function latestIncidentInfoFromLogs(
     logs: MissionLogLike[],
-): { fields: IncidentInfoForm; logId: string; keywords: string[] } | null {
-    let best: { fields: IncidentInfoForm; logId: string; created: string; keywords: string[] } | null = null;
+): { fields: IncidentInfoForm; logId: string; keywords: string[]; content: string } | null {
+    let best: {
+        fields: IncidentInfoForm;
+        logId: string;
+        created: string;
+        keywords: string[];
+        content: string;
+    } | null = null;
     for (const log of logs) {
         if (!log.keywords?.includes(INITIAL_INFO_KEYWORD)) continue;
         const created = log.created || log.dtg || '';
@@ -182,10 +204,18 @@ export function latestIncidentInfoFromLogs(
         const fields = fieldsFromLog(log.keywords);
         const keywords = Array.isArray(log.keywords) ? log.keywords : [];
         if (!best || Date.parse(created) >= Date.parse(best.created)) {
-            best = { fields, logId, created, keywords };
+            best = {
+                fields,
+                logId,
+                created,
+                keywords,
+                content: log.content || '',
+            };
         }
     }
-    return best ? { fields: best.fields, logId: best.logId, keywords: best.keywords } : null;
+    return best
+        ? { fields: best.fields, logId: best.logId, keywords: best.keywords, content: best.content }
+        : null;
 }
 
 /** Fill empty activity / report fields from parsed CFS identifiers. */

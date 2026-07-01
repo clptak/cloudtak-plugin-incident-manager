@@ -230,10 +230,12 @@ import { getMpsRows } from '../../../lib/mpsParser.ts';
 import type { MpsRow } from '../../../lib/mpsParser.ts';
 import {
     applyParsedCadToForm,
+    assignmentDataFromLogContent,
     blankIncidentInfoForm,
     buildIncidentInfoContent,
     buildIncidentInfoKeywords,
     isValidDemaMission,
+    isoToDatetimeLocal,
     latestIncidentInfoFromLogs,
     suggestIncidentName,
     type IncidentInfoForm,
@@ -244,6 +246,7 @@ import {
     applyIncidentFormToSchema,
     applyMissionContextToSchema,
     appendMpsRowsToSchema,
+    assignmentDataFromSchema,
     incidentFormFromSchema,
     loadMissionSchema,
     mergeAssignmentIntoForm,
@@ -322,6 +325,13 @@ async function loadIncidentInfo(): Promise<void> {
         if (schemaContentHash.value || legacySchemaLogId.value) {
             Object.assign(incidentForm, incidentFormFromSchema(loaded.schema));
             mergeAssignmentIntoForm(incidentForm, loaded.schema, saved?.keywords);
+            if (!incidentForm.assignmentText.trim() && saved?.content) {
+                const fromContent = assignmentDataFromLogContent(saved.content);
+                if (fromContent.text) incidentForm.assignmentText = fromContent.text;
+                if (fromContent.datetime && !assignmentDataFromSchema(loaded.schema).datetime) {
+                    incidentForm.assignmentDateTime = isoToDatetimeLocal(fromContent.datetime);
+                }
+            }
             incidentForm.logId = saved?.logId;
             if (!incidentForm.incidentName.trim()) applySubjectNameSuggestion(logs);
         } else if (saved) {
@@ -375,6 +385,7 @@ async function saveIncidentInfo(): Promise<void> {
             const created = await sub.log.create(body);
             incidentForm.logId = String(created.id);
         }
+        await loadIncidentInfo();
         status.value = `Saved incident information to ${activeMission.value.name}.`;
     } catch (err) {
         statusError.value = true;
@@ -393,7 +404,7 @@ async function syncSchemaFromForm(
         token: activeMission.value.token ?? '',
     });
     const schema = missionSchema.value ?? (await loadMissionSchema(sub)).schema;
-    applyIncidentFormToSchema(incidentForm, schema);
+    applyIncidentFormToSchema(incidentForm, schema, { preserveEmptyAssignment: true });
     if (parsed) applyCadIdsToSchema(schema, parsed);
     if (parsedRows?.length) {
         replaceMpsRowsInSchema(schema, parsedRows, activeMission.value.name);
