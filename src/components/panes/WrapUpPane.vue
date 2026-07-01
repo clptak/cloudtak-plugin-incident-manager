@@ -76,6 +76,7 @@
 import { ref } from 'vue';
 import Subscription from '../../../../../src/base/subscription.ts';
 import { useIncident } from '../../composables/useIncident.ts';
+import { loadMissionSchema, type MissionSchema } from '../../lib/missionSchema.ts';
 
 const { activeMission } = useIncident();
 
@@ -88,12 +89,18 @@ function pad2(n: number): string {
     return String(n).padStart(2, '0');
 }
 
+function formatReportDateTimeParts(epoch: number): { date: string; time: string } {
+    const d = new Date(epoch);
+    return {
+        date: `${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}-${d.getFullYear()}`,
+        time: `${pad2(d.getHours())}${pad2(d.getMinutes())}`,
+    };
+}
+
 /** Browser-local timestamp for the patrol report: MM-DD-YYYY at HHMM. */
 function formatReportTime(epoch: number, raw?: string): string {
     if (epoch <= 0) return raw || '';
-    const d = new Date(epoch);
-    const date = `${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}-${d.getFullYear()}`;
-    const time = `${pad2(d.getHours())}${pad2(d.getMinutes())}`;
+    const { date, time } = formatReportDateTimeParts(epoch);
     return `${date} at ${time}`;
 }
 
@@ -104,6 +111,27 @@ function parseTime(raw?: string): { rawTime: string; epoch: number } {
     return { rawTime: raw, epoch: ms };
 }
 
+function assignmentLines(schema: MissionSchema): string[] | null {
+    const assignment = schema.assignment;
+    if (!assignment) return null;
+
+    const txt = (assignment.text || '').trim();
+    const dtRaw = (assignment.datetime || '').trim();
+    if (!txt && !dtRaw) return null;
+
+    const { epoch } = parseTime(dtRaw);
+    const { date, time } = epoch > 0
+        ? formatReportDateTimeParts(epoch)
+        : { date: '', time: '' };
+
+    return [
+        '## ASSIGNMENT:',
+        '',
+        `On ${date} at approximately ${time}, ${txt}`,
+        '',
+    ];
+}
+
 async function generate(): Promise<void> {
     if (!activeMission.value) return;
     loading.value = true; error.value = ''; report.value = '';
@@ -111,6 +139,7 @@ async function generate(): Promise<void> {
         const sub = await Subscription.load(activeMission.value.guid, {
             token: activeMission.value.token ?? '',
         });
+        const { schema } = await loadMissionSchema(sub);
         const logs = await sub.log.list({ refresh: true });
         const sortedLogs = [...logs].sort((a, b) => {
             const ea = parseTime(a.dtg || a.created).epoch;
@@ -125,7 +154,9 @@ async function generate(): Promise<void> {
         lines.push(`Mission GUID: ${activeMission.value.guid}`);
         lines.push(`Log entries: ${logs.length}`);
         lines.push('');
-        lines.push('## Log');
+        const assignment = assignmentLines(schema);
+        if (assignment) lines.push(...assignment);
+        lines.push('## INVESTIGATION:');
         lines.push('');
         if (!sortedLogs.length) {
             lines.push('_No log entries found._');
