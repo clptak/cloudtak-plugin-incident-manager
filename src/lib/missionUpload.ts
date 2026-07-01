@@ -45,6 +45,25 @@ export function extractUploadContentHash(payload: unknown): string | undefined {
     return undefined;
 }
 
+function formatUploadError(status: number, detail: string): string {
+    const trimmed = detail.trim();
+    if (trimmed.startsWith('{')) {
+        try {
+            const parsed = JSON.parse(trimmed) as { message?: string };
+            if (parsed.message && !parsed.message.includes('<!DOCTYPE')) {
+                return `Upload failed (${status}): ${parsed.message}`;
+            }
+        } catch {
+            /* fall through */
+        }
+    }
+    if (trimmed.includes('<!DOCTYPE') || trimmed.includes('<html')) {
+        return `Upload failed (${status}): the server rejected the file upload. `
+            + 'Confirm you have MISSION_WRITE on this mission.';
+    }
+    return `Upload failed (${status})${trimmed ? `: ${trimmed.slice(0, 200)}` : ''}`;
+}
+
 /** Upload raw bytes as a mission file (DataSync contents). Returns content hash when present. */
 export async function uploadMissionFile(
     missionGuid: string,
@@ -52,30 +71,28 @@ export async function uploadMissionFile(
     data: Uint8Array,
     opts?: {
         missionToken?: string;
-        mimeType?: string;
     },
 ): Promise<string | undefined> {
     const { value: token } = await Preferences.get({ key: 'token' });
     const url = stdurl(`/api/marti/missions/${missionGuid}/upload`);
     url.searchParams.set('name', filename);
-    const mimeType = opts?.mimeType ?? 'application/pdf';
 
     const headers: Record<string, string> = {
         'X-Requested-With': 'XMLHttpRequest',
-        'Content-Type': mimeType,
     };
     if (token) headers.Authorization = `Bearer ${token}`;
     if (opts?.missionToken) headers.MissionAuthorization = opts.missionToken;
 
+    const body = bytesToArrayBuffer(data);
     const res = await fetch(url.toString(), {
         method: 'POST',
         headers,
-        body: bytesToArrayBuffer(data),
+        body,
     });
 
     const detail = await res.text().catch(() => '');
     if (!res.ok) {
-        throw new Error(`Upload failed (${res.status})${detail ? `: ${detail.slice(0, 200)}` : ''}`);
+        throw new Error(formatUploadError(res.status, detail));
     }
 
     if (!detail.trim()) return undefined;

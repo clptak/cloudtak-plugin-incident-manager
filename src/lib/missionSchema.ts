@@ -405,7 +405,6 @@ export async function saveMissionSchema(
     const missionToken = opts?.missionToken;
     const uploadHash = await uploadMissionFile(sub.guid, MISSION_SCHEMA_FILENAME, bytes, {
         missionToken,
-        mimeType: 'application/json',
     });
 
     if (sub.fetch) await sub.fetch();

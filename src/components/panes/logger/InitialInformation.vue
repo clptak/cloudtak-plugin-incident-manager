@@ -421,25 +421,30 @@ async function saveIncidentInfo(): Promise<void> {
             incidentForm.logId = String(created.id);
         }
 
-        let schema = missionSchema.value;
-        if (!schema) {
-            const loaded = await loadMissionSchema(sub);
-            schema = loaded.schema;
-            schemaContentHash.value = loaded.contentHash ?? schemaContentHash.value;
-            legacySchemaLogId.value = loaded.legacyLogId ?? legacySchemaLogId.value;
+        try {
+            let schema = missionSchema.value;
+            if (!schema) {
+                const loaded = await loadMissionSchema(sub);
+                schema = loaded.schema;
+                schemaContentHash.value = loaded.contentHash ?? schemaContentHash.value;
+                legacySchemaLogId.value = loaded.legacyLogId ?? legacySchemaLogId.value;
+            }
+            applyIncidentFormToSchema(incidentForm, schema);
+            applyMissionContextToSchema(schema, activeMission.value.name);
+            const savedSchema = await saveMissionSchema(sub, schema, {
+                contentHash: schemaContentHash.value,
+                legacyLogId: legacySchemaLogId.value,
+                missionToken,
+            });
+            schemaContentHash.value = savedSchema.contentHash;
+            legacySchemaLogId.value = undefined;
+            missionSchema.value = schema;
+            incidentStatus.value = `Saved incident information and mission_schema.json to ${activeMission.value.name}.`;
+        } catch (schemaErr) {
+            incidentStatusError.value = true;
+            const detail = schemaErr instanceof Error ? schemaErr.message : String(schemaErr);
+            incidentStatus.value = `Saved incident log to ${activeMission.value.name}, but mission_schema.json failed: ${detail}`;
         }
-        applyIncidentFormToSchema(incidentForm, schema);
-        applyMissionContextToSchema(schema, activeMission.value.name);
-        const savedSchema = await saveMissionSchema(sub, schema, {
-            contentHash: schemaContentHash.value,
-            legacyLogId: legacySchemaLogId.value,
-            missionToken,
-        });
-        schemaContentHash.value = savedSchema.contentHash;
-        legacySchemaLogId.value = undefined;
-        missionSchema.value = schema;
-
-        incidentStatus.value = `Saved incident information and mission_schema.json to ${activeMission.value.name}.`;
     } catch (err) {
         incidentStatusError.value = true;
         incidentStatus.value = err instanceof Error ? err.message : String(err);
