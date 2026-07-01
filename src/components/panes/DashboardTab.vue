@@ -84,38 +84,68 @@
             </div>
 
             <div
-                v-if='subjects.length'
-                class='mb-3'
+                v-if='showInfoPanels'
+                class='row mb-3'
             >
-                <h4 class='h5 mb-2'>
-                    Subject Information
-                </h4>
                 <div
-                    v-for='s in subjects'
-                    :key='s.subjectCaseID'
-                    class='card mb-2'
+                    v-if='initialInfoRows.length'
+                    class='col-lg-6'
                 >
-                    <div class='card-header py-2'>
-                        <strong>Subject {{ displaySubjectNumber(s.subjectCaseID) }}</strong>
-                        <span
-                            v-if='s.subjectName'
-                            class='text-muted ms-2'
-                        >{{ s.subjectName }}</span>
+                    <h4 class='h5 mb-2'>
+                        Initial Information
+                    </h4>
+                    <div class='card'>
+                        <div class='card-body py-2'>
+                            <dl class='row mb-0 small'>
+                                <template
+                                    v-for='row in initialInfoRows'
+                                    :key='row.label'
+                                >
+                                    <dt class='col-sm-4 text-muted'>
+                                        {{ row.label }}
+                                    </dt>
+                                    <dd class='col-sm-8 mb-1'>
+                                        {{ row.value }}
+                                    </dd>
+                                </template>
+                            </dl>
+                        </div>
                     </div>
-                    <div class='card-body py-2'>
-                        <dl class='row mb-0 small'>
-                            <template
-                                v-for='row in subjectDetailRows(s)'
-                                :key='row.label'
-                            >
-                                <dt class='col-sm-3 col-md-2 text-muted'>
-                                    {{ row.label }}
-                                </dt>
-                                <dd class='col-sm-9 col-md-10 mb-1'>
-                                    {{ row.value }}
-                                </dd>
-                            </template>
-                        </dl>
+                </div>
+                <div
+                    v-if='subjects.length'
+                    :class='initialInfoRows.length ? "col-lg-6" : "col-12"'
+                >
+                    <h4 class='h5 mb-2'>
+                        Subject Information
+                    </h4>
+                    <div
+                        v-for='s in subjects'
+                        :key='s.subjectCaseID'
+                        class='card mb-2'
+                    >
+                        <div class='card-header py-2'>
+                            <strong>Subject {{ displaySubjectNumber(s.subjectCaseID) }}</strong>
+                            <span
+                                v-if='s.subjectName'
+                                class='text-muted ms-2'
+                            >{{ s.subjectName }}</span>
+                        </div>
+                        <div class='card-body py-2'>
+                            <dl class='row mb-0 small'>
+                                <template
+                                    v-for='row in subjectDetailRows(s)'
+                                    :key='row.label'
+                                >
+                                    <dt class='col-sm-4 text-muted'>
+                                        {{ row.label }}
+                                    </dt>
+                                    <dd class='col-sm-8 mb-1'>
+                                        {{ row.value }}
+                                    </dd>
+                                </template>
+                            </dl>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -172,7 +202,6 @@
 
 <script setup lang='ts'>
 import { ref, reactive, computed, watch, onMounted } from 'vue';
-import Subscription from '../../../../../src/base/subscription.ts';
 import type { DBSubscriptionLog } from '../../../../../src/database.ts';
 import { useIncident } from '../../composables/useIncident.ts';
 import { loadIncidentSubscription } from '../../lib/incidentSubscription.ts';
@@ -181,6 +210,10 @@ import {
     exportDashboardPdf,
     formatLocalTime,
 } from '../../lib/dashboardExport.ts';
+import {
+    initialInfoDetailRows,
+    type IncidentInfoForm,
+} from '../../lib/incidentInfo.ts';
 import { loadMissionSchema, resolveIncidentInfoForm } from '../../lib/missionSchema.ts';
 import {
     displaySubjectNumber,
@@ -202,6 +235,7 @@ interface Row {
 
 const rows = ref<Row[]>([]);
 const subjects = ref<ParsedSubject[]>([]);
+const initialInfo = ref<IncidentInfoForm | null>(null);
 const loading = ref(false);
 const error = ref('');
 const sortAsc = ref(true);
@@ -253,7 +287,17 @@ const sortedRows = computed(() => {
 
 const displayRows = computed(() => sortedRows.value.filter((r) => rowMatches(r.keywords)));
 
-const canExport = computed(() => subjects.value.length > 0 || displayRows.value.length > 0);
+const initialInfoRows = computed(() => (
+    initialInfo.value ? initialInfoDetailRows(initialInfo.value) : []
+));
+
+const showInfoPanels = computed(
+    () => initialInfoRows.value.length > 0 || subjects.value.length > 0,
+);
+
+const canExport = computed(
+    () => showInfoPanels.value || displayRows.value.length > 0,
+);
 
 function sortBy(): void {
     sortAsc.value = !sortAsc.value;
@@ -355,11 +399,14 @@ function exportCsv(): void {
 async function exportPdf(): Promise<void> {
     if (!activeMission.value || !canExport.value) return;
     try {
-        const sub = await loadIncidentSubscription(activeMission.value);
-        const { schema } = await loadMissionSchema(sub);
-        const logs = await sub.log.list({ refresh: true });
-        const initialInfo = resolveIncidentInfoForm(schema, logs);
-        exportDashboardPdf(exportRows(), activeMission.value.name, subjects.value, initialInfo);
+        let info = initialInfo.value;
+        if (!info) {
+            const sub = await loadIncidentSubscription(activeMission.value);
+            const { schema } = await loadMissionSchema(sub);
+            const logs = await sub.log.list({ refresh: true });
+            info = resolveIncidentInfoForm(schema, logs);
+        }
+        exportDashboardPdf(exportRows(), activeMission.value.name, subjects.value, info);
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
     }
@@ -369,10 +416,10 @@ async function refresh(): Promise<void> {
     if (!activeMission.value) return;
     loading.value = true; error.value = '';
     try {
-        const sub = await Subscription.load(activeMission.value.guid, {
-            token: activeMission.value.token ?? '',
-        });
+        const sub = await loadIncidentSubscription(activeMission.value);
+        const { schema } = await loadMissionSchema(sub);
         const logs = await sub.log.list({ refresh: true });
+        initialInfo.value = resolveIncidentInfoForm(schema, logs);
         subjects.value = parseSubjectsFromLogs(logs);
         rows.value = logs
             .filter((log: DBSubscriptionLog) => {
@@ -404,6 +451,7 @@ watch(activeMission, (m) => {
     else {
         rows.value = [];
         subjects.value = [];
+        initialInfo.value = null;
     }
 }, { immediate: true });
 </script>
