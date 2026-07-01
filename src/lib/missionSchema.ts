@@ -6,9 +6,11 @@
 import missionSchemaTemplate from '../data/mission_schema.json';
 import type { CadIdentifiers, IncidentInfoForm } from './incidentInfo.ts';
 import {
+    assignmentDataFromKeywords,
     datetimeLocalToIso,
     datetimeLocalToLocalIso,
     isoToDatetimeLocal,
+    latestIncidentInfoFromLogs,
     nowDatetimeLocal,
 } from './incidentInfo.ts';
 import type { MpsRow } from './mpsParser.ts';
@@ -141,6 +143,51 @@ export function incidentFormFromSchema(schema: MissionSchema): IncidentInfoForm 
         assignmentText: assignment.text || '',
         assignmentDateTime: assignmentIso ? isoToDatetimeLocal(assignmentIso) : nowDatetimeLocal(),
     };
+}
+
+export interface AssignmentData {
+    text: string;
+    datetime: string;
+}
+
+export function assignmentDataFromSchema(schema: MissionSchema): AssignmentData {
+    const assignment = schema.assignment;
+    return {
+        text: (assignment?.text || '').trim(),
+        datetime: (assignment?.datetime || '').trim(),
+    };
+}
+
+/** Prefer mission_schema.json; fill gaps from the latest initial-information log keywords. */
+export function resolveAssignmentData(
+    schema: MissionSchema,
+    logs?: SchemaLogLike[],
+): AssignmentData | null {
+    const fromSchema = assignmentDataFromSchema(schema);
+    const saved = logs ? latestIncidentInfoFromLogs(logs) : null;
+    const fromLog = assignmentDataFromKeywords(saved?.keywords);
+    const merged: AssignmentData = {
+        text: fromSchema.text || fromLog.text,
+        datetime: fromSchema.datetime || fromLog.datetime,
+    };
+    if (!merged.text && !merged.datetime) return null;
+    return merged;
+}
+
+/** Backfill assignment form fields from log keywords when the schema file has none. */
+export function mergeAssignmentIntoForm(
+    form: IncidentInfoForm,
+    schema: MissionSchema,
+    logKeywords?: string[],
+): void {
+    const fromSchema = assignmentDataFromSchema(schema);
+    const fromLog = assignmentDataFromKeywords(logKeywords);
+    if (!fromSchema.text && fromLog.text) {
+        form.assignmentText = fromLog.text;
+    }
+    if (!fromSchema.datetime && fromLog.datetime) {
+        form.assignmentDateTime = isoToDatetimeLocal(fromLog.datetime);
+    }
 }
 
 export function applyIncidentFormToSchema(form: IncidentInfoForm, schema: MissionSchema): void {

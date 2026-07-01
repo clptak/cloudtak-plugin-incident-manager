@@ -162,20 +162,30 @@ export function buildIncidentInfoKeywords(f: IncidentInfoForm): string[] {
     return kws;
 }
 
+export function assignmentDataFromKeywords(keywords?: string[]): { text: string; datetime: string } {
+    return {
+        text: kwValue(keywords, 'assignmentText:').trim(),
+        datetime: kwValue(keywords, 'assignmentDateTime:').trim(),
+    };
+}
+
 /** Most recent saved initial-information log entry, if any. */
-export function latestIncidentInfoFromLogs(logs: MissionLogLike[]): { fields: IncidentInfoForm; logId: string } | null {
-    let best: { fields: IncidentInfoForm; logId: string; created: string } | null = null;
+export function latestIncidentInfoFromLogs(
+    logs: MissionLogLike[],
+): { fields: IncidentInfoForm; logId: string; keywords: string[] } | null {
+    let best: { fields: IncidentInfoForm; logId: string; created: string; keywords: string[] } | null = null;
     for (const log of logs) {
         if (!log.keywords?.includes(INITIAL_INFO_KEYWORD)) continue;
         const created = log.created || log.dtg || '';
         const logId = String(log.id ?? '');
         if (!logId) continue;
         const fields = fieldsFromLog(log.keywords);
+        const keywords = Array.isArray(log.keywords) ? log.keywords : [];
         if (!best || Date.parse(created) >= Date.parse(best.created)) {
-            best = { fields, logId, created };
+            best = { fields, logId, created, keywords };
         }
     }
-    return best ? { fields: best.fields, logId: best.logId } : null;
+    return best ? { fields: best.fields, logId: best.logId, keywords: best.keywords } : null;
 }
 
 /** Fill empty activity / report fields from parsed CFS identifiers. */

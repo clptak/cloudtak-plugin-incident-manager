@@ -76,7 +76,7 @@
 import { ref } from 'vue';
 import Subscription from '../../../../../src/base/subscription.ts';
 import { useIncident } from '../../composables/useIncident.ts';
-import { loadMissionSchema, type MissionSchema } from '../../lib/missionSchema.ts';
+import { loadMissionSchema, resolveAssignmentData } from '../../lib/missionSchema.ts';
 
 const { activeMission } = useIncident();
 
@@ -111,12 +111,11 @@ function parseTime(raw?: string): { rawTime: string; epoch: number } {
     return { rawTime: raw, epoch: ms };
 }
 
-function assignmentLines(schema: MissionSchema): string[] | null {
-    const assignment = schema.assignment;
-    if (!assignment) return null;
+function assignmentLines(data: { text: string; datetime: string } | null): string[] | null {
+    if (!data) return null;
 
-    const txt = (assignment.text || '').trim();
-    const dtRaw = (assignment.datetime || '').trim();
+    const txt = data.text;
+    const dtRaw = data.datetime;
     if (!txt && !dtRaw) return null;
 
     const { epoch } = parseTime(dtRaw);
@@ -141,6 +140,7 @@ async function generate(): Promise<void> {
         });
         const { schema } = await loadMissionSchema(sub);
         const logs = await sub.log.list({ refresh: true });
+        const assignmentData = resolveAssignmentData(schema, logs);
         const sortedLogs = [...logs].sort((a, b) => {
             const ea = parseTime(a.dtg || a.created).epoch;
             const eb = parseTime(b.dtg || b.created).epoch;
@@ -154,7 +154,7 @@ async function generate(): Promise<void> {
         lines.push(`Mission GUID: ${activeMission.value.guid}`);
         lines.push(`Log entries: ${logs.length}`);
         lines.push('');
-        const assignment = assignmentLines(schema);
+        const assignment = assignmentLines(assignmentData);
         if (assignment) lines.push(...assignment);
         lines.push('## INVESTIGATION:');
         lines.push('');

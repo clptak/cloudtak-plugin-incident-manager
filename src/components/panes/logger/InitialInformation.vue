@@ -246,6 +246,7 @@ import {
     appendMpsRowsToSchema,
     incidentFormFromSchema,
     loadMissionSchema,
+    mergeAssignmentIntoForm,
     replaceMpsRowsInSchema,
     saveMissionSchema,
     type MissionSchema,
@@ -320,6 +321,7 @@ async function loadIncidentInfo(): Promise<void> {
         const saved = latestIncidentInfoFromLogs(logs);
         if (schemaContentHash.value || legacySchemaLogId.value) {
             Object.assign(incidentForm, incidentFormFromSchema(loaded.schema));
+            mergeAssignmentIntoForm(incidentForm, loaded.schema, saved?.keywords);
             incidentForm.logId = saved?.logId;
             if (!incidentForm.incidentName.trim()) applySubjectNameSuggestion(logs);
         } else if (saved) {
