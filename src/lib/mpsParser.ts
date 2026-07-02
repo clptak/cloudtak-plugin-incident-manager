@@ -29,6 +29,19 @@ export interface MpsParseResult {
     rows: MpsRow[];
 }
 
+export interface MpsParseOptions {
+    /** Merge rows whose timestamps fall within this window (transitive). Default 60_000; set 0 to disable. */
+    mergeWithinMs?: number;
+}
+
+interface ParsedRemarkRow {
+    dtg: string;
+    uid: string;
+    remark: string;
+}
+
+const DEFAULT_MERGE_WITHIN_MS = 60_000;
+
 const MPS_EVENT_ID = /A\d{8}/;
 const MPS_CALL_CREATED = /Created\s*\n[\d:]+\s+([0-1]\d\/[0-3]\d\/[2-4]\d)/;
 const MPS_REMARKS_START = /Remarks\s*\n\s*\n\s*\n?\n?/;
@@ -78,8 +91,89 @@ function splitByDate(str: string, dates: string[]): string[] {
     return str.replace(/,/g, ' | ').split(re).filter((p) => p.trim() && !p.includes('Today'));
 }
 
-function parseLogBlock(block: string, dateStr: string): Array<{ dtg: string; uid: string; remark: string }> {
-    const rows: Array<{ dtg: string; uid: string; remark: string }> = [];
+function parseDtgMs(dtg: string): number {
+    const m = dtg.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})$/);
+    if (!m) return Number.NaN;
+    return new Date(
+        Number(m[1]),
+        Number(m[2]) - 1,
+        Number(m[3]),
+        Number(m[4]),
+        Number(m[5]),
+        Number(m[6]),
+    ).getTime();
+}
+
+/** Cluster rows within mergeWithinMs (transitive) and combine each cluster into one row. */
+export function mergeNearbyRows<T extends ParsedRemarkRow>(
+    rows: T[],
+    mergeWithinMs: number,
+): T[] {
+    if (mergeWithinMs <= 0 || rows.length <= 1) return rows;
+
+    const indexed = rows.map((row, index) => ({
+        row,
+        index,
+        ms: parseDtgMs(row.dtg),
+    }));
+    indexed.sort((a, b) => {
+        if (a.ms !== b.ms) return a.ms - b.ms;
+        return a.index - b.index;
+    });
+
+    const parent = indexed.map((_, i) => i);
+    function find(i: number): number {
+        if (parent[i] !== i) parent[i] = find(parent[i]);
+        return parent[i];
+    }
+    function unite(a: number, b: number): void {
+        parent[find(a)] = find(b);
+    }
+
+    for (let i = 0; i < indexed.length; i++) {
+        if (Number.isNaN(indexed[i].ms)) continue;
+        for (let j = i + 1; j < indexed.length; j++) {
+            if (Number.isNaN(indexed[j].ms)) break;
+            const delta = indexed[j].ms - indexed[i].ms;
+            if (delta > mergeWithinMs) break;
+            unite(i, j);
+        }
+    }
+
+    const groups = new Map<number, typeof indexed>();
+    for (let i = 0; i < indexed.length; i++) {
+        const root = find(i);
+        const list = groups.get(root);
+        if (list) list.push(indexed[i]);
+        else groups.set(root, [indexed[i]]);
+    }
+
+    const merged: T[] = [];
+    for (const group of groups.values()) {
+        group.sort((a, b) => {
+            if (a.ms !== b.ms) return a.ms - b.ms;
+            return a.index - b.index;
+        });
+        if (group.length === 1) {
+            merged.push(group[0].row);
+            continue;
+        }
+        const remarks = group.map((g) => g.row.remark).filter((r) => r);
+        const uids = [...new Set(group.map((g) => g.row.uid).filter(Boolean))];
+        merged.push({
+            ...group[0].row,
+            dtg: group[0].row.dtg,
+            uid: uids.join(', '),
+            remark: remarks.join(' | '),
+        });
+    }
+
+    merged.sort((a, b) => parseDtgMs(a.dtg) - parseDtgMs(b.dtg));
+    return merged;
+}
+
+function parseLogBlock(block: string, dateStr: string): ParsedRemarkRow[] {
+    const rows: ParsedRemarkRow[] = [];
     let m: RegExpExecArray | null;
     MPS_LOG_ENTRY.lastIndex = 0;
     while ((m = MPS_LOG_ENTRY.exec(block)) !== null) {
@@ -92,7 +186,7 @@ function parseLogBlock(block: string, dateStr: string): Array<{ dtg: string; uid
 }
 
 function annotateRemarks(
-    rows: Array<{ dtg: string; uid: string; remark: string }>,
+    rows: ParsedRemarkRow[],
     eventId: string | null
 ): MpsRow[] {
     return rows.map((r) => {
@@ -121,7 +215,8 @@ function annotateRemarks(
     });
 }
 
-export function getMpsRows(cadText: string): MpsParseResult {
+export function getMpsRows(cadText: string, options?: MpsParseOptions): MpsParseResult {
+    const mergeWithinMs = options?.mergeWithinMs ?? DEFAULT_MERGE_WITHIN_MS;
     const cadIds = parseCadIdentifiers(cadText);
     const eventId = cadIds.activityNumber ?? getEventId(cadText);
     const rawRemarks = getRemarksSection(cadText);
@@ -139,14 +234,15 @@ export function getMpsRows(cadText: string): MpsParseResult {
     const blocks = splitByDate(rawRemarks, dates);
     const isoDates = dates.map(toISODate);
 
-    const allRows: Array<{ dtg: string; uid: string; remark: string }> = [];
+    const allRows: ParsedRemarkRow[] = [];
     for (let i = 0; i < isoDates.length && i < blocks.length; i++) {
         parseLogBlock(blocks[i], isoDates[i]).forEach((r) => allRows.push(r));
     }
+    const mergedRows = mergeNearbyRows(allRows, mergeWithinMs);
     return {
         eventId,
         activityNumber: cadIds.activityNumber,
         reportNumber: cadIds.reportNumber,
-        rows: annotateRemarks(allRows, eventId),
+        rows: annotateRemarks(mergedRows, eventId),
     };
 }
