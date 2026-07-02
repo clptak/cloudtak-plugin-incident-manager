@@ -4,7 +4,7 @@ import {
     rgb,
 } from '../vendor/pdf-lib.esm.min.js';
 import type { PDFFont, PDFPage } from '../vendor/pdf-lib.esm.min.js';
-import templateDataUrl from '../assets/sar-briefing-template.pdf?inline';
+import templateUrl from '../assets/sar-briefing-template.pdf?url';
 import type { BriefingSubjectColumn, IrBriefingForm } from './irBriefing.ts';
 
 export const SAR_BRIEFING_MISSION_FILENAME = 'SAR-Briefing.pdf';
@@ -12,6 +12,8 @@ export const SAR_BRIEFING_MISSION_FILENAME = 'SAR-Briefing.pdf';
 /** Page 2 header/roster fields sit above this y (PDF points, origin bottom-left). */
 const PAGE2_Y_THRESHOLD = 690;
 
+const PAGE_W = 612;
+const PAGE_H = 792;
 const FONT_SIZE = 9;
 const LINE_HEIGHT = 11;
 const CELL_PAD = 2;
@@ -94,12 +96,11 @@ const WRAPPED_FIELD_NAMES = new Set([
     'SubjectExperience',
 ]);
 
-function templateDataUrlToBytes(dataUrl: string): Uint8Array {
-    const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1]! : dataUrl;
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return bytes;
+function loadTemplateBytes(): Promise<ArrayBuffer> {
+    return fetch(templateUrl, { cache: 'no-store' }).then((res) => {
+        if (!res.ok) throw new Error(`Could not load SAR Briefing template (${res.status})`);
+        return res.arrayBuffer();
+    });
 }
 
 function splitIppDatum(ippText: string): { ipp: string; datum: string } {
@@ -251,9 +252,23 @@ function collectFieldValues(form: IrBriefingForm): Map<string, string> {
     return values;
 }
 
+/** Same embedPage + drawPage pattern as ICS 234 — avoids blank pages and AcroForm widget overlays. */
+async function embedTemplatePage(
+    templateDoc: PDFDocument,
+    outDoc: PDFDocument,
+    pageIndex: number,
+): Promise<PDFPage> {
+    const [templatePage] = await outDoc.copyPages(templateDoc, [pageIndex]);
+    const embedded = await outDoc.embedPage(templatePage);
+    const page = outDoc.addPage([PAGE_W, PAGE_H]);
+    page.drawPage(embedded, { x: 0, y: 0, width: PAGE_W, height: PAGE_H });
+    return page;
+}
+
 /** Paint briefing values onto the SAR template using measured AcroForm widget boxes. */
 export async function buildSarBriefingPdf(form: IrBriefingForm): Promise<Uint8Array> {
-    const templateDoc = await PDFDocument.load(templateDataUrlToBytes(templateDataUrl));
+    const templateBytes = await loadTemplateBytes();
+    const templateDoc = await PDFDocument.load(templateBytes);
     const templatePdf = templateDoc as PDFDocument & {
         getForm(): BriefingPdfForm;
         getPageCount(): number;
@@ -262,16 +277,13 @@ export async function buildSarBriefingPdf(form: IrBriefingForm): Promise<Uint8Ar
     const fieldValues = collectFieldValues(form);
     const layouts = buildFieldLayoutMap(templatePdf.getForm(), fieldValues.keys());
 
-    // Copy template pages into a new doc so AcroForm widgets (e.g. IC dropdown) are not
-    // rendered as interactive black boxes on top of painted text.
     const outDoc = await PDFDocument.create();
-    const pageCount = templatePdf.getPageCount();
-    const copiedPages = await outDoc.copyPages(templateDoc, [...Array(pageCount).keys()]);
-    const addCopiedPage = (outDoc as PDFDocument & { addPage(page: PDFPage): PDFPage }).addPage.bind(outDoc);
-    for (const page of copiedPages) addCopiedPage(page);
-
-    const pages = (outDoc as PDFDocument & { getPages(): PDFPage[] }).getPages();
     const font = await outDoc.embedFont(StandardFonts.Helvetica);
+
+    const pages: PDFPage[] = [];
+    for (let pageIndex = 0; pageIndex < templatePdf.getPageCount(); pageIndex++) {
+        pages.push(await embedTemplatePage(templateDoc, outDoc, pageIndex));
+    }
 
     for (const [fieldName, value] of fieldValues) {
         const layout = layouts.get(fieldName);

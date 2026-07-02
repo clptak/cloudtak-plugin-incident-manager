@@ -18,6 +18,18 @@ export async function fetchWeatherSummary(
     return formatWeatherSummary(data.weather);
 }
 
+export function formatPeriodStartTime(iso: string): string {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleString('en-US', {
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+    });
+}
+
 export function formatWeatherSummary(weather: SearchReverseWeather['weather']): string {
     if (!weather?.properties?.periods?.length) return '';
 
@@ -28,7 +40,9 @@ export function formatWeatherSummary(weather: SearchReverseWeather['weather']): 
         const wind = `${period.windSpeed} ${period.windDirection}`.trim();
         const precip = period.probabilityOfPrecipitation?.value;
         const precipText = precip != null && precip > 0 ? `, ${precip}% precip` : '';
-        lines.push(`${period.name}: ${period.shortForecast}, ${temp}, wind ${wind}${precipText}`);
+        const time = formatPeriodStartTime(period.startTime);
+        const timePrefix = time ? `${time} — ` : '';
+        lines.push(`${timePrefix}${period.shortForecast}, ${temp}, wind ${wind}${precipText}`);
     }
 
     const generator = weather.properties.forecastGenerator;

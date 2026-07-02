@@ -128,7 +128,7 @@
                 </div>
                 <div class='row g-2 mb-2'>
                     <div class='col-md-4'>
-                        <label class='form-label small mb-1'>2 ADAM Repeated Channel</label>
+                        <label class='form-label small mb-1'>Repeated Channel</label>
                         <input
                             v-model='form.adamRepeatedChannel'
                             type='text'
@@ -325,7 +325,7 @@ const loading = ref(false);
 const refreshing = ref(false);
 const exporting = ref(false);
 const uploading = ref(false);
-const pdfExpanded = ref(false);
+const pdfExpanded = ref(true);
 const status = ref('');
 const statusError = ref(false);
 
