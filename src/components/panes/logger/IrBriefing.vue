@@ -314,7 +314,6 @@ import { fetchWeatherSummary } from '../../../lib/irBriefingWeather.ts';
 import {
     buildSarBriefingPdf,
     defaultSarBriefingFilename,
-    SAR_BRIEFING_GENERATOR_VERSION,
     SAR_BRIEFING_MISSION_FILENAME,
 } from '../../../lib/sarBriefingPdf.ts';
 import { downloadPdfBytes, uploadMissionFile } from '../../../lib/missionUpload.ts';
@@ -443,7 +442,7 @@ async function downloadPdf(): Promise<void> {
             form.incidentName || activeMission.value?.name || 'incident',
         );
         downloadPdfBytes(bytes, filename);
-        status.value = `PDF downloaded (${filename}). Footer should read "IM ${SAR_BRIEFING_GENERATOR_VERSION}".`;
+        status.value = 'PDF downloaded.';
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);

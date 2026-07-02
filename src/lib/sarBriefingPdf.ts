@@ -9,16 +9,12 @@ import type { BriefingSubjectColumn, IrBriefingForm } from './irBriefing.ts';
 
 export const SAR_BRIEFING_MISSION_FILENAME = 'SAR-Briefing.pdf';
 
-/** Bump when PDF output logic changes — stamped on generated PDFs for debugging. */
-export const SAR_BRIEFING_GENERATOR_VERSION = '2026-07-02c';
-
 /** Page 2 header/roster fields sit above this y (PDF points, origin bottom-left). */
 const PAGE2_Y_THRESHOLD = 690;
 
 const FONT_SIZE = 9;
 const LINE_HEIGHT = 11;
 const CELL_PAD = 2;
-const FIELD_WHITE_OUT_PAD = 2;
 
 interface FieldLayout {
     pageIndex: number;
@@ -32,9 +28,6 @@ interface BriefingPdfForm {
     getField(name: string): {
         acroField: { getWidgets(): Array<{ getRectangle(): { x: number; y: number; width: number; height: number } }> };
     };
-    getFields(): Array<{
-        acroField: { getWidgets(): Array<{ getRectangle(): { x: number; y: number; width: number; height: number } }> };
-    }>;
 }
 
 /** AcroForm field names per subject column (template naming is inconsistent on column 3). */
@@ -117,34 +110,21 @@ function splitIppDatum(ippText: string): { ipp: string; datum: string } {
     return { ipp: ippText.trim(), datum: '' };
 }
 
-function layoutFromRect(rect: { x: number; y: number; width: number; height: number }): FieldLayout {
-    return {
-        pageIndex: rect.y >= PAGE2_Y_THRESHOLD ? 1 : 0,
-        x: rect.x,
-        y: rect.y,
-        w: rect.width,
-        h: rect.height,
-    };
-}
-
 function getFieldLayout(form: BriefingPdfForm, fieldName: string): FieldLayout | null {
     try {
         const widget = form.getField(fieldName).acroField.getWidgets()[0];
         if (!widget) return null;
-        return layoutFromRect(widget.getRectangle());
+        const rect = widget.getRectangle();
+        return {
+            pageIndex: rect.y >= PAGE2_Y_THRESHOLD ? 1 : 0,
+            x: rect.x,
+            y: rect.y,
+            w: rect.width,
+            h: rect.height,
+        };
     } catch {
         return null;
     }
-}
-
-function buildAllFieldLayouts(form: BriefingPdfForm): FieldLayout[] {
-    const layouts: FieldLayout[] = [];
-    for (const field of form.getFields()) {
-        for (const widget of field.acroField.getWidgets()) {
-            layouts.push(layoutFromRect(widget.getRectangle()));
-        }
-    }
-    return layouts;
 }
 
 function wrapLines(text: string, font: PDFFont, maxWidth: number): string[] {
@@ -177,33 +157,13 @@ function maxLinesForHeight(height: number): number {
 
 function whiteOutField(page: PDFPage, layout: FieldLayout): void {
     page.drawRectangle({
-        x: layout.x - FIELD_WHITE_OUT_PAD,
-        y: layout.y - FIELD_WHITE_OUT_PAD,
-        width: layout.w + FIELD_WHITE_OUT_PAD * 2,
-        height: layout.h + FIELD_WHITE_OUT_PAD * 2,
+        x: layout.x,
+        y: layout.y,
+        width: layout.w,
+        height: layout.h,
         color: rgb(1, 1, 1),
         borderWidth: 0,
     });
-}
-
-function whiteOutAllTemplateFields(pages: PDFPage[], layouts: FieldLayout[]): void {
-    for (const layout of layouts) {
-        const page = pages[layout.pageIndex];
-        if (page) whiteOutField(page, layout);
-    }
-}
-
-function stampGeneratorVersion(pages: PDFPage[], font: PDFFont): void {
-    const stamp = `Generated ${new Date().toISOString().replace('T', ' ').slice(0, 16)} UTC — IM ${SAR_BRIEFING_GENERATOR_VERSION}`;
-    for (const page of pages) {
-        page.drawText(stamp, {
-            x: 36,
-            y: 8,
-            size: 6,
-            font,
-            color: rgb(0.45, 0.45, 0.45),
-        });
-    }
 }
 
 function drawSingleLine(page: PDFPage, font: PDFFont, text: string, layout: FieldLayout): void {
@@ -300,9 +260,7 @@ export async function buildSarBriefingPdf(form: IrBriefingForm): Promise<Uint8Ar
     };
 
     const fieldValues = collectFieldValues(form);
-    const templateForm = templatePdf.getForm();
-    const layouts = buildFieldLayoutMap(templateForm, fieldValues.keys());
-    const allTemplateLayouts = buildAllFieldLayouts(templateForm);
+    const layouts = buildFieldLayoutMap(templatePdf.getForm(), fieldValues.keys());
 
     // Copy template pages into a new doc so AcroForm widgets (e.g. IC dropdown) are not
     // rendered as interactive black boxes on top of painted text.
@@ -315,15 +273,11 @@ export async function buildSarBriefingPdf(form: IrBriefingForm): Promise<Uint8Ar
     const pages = (outDoc as PDFDocument & { getPages(): PDFPage[] }).getPages();
     const font = await outDoc.embedFont(StandardFonts.Helvetica);
 
-    whiteOutAllTemplateFields(pages, allTemplateLayouts);
-
     for (const [fieldName, value] of fieldValues) {
         const layout = layouts.get(fieldName);
         if (!layout) continue;
         paintField(pages, font, layout, value, WRAPPED_FIELD_NAMES.has(fieldName));
     }
-
-    stampGeneratorVersion(pages, font);
 
     return outDoc.save();
 }
