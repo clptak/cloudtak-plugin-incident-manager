@@ -1,159 +1,294 @@
 <template>
-    <div class='row g-3'>
-        <div class='col-lg-8'>
-            <!-- Incident Information -->
-            <div class='card mb-3'>
-                <div class='card-header'>
-                    <h3 class='card-title mb-0'>
-                        Incident Information
-                    </h3>
+    <div>
+        <!-- Incident Information -->
+        <div class='card mb-3'>
+            <div class='card-header'>
+                <h3 class='card-title mb-0'>
+                    Incident Information
+                </h3>
+            </div>
+            <div class='card-body'>
+                <div class='row g-3'>
+                    <div class='col-md-6'>
+                        <label class='form-label'>Incident Name</label>
+                        <input
+                            v-model='incidentForm.incidentName'
+                            type='text'
+                            class='form-control form-control-sm'
+                            placeholder='e.g. Smith Search'
+                        >
+                    </div>
+                    <div class='col-md-6'>
+                        <label class='form-label'>Activity Number</label>
+                        <input
+                            v-model='incidentForm.eventId'
+                            type='text'
+                            class='form-control form-control-sm'
+                            placeholder='e.g. A22012345'
+                        >
+                    </div>
+                    <div class='col-md-6'>
+                        <label class='form-label'>Department Report Number</label>
+                        <input
+                            v-model='incidentForm.incidentId'
+                            type='text'
+                            class='form-control form-control-sm'
+                            placeholder='e.g. S2201234'
+                        >
+                    </div>
+                    <div class='col-md-6'>
+                        <label class='form-label'>DEMA Mission Number</label>
+                        <input
+                            v-model='incidentForm.demaMission'
+                            type='text'
+                            class='form-control form-control-sm'
+                            :class='{ "is-invalid": demaInvalid }'
+                            placeholder='e.g. 2025-12345'
+                        >
+                        <div
+                            v-if='demaInvalid'
+                            class='invalid-feedback d-block'
+                        >
+                            Format: 20YY-NNNNN (e.g. 2025-12345)
+                        </div>
+                    </div>
+                    <div class='col-md-6'>
+                        <label class='form-label'>IC Coordinator&apos;s Name</label>
+                        <input
+                            v-model='incidentForm.icCoordinator'
+                            type='text'
+                            class='form-control form-control-sm'
+                            placeholder='Coordinator name'
+                        >
+                        <div class='form-text'>
+                            Will be populated from your TAK Portal user (future).
+                        </div>
+                    </div>
+                    <div class='col-md-6'>
+                        <label class='form-label'>Incident Conclusion Time</label>
+                        <input
+                            v-model='incidentForm.incidentConclusionTime'
+                            type='datetime-local'
+                            class='form-control form-control-sm'
+                        >
+                    </div>
+                    <div class='col-md-8'>
+                        <label class='form-label'>Assignment</label>
+                        <textarea
+                            v-model='incidentForm.assignmentText'
+                            class='form-control form-control-sm'
+                            rows='3'
+                            placeholder='Assignment details'
+                        />
+                    </div>
+                    <div class='col-md-4'>
+                        <label class='form-label'>Assignment Date/Time</label>
+                        <input
+                            v-model='incidentForm.assignmentDateTime'
+                            type='datetime-local'
+                            class='form-control form-control-sm'
+                        >
+                    </div>
                 </div>
-                <div class='card-body'>
-                    <div class='row g-3'>
-                        <div class='col-md-6'>
-                            <label class='form-label'>Incident Name</label>
-                            <input
-                                v-model='incidentForm.incidentName'
-                                type='text'
-                                class='form-control form-control-sm'
-                                placeholder='e.g. Smith Search'
-                            >
-                        </div>
-                        <div class='col-md-6'>
-                            <label class='form-label'>Activity Number</label>
-                            <input
-                                v-model='incidentForm.eventId'
-                                type='text'
-                                class='form-control form-control-sm'
-                                placeholder='e.g. A22012345'
-                            >
-                        </div>
-                        <div class='col-md-6'>
-                            <label class='form-label'>Department Report Number</label>
-                            <input
-                                v-model='incidentForm.incidentId'
-                                type='text'
-                                class='form-control form-control-sm'
-                                placeholder='e.g. S2201234'
-                            >
-                        </div>
-                        <div class='col-md-6'>
-                            <label class='form-label'>DEMA Mission Number</label>
-                            <input
-                                v-model='incidentForm.demaMission'
-                                type='text'
-                                class='form-control form-control-sm'
-                                :class='{ "is-invalid": demaInvalid }'
-                                placeholder='e.g. 2025-12345'
-                            >
-                            <div
-                                v-if='demaInvalid'
-                                class='invalid-feedback d-block'
-                            >
-                                Format: 20YY-NNNNN (e.g. 2025-12345)
-                            </div>
-                        </div>
-                        <div class='col-md-6'>
-                            <label class='form-label'>IC Coordinator&apos;s Name</label>
-                            <input
-                                v-model='incidentForm.icCoordinator'
-                                type='text'
-                                class='form-control form-control-sm'
-                                placeholder='Coordinator name'
-                            >
-                            <div class='form-text'>
-                                Will be populated from your TAK Portal user (future).
-                            </div>
-                        </div>
-                        <div class='col-md-6'>
-                            <label class='form-label'>Incident Conclusion Time</label>
-                            <input
-                                v-model='incidentForm.incidentConclusionTime'
-                                type='datetime-local'
-                                class='form-control form-control-sm'
-                            >
-                        </div>
-                        <div class='col-md-8'>
-                            <label class='form-label'>Assignment</label>
-                            <textarea
-                                v-model='incidentForm.assignmentText'
-                                class='form-control form-control-sm'
-                                rows='3'
-                                placeholder='Assignment details'
-                            />
-                        </div>
-                        <div class='col-md-4'>
-                            <label class='form-label'>Assignment Date/Time</label>
-                            <input
-                                v-model='incidentForm.assignmentDateTime'
-                                type='datetime-local'
-                                class='form-control form-control-sm'
-                            >
-                        </div>
-                    </div>
 
-                    <div
-                        v-if='!activeMission'
-                        class='form-text text-warning mt-2'
-                    >
-                        No active mission. Select one in Create | Open first.
-                    </div>
-                    <div
-                        v-else
-                        class='form-text mt-2'
-                    >
-                        Active DataSync: <strong>{{ activeMission.name }}</strong>
-                    </div>
+                <div
+                    v-if='!activeMission'
+                    class='form-text text-warning mt-2'
+                >
+                    No active mission. Select one in Create | Open first.
+                </div>
+                <div
+                    v-else
+                    class='form-text mt-2'
+                >
+                    Active DataSync: <strong>{{ activeMission.name }}</strong>
+                </div>
 
-                    <div
-                        v-if='demaInvalid'
-                        class='form-text text-warning mt-2'
-                    >
-                        Fix the DEMA mission number format before saving.
-                    </div>
+                <div
+                    v-if='demaInvalid'
+                    class='form-text text-warning mt-2'
+                >
+                    Fix the DEMA mission number format before saving.
+                </div>
 
-                    <button
-                        class='btn btn-primary btn-sm mt-3'
-                        :disabled='!activeMission || savingIncident || demaInvalid'
-                        @click='saveIncidentInfo'
-                    >
-                        {{ savingIncident ? 'Saving…' : 'Save to DataSync' }}
-                    </button>
+                <button
+                    class='btn btn-primary btn-sm mt-3'
+                    :disabled='!activeMission || savingIncident || demaInvalid'
+                    @click='saveIncidentInfo'
+                >
+                    {{ savingIncident ? 'Saving…' : 'Save to DataSync' }}
+                </button>
 
-                    <div
-                        v-if='incidentStatus'
-                        class='mt-2 fw-bold'
-                        :class='incidentStatusError ? "text-danger" : "text-success"'
-                    >
-                        {{ incidentStatus }}
-                    </div>
+                <div
+                    v-if='incidentStatus'
+                    class='mt-2 fw-bold'
+                    :class='incidentStatusError ? "text-danger" : "text-success"'
+                >
+                    {{ incidentStatus }}
                 </div>
             </div>
+        </div>
 
-            <!-- CFS / Call Notes -->
-            <div class='card'>
-                <div class='card-header'>
-                    <h3 class='card-title mb-0'>
-                        CFS / Call Notes
-                    </h3>
+        <!-- CFS / Call Notes -->
+        <div class='card'>
+            <div class='card-header'>
+                <h3 class='card-title mb-0'>
+                    CFS / Call Notes
+                </h3>
+            </div>
+            <div class='card-body'>
+                <label class='form-label mb-1'>Paste full CFS text (header + Remarks section)</label>
+                <textarea
+                    v-model='cadText'
+                    class='form-control'
+                    rows='10'
+                    placeholder='Paste the full MPS Call Notes here — include the Remarks section with timestamped log entries.'
+                />
+
+                <div class='mt-3'>
+                    <button
+                        class='btn btn-primary'
+                        @click='parse'
+                    >
+                        Parse &amp; Build
+                    </button>
                 </div>
-                <div class='card-body'>
-                    <label class='form-label mb-1'>Paste full CFS text (header + Remarks section)</label>
-                    <textarea
-                        v-model='cadText'
-                        class='form-control'
-                        rows='10'
-                        placeholder='Paste the full MPS Call Notes here — include the Remarks section with timestamped log entries.'
-                    />
 
-                    <div class='mt-3 d-flex flex-wrap gap-2'>
+                <div
+                    v-if='!activeMission'
+                    class='form-text text-warning mt-2'
+                >
+                    No active mission. Select one in Create | Open first.
+                </div>
+                <div
+                    v-else
+                    class='form-text mt-2'
+                >
+                    Active DataSync: <strong>{{ activeMission.name }}</strong>
+                </div>
+
+                <div
+                    v-if='status'
+                    class='mt-2 fw-bold'
+                    :class='statusError ? "text-danger" : "text-success"'
+                >
+                    {{ status }}
+                </div>
+            </div>
+        </div>
+
+        <div
+            v-if='showParsedModal'
+            class='modal modal-blur show d-block'
+            tabindex='-1'
+            role='dialog'
+            @click.self='closeParsedModal'
+        >
+            <div
+                class='modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable'
+                role='document'
+            >
+                <div class='modal-content'>
+                    <div class='modal-header'>
+                        <h5 class='modal-title'>
+                            Parsed Information ({{ selectedCount }}/{{ rows.length }})
+                        </h5>
                         <button
-                            class='btn btn-primary'
-                            @click='parse'
+                            type='button'
+                            class='btn-close'
+                            aria-label='Close'
+                            @click='closeParsedModal'
+                        />
+                    </div>
+                    <div class='modal-body'>
+                        <div class='d-flex align-items-center justify-content-between mb-2'>
+                            <span class='text-muted small'>
+                                Review parsed call-note entries before posting to DataSync.
+                            </span>
+                            <button
+                                v-if='rows.length'
+                                type='button'
+                                class='btn btn-sm btn-link p-0'
+                                @click='toggleAll'
+                            >
+                                {{ allSelected ? 'Deselect all' : 'Select all' }}
+                            </button>
+                        </div>
+
+                        <div
+                            v-if='parsedActivityNumber || parsedReportNumber'
+                            class='small text-muted mb-3'
                         >
-                            Parse &amp; Build
+                            <div v-if='parsedActivityNumber'>
+                                Activity: <code>{{ parsedActivityNumber }}</code>
+                            </div>
+                            <div v-if='parsedReportNumber'>
+                                Report: <code>{{ parsedReportNumber }}</code>
+                            </div>
+                        </div>
+
+                        <div
+                            v-if='!rows.length'
+                            class='text-muted small'
+                        >
+                            No entries parsed yet.
+                        </div>
+
+                        <div
+                            v-else
+                            style='max-height: 50vh; overflow: auto;'
+                        >
+                            <label
+                                v-for='(r, i) in rows'
+                                :key='i'
+                                class='border-bottom py-2 small d-flex gap-2'
+                                style='cursor: pointer;'
+                            >
+                                <input
+                                    v-model='selected[i]'
+                                    type='checkbox'
+                                    class='form-check-input mt-1 flex-shrink-0'
+                                >
+                                <span>
+                                    <span class='text-muted'>{{ r.dtg }} · {{ r.uid }}</span>
+                                    <br>
+                                    {{ r.remark }}
+                                    <span
+                                        v-if='r.lat !== "" && r.lon !== ""'
+                                        class='text-azure d-block'
+                                    >
+                                        {{ r.lat }}, {{ r.lon }}
+                                    </span>
+                                </span>
+                            </label>
+                        </div>
+
+                        <div
+                            v-if='status'
+                            class='mt-3 fw-bold'
+                            :class='statusError ? "text-danger" : "text-success"'
+                        >
+                            {{ status }}
+                        </div>
+
+                        <div
+                            v-if='!activeMission'
+                            class='form-text text-warning mt-2'
+                        >
+                            No active mission. Select one in Create | Open first.
+                        </div>
+                    </div>
+                    <div class='modal-footer'>
+                        <button
+                            type='button'
+                            class='btn btn-secondary'
+                            :disabled='posting'
+                            @click='closeParsedModal'
+                        >
+                            Close
                         </button>
                         <button
+                            type='button'
                             class='btn btn-success'
                             :disabled='!selectedCount || !activeMission || posting'
                             @click='postLogs'
@@ -161,93 +296,13 @@
                             {{ posting ? 'Posting…' : `Post ${selectedCount} entr${selectedCount === 1 ? "y" : "ies"} to DataSync` }}
                         </button>
                     </div>
-
-                    <div
-                        v-if='!activeMission'
-                        class='form-text text-warning mt-2'
-                    >
-                        No active mission. Select one in Create | Open first.
-                    </div>
-                    <div
-                        v-else
-                        class='form-text mt-2'
-                    >
-                        Active DataSync: <strong>{{ activeMission.name }}</strong>
-                    </div>
-
-                    <div
-                        v-if='status'
-                        class='mt-2 fw-bold'
-                        :class='statusError ? "text-danger" : "text-success"'
-                    >
-                        {{ status }}
-                    </div>
                 </div>
             </div>
         </div>
-
-        <div class='col-lg-4'>
-            <div class='card'>
-                <div class='card-header py-2 d-flex align-items-center justify-content-between'>
-                    <h3 class='card-title mb-0'>
-                        Parsed Entries ({{ selectedCount }}/{{ rows.length }})
-                    </h3>
-                    <button
-                        v-if='rows.length'
-                        type='button'
-                        class='btn btn-sm btn-link p-0'
-                        @click='toggleAll'
-                    >
-                        {{ allSelected ? 'Deselect all' : 'Select all' }}
-                    </button>
-                </div>
-                <div
-                    class='card-body py-2'
-                    style='max-height: 360px; overflow:auto;'
-                >
-                    <div
-                        v-if='parsedActivityNumber || parsedReportNumber'
-                        class='small text-muted mb-2'
-                    >
-                        <div v-if='parsedActivityNumber'>
-                            Activity: <code>{{ parsedActivityNumber }}</code>
-                        </div>
-                        <div v-if='parsedReportNumber'>
-                            Report: <code>{{ parsedReportNumber }}</code>
-                        </div>
-                    </div>
-                    <div
-                        v-if='!rows.length'
-                        class='text-muted small'
-                    >
-                        No entries parsed yet.
-                    </div>
-                    <label
-                        v-for='(r, i) in rows'
-                        :key='i'
-                        class='border-bottom py-1 small d-flex gap-2'
-                        style='cursor: pointer;'
-                    >
-                        <input
-                            v-model='selected[i]'
-                            type='checkbox'
-                            class='form-check-input mt-1 flex-shrink-0'
-                        >
-                        <span>
-                            <span class='text-muted'>{{ r.dtg }} · {{ r.uid }}</span>
-                            <br>
-                            {{ r.remark }}
-                            <span
-                                v-if='r.lat !== "" && r.lon !== ""'
-                                class='text-azure d-block'
-                            >
-                                {{ r.lat }}, {{ r.lon }}
-                            </span>
-                        </span>
-                    </label>
-                </div>
-            </div>
-        </div>
+        <div
+            v-if='showParsedModal'
+            class='modal-backdrop fade show'
+        />
     </div>
 </template>
 
@@ -299,6 +354,7 @@ const selected = ref<boolean[]>([]);
 const parsedActivityNumber = ref<string | null>(null);
 const parsedReportNumber = ref<string | null>(null);
 const posting = ref(false);
+const showParsedModal = ref(false);
 const status = ref('');
 const statusError = ref(false);
 const incidentStatus = ref('');
@@ -326,6 +382,10 @@ const allSelected = computed(
 function toggleAll(): void {
     const next = !allSelected.value;
     selected.value = rows.value.map(() => next);
+}
+
+function closeParsedModal(): void {
+    showParsedModal.value = false;
 }
 
 function applySubjectNameSuggestion(logs: { keywords?: string[] }[]): void {
@@ -495,6 +555,7 @@ function parse(): void {
         activityNumber: res.activityNumber,
         reportNumber: res.reportNumber,
     });
+    showParsedModal.value = true;
     void syncSchemaFromForm({
         activityNumber: res.activityNumber,
         reportNumber: res.reportNumber,
