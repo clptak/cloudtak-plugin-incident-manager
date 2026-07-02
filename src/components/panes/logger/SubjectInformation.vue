@@ -170,7 +170,88 @@
                                 v-model='draft.form.subjectDescription'
                                 type='text'
                                 class='form-control'
-                                placeholder='Height, weight, hair color, eye color, clothing'
+                                placeholder='General description or notes'
+                            >
+                        </div>
+                        <div class='col-md-4'>
+                            <label class='form-label'>Height</label>
+                            <input
+                                v-model='draft.form.subjectHeight'
+                                type='text'
+                                class='form-control'
+                                placeholder='Height'
+                            >
+                        </div>
+                        <div class='col-md-4'>
+                            <label class='form-label'>Weight</label>
+                            <input
+                                v-model='draft.form.subjectWeight'
+                                type='text'
+                                class='form-control'
+                                placeholder='Weight'
+                            >
+                        </div>
+                        <div class='col-md-4'>
+                            <label class='form-label'>Hair Color</label>
+                            <input
+                                v-model='draft.form.subjectHairColor'
+                                type='text'
+                                class='form-control'
+                                placeholder='Hair Color'
+                            >
+                        </div>
+                        <div class='col-md-4'>
+                            <label class='form-label'>Facial Hair</label>
+                            <input
+                                v-model='draft.form.subjectFacialHair'
+                                type='text'
+                                class='form-control'
+                                placeholder='Facial Hair'
+                            >
+                        </div>
+                        <div class='col-md-4'>
+                            <label class='form-label'>Glasses</label>
+                            <input
+                                v-model='draft.form.subjectGlasses'
+                                type='text'
+                                class='form-control'
+                                placeholder='Glasses'
+                            >
+                        </div>
+                        <div class='col-md-4'>
+                            <label class='form-label'>Other Distinguishing Marks</label>
+                            <input
+                                v-model='draft.form.subjectDistinguishingMarks'
+                                type='text'
+                                class='form-control'
+                                placeholder='Other Distinguishing Marks'
+                            >
+                        </div>
+                        <div class='col-md-6'>
+                            <label class='form-label'>Clothing Description</label>
+                            <input
+                                v-model='draft.form.subjectClothing'
+                                type='text'
+                                class='form-control'
+                                placeholder='Clothing Description'
+                            >
+                        </div>
+                        <div class='col-md-6'>
+                            <label class='form-label'>Footwear (type and size)</label>
+                            <input
+                                v-model='draft.form.subjectFootwear'
+                                type='text'
+                                class='form-control'
+                                placeholder='Footwear (type and size)'
+                            >
+                        </div>
+                        <div class='col-md-6'>
+                            <label class='form-label'>Vehicle Description</label>
+                            <input
+                                v-model='draft.form.subjectVehicle'
+                                type='text'
+                                class='form-control'
+                                placeholder='Vehicle Description'
                             >
                         </div>
                         <div class='col-md-6'>

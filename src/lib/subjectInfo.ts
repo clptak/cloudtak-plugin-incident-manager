@@ -23,6 +23,15 @@ export interface SubjectForm {
     subjectGender: string;
     subjectCategory: string;
     subjectDescription: string;
+    subjectHeight: string;
+    subjectWeight: string;
+    subjectHairColor: string;
+    subjectFacialHair: string;
+    subjectGlasses: string;
+    subjectDistinguishingMarks: string;
+    subjectClothing: string;
+    subjectFootwear: string;
+    subjectVehicle: string;
     subjectMedicalConditions: string;
     subjectExperience: string;
     subjectEquipment: string;
@@ -99,6 +108,15 @@ export function blankSubjectForm(subjectCaseID = '01'): SubjectForm {
         subjectGender: '',
         subjectCategory: '',
         subjectDescription: '',
+        subjectHeight: '',
+        subjectWeight: '',
+        subjectHairColor: '',
+        subjectFacialHair: '',
+        subjectGlasses: '',
+        subjectDistinguishingMarks: '',
+        subjectClothing: '',
+        subjectFootwear: '',
+        subjectVehicle: '',
         subjectMedicalConditions: '',
         subjectExperience: '',
         subjectEquipment: '',
@@ -134,6 +152,15 @@ export function fieldsFromLog(keywords?: string[]): SubjectForm {
         subjectGender: kwValue(keywords, 'gender:'),
         subjectCategory: kwValue(keywords, 'category:'),
         subjectDescription: kwValue(keywords, 'description:'),
+        subjectHeight: kwValue(keywords, 'height:'),
+        subjectWeight: kwValue(keywords, 'weight:'),
+        subjectHairColor: kwValue(keywords, 'hairColor:'),
+        subjectFacialHair: kwValue(keywords, 'facialHair:'),
+        subjectGlasses: kwValue(keywords, 'glasses:'),
+        subjectDistinguishingMarks: kwValue(keywords, 'distinguishingMarks:'),
+        subjectClothing: kwValue(keywords, 'clothing:'),
+        subjectFootwear: kwValue(keywords, 'footwear:'),
+        subjectVehicle: kwValue(keywords, 'vehicle:'),
         subjectMedicalConditions: kwValue(keywords, 'medical:'),
         subjectExperience: kwValue(keywords, 'experience:'),
         subjectEquipment: kwValue(keywords, 'equipment:'),
@@ -155,6 +182,15 @@ export function hasFilledSubjectFields(f: SubjectForm): boolean {
         f.subjectGender,
         f.subjectCategory,
         f.subjectDescription,
+        f.subjectHeight,
+        f.subjectWeight,
+        f.subjectHairColor,
+        f.subjectFacialHair,
+        f.subjectGlasses,
+        f.subjectDistinguishingMarks,
+        f.subjectClothing,
+        f.subjectFootwear,
+        f.subjectVehicle,
         f.subjectMedicalConditions,
         f.subjectExperience,
         f.subjectEquipment,
@@ -178,6 +214,17 @@ function buildParts(f: SubjectForm): string[] {
     if (hasValue(f.subjectGender)) parts.push(`Gender: ${f.subjectGender}`);
     if (hasValue(f.subjectCategory)) parts.push(`Category: ${categoryLabel(f.subjectCategory)}`);
     if (hasValue(f.subjectDescription)) parts.push(`Description: ${f.subjectDescription.trim()}`);
+    if (hasValue(f.subjectHeight)) parts.push(`Height: ${f.subjectHeight.trim()}`);
+    if (hasValue(f.subjectWeight)) parts.push(`Weight: ${f.subjectWeight.trim()}`);
+    if (hasValue(f.subjectHairColor)) parts.push(`Hair Color: ${f.subjectHairColor.trim()}`);
+    if (hasValue(f.subjectFacialHair)) parts.push(`Facial Hair: ${f.subjectFacialHair.trim()}`);
+    if (hasValue(f.subjectGlasses)) parts.push(`Glasses: ${f.subjectGlasses.trim()}`);
+    if (hasValue(f.subjectDistinguishingMarks)) {
+        parts.push(`Distinguishing Marks: ${f.subjectDistinguishingMarks.trim()}`);
+    }
+    if (hasValue(f.subjectClothing)) parts.push(`Clothing: ${f.subjectClothing.trim()}`);
+    if (hasValue(f.subjectFootwear)) parts.push(`Footwear: ${f.subjectFootwear.trim()}`);
+    if (hasValue(f.subjectVehicle)) parts.push(`Vehicle: ${f.subjectVehicle.trim()}`);
     if (hasValue(f.subjectMedicalConditions)) parts.push(`Medical: ${f.subjectMedicalConditions.trim()}`);
     if (hasValue(f.subjectExperience)) parts.push(`Experience: ${f.subjectExperience.trim()}`);
     if (hasValue(f.subjectEquipment)) parts.push(`Equipment: ${f.subjectEquipment.trim()}`);
@@ -204,6 +251,17 @@ export function buildSubjectKeywords(f: SubjectForm): string[] {
     if (hasValue(f.subjectGender)) kws.push(`gender:${f.subjectGender}`);
     if (hasValue(f.subjectCategory)) kws.push(`category:${f.subjectCategory}`);
     if (hasValue(f.subjectDescription)) kws.push(`description:${f.subjectDescription.trim()}`);
+    if (hasValue(f.subjectHeight)) kws.push(`height:${f.subjectHeight.trim()}`);
+    if (hasValue(f.subjectWeight)) kws.push(`weight:${f.subjectWeight.trim()}`);
+    if (hasValue(f.subjectHairColor)) kws.push(`hairColor:${f.subjectHairColor.trim()}`);
+    if (hasValue(f.subjectFacialHair)) kws.push(`facialHair:${f.subjectFacialHair.trim()}`);
+    if (hasValue(f.subjectGlasses)) kws.push(`glasses:${f.subjectGlasses.trim()}`);
+    if (hasValue(f.subjectDistinguishingMarks)) {
+        kws.push(`distinguishingMarks:${f.subjectDistinguishingMarks.trim()}`);
+    }
+    if (hasValue(f.subjectClothing)) kws.push(`clothing:${f.subjectClothing.trim()}`);
+    if (hasValue(f.subjectFootwear)) kws.push(`footwear:${f.subjectFootwear.trim()}`);
+    if (hasValue(f.subjectVehicle)) kws.push(`vehicle:${f.subjectVehicle.trim()}`);
     if (hasValue(f.subjectMedicalConditions)) kws.push(`medical:${f.subjectMedicalConditions.trim()}`);
     if (hasValue(f.subjectExperience)) kws.push(`experience:${f.subjectExperience.trim()}`);
     if (hasValue(f.subjectEquipment)) kws.push(`equipment:${f.subjectEquipment.trim()}`);
@@ -264,6 +322,17 @@ export function subjectDetailRows(s: SubjectForm): SubjectDetailRow[] {
         rows.push({ label: 'Category', value: categoryLabel(s.subjectCategory) });
     }
     if (hasValue(s.subjectDescription)) rows.push({ label: 'Description', value: s.subjectDescription.trim() });
+    if (hasValue(s.subjectHeight)) rows.push({ label: 'Height', value: s.subjectHeight.trim() });
+    if (hasValue(s.subjectWeight)) rows.push({ label: 'Weight', value: s.subjectWeight.trim() });
+    if (hasValue(s.subjectHairColor)) rows.push({ label: 'Hair Color', value: s.subjectHairColor.trim() });
+    if (hasValue(s.subjectFacialHair)) rows.push({ label: 'Facial Hair', value: s.subjectFacialHair.trim() });
+    if (hasValue(s.subjectGlasses)) rows.push({ label: 'Glasses', value: s.subjectGlasses.trim() });
+    if (hasValue(s.subjectDistinguishingMarks)) {
+        rows.push({ label: 'Distinguishing Marks', value: s.subjectDistinguishingMarks.trim() });
+    }
+    if (hasValue(s.subjectClothing)) rows.push({ label: 'Clothing', value: s.subjectClothing.trim() });
+    if (hasValue(s.subjectFootwear)) rows.push({ label: 'Footwear', value: s.subjectFootwear.trim() });
+    if (hasValue(s.subjectVehicle)) rows.push({ label: 'Vehicle', value: s.subjectVehicle.trim() });
     if (hasValue(s.subjectMedicalConditions)) {
         rows.push({ label: 'Medical Conditions', value: s.subjectMedicalConditions.trim() });
     }
