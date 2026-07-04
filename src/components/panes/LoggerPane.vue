@@ -9,6 +9,7 @@
         <SearchArea v-else-if='sub === "search-area"' />
         <SearchUrgency v-else-if='sub === "search-urgency"' />
         <IrBriefing v-else-if='sub === "ir-briefing"' />
+        <Ics201 v-else-if='sub === "ics-201"' />
         <SearchScenarios v-else-if='sub === "search-scenarios"' />
         <RiskAssessment v-else-if='sub === "risk-assessment"' />
         <IncidentPost v-else-if='sub === "incident-post"' />
@@ -34,6 +35,7 @@ const SubjectInformation = defineAsyncComponent(() => import('./logger/SubjectIn
 const SearchArea = defineAsyncComponent(() => import('./logger/SearchArea.vue'));
 const SearchUrgency = defineAsyncComponent(() => import('./logger/SearchUrgency.vue'));
 const IrBriefing = defineAsyncComponent(() => import('./logger/IrBriefing.vue'));
+const Ics201 = defineAsyncComponent(() => import('./logger/Ics201.vue'));
 const SearchScenarios = defineAsyncComponent(() => import('./logger/SearchScenarios.vue'));
 const RiskAssessment = defineAsyncComponent(() => import('./logger/RiskAssessment.vue'));
 const IncidentPost = defineAsyncComponent(() => import('./logger/IncidentPost.vue'));
@@ -46,6 +48,7 @@ const labels: Record<string, string> = {
     'search-area': 'Search Area',
     'search-urgency': 'Search Urgency',
     'ir-briefing': 'IR Briefing',
+    'ics-201': 'ICS 201',
     'search-scenarios': 'Search Scenarios',
     'risk-assessment': 'Risk Assessment',
     'incident-post': 'Incident POST',

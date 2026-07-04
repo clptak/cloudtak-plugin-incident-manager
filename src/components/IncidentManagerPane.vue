@@ -99,6 +99,7 @@ const navItems: NavEntry[] = [
     { kind: 'sub', key: 'subject-info', label: 'Subject Information' },
     { kind: 'sub', key: 'search-urgency', label: 'Search Urgency' },
     { kind: 'sub', key: 'ir-briefing', label: 'IR Briefing' },
+    { kind: 'sub', key: 'ics-201', label: 'ICS 201' },
 
     { kind: 'header', key: 'h-area', label: 'Area Search' },
     { kind: 'sub', key: 'search-scenarios', label: 'Search Scenarios' },
