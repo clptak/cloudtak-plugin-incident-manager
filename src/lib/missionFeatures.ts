@@ -170,6 +170,36 @@ export async function pushPointToMission(opts: {
 }
 
 /**
+ * Update an existing mission CoT's remarks in place (same path as draw/buffer).
+ * Returns `missing` when the uuid is not on the mission.
+ */
+export async function updateMissionFeatureRemarks(opts: {
+    missionGuid: string;
+    missionToken?: string;
+    uid: string;
+    remarks: string;
+}): Promise<'updated' | 'missing'> {
+    const sub = await Subscription.load(opts.missionGuid, {
+        token: await sessionToken(),
+        missiontoken: opts.missionToken,
+        subscribed: true,
+    });
+
+    const feats = await sub.feature.list({ refresh: true }) as Feature[];
+    const match = feats.find((f) => String(f.id) === opts.uid);
+    if (!match) return 'missing';
+
+    const feat = toPlainFeature(match);
+    feat.properties = {
+        ...feat.properties,
+        remarks: opts.remarks.trim(),
+    };
+
+    await pushFeatureToMission(opts.missionGuid, feat, opts.missionToken);
+    return 'updated';
+}
+
+/**
  * Delete a feature from a mission by its CoT uuid via the REST endpoint
  * (DELETE /api/marti/missions/:guid/cot/:uid). Used to drop a ring polygon when
  * its search-area log entry is removed.

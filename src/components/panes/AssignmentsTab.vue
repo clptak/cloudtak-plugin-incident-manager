@@ -47,7 +47,9 @@
         <p class='text-muted small mb-2 flex-shrink-0'>
             Configure teams, incident command, and rescue management roles, drag them onto the chart,
             then add D4H personnel. The org chart auto-saves in <strong>mission_schema.json</strong>.
-            Use <strong>Sync org chart to DataSync</strong> for ICS 201 log lines. Use
+            Use <strong>Sync org chart to DataSync</strong> for ICS 201 log lines; teams with a
+            selected assignment CoT are linked via <code>entryUid</code> and the CoT remarks are
+            updated to match. Use
             <strong>×</strong> to remove a node, or <strong>Clear canvas</strong> to start over.
         </p>
 
@@ -750,6 +752,12 @@ async function syncOrgChart(): Promise<void> {
         if (result.created) parts.push(`${result.created} new`);
         if (result.updated) parts.push(`${result.updated} updated`);
         if (result.removed) parts.push(`${result.removed} removed`);
+        if (result.assignmentRemarksUpdated) {
+            parts.push(`${result.assignmentRemarksUpdated} assignment CoT remark${result.assignmentRemarksUpdated === 1 ? '' : 's'} updated`);
+        }
+        if (result.assignmentRemarksMissing) {
+            parts.push(`${result.assignmentRemarksMissing} assignment CoT${result.assignmentRemarksMissing === 1 ? '' : 's'} not found`);
+        }
         syncStatus.value = `Synced ${result.lines} org position${result.lines === 1 ? '' : 's'} to ${activeMission.value.name}`
             + (parts.length ? ` (${parts.join(', ')})` : '')
             + '. ICS 201 will pick these up on refresh.';

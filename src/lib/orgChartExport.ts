@@ -28,6 +28,8 @@ export interface OrgChartExportLine {
     content: string;
     pdfField?: OrgChartPdfField;
     order: number;
+    /** Mission CoT uuid for team assignment linkage (DataSync log entryUid). */
+    entryUid?: string;
 }
 
 const ICS_ROLE_TO_PDF_FIELD: Record<string, Exclude<Ics201OrgField, 'organizationNotes'>> = {
@@ -182,7 +184,12 @@ export function orgChartLinesFromTree(tree: HastyTreeNode): OrgChartExportLine[]
     const incidentCommandRoles = new Map<string, { title: string; assignee: string }>();
     let order = 0;
 
-    const push = (key: string, content: string, pdfField?: OrgChartPdfField): void => {
+    const push = (
+        key: string,
+        content: string,
+        pdfField?: OrgChartPdfField,
+        entryUid?: string,
+    ): void => {
         const trimmed = content.trim();
         if (!trimmed && pdfField !== INCIDENT_COMMAND_COMBINED_FIELD) return;
         lines.push({
@@ -190,6 +197,7 @@ export function orgChartLinesFromTree(tree: HastyTreeNode): OrgChartExportLine[]
             content: trimmed,
             pdfField,
             order: order++,
+            entryUid: entryUid?.trim() || undefined,
         });
     };
 
@@ -202,7 +210,7 @@ export function orgChartLinesFromTree(tree: HastyTreeNode): OrgChartExportLine[]
         const self = node.self;
 
         if (isTeamLikeNode(self)) {
-            push(`team:${self.id}`, teamLineContent(self, node));
+            push(`team:${self.id}`, teamLineContent(self, node), undefined, self.assignmentUid);
             return;
         }
 
@@ -247,6 +255,7 @@ export function buildOrgChartLogKeywords(line: OrgChartExportLine): string[] {
         `order:${line.order}`,
         `field:${line.pdfField ?? 'organizationNotes'}`,
     ];
+    if (line.entryUid) kws.push(`uid:${line.entryUid}`);
     return kws;
 }
 
