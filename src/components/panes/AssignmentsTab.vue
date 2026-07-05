@@ -10,7 +10,13 @@
             >
                 D4H sync {{ formatD4hSyncTime(meta.fetchedAt) }}
             </span>
-            <div class='ms-auto d-flex flex-wrap gap-2'>
+            <span
+                v-if='persistStatus'
+                class='text-muted small'
+            >
+                {{ persistStatus }}
+            </span>
+            <div class='ms-auto d-flex flex-wrap gap-2 align-items-center'>
                 <button
                     type='button'
                     class='btn btn-outline-success btn-sm'
@@ -40,8 +46,9 @@
 
         <p class='text-muted small mb-2 flex-shrink-0'>
             Configure teams, incident command, and rescue management roles, drag them onto the chart,
-            then add D4H personnel. Use <strong>×</strong> to remove a node, or
-            <strong>Clear canvas</strong> to start over.
+            then add D4H personnel. The org chart auto-saves to the active DataSync mission.
+            Use <strong>Sync org chart to DataSync</strong> for ICS 201 log lines. Use
+            <strong>×</strong> to remove a node, or <strong>Clear canvas</strong> to start over.
         </p>
 
         <div
@@ -446,7 +453,7 @@
 </template>
 
 <script setup lang='ts'>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { HastyTeam } from '@tak-ps/vue-hasty-team';
 import { IconLifebuoy, IconShield, IconTag, IconUser, IconUsers, IconX } from '@tabler/icons-vue';
 import { useIncident } from '../../composables/useIncident.ts';
@@ -479,6 +486,7 @@ import {
     type PendingPaletteDrop,
 } from '../../lib/hastyTeamTree.ts';
 import { syncOrgChartToDataSync } from '../../lib/orgChartDataSync.ts';
+import { loadOrgChartFromMission, saveOrgChartToMission } from '../../lib/orgChartPersistence.ts';
 import { formatPersonNameFirstLast } from '../../lib/personName.ts';
 import { listMissionCots, type MissionCotRef } from '../../lib/missionCots.ts';
 
@@ -500,6 +508,13 @@ const rescueSlots = ref<Record<string, RoleSlotConfig>>(createEmptyRescueSlots()
 const syncingOrgChart = ref(false);
 const syncStatus = ref('');
 const syncStatusError = ref(false);
+const orgChartLogId = ref<string | undefined>();
+const loadingOrgChart = ref(false);
+const savingOrgChart = ref(false);
+const persistStatus = ref('');
+
+let saveOrgChartTimer: ReturnType<typeof setTimeout> | null = null;
+let saveOrgChartGeneration = 0;
 
 const hasCanvas = computed(() => treeHasContent(teamTree.value));
 
@@ -657,6 +672,71 @@ function clearCanvas(): void {
     teamTree.value = {};
 }
 
+function scheduleOrgChartSave(): void {
+    if (loadingOrgChart.value || !activeMission.value) return;
+    if (saveOrgChartTimer) clearTimeout(saveOrgChartTimer);
+    saveOrgChartTimer = setTimeout(() => {
+        saveOrgChartTimer = null;
+        void persistOrgChart();
+    }, 800);
+}
+
+async function loadPersistedOrgChart(): Promise<void> {
+    if (!activeMission.value) {
+        teamTree.value = {};
+        orgChartLogId.value = undefined;
+        persistStatus.value = '';
+        return;
+    }
+
+    loadingOrgChart.value = true;
+    persistStatus.value = 'Loading chart…';
+    try {
+        const loaded = await loadOrgChartFromMission(activeMission.value);
+        teamTree.value = loaded.tree;
+        orgChartLogId.value = loaded.logId;
+        persistStatus.value = loaded.logId || treeHasContent(loaded.tree)
+            ? 'Chart loaded from DataSync'
+            : '';
+    } catch (err) {
+        persistStatus.value = '';
+        syncStatusError.value = true;
+        syncStatus.value = `Could not load saved org chart: ${err instanceof Error ? err.message : String(err)}`;
+    } finally {
+        loadingOrgChart.value = false;
+    }
+}
+
+async function persistOrgChart(): Promise<void> {
+    if (!activeMission.value || loadingOrgChart.value) return;
+
+    const generation = ++saveOrgChartGeneration;
+    savingOrgChart.value = true;
+    persistStatus.value = 'Saving chart…';
+
+    try {
+        const logId = await saveOrgChartToMission(
+            activeMission.value,
+            teamTree.value,
+            orgChartLogId.value,
+        );
+        if (generation !== saveOrgChartGeneration) return;
+        orgChartLogId.value = logId;
+        persistStatus.value = treeHasContent(teamTree.value)
+            ? 'Chart saved to DataSync'
+            : '';
+    } catch (err) {
+        if (generation !== saveOrgChartGeneration) return;
+        persistStatus.value = 'Save failed';
+        syncStatusError.value = true;
+        syncStatus.value = `Could not save org chart: ${err instanceof Error ? err.message : String(err)}`;
+    } finally {
+        if (generation === saveOrgChartGeneration) {
+            savingOrgChart.value = false;
+        }
+    }
+}
+
 async function syncOrgChart(): Promise<void> {
     if (!activeMission.value || !hasCanvas.value) return;
     syncingOrgChart.value = true;
@@ -708,11 +788,21 @@ async function refreshMissionCots(): Promise<void> {
 onMounted(() => {
     void refreshRoster();
     void refreshMissionCots();
+    void loadPersistedOrgChart();
+});
+
+onUnmounted(() => {
+    if (saveOrgChartTimer) clearTimeout(saveOrgChartTimer);
 });
 
 watch(() => activeMission.value?.guid, () => {
     void refreshMissionCots();
+    void loadPersistedOrgChart();
 });
+
+watch(teamTree, () => {
+    scheduleOrgChartSave();
+}, { deep: true });
 </script>
 
 <style scoped>
