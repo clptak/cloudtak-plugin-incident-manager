@@ -7,6 +7,7 @@ import {
 } from '../data/rescueManagementPositions.ts';
 import type { D4HMember } from './d4hTypes.ts';
 import type { PendingPaletteDrop, RoleCategory } from './hastyTeamTree.ts';
+import { formatPersonNameFirstLast } from './personName.ts';
 
 export interface SingleRoleSlotConfig {
     d4hMemberId: number | '';
@@ -44,12 +45,17 @@ export function resolveSingleAssignee(
     members: D4HMember[],
 ): { assigneeName?: string; d4hMemberId?: number } {
     const custom = slot.customName.trim();
-    if (custom) return { assigneeName: custom };
+    if (custom) return { assigneeName: formatPersonNameFirstLast(custom) };
 
     if (slot.d4hMemberId !== '') {
         const memberId = Number(slot.d4hMemberId);
         const member = members.find((m) => m.id === memberId);
-        if (member) return { assigneeName: member.name, d4hMemberId: member.id };
+        if (member) {
+            return {
+                assigneeName: formatPersonNameFirstLast(member.name),
+                d4hMemberId: member.id,
+            };
+        }
     }
 
     return {};
@@ -65,7 +71,10 @@ export function resolveMultipleAssignees(
 ): { assigneeNames: string[]; d4hMemberIds: number[] } {
     const custom = slot.customNames.trim();
     if (custom) {
-        return { assigneeNames: parseCustomNamesList(custom), d4hMemberIds: [] };
+        return {
+            assigneeNames: parseCustomNamesList(custom).map((name) => formatPersonNameFirstLast(name)),
+            d4hMemberIds: [],
+        };
     }
 
     const d4hMemberIds = slot.d4hMemberIds
@@ -73,7 +82,8 @@ export function resolveMultipleAssignees(
         .filter((id) => !Number.isNaN(id));
     const assigneeNames = d4hMemberIds
         .map((id) => members.find((m) => m.id === id)?.name)
-        .filter((name): name is string => Boolean(name));
+        .filter((name): name is string => Boolean(name))
+        .map((name) => formatPersonNameFirstLast(name));
 
     return { assigneeNames, d4hMemberIds };
 }

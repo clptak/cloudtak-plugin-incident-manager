@@ -13,6 +13,14 @@
             <div class='ms-auto d-flex flex-wrap gap-2'>
                 <button
                     type='button'
+                    class='btn btn-outline-success btn-sm'
+                    :disabled='!activeMission || !hasCanvas || syncingOrgChart'
+                    @click='syncOrgChart'
+                >
+                    {{ syncingOrgChart ? 'Syncing…' : 'Sync org chart to DataSync' }}
+                </button>
+                <button
+                    type='button'
                     class='btn btn-outline-danger btn-sm'
                     :disabled='!hasCanvas'
                     @click='clearCanvas'
@@ -35,6 +43,14 @@
             then add D4H personnel. Use <strong>×</strong> to remove a node, or
             <strong>Clear canvas</strong> to start over.
         </p>
+
+        <div
+            v-if='syncStatus'
+            class='alert small py-2 mb-2 flex-shrink-0'
+            :class='syncStatusError ? "alert-danger" : "alert-success"'
+        >
+            {{ syncStatus }}
+        </div>
 
         <div
             v-if='!loadingRoster && !members.length'
@@ -462,6 +478,8 @@ import {
     type HastyTreeNode,
     type PendingPaletteDrop,
 } from '../../lib/hastyTeamTree.ts';
+import { syncOrgChartToDataSync } from '../../lib/orgChartDataSync.ts';
+import { formatPersonNameFirstLast } from '../../lib/personName.ts';
 import { listMissionCots, type MissionCotRef } from '../../lib/missionCots.ts';
 
 const { activeMission } = useIncident();
@@ -479,6 +497,9 @@ const teamResourceName = ref('');
 const teamAssignmentUid = ref('');
 const icsSlots = ref<Record<string, RoleSlotConfig>>(createEmptyIcsSlots());
 const rescueSlots = ref<Record<string, RoleSlotConfig>>(createEmptyRescueSlots());
+const syncingOrgChart = ref(false);
+const syncStatus = ref('');
+const syncStatusError = ref(false);
 
 const hasCanvas = computed(() => treeHasContent(teamTree.value));
 
@@ -582,10 +603,11 @@ function onConfiguredTeamDragStart(event: DragEvent): void {
 }
 
 function onMemberDragStart(event: DragEvent, m: D4HMember): void {
+    const displayName = formatPersonNameFirstLast(m.name);
     pendingDrop.value = {
         kind: 'member',
         d4hMemberId: m.id,
-        title: m.name,
+        title: displayName,
         description: memberSubtitle(m),
     };
     event.dataTransfer?.setData('text/plain', `member:${m.id}`);
@@ -633,6 +655,28 @@ function clearCanvas(): void {
     if (!hasCanvas.value) return;
     if (!window.confirm('Clear the entire assignment chart? This cannot be undone.')) return;
     teamTree.value = {};
+}
+
+async function syncOrgChart(): Promise<void> {
+    if (!activeMission.value || !hasCanvas.value) return;
+    syncingOrgChart.value = true;
+    syncStatus.value = '';
+    syncStatusError.value = false;
+    try {
+        const result = await syncOrgChartToDataSync(activeMission.value, teamTree.value);
+        const parts: string[] = [];
+        if (result.created) parts.push(`${result.created} new`);
+        if (result.updated) parts.push(`${result.updated} updated`);
+        if (result.removed) parts.push(`${result.removed} removed`);
+        syncStatus.value = `Synced ${result.lines} org position${result.lines === 1 ? '' : 's'} to ${activeMission.value.name}`
+            + (parts.length ? ` (${parts.join(', ')})` : '')
+            + '. ICS 201 will pick these up on refresh.';
+    } catch (err) {
+        syncStatusError.value = true;
+        syncStatus.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        syncingOrgChart.value = false;
+    }
 }
 
 async function refreshRoster(): Promise<void> {

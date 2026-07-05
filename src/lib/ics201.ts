@@ -23,6 +23,7 @@ import {
     nowBriefingTime,
     resolveIppLatLng,
 } from './irBriefing.ts';
+import { organizationFromOrgChartLogs } from './orgChartExport.ts';
 
 export const ICS201_KEYWORD = 'ics-201';
 export const RESOURCES_KEYWORD = 'resources';
@@ -607,6 +608,17 @@ export async function loadIcs201FromMission(
         form.situationSummary = situationFromIrBriefingLogs(logs);
     }
 
+    const orgChart = organizationFromOrgChartLogs(logs);
+    if (orgChart.incidentCommanders) form.incidentCommanders = orgChart.incidentCommanders;
+    if (orgChart.liaisonOfficer) form.liaisonOfficer = orgChart.liaisonOfficer;
+    if (orgChart.safetyOfficer) form.safetyOfficer = orgChart.safetyOfficer;
+    if (orgChart.publicInformationOfficer) form.publicInformationOfficer = orgChart.publicInformationOfficer;
+    if (orgChart.planningSectionChief) form.planningSectionChief = orgChart.planningSectionChief;
+    if (orgChart.operationsSectionChief) form.operationsSectionChief = orgChart.operationsSectionChief;
+    if (orgChart.financeSectionChief) form.financeSectionChief = orgChart.financeSectionChief;
+    if (orgChart.logisticsSectionChief) form.logisticsSectionChief = orgChart.logisticsSectionChief;
+    if (orgChart.organizationNotes) form.organizationNotes = orgChart.organizationNotes;
+
     const saved = latestIcs201FromLogs(logs);
     if (saved) {
         Object.assign(form, applyPartialIcs201Form(form, saved.form));
@@ -621,6 +633,12 @@ export async function loadIcs201FromMission(
         }
         if (ippLatLng) {
             form.initialPlanningPoint = formatIppAsUtm(ippLatLng.lat, ippLatLng.lng);
+        }
+        if (!form.incidentCommanders.trim() && orgChart.incidentCommanders) {
+            form.incidentCommanders = orgChart.incidentCommanders;
+        }
+        if (!form.organizationNotes.trim() && orgChart.organizationNotes) {
+            form.organizationNotes = orgChart.organizationNotes;
         }
     }
 
