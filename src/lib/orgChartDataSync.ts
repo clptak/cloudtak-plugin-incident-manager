@@ -12,6 +12,14 @@ import {
 import type { HastyTreeNode } from './hastyTeamTree.ts';
 import { treeHasContent } from './hastyTeamTree.ts';
 
+/** Mission log body with optional CoT linkage (DataSync entryUid). */
+interface OrgChartLogWriteBody {
+    dtg: string;
+    content: string;
+    keywords: string[];
+    entryUid?: string;
+}
+
 export interface OrgChartSyncResult {
     created: number;
     updated: number;
@@ -80,14 +88,19 @@ async function upsertOrgLine(
     line: OrgChartExportLine,
     existingId?: string,
 ): Promise<void> {
-    const body = {
+    const body: OrgChartLogWriteBody = {
         dtg: new Date().toISOString(),
         content: buildOrgChartLogContent(line),
         keywords: buildOrgChartLogKeywords(line),
     };
+    if (line.entryUid) body.entryUid = line.entryUid;
+    const log = sub.log as unknown as {
+        create(body: OrgChartLogWriteBody): Promise<{ id: string }>;
+        update(logid: string, body: OrgChartLogWriteBody): Promise<{ id: string }>;
+    };
     if (existingId) {
-        await sub.log.update(existingId, body);
+        await log.update(existingId, body);
         return;
     }
-    await sub.log.create(body);
+    await log.create(body);
 }

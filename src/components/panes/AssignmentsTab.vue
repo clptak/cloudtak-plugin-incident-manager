@@ -47,7 +47,8 @@
         <p class='text-muted small mb-2 flex-shrink-0'>
             Configure teams, incident command, and rescue management roles, drag them onto the chart,
             then add D4H personnel. The org chart auto-saves in <strong>mission_schema.json</strong>.
-            Use <strong>Sync org chart to DataSync</strong> for ICS 201 log lines. Use
+            Use <strong>Sync org chart to DataSync</strong> for ICS 201 log lines (teams with a
+            selected assignment CoT are linked via <code>entryUid</code>). Use
             <strong>×</strong> to remove a node, or <strong>Clear canvas</strong> to start over.
         </p>
 
