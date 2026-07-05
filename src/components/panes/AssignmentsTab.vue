@@ -24,6 +24,14 @@
         </p>
 
         <div
+            v-if='!loadingRoster && !members.length'
+            class='alert alert-info small mb-2 flex-shrink-0'
+        >
+            No D4H roster in this browser. Open the <strong>D4H</strong> plugin, configure
+            Team Manager, and run <strong>Sync now</strong>, then click <strong>Refresh D4H</strong>.
+        </div>
+
+        <div
             class='d-flex gap-2 flex-grow-1'
             style='min-height: 420px; min-width: 0;'
         >
@@ -60,13 +68,6 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    <div
-                        v-if='!members.length'
-                        class='text-muted small px-1'
-                    >
-                        No D4H personnel — sync in the D4H plugin first.
                     </div>
 
                     <div

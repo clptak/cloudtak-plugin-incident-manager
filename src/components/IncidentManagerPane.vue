@@ -53,7 +53,7 @@
 
             <div class='tab-content'>
                 <!-- Main: shows the active vertical pane -->
-                <div v-show='activeHTab === "main"'>
+                <div v-if='activeHTab === "main"'>
                     <CreateOpenPane v-if='activeKey === "create-open"' />
                     <CasiePane v-else-if='activeKey === "casie"' />
                     <WrapUpPane v-else-if='activeKey === "wrapup"' />
@@ -63,10 +63,10 @@
                     />
                 </div>
 
-                <DashboardTab v-show='activeHTab === "dashboard"' />
-                <TaskTab v-show='activeHTab === "task"' />
-                <AssignmentsTab v-show='activeHTab === "assignments"' />
-                <ResourcesTab v-show='activeHTab === "resources"' />
+                <DashboardTab v-if='activeHTab === "dashboard"' />
+                <TaskTab v-if='activeHTab === "task"' />
+                <AssignmentsTab v-if='activeHTab === "assignments"' />
+                <ResourcesTab v-if='activeHTab === "resources"' />
             </div>
         </div>
     </div>
