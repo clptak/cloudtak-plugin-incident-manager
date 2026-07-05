@@ -10,6 +10,7 @@
   "peerDependencies": {
     "@tabler/icons-vue": "^3.0.0",
     "@tak-ps/cloudtak": "*",
+    "@tak-ps/vue-hasty-team": "*",
     "vue": "^3.4.0"
   },
   "devDependencies": {
