@@ -63,8 +63,10 @@
                     />
                 </div>
 
-                <TaskTab v-show='activeHTab === "task"' />
                 <DashboardTab v-show='activeHTab === "dashboard"' />
+                <TaskTab v-show='activeHTab === "task"' />
+                <AssignmentsTab v-show='activeHTab === "assignments"' />
+                <ResourcesTab v-show='activeHTab === "resources"' />
             </div>
         </div>
     </div>
@@ -82,8 +84,10 @@ const CreateOpenPane = defineAsyncComponent(() => import('./panes/CreateOpenPane
 const LoggerPane = defineAsyncComponent(() => import('./panes/LoggerPane.vue'));
 const CasiePane = defineAsyncComponent(() => import('./panes/CasiePane.vue'));
 const WrapUpPane = defineAsyncComponent(() => import('./panes/WrapUpPane.vue'));
-const TaskTab = defineAsyncComponent(() => import('./panes/TaskTab.vue'));
 const DashboardTab = defineAsyncComponent(() => import('./panes/DashboardTab.vue'));
+const TaskTab = defineAsyncComponent(() => import('./panes/TaskTab.vue'));
+const AssignmentsTab = defineAsyncComponent(() => import('./panes/AssignmentsTab.vue'));
+const ResourcesTab = defineAsyncComponent(() => import('./panes/ResourcesTab.vue'));
 
 interface NavEntry {
     kind: 'item' | 'header' | 'sub';
@@ -113,8 +117,10 @@ const navItems: NavEntry[] = [
 
 const hTabs = [
     { key: 'main', label: 'Main' },
-    { key: 'task', label: 'Task' },
     { key: 'dashboard', label: 'Dashboard' },
+    { key: 'task', label: 'Tasks' },
+    { key: 'assignments', label: 'Assignments' },
+    { key: 'resources', label: 'Resources' },
 ] as const;
 
 const navKeys = new Set(
@@ -124,7 +130,7 @@ const navKeys = new Set(
 type HTabKey = typeof hTabs[number]['key'];
 
 function isHTabKey(value: string): value is HTabKey {
-    return value === 'main' || value === 'task' || value === 'dashboard';
+    return hTabs.some((tab) => tab.key === value);
 }
 
 function loadNavFromSession(): { activeKey: string; activeHTab: HTabKey } {

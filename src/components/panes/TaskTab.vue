@@ -1,7 +1,7 @@
 <template>
     <div>
         <h3 class='mb-3'>
-            Task
+            Tasks
         </h3>
 
         <div class='row g-3'>
