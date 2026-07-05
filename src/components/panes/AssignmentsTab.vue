@@ -1,5 +1,5 @@
 <template>
-    <div class='d-flex flex-column h-100'>
+    <div class='d-flex flex-column h-100 min-height-0 overflow-hidden'>
         <div class='d-flex flex-wrap align-items-center gap-2 mb-2 flex-shrink-0'>
             <h3 class='mb-0'>
                 Assignments
@@ -44,19 +44,16 @@
             Team Manager, and run <strong>Sync now</strong>, then click <strong>Refresh D4H</strong>.
         </div>
 
-        <div
-            class='d-flex gap-2 flex-grow-1'
-            style='min-height: 420px; min-width: 0;'
-        >
+        <div class='d-flex gap-2 flex-grow-1 min-height-0 overflow-hidden assignments-workspace'>
             <!-- Palette -->
             <div
-                class='card flex-shrink-0'
+                class='card flex-shrink-0 d-flex flex-column min-height-0 assignments-palette'
                 style='width: 300px;'
             >
-                <div class='card-header py-2 small fw-semibold'>
+                <div class='card-header py-2 small fw-semibold flex-shrink-0'>
                     Palette
                 </div>
-                <div class='card-body p-2 overflow-auto'>
+                <div class='card-body p-2 overflow-auto flex-grow-1 min-height-0'>
                     <input
                         v-model='paletteSearch'
                         type='search'
@@ -349,14 +346,8 @@
             </div>
 
             <!-- HastyTeam canvas -->
-            <div
-                class='card flex-grow-1 overflow-auto'
-                style='min-width: 0;'
-            >
-                <div
-                    class='card-body p-0 h-100 assignments-chart'
-                    style='min-height: 400px;'
-                >
+            <div class='card flex-grow-1 min-width-0 min-height-0 d-flex flex-column overflow-hidden assignments-canvas'>
+                <div class='card-body p-0 flex-grow-1 min-height-0 assignments-chart'>
                     <HastyTeam
                         v-model='teamTree'
                         @drop:root='onDropRoot'
@@ -681,6 +672,19 @@ watch(() => activeMission.value?.guid, () => {
 </script>
 
 <style scoped>
+.assignments-workspace {
+    min-width: 0;
+}
+
+.assignments-palette,
+.assignments-canvas {
+    height: 100%;
+}
+
+.assignments-chart {
+    height: 100%;
+}
+
 .assignments-chart :deep(.h-100.w-100.position-relative.d-flex) {
     align-items: flex-start;
     justify-content: flex-start;

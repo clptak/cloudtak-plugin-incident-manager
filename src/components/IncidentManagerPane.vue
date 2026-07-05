@@ -31,7 +31,7 @@
 
         <!-- ── Right: horizontal tabs + content ── -->
         <div
-            class='flex-fill'
+            class='flex-fill d-flex flex-column min-height-0'
             style='min-width: 0;'
         >
             <ul class='nav nav-tabs mb-3'>
@@ -51,7 +51,7 @@
                 </li>
             </ul>
 
-            <div class='tab-content'>
+            <div class='tab-content flex-grow-1 min-height-0 overflow-hidden'>
                 <!-- Main: shows the active vertical pane -->
                 <div v-if='activeHTab === "main"'>
                     <CreateOpenPane v-if='activeKey === "create-open"' />
@@ -65,7 +65,10 @@
 
                 <DashboardTab v-if='activeHTab === "dashboard"' />
                 <TaskTab v-if='activeHTab === "task"' />
-                <AssignmentsTab v-if='activeHTab === "assignments"' />
+                <AssignmentsTab
+                    v-if='activeHTab === "assignments"'
+                    class='h-100 min-height-0'
+                />
                 <ResourcesTab v-if='activeHTab === "resources"' />
             </div>
         </div>
