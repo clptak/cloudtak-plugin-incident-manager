@@ -26,7 +26,7 @@ export function orgChartFromSchemaValue(value: unknown): HastyTreeNode {
 }
 
 export function applyOrgChartToSchema(schema: MissionSchema, tree: HastyTreeNode): void {
-    schema.assignments_org_chart = treeHasContent(tree) ? tree : {};
+    schema.assignments_org_chart = (treeHasContent(tree) ? tree : {}) as Record<string, unknown>;
 }
 
 function parseOrgChartTreeFromLogContent(content: string): HastyTreeNode | null {
