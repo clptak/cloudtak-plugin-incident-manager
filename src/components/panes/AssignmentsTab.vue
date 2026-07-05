@@ -46,7 +46,7 @@
 
         <p class='text-muted small mb-2 flex-shrink-0'>
             Configure teams, incident command, and rescue management roles, drag them onto the chart,
-            then add D4H personnel. The org chart auto-saves to the active DataSync mission.
+            then add D4H personnel. The org chart auto-saves in <strong>mission_schema.json</strong>.
             Use <strong>Sync org chart to DataSync</strong> for ICS 201 log lines. Use
             <strong>×</strong> to remove a node, or <strong>Clear canvas</strong> to start over.
         </p>
@@ -508,7 +508,7 @@ const rescueSlots = ref<Record<string, RoleSlotConfig>>(createEmptyRescueSlots()
 const syncingOrgChart = ref(false);
 const syncStatus = ref('');
 const syncStatusError = ref(false);
-const orgChartLogId = ref<string | undefined>();
+const orgChartSchemaHash = ref<string | undefined>();
 const loadingOrgChart = ref(false);
 const savingOrgChart = ref(false);
 const persistStatus = ref('');
@@ -684,7 +684,7 @@ function scheduleOrgChartSave(): void {
 async function loadPersistedOrgChart(): Promise<void> {
     if (!activeMission.value) {
         teamTree.value = {};
-        orgChartLogId.value = undefined;
+        orgChartSchemaHash.value = undefined;
         persistStatus.value = '';
         return;
     }
@@ -694,10 +694,12 @@ async function loadPersistedOrgChart(): Promise<void> {
     try {
         const loaded = await loadOrgChartFromMission(activeMission.value);
         teamTree.value = loaded.tree;
-        orgChartLogId.value = loaded.logId;
-        persistStatus.value = loaded.logId || treeHasContent(loaded.tree)
-            ? 'Chart loaded from DataSync'
-            : '';
+        orgChartSchemaHash.value = loaded.contentHash;
+        persistStatus.value = loaded.migratedFromLog
+            ? 'Chart moved into mission_schema.json'
+            : (loaded.contentHash || treeHasContent(loaded.tree))
+                ? 'Chart loaded from mission_schema.json'
+                : '';
     } catch (err) {
         persistStatus.value = '';
         syncStatusError.value = true;
@@ -715,15 +717,15 @@ async function persistOrgChart(): Promise<void> {
     persistStatus.value = 'Saving chart…';
 
     try {
-        const logId = await saveOrgChartToMission(
+        const contentHash = await saveOrgChartToMission(
             activeMission.value,
             teamTree.value,
-            orgChartLogId.value,
+            orgChartSchemaHash.value,
         );
         if (generation !== saveOrgChartGeneration) return;
-        orgChartLogId.value = logId;
+        orgChartSchemaHash.value = contentHash;
         persistStatus.value = treeHasContent(teamTree.value)
-            ? 'Chart saved to DataSync'
+            ? 'Chart saved to mission_schema.json'
             : '';
     } catch (err) {
         if (generation !== saveOrgChartGeneration) return;

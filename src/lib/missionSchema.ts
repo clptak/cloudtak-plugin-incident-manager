@@ -80,6 +80,8 @@ export interface MissionSchema {
         text: string;
         datetime: string;
     };
+    /** Assignments tab org chart (HastyTeam tree); stored in mission_schema.json. */
+    assignments_org_chart?: Record<string, unknown>;
     [key: string]: unknown;
 }
 
