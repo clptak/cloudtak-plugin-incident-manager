@@ -51,7 +51,12 @@
                 </li>
             </ul>
 
-            <div class='tab-content flex-grow-1 min-height-0 overflow-hidden'>
+            <div
+                class='tab-content flex-grow-1 min-height-0'
+                :class='activeHTab === "assignments"
+                    ? "overflow-hidden d-flex flex-column"
+                    : "overflow-auto"'
+            >
                 <!-- Main: shows the active vertical pane -->
                 <div v-if='activeHTab === "main"'>
                     <CreateOpenPane v-if='activeKey === "create-open"' />
