@@ -31,8 +31,8 @@
         </div>
 
         <p class='text-muted small mb-2 flex-shrink-0'>
-            Configure teams and incident command positions, drag them onto the chart, then add
-            D4H personnel. Use <strong>×</strong> to remove a node, or
+            Configure teams, incident command, and rescue management roles, drag them onto the chart,
+            then add D4H personnel. Use <strong>×</strong> to remove a node, or
             <strong>Clear canvas</strong> to start over.
         </p>
 
@@ -151,74 +151,167 @@
                         </div>
                     </div>
 
-                    <div class='text-muted text-uppercase small mb-1 mt-2'>
-                        Incident Command
-                    </div>
-
-                    <div
-                        v-if='!filteredIcsPositions.length'
-                        class='text-muted small px-1 mb-2'
-                    >
-                        No command positions match your search.
-                    </div>
-
-                    <div
-                        v-for='pos in filteredIcsPositions'
-                        :key='pos.key'
-                        class='card card-sm mb-2'
-                    >
-                        <div class='card-body p-2'>
-                            <label class='form-label small mb-1'>{{ pos.title }}</label>
-                            <select
-                                v-model='icsSlots[pos.key].d4hMemberId'
-                                class='form-select form-select-sm mb-1'
-                            >
-                                <option value=''>
-                                    — D4H —
-                                </option>
-                                <option
-                                    v-for='m in configurationMembers'
-                                    :key='m.id'
-                                    :value='m.id'
-                                >
-                                    {{ m.name }}
-                                </option>
-                            </select>
-                            <input
-                                v-model='icsSlots[pos.key].customName'
-                                type='text'
-                                class='form-control form-control-sm mb-1'
-                                placeholder='Or type name'
-                                autocomplete='off'
-                            >
+                    <details class='palette-collapse mb-2'>
+                        <summary class='palette-collapse__summary'>
+                            Incident Command
+                        </summary>
+                        <div class='palette-collapse__body'>
                             <div
-                                class='card card-sm border-secondary-subtle bg-light'
-                                draggable='true'
-                                style='cursor: grab;'
-                                @dragstart='onIcsCommandDragStart($event, pos)'
-                                @dragend='onPaletteDragEnd'
+                                v-if='!filteredIcsPositions.length'
+                                class='text-muted small px-1 mb-2'
                             >
-                                <div class='card-body py-2 px-2 d-flex align-items-center gap-2'>
-                                    <IconShield
-                                        :size='16'
-                                        stroke='1.5'
-                                    />
-                                    <div class='small'>
-                                        <div class='fw-semibold'>
-                                            {{ icsCommandPreview(pos).title }}
-                                        </div>
-                                        <div
-                                            v-if='icsCommandPreview(pos).description'
-                                            class='text-muted'
-                                            style='font-size: 0.72rem;'
+                                No command positions match your search.
+                            </div>
+
+                            <div
+                                v-for='pos in filteredIcsPositions'
+                                :key='pos.key'
+                                class='card card-sm mb-2'
+                            >
+                                <div class='card-body p-2'>
+                                    <label class='form-label small mb-1'>{{ pos.title }}</label>
+                                    <select
+                                        v-model='asSingleSlot(icsSlots[pos.key]).d4hMemberId'
+                                        class='form-select form-select-sm mb-1'
+                                    >
+                                        <option value=''>
+                                            — D4H —
+                                        </option>
+                                        <option
+                                            v-for='m in configurationMembers'
+                                            :key='m.id'
+                                            :value='m.id'
                                         >
-                                            {{ icsCommandPreview(pos).description }}
+                                            {{ m.name }}
+                                        </option>
+                                    </select>
+                                    <input
+                                        v-model='asSingleSlot(icsSlots[pos.key]).customName'
+                                        type='text'
+                                        class='form-control form-control-sm mb-1'
+                                        placeholder='Or type name'
+                                        autocomplete='off'
+                                    >
+                                    <div
+                                        class='card card-sm border-secondary-subtle bg-light'
+                                        draggable='true'
+                                        style='cursor: grab;'
+                                        @dragstart='onRolePositionDragStart($event, pos, icsSlots[pos.key])'
+                                        @dragend='onPaletteDragEnd'
+                                    >
+                                        <div class='card-body py-2 px-2 d-flex align-items-center gap-2'>
+                                            <IconShield
+                                                :size='16'
+                                                stroke='1.5'
+                                            />
+                                            <div class='small'>
+                                                <div class='fw-semibold'>
+                                                    {{ rolePositionPreview(pos, icsSlots[pos.key]).title }}
+                                                </div>
+                                                <div
+                                                    v-if='rolePositionPreview(pos, icsSlots[pos.key]).description'
+                                                    class='text-muted'
+                                                    style='font-size: 0.72rem;'
+                                                >
+                                                    {{ rolePositionPreview(pos, icsSlots[pos.key]).description }}
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </details>
+
+                    <details class='palette-collapse mb-2'>
+                        <summary class='palette-collapse__summary'>
+                            Rescue Management
+                        </summary>
+                        <div class='palette-collapse__body'>
+                            <div
+                                v-if='!filteredRescuePositions.length && !filteredRescueGroupLabels.length'
+                                class='text-muted small px-1 mb-2'
+                            >
+                                No rescue positions match your search.
+                            </div>
+
+                            <div
+                                v-for='pos in filteredRescuePositions'
+                                :key='pos.key'
+                                class='card card-sm mb-2'
+                            >
+                                <div class='card-body p-2'>
+                                    <label class='form-label small mb-1'>{{ pos.title }}</label>
+                                    <select
+                                        v-model='asSingleSlot(rescueSlots[pos.key]).d4hMemberId'
+                                        class='form-select form-select-sm mb-1'
+                                    >
+                                        <option value=''>
+                                            — D4H —
+                                        </option>
+                                        <option
+                                            v-for='m in configurationMembers'
+                                            :key='m.id'
+                                            :value='m.id'
+                                        >
+                                            {{ m.name }}
+                                        </option>
+                                    </select>
+                                    <input
+                                        v-model='asSingleSlot(rescueSlots[pos.key]).customName'
+                                        type='text'
+                                        class='form-control form-control-sm mb-1'
+                                        placeholder='Or type name'
+                                        autocomplete='off'
+                                    >
+                                    <div
+                                        class='card card-sm border-secondary-subtle bg-light'
+                                        draggable='true'
+                                        style='cursor: grab;'
+                                        @dragstart='onRolePositionDragStart($event, pos, rescueSlots[pos.key])'
+                                        @dragend='onPaletteDragEnd'
+                                    >
+                                        <div class='card-body py-2 px-2 d-flex align-items-center gap-2'>
+                                            <IconLifebuoy
+                                                :size='16'
+                                                stroke='1.5'
+                                            />
+                                            <div class='small'>
+                                                <div class='fw-semibold'>
+                                                    {{ rolePositionPreview(pos, rescueSlots[pos.key]).title }}
+                                                </div>
+                                                <div
+                                                    v-if='rolePositionPreview(pos, rescueSlots[pos.key]).description'
+                                                    class='text-muted'
+                                                    style='font-size: 0.72rem;'
+                                                >
+                                                    {{ rolePositionPreview(pos, rescueSlots[pos.key]).description }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div
+                                v-for='label in filteredRescueGroupLabels'
+                                :key='label.key'
+                                class='card card-sm mb-2'
+                                draggable='true'
+                                style='cursor: grab;'
+                                @dragstart='onRescueGroupLabelDragStart($event, label)'
+                                @dragend='onPaletteDragEnd'
+                            >
+                                <div class='card-body py-2 px-2 d-flex align-items-center gap-2'>
+                                    <IconLifebuoy
+                                        :size='16'
+                                        stroke='1.5'
+                                    />
+                                    <span class='small fw-semibold'>{{ label.title }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
 
                     <div class='text-muted text-uppercase small mb-1 mt-2'>
                         Personnel
@@ -296,7 +389,13 @@
                                             class='flex-shrink-0 mt-1'
                                         />
                                         <IconShield
-                                            v-else-if='node.type === "command"'
+                                            v-else-if='node.type === "role" && node.roleCategory === "incident-command"'
+                                            :size='16'
+                                            stroke='1.5'
+                                            class='flex-shrink-0 mt-1'
+                                        />
+                                        <IconLifebuoy
+                                            v-else-if='node.type === "role" && node.roleCategory === "rescue-management"'
                                             :size='16'
                                             stroke='1.5'
                                             class='flex-shrink-0 mt-1'
@@ -342,19 +441,25 @@
 <script setup lang='ts'>
 import { computed, onMounted, ref, watch } from 'vue';
 import { HastyTeam } from '@tak-ps/vue-hasty-team';
-import { IconShield, IconTag, IconUser, IconUsers, IconX } from '@tabler/icons-vue';
+import { IconLifebuoy, IconShield, IconTag, IconUser, IconUsers, IconX } from '@tabler/icons-vue';
 import { useIncident } from '../../composables/useIncident.ts';
 import { ASSIGNMENT_RESOURCES } from '../../data/assignmentResources.ts';
-import type { IncidentCommandPositionDef } from '../../data/incidentCommandPositions.ts';
+import type { RescueGroupLabel } from '../../data/rescueManagementPositions.ts';
+import type { RolePositionDef } from '../../data/rolePositionTypes.ts';
 import { formatD4hSyncTime, filterAndSortPaletteMembers, loadD4hMeta, loadD4hRoster, sortMembersByNameAsc } from '../../lib/d4hRoster.ts';
 import type { D4HMember, D4HRosterMeta } from '../../lib/d4hTypes.ts';
 import {
+    asSingleSlot,
     createEmptyIcsSlots,
+    createEmptyRescueSlots,
     filterIcsPositions,
-    icsCommandDropFromSlot,
-    icsCommandPreview as buildIcsCommandPreview,
-    type IcsSlotConfig,
-} from '../../lib/incidentCommandPositions.ts';
+    filterRescueGroupLabels,
+    filterRescuePositions,
+    fixedRescueLabelDrop,
+    rolePositionDropFromSlot,
+    rolePositionPreview as buildRolePositionPreview,
+    type RoleSlotConfig,
+} from '../../lib/rolePositions.ts';
 import {
     applyPaletteToRoot,
     appendPaletteDrop,
@@ -381,7 +486,8 @@ const paletteSearch = ref('');
 const teamNumber = ref(1);
 const teamResourceName = ref('');
 const teamAssignmentUid = ref('');
-const icsSlots = ref<Record<string, IcsSlotConfig>>(createEmptyIcsSlots());
+const icsSlots = ref<Record<string, RoleSlotConfig>>(createEmptyIcsSlots());
+const rescueSlots = ref<Record<string, RoleSlotConfig>>(createEmptyRescueSlots());
 
 const hasCanvas = computed(() => treeHasContent(teamTree.value));
 
@@ -405,6 +511,14 @@ const filteredMissionCots = computed(() => {
 
 const filteredIcsPositions = computed(() =>
     filterIcsPositions(paletteSearch.value, icsSlots.value, members.value),
+);
+
+const filteredRescuePositions = computed(() =>
+    filterRescuePositions(paletteSearch.value, rescueSlots.value, members.value),
+);
+
+const filteredRescueGroupLabels = computed(() =>
+    filterRescueGroupLabels(paletteSearch.value),
 );
 
 const configuredTeamPreview = computed(() => {
@@ -431,14 +545,27 @@ function memberSubtitle(m: D4HMember): string {
     return [m.ref, m.position].filter(Boolean).join(' · ') || 'D4H member';
 }
 
-function icsCommandPreview(pos: IncidentCommandPositionDef): { title: string; description: string } {
-    return buildIcsCommandPreview(pos, icsSlots.value[pos.key], members.value);
+function rolePositionPreview(
+    pos: RolePositionDef,
+    slot: RoleSlotConfig,
+): { title: string; description: string } {
+    return buildRolePositionPreview(pos, slot, members.value);
 }
 
-function onIcsCommandDragStart(event: DragEvent, pos: IncidentCommandPositionDef): void {
-    const drop = icsCommandDropFromSlot(pos, icsSlots.value[pos.key], members.value);
+function onRolePositionDragStart(
+    event: DragEvent,
+    pos: RolePositionDef,
+    slot: RoleSlotConfig,
+): void {
+    const drop = rolePositionDropFromSlot(pos, slot, members.value);
     pendingDrop.value = drop;
-    event.dataTransfer?.setData('text/plain', `ics-command:${pos.key}`);
+    event.dataTransfer?.setData('text/plain', `role-position:${pos.category}:${pos.key}`);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+}
+
+function onRescueGroupLabelDragStart(event: DragEvent, label: RescueGroupLabel): void {
+    pendingDrop.value = fixedRescueLabelDrop(label);
+    event.dataTransfer?.setData('text/plain', `rescue-label:${label.key}`);
     if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
 }
 
@@ -562,5 +689,31 @@ watch(() => activeMission.value?.guid, () => {
 .assignments-chart :deep(.px-4.py-4) {
     min-height: auto;
     height: auto;
+}
+
+.palette-collapse__summary {
+    cursor: pointer;
+    list-style: none;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--bs-secondary);
+    user-select: none;
+}
+
+.palette-collapse__summary::-webkit-details-marker {
+    display: none;
+}
+
+.palette-collapse__summary::before {
+    content: '▸ ';
+}
+
+.palette-collapse[open] > .palette-collapse__summary::before {
+    content: '▾ ';
+}
+
+.palette-collapse__body {
+    padding-top: 0.25rem;
 }
 </style>

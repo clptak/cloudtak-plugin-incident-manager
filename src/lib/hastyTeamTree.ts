@@ -1,4 +1,6 @@
-export type AssignmentNodeType = 'team' | 'member' | 'position' | 'command';
+export type AssignmentNodeType = 'team' | 'member' | 'position' | 'role';
+
+export type RoleCategory = 'incident-command' | 'rescue-management';
 
 export type TeamMode = 'generic' | 'configured';
 
@@ -13,9 +15,12 @@ export interface AssignmentNodeSelf {
     resourceName?: string;
     assignmentUid?: string;
     assignmentCallsign?: string;
-    icsPositionKey?: string;
-    icsPositionTitle?: string;
+    roleCategory?: RoleCategory;
+    roleKey?: string;
+    roleTitle?: string;
     assigneeName?: string;
+    assigneeNames?: string[];
+    d4hMemberIds?: number[];
 }
 
 export interface HastyTreeNode {
@@ -36,13 +41,17 @@ export type PendingPaletteDrop =
     | { kind: 'member'; d4hMemberId: number; title: string; description: string }
     | { kind: 'position'; resourceName: string; title: string; description: string }
     | {
-        kind: 'ics-command';
-        icsPositionKey: string;
-        icsPositionTitle: string;
+        kind: 'role-position';
+        roleCategory: RoleCategory;
+        roleKey: string;
+        roleTitle: string;
+        assigneeMode: 'single' | 'multiple';
         title: string;
         description: string;
         assigneeName?: string;
         d4hMemberId?: number;
+        assigneeNames?: string[];
+        d4hMemberIds?: number[];
     };
 
 export function configuredTeamTitle(teamNumber: number): string {
@@ -119,22 +128,23 @@ export function newPositionNode(resourceName: string): HastyTreeNode {
     };
 }
 
-export function newCommandNode(
-    icsPositionKey: string,
-    icsPositionTitle: string,
-    assigneeName?: string,
-    d4hMemberId?: number,
+export function newRoleNode(
+    roleCategory: RoleCategory,
+    roleKey: string,
+    roleTitle: string,
+    description?: string,
+    extra?: Pick<AssignmentNodeSelf, 'assigneeName' | 'd4hMemberId' | 'assigneeNames' | 'd4hMemberIds'>,
 ): HastyTreeNode {
     return {
         self: {
             id: crypto.randomUUID(),
-            type: 'command',
-            title: icsPositionTitle,
-            description: assigneeName,
-            icsPositionKey,
-            icsPositionTitle,
-            assigneeName,
-            d4hMemberId,
+            type: 'role',
+            title: roleTitle,
+            description,
+            roleCategory,
+            roleKey,
+            roleTitle,
+            ...extra,
         },
         children: [],
     };
@@ -153,17 +163,23 @@ export function teamNodeFromPaletteDrop(
 }
 
 export function leafNodeFromPaletteDrop(
-    pending: Extract<PendingPaletteDrop, { kind: 'member' | 'position' | 'ics-command' }>,
+    pending: Extract<PendingPaletteDrop, { kind: 'member' | 'position' | 'role-position' }>,
 ): HastyTreeNode {
     if (pending.kind === 'position') {
         return newPositionNode(pending.resourceName);
     }
-    if (pending.kind === 'ics-command') {
-        return newCommandNode(
-            pending.icsPositionKey,
-            pending.icsPositionTitle,
-            pending.assigneeName,
-            pending.d4hMemberId,
+    if (pending.kind === 'role-position') {
+        return newRoleNode(
+            pending.roleCategory,
+            pending.roleKey,
+            pending.roleTitle,
+            pending.description,
+            {
+                assigneeName: pending.assigneeName,
+                d4hMemberId: pending.d4hMemberId,
+                assigneeNames: pending.assigneeNames,
+                d4hMemberIds: pending.d4hMemberIds,
+            },
         );
     }
     return newMemberNode(pending.title, pending.description, pending.d4hMemberId);
