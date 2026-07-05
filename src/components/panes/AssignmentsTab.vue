@@ -177,7 +177,7 @@
                                     — D4H —
                                 </option>
                                 <option
-                                    v-for='m in members'
+                                    v-for='m in configurationMembers'
                                     :key='m.id'
                                     :value='m.id'
                                 >
@@ -346,7 +346,7 @@ import { IconShield, IconTag, IconUser, IconUsers, IconX } from '@tabler/icons-v
 import { useIncident } from '../../composables/useIncident.ts';
 import { ASSIGNMENT_RESOURCES } from '../../data/assignmentResources.ts';
 import type { IncidentCommandPositionDef } from '../../data/incidentCommandPositions.ts';
-import { formatD4hSyncTime, filterAndSortPaletteMembers, loadD4hMeta, loadD4hRoster } from '../../lib/d4hRoster.ts';
+import { formatD4hSyncTime, filterAndSortPaletteMembers, loadD4hMeta, loadD4hRoster, sortMembersByNameAsc } from '../../lib/d4hRoster.ts';
 import type { D4HMember, D4HRosterMeta } from '../../lib/d4hTypes.ts';
 import {
     createEmptyIcsSlots,
@@ -388,6 +388,8 @@ const hasCanvas = computed(() => treeHasContent(teamTree.value));
 const filteredMembers = computed(() =>
     filterAndSortPaletteMembers(members.value, paletteSearch.value),
 );
+
+const configurationMembers = computed(() => sortMembersByNameAsc(members.value));
 
 const filteredTeamResources = computed(() => {
     const q = paletteSearch.value.trim().toLowerCase();

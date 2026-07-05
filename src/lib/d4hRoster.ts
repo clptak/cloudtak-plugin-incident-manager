@@ -63,6 +63,12 @@ export function sortMembersByRefAsc(members: D4HMember[]): D4HMember[] {
     return [...members].sort((a, b) => compareD4hRefAsc(a.ref, b.ref));
 }
 
+export function sortMembersByNameAsc(members: D4HMember[]): D4HMember[] {
+    return [...members].sort((a, b) =>
+        (a.name ?? '').localeCompare(b.name ?? '', undefined, { sensitivity: 'base' }),
+    );
+}
+
 export function filterAndSortPaletteMembers(
     members: D4HMember[],
     query: string,
