@@ -10,17 +10,29 @@
             >
                 D4H sync {{ formatD4hSyncTime(meta.fetchedAt) }}
             </span>
-            <button
-                class='btn btn-outline-primary btn-sm ms-auto'
-                :disabled='loadingRoster'
-                @click='refreshRoster'
-            >
-                {{ loadingRoster ? 'Loading…' : 'Refresh D4H' }}
-            </button>
+            <div class='ms-auto d-flex flex-wrap gap-2'>
+                <button
+                    type='button'
+                    class='btn btn-outline-danger btn-sm'
+                    :disabled='!hasCanvas'
+                    @click='clearCanvas'
+                >
+                    Clear canvas
+                </button>
+                <button
+                    type='button'
+                    class='btn btn-outline-primary btn-sm'
+                    :disabled='loadingRoster'
+                    @click='refreshRoster'
+                >
+                    {{ loadingRoster ? 'Loading…' : 'Refresh D4H' }}
+                </button>
+            </div>
         </div>
 
         <p class='text-muted small mb-2 flex-shrink-0'>
-            Drag <strong>Team</strong> or D4H personnel onto the chart. Rearrange nodes on the canvas.
+            Drag <strong>Team</strong> or D4H personnel onto the chart. Use
+            <strong>×</strong> on a node to remove it, or <strong>Clear canvas</strong> to start over.
         </p>
 
         <div
@@ -121,20 +133,33 @@
                                 @dragend='onPaletteDragEnd'
                             >
                                 <div class='card-body py-2 px-3'>
-                                    <div class='d-flex align-items-center gap-2 mb-1'>
+                                    <div class='d-flex align-items-start gap-2 mb-1'>
                                         <IconUsers
                                             v-if='node.type === "team"'
                                             :size='16'
                                             stroke='1.5'
+                                            class='flex-shrink-0 mt-1'
                                         />
                                         <IconUser
                                             v-else
                                             :size='16'
                                             stroke='1.5'
+                                            class='flex-shrink-0 mt-1'
                                         />
-                                        <span class='fw-semibold small'>
+                                        <span class='fw-semibold small flex-grow-1'>
                                             {{ node.title || (node.type === "team" ? "Team" : "Member") }}
                                         </span>
+                                        <button
+                                            type='button'
+                                            class='btn btn-link btn-sm text-danger p-0 lh-1'
+                                            title='Remove from chart'
+                                            @click.stop='removeNode(node.id)'
+                                        >
+                                            <IconX
+                                                :size='16'
+                                                stroke='1.5'
+                                            />
+                                        </button>
                                     </div>
                                     <div
                                         v-if='node.description'
@@ -154,15 +179,17 @@
 </template>
 
 <script setup lang='ts'>
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { HastyTeam } from '@tak-ps/vue-hasty-team';
-import { IconUser, IconUsers } from '@tabler/icons-vue';
+import { IconUser, IconUsers, IconX } from '@tabler/icons-vue';
 import { formatD4hSyncTime, loadD4hMeta, loadD4hRoster } from '../../lib/d4hRoster.ts';
 import type { D4HMember, D4HRosterMeta } from '../../lib/d4hTypes.ts';
 import {
     applyPaletteToRoot,
     appendPaletteDrop,
+    deleteNodeFromTree,
     extractNodeById,
+    treeHasContent,
     type HastyTreeNode,
     type PendingPaletteDrop,
 } from '../../lib/hastyTeamTree.ts';
@@ -172,6 +199,8 @@ const pendingDrop = ref<PendingPaletteDrop | null>(null);
 const loadingRoster = ref(false);
 const meta = ref<D4HRosterMeta | null>(null);
 const members = ref<D4HMember[]>([]);
+
+const hasCanvas = computed(() => treeHasContent(teamTree.value));
 
 function memberSubtitle(m: D4HMember): string {
     return [m.ref, m.position].filter(Boolean).join(' · ') || 'D4H member';
@@ -222,6 +251,19 @@ function onDropNode(payload: { node: HastyTreeNode; draggedId: string | null }):
     }
     appendPaletteDrop(node, pendingDrop.value);
     pendingDrop.value = null;
+}
+
+function removeNode(nodeId: string): void {
+    const result = deleteNodeFromTree(teamTree.value, nodeId);
+    if (result === 'root') {
+        teamTree.value = {};
+    }
+}
+
+function clearCanvas(): void {
+    if (!hasCanvas.value) return;
+    if (!window.confirm('Clear the entire assignment chart? This cannot be undone.')) return;
+    teamTree.value = {};
 }
 
 async function refreshRoster(): Promise<void> {

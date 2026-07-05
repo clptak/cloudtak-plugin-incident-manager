@@ -61,6 +61,20 @@ export function extractNodeById(root: HastyTreeNode, id: string): HastyTreeNode 
     return null;
 }
 
+export function treeHasContent(tree: HastyTreeNode): boolean {
+    return !!(tree.self || (tree.children && tree.children.length > 0));
+}
+
+/** Remove a node by id. Returns `root` if the root node was removed (caller should reset tree). */
+export function deleteNodeFromTree(
+    tree: HastyTreeNode,
+    nodeId: string,
+): 'root' | 'child' | 'missing' {
+    if (!nodeId) return 'missing';
+    if (tree.self?.id === nodeId) return 'root';
+    return extractNodeById(tree, nodeId) ? 'child' : 'missing';
+}
+
 export function appendPaletteDrop(
     parent: HastyTreeNode,
     pending: PendingPaletteDrop | null,
