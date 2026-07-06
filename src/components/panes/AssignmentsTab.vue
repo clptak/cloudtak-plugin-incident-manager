@@ -327,38 +327,48 @@
                         </div>
                     </details>
 
-                    <div class='text-muted text-uppercase small mb-1 mt-2'>
-                        Personnel
-                    </div>
-
-                    <div
-                        v-if='members.length && !filteredMembers.length'
-                        class='text-muted small px-1 mb-2'
-                    >
-                        No personnel match your search.
-                    </div>
-
-                    <div
-                        v-for='m in filteredMembers'
-                        :key='m.id'
-                        class='card card-sm mb-2'
-                        draggable='true'
-                        style='cursor: grab;'
-                        @dragstart='onMemberDragStart($event, m)'
-                        @dragend='onPaletteDragEnd'
-                    >
-                        <div class='card-body py-2 px-2'>
-                            <div class='fw-semibold small text-truncate'>
-                                {{ m.name }}
+                    <details class='palette-collapse mb-2'>
+                        <summary class='palette-collapse__summary'>
+                            Personnel ({{ filteredMembers.length }})
+                        </summary>
+                        <div class='palette-collapse__body'>
+                            <div
+                                v-if='!members.length'
+                                class='text-muted small px-1 mb-2'
+                            >
+                                No D4H roster — sync in the <strong>D4H</strong> plugin, then
+                                <strong>Refresh D4H</strong>.
                             </div>
                             <div
-                                class='text-muted text-truncate'
-                                style='font-size: 0.72rem;'
+                                v-else-if='!filteredMembers.length'
+                                class='text-muted small px-1 mb-2'
                             >
-                                {{ memberSubtitle(m) }}
+                                No personnel match your search.
+                            </div>
+
+                            <div
+                                v-for='m in filteredMembers'
+                                :key='m.id'
+                                class='card card-sm mb-2'
+                                draggable='true'
+                                style='cursor: grab;'
+                                @dragstart='onMemberDragStart($event, m)'
+                                @dragend='onPaletteDragEnd'
+                            >
+                                <div class='card-body py-2 px-2'>
+                                    <div class='fw-semibold small text-truncate'>
+                                        {{ m.name }}
+                                    </div>
+                                    <div
+                                        class='text-muted text-truncate'
+                                        style='font-size: 0.72rem;'
+                                    >
+                                        {{ memberSubtitle(m) }}
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    </details>
                 </div>
             </div>
 
