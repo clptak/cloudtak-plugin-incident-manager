@@ -334,7 +334,13 @@
             </div>
 
             <div class='table-responsive'>
-                <table class='table table-sm table-vcenter table-striped table-hover mb-0'>
+                <table class='table table-sm table-vcenter table-striped table-hover mb-0 dashboard-log-table'>
+                    <colgroup>
+                        <col class='dashboard-log-col-time'>
+                        <col class='dashboard-log-col-entry'>
+                        <col class='dashboard-log-col-source'>
+                        <col class='dashboard-log-col-keywords'>
+                    </colgroup>
                     <thead>
                         <tr>
                             <th
@@ -356,11 +362,13 @@
                             <td class='text-nowrap'>
                                 {{ formatLocalTime(r.epoch, r.rawTime) }}
                             </td>
-                            <td>{{ r.content }}</td>
+                            <td class='dashboard-log-entry-cell'>
+                                {{ r.content }}
+                            </td>
                             <td class='text-nowrap'>
                                 {{ displaySource(r.source) }}
                             </td>
-                            <td>
+                            <td class='dashboard-log-keywords-cell'>
                                 <span
                                     v-for='k in r.keywords'
                                     :key='k'
@@ -702,5 +710,44 @@ watch(activeMission, (m) => {
 
 .rotate-180 {
     transform: rotate(180deg);
+}
+
+.dashboard-log-table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.dashboard-log-col-time {
+    width: 12%;
+}
+
+.dashboard-log-col-entry {
+    width: 58%;
+}
+
+.dashboard-log-col-source {
+    width: 14%;
+}
+
+.dashboard-log-col-keywords {
+    width: 16%;
+}
+
+.dashboard-log-entry-cell {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.dashboard-log-keywords-cell {
+    overflow-wrap: anywhere;
+}
+
+/* Enforce default visual proportions across header/body cells. */
+.dashboard-log-table :is(th, td):nth-child(2) {
+    width: 58%;
+}
+
+.dashboard-log-table :is(th, td):nth-child(4) {
+    width: 16%;
 }
 </style>
