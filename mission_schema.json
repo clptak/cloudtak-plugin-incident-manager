@@ -138,6 +138,7 @@
             }
         ],
         "resource_assignments": [],
+        "work_assignments": [],
         "ipp_coordinates": {},
         "ipp_type": "",
         "subjectLpbCategory": "",

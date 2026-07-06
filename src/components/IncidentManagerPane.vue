@@ -53,7 +53,7 @@
 
             <div
                 class='tab-content flex-grow-1 min-height-0'
-                :class='activeHTab === "assignments"
+                :class='activeHTab === "organization"
                     ? "overflow-hidden d-flex flex-column"
                     : "overflow-auto"'
             >
@@ -70,11 +70,12 @@
 
                 <DashboardTab v-if='activeHTab === "dashboard"' />
                 <TaskTab v-if='activeHTab === "task"' />
-                <AssignmentsTab
-                    v-if='activeHTab === "assignments"'
+                <AssignmentsTab v-if='activeHTab === "work-assignments"' />
+                <ResourcesTab v-if='activeHTab === "resources"' />
+                <OrganizationTab
+                    v-if='activeHTab === "organization"'
                     class='h-100 min-height-0'
                 />
-                <ResourcesTab v-if='activeHTab === "resources"' />
             </div>
         </div>
     </div>
@@ -95,6 +96,7 @@ const WrapUpPane = defineAsyncComponent(() => import('./panes/WrapUpPane.vue'));
 const DashboardTab = defineAsyncComponent(() => import('./panes/DashboardTab.vue'));
 const TaskTab = defineAsyncComponent(() => import('./panes/TaskTab.vue'));
 const AssignmentsTab = defineAsyncComponent(() => import('./panes/AssignmentsTab.vue'));
+const OrganizationTab = defineAsyncComponent(() => import('./panes/OrganizationTab.vue'));
 const ResourcesTab = defineAsyncComponent(() => import('./panes/ResourcesTab.vue'));
 
 interface NavEntry {
@@ -127,8 +129,9 @@ const hTabs = [
     { key: 'main', label: 'Main' },
     { key: 'dashboard', label: 'Dashboard' },
     { key: 'task', label: 'Tasks' },
-    { key: 'assignments', label: 'Organization' },
+    { key: 'work-assignments', label: 'Assignments' },
     { key: 'resources', label: 'Resources' },
+    { key: 'organization', label: 'Organization' },
 ] as const;
 
 const navKeys = new Set(
@@ -150,7 +153,9 @@ function loadNavFromSession(): { activeKey: string; activeHTab: HTabKey } {
             return { activeKey: 'create-open', activeHTab: 'main' };
         }
         const key = (parsed as PaneNavState).activeKey;
-        const htab = (parsed as PaneNavState).activeHTab;
+        let htab = (parsed as PaneNavState).activeHTab;
+        // Legacy: org chart tab was stored as `assignments` before Organization / work-assignments split.
+        if (htab === 'assignments') htab = 'organization';
         return {
             activeKey: navKeys.has(key) ? key : 'create-open',
             activeHTab: isHTabKey(htab) ? htab : 'main',
