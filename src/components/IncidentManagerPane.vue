@@ -60,6 +60,7 @@
                 <!-- Main: shows the active vertical pane -->
                 <div v-if='activeHTab === "main"'>
                     <CreateOpenPane v-if='activeKey === "create-open"' />
+                    <ResourcesTab v-else-if='activeKey === "resources"' />
                     <CasiePane v-else-if='activeKey === "casie"' />
                     <WrapUpPane v-else-if='activeKey === "wrapup"' />
                     <LoggerPane
@@ -71,7 +72,6 @@
                 <DashboardTab v-if='activeHTab === "dashboard"' />
                 <TaskTab v-if='activeHTab === "task"' />
                 <AssignmentsTab v-if='activeHTab === "work-assignments"' />
-                <ResourcesTab v-if='activeHTab === "resources"' />
                 <OrganizationTab
                     v-if='activeHTab === "organization"'
                     class='h-100 min-height-0'
@@ -113,6 +113,7 @@ const navItems: NavEntry[] = [
     { kind: 'sub', key: 'subject-info', label: 'Subject Information' },
     { kind: 'sub', key: 'search-urgency', label: 'Search Urgency' },
     { kind: 'sub', key: 'ir-briefing', label: 'IR Briefing' },
+    { kind: 'sub', key: 'resources', label: 'Resources' },
     { kind: 'sub', key: 'ics-201', label: 'ICS 201' },
 
     { kind: 'header', key: 'h-area', label: 'Area Search' },
@@ -130,7 +131,6 @@ const hTabs = [
     { key: 'dashboard', label: 'Dashboard' },
     { key: 'task', label: 'Tasks' },
     { key: 'work-assignments', label: 'Assignments' },
-    { key: 'resources', label: 'Resources' },
     { key: 'organization', label: 'Organization' },
 ] as const;
 
@@ -152,10 +152,15 @@ function loadNavFromSession(): { activeKey: string; activeHTab: HTabKey } {
         if (!parsed || typeof parsed !== 'object') {
             return { activeKey: 'create-open', activeHTab: 'main' };
         }
-        const key = (parsed as PaneNavState).activeKey;
+        let key = (parsed as PaneNavState).activeKey;
         let htab = (parsed as PaneNavState).activeHTab;
         // Legacy: org chart tab was stored as `assignments` before Organization / work-assignments split.
         if (htab === 'assignments') htab = 'organization';
+        // Resources moved from horizontal tab into Main vertical nav.
+        if (htab === 'resources') {
+            htab = 'main';
+            key = 'resources';
+        }
         return {
             activeKey: navKeys.has(key) ? key : 'create-open',
             activeHTab: isHTabKey(htab) ? htab : 'main',
