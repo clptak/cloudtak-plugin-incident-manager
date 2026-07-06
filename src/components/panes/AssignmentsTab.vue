@@ -173,6 +173,41 @@
                         </div>
                     </div>
 
+                    <div
+                        v-if='filteredResourceAssignments.length'
+                        class='text-muted text-uppercase small mb-1 mt-2'
+                    >
+                        Resource teams
+                    </div>
+
+                    <div
+                        v-for='assignment in filteredResourceAssignments'
+                        :key='assignment.id'
+                        class='card card-sm mb-2 border-primary-subtle'
+                        draggable='true'
+                        style='cursor: grab;'
+                        @dragstart='onResourceTeamDragStart($event, assignment)'
+                        @dragend='onPaletteDragEnd'
+                    >
+                        <div class='card-body py-2 px-2 d-flex align-items-center gap-2'>
+                            <IconTag
+                                :size='18'
+                                stroke='1.5'
+                            />
+                            <div class='small min-width-0'>
+                                <div class='fw-semibold text-truncate'>
+                                    {{ assignment.resourceIdentifier }}
+                                </div>
+                                <div
+                                    class='text-muted'
+                                    style='font-size: 0.72rem;'
+                                >
+                                    {{ resourceAssignmentDescription(assignment) }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <details class='palette-collapse mb-2'>
                         <summary class='palette-collapse__summary'>
                             Incident Command
@@ -465,6 +500,13 @@ import type { RolePositionDef } from '../../data/rolePositionTypes.ts';
 import { formatD4hSyncTime, filterAndSortPaletteMembers, loadD4hMeta, loadD4hRoster, sortMembersByNameAsc } from '../../lib/d4hRoster.ts';
 import type { D4HMember, D4HRosterMeta } from '../../lib/d4hTypes.ts';
 import {
+    resourceAssignmentMatchesFilter,
+    resourceAssignmentDescription,
+    resourceTeamPaletteDrop,
+    type ResourceAssignment,
+} from '../../lib/resourceAssignments.ts';
+import { useResourceAssignments } from '../../composables/useResourceAssignments.ts';
+import {
     asSingleSlot,
     createEmptyIcsSlots,
     createEmptyRescueSlots,
@@ -493,6 +535,7 @@ import { formatPersonNameFirstLast } from '../../lib/personName.ts';
 import { listMissionCots, type MissionCotRef } from '../../lib/missionCots.ts';
 
 const { activeMission } = useIncident();
+const { assignments: resourceAssignments, loadForMission: loadResourceAssignments } = useResourceAssignments();
 
 const teamTree = ref<HastyTreeNode>({});
 const pendingDrop = ref<PendingPaletteDrop | null>(null);
@@ -525,6 +568,10 @@ const filteredMembers = computed(() =>
 );
 
 const configurationMembers = computed(() => sortMembersByNameAsc(members.value));
+
+const filteredResourceAssignments = computed(() =>
+    resourceAssignments.value.filter((a) => resourceAssignmentMatchesFilter(a, paletteSearch.value)),
+);
 
 const filteredTeamResources = computed(() => {
     const q = paletteSearch.value.trim().toLowerCase();
@@ -616,6 +663,13 @@ function onConfiguredTeamDragStart(event: DragEvent): void {
     };
     pendingDrop.value = drop;
     event.dataTransfer?.setData('text/plain', `configured-team:${n}`);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+}
+
+function onResourceTeamDragStart(event: DragEvent, assignment: ResourceAssignment): void {
+    const drop = resourceTeamPaletteDrop(assignment);
+    pendingDrop.value = drop;
+    event.dataTransfer?.setData('text/plain', `resource-team:${assignment.id}`);
     if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
 }
 
@@ -799,6 +853,7 @@ onMounted(() => {
     void refreshRoster();
     void refreshMissionCots();
     void loadPersistedOrgChart();
+    void loadResourceAssignments(activeMission.value);
 });
 
 onUnmounted(() => {
@@ -808,6 +863,7 @@ onUnmounted(() => {
 watch(() => activeMission.value?.guid, () => {
     void refreshMissionCots();
     void loadPersistedOrgChart();
+    void loadResourceAssignments(activeMission.value);
 });
 
 watch(teamTree, () => {

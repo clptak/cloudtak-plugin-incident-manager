@@ -137,6 +137,7 @@
                 "resource_notes":""
             }
         ],
+        "resource_assignments": [],
         "ipp_coordinates": {},
         "ipp_type": "",
         "subjectLpbCategory": "",

@@ -2,7 +2,7 @@ export type AssignmentNodeType = 'team' | 'member' | 'position' | 'role';
 
 export type RoleCategory = 'incident-command' | 'rescue-management';
 
-export type TeamMode = 'generic' | 'configured';
+export type TeamMode = 'generic' | 'configured' | 'resource';
 
 export interface AssignmentNodeSelf {
     id: string;
@@ -15,6 +15,12 @@ export interface AssignmentNodeSelf {
     resourceName?: string;
     assignmentUid?: string;
     assignmentCallsign?: string;
+    resourceAssignmentId?: string;
+    agency?: string;
+    timeOrdered?: string;
+    eta?: number | null;
+    assignmentStatus?: 'current' | 'planned';
+    timeArrived?: string;
     roleCategory?: RoleCategory;
     roleKey?: string;
     roleTitle?: string;
@@ -37,6 +43,18 @@ export type PendingPaletteDrop =
         resourceName?: string;
         assignmentUid?: string;
         assignmentCallsign?: string;
+    }
+    | {
+        kind: 'resource-team';
+        assignmentId: string;
+        title: string;
+        description: string;
+        resourceName: string;
+        agency: string;
+        timeOrdered: string;
+        eta: number | null;
+        status: 'current' | 'planned';
+        timeArrived: string;
     }
     | { kind: 'member'; d4hMemberId: number; title: string; description: string }
     | { kind: 'position'; resourceName: string; title: string; description: string }
@@ -75,9 +93,9 @@ export function emptyTree(): HastyTreeNode {
 
 export function isTeamPaletteDrop(pending: PendingPaletteDrop | null): pending is Extract<
     PendingPaletteDrop,
-    { kind: 'configured-team' }
+    { kind: 'configured-team' | 'resource-team' }
 > {
-    return pending?.kind === 'configured-team';
+    return pending?.kind === 'configured-team' || pending?.kind === 'resource-team';
 }
 
 export function newTeamNode(
@@ -151,8 +169,21 @@ export function newRoleNode(
 }
 
 export function teamNodeFromPaletteDrop(
-    pending: Extract<PendingPaletteDrop, { kind: 'configured-team' }>,
+    pending: Extract<PendingPaletteDrop, { kind: 'configured-team' | 'resource-team' }>,
 ): HastyTreeNode {
+    if (pending.kind === 'resource-team') {
+        return newTeamNode(pending.title, pending.description, {
+            teamMode: 'resource',
+            resourceAssignmentId: pending.assignmentId,
+            resourceName: pending.resourceName,
+            agency: pending.agency,
+            timeOrdered: pending.timeOrdered,
+            eta: pending.eta,
+            assignmentStatus: pending.status,
+            timeArrived: pending.timeArrived,
+        });
+    }
+
     return newTeamNode(pending.title, pending.description, {
         teamMode: 'configured',
         teamNumber: pending.teamNumber,

@@ -8,116 +8,304 @@
                 v-if='meta?.fetchedAt'
                 class='text-muted small'
             >
-                D4H sync {{ formatD4hSyncTime(meta.fetchedAt) }}
+                D4H agencies synced {{ formatD4hSyncTime(meta.fetchedAt) }}
             </span>
-            <div class='ms-auto'>
+            <div class='ms-auto d-flex gap-2'>
                 <button
                     type='button'
-                    class='btn btn-outline-primary btn-sm'
+                    class='btn btn-outline-secondary btn-sm'
                     :disabled='loadingRoster'
-                    @click='refreshRoster'
+                    @click='refreshAgencies'
                 >
-                    {{ loadingRoster ? 'Loading…' : 'Refresh D4H' }}
+                    {{ loadingRoster ? 'Loading…' : 'Refresh agencies' }}
                 </button>
             </div>
         </div>
 
         <p class='text-muted small mb-2'>
-            External agencies from the D4H <strong>External Resource Tracker</strong>
-            (Intelligence → Resources). Sync in the <strong>D4H</strong> plugin first, then
-            refresh here.
+            Create and manage resource team assignments. Each record is saved to
+            <strong>mission_schema.json</strong> (<code>incident_response.resource_assignments</code>)
+            and appears in the <strong>Assignments</strong> palette by Resource Identifier.
         </p>
 
         <div
-            v-if='!loadingRoster && !meta'
-            class='alert alert-info small mb-2'
+            v-if='!activeMission'
+            class='alert alert-info small mb-3'
         >
-            No D4H roster in this browser. Open the <strong>D4H</strong> plugin, configure
-            Team Manager, and run <strong>Sync now</strong>, then click <strong>Refresh D4H</strong>.
+            Select a mission in <strong>Create | Open</strong> before creating resource assignments.
         </div>
 
         <div
-            v-else-if='!loadingRoster && !externalResources.length'
-            class='alert alert-warning small mb-2'
+            v-if='statusMessage'
+            class='alert small py-2 mb-3'
+            :class='statusError ? "alert-danger" : "alert-success"'
         >
-            No external resources in the cached D4H roster. Run <strong>Sync now</strong> in the
-            D4H plugin (uses the D4H search API), then click <strong>Refresh D4H</strong>.
+            {{ statusMessage }}
+        </div>
+
+        <div class='card mb-3'>
+            <div class='card-header py-2 small fw-semibold'>
+                New resource assignment
+            </div>
+            <div class='card-body'>
+                <div class='row g-2'>
+                    <div class='col-md-6'>
+                        <label class='form-label small mb-1'>Resource Identifier</label>
+                        <input
+                            v-model='form.resourceIdentifier'
+                            type='text'
+                            class='form-control form-control-sm'
+                            placeholder='e.g. YCSO GROUND TEAM 1'
+                            autocomplete='off'
+                            :disabled='!activeMission || saving'
+                        >
+                    </div>
+                    <div class='col-md-6'>
+                        <label class='form-label small mb-1'>Resource</label>
+                        <select
+                            v-model='form.resource'
+                            class='form-select form-select-sm'
+                            :disabled='!activeMission || saving'
+                        >
+                            <option value=''>
+                                — Select resource —
+                            </option>
+                            <option
+                                v-for='resource in resourceTypeOptions'
+                                :key='resource'
+                                :value='resource'
+                            >
+                                {{ resource }}
+                            </option>
+                        </select>
+                    </div>
+                    <div class='col-md-6'>
+                        <label class='form-label small mb-1'>Agency</label>
+                        <select
+                            v-model='form.agency'
+                            class='form-select form-select-sm'
+                            :disabled='!activeMission || saving'
+                        >
+                            <option
+                                v-for='agency in agencyOptions'
+                                :key='agency'
+                                :value='agency'
+                            >
+                                {{ agency }}
+                            </option>
+                        </select>
+                    </div>
+                    <div class='col-md-3'>
+                        <label class='form-label small mb-1'>Time Ordered</label>
+                        <input
+                            v-model='form.timeOrdered'
+                            type='datetime-local'
+                            class='form-control form-control-sm'
+                            :disabled='!activeMission || saving'
+                        >
+                    </div>
+                    <div class='col-md-3'>
+                        <label class='form-label small mb-1'>ETA</label>
+                        <input
+                            v-model.number='form.eta'
+                            type='number'
+                            min='0'
+                            step='1'
+                            class='form-control form-control-sm'
+                            placeholder='Hours'
+                            :disabled='!activeMission || saving'
+                        >
+                    </div>
+                    <div class='col-md-3'>
+                        <label class='form-label small mb-1'>Status</label>
+                        <select
+                            v-model='form.status'
+                            class='form-select form-select-sm'
+                            :disabled='!activeMission || saving'
+                        >
+                            <option
+                                v-for='opt in statusOptions'
+                                :key='opt.value'
+                                :value='opt.value'
+                            >
+                                {{ opt.label }}
+                            </option>
+                        </select>
+                    </div>
+                    <div class='col-md-3'>
+                        <label class='form-label small mb-1'>Time Arrived</label>
+                        <input
+                            v-model='form.timeArrived'
+                            type='datetime-local'
+                            class='form-control form-control-sm'
+                            :disabled='!activeMission || saving'
+                        >
+                    </div>
+                </div>
+
+                <div class='d-flex flex-wrap gap-2 mt-3'>
+                    <button
+                        type='button'
+                        class='btn btn-primary btn-sm'
+                        :disabled='!canCreate || saving'
+                        @click='createAssignment'
+                    >
+                        {{ saving ? 'Saving…' : 'Create assignment' }}
+                    </button>
+                    <button
+                        type='button'
+                        class='btn btn-outline-secondary btn-sm'
+                        :disabled='saving'
+                        @click='resetForm'
+                    >
+                        Clear form
+                    </button>
+                </div>
+            </div>
         </div>
 
         <div
-            v-if='externalResourceWarnings.length'
-            class='alert alert-warning small py-2 mb-2'
+            v-if='activeMission'
+            class='card'
         >
+            <div class='card-header py-2 small fw-semibold d-flex align-items-center gap-2'>
+                <span>Mission resource assignments ({{ assignments.length }})</span>
+                <span
+                    v-if='loading'
+                    class='text-muted fw-normal'
+                >Loading…</span>
+            </div>
             <div
-                v-for='(warning, i) in externalResourceWarnings'
-                :key='`ext-warning-${i}`'
+                v-if='!assignments.length && !loading'
+                class='card-body text-muted small'
             >
-                {{ warning }}
+                No assignments yet — create one above. They will be stored in mission_schema.json.
             </div>
-        </div>
-
-        <div
-            v-if='externalResources.length'
-            class='card mb-0'
-        >
-            <div class='card-header py-2 px-3 d-flex align-items-center gap-2 flex-wrap'>
-                <span class='small fw-semibold'>
-                    External resources ({{ visibleExternalResources.length }}<span
-                        v-if='visibleExternalResources.length !== externalResources.length'
-                        class='text-muted fw-normal'
-                    > of {{ externalResources.length }}</span>)
-                </span>
-                <input
-                    v-model='resourceFilter'
-                    type='search'
-                    class='form-control form-control-sm ms-auto'
-                    style='max-width: 280px;'
-                    placeholder='Filter by id or agency name…'
-                    autocomplete='off'
-                >
-            </div>
-            <div class='resources-table-scroll'>
-                <table class='table table-sm table-hover mb-0 small'>
+            <div
+                v-else-if='assignments.length'
+                class='resources-table-scroll'
+            >
+                <table class='table table-sm table-hover mb-0 small align-middle'>
                     <thead class='sticky-top bg-body'>
                         <tr>
-                            <th
-                                style='width: 88px; cursor: pointer; user-select: none;'
-                                @click='toggleResourceSort("id")'
-                            >
-                                ID
-                                <span
-                                    v-if='resourceSortBy === "id"'
-                                    class='text-muted ms-1'
-                                >{{ resourceSortDir === "asc" ? "▲" : "▼" }}</span>
+                            <th>Resource Identifier</th>
+                            <th>Resource</th>
+                            <th>Agency</th>
+                            <th>Time Ordered</th>
+                            <th style='width: 72px;'>
+                                ETA
                             </th>
-                            <th
-                                style='cursor: pointer; user-select: none;'
-                                @click='toggleResourceSort("name")'
-                            >
-                                Agency
-                                <span
-                                    v-if='resourceSortBy === "name"'
-                                    class='text-muted ms-1'
-                                >{{ resourceSortDir === "asc" ? "▲" : "▼" }}</span>
+                            <th style='width: 96px;'>
+                                Status
                             </th>
+                            <th>Time Arrived</th>
+                            <th style='width: 72px;' />
                         </tr>
                     </thead>
                     <tbody>
                         <tr
-                            v-for='r in visibleExternalResources'
-                            :key='r.id'
+                            v-for='assignment in assignments'
+                            :key='assignment.id'
                         >
-                            <td class='font-monospace'>
-                                {{ r.id }}
+                            <td>
+                                <input
+                                    :value='assignment.resourceIdentifier'
+                                    type='text'
+                                    class='form-control form-control-sm'
+                                    :disabled='saving'
+                                    @change='onFieldChange(assignment.id, "resourceIdentifier", ($event.target as HTMLInputElement).value)'
+                                >
                             </td>
-                            <td>{{ r.name }}</td>
-                        </tr>
-                        <tr v-if='visibleExternalResources.length === 0'>
-                            <td
-                                colspan='2'
-                                class='text-center text-muted py-3'
-                            >
-                                No resources match the filter.
+                            <td>
+                                <select
+                                    :value='assignment.resource'
+                                    class='form-select form-select-sm'
+                                    :disabled='saving'
+                                    @change='onFieldChange(assignment.id, "resource", ($event.target as HTMLSelectElement).value)'
+                                >
+                                    <option value=''>
+                                        —
+                                    </option>
+                                    <option
+                                        v-for='resource in resourceTypeOptions'
+                                        :key='resource'
+                                        :value='resource'
+                                    >
+                                        {{ resource }}
+                                    </option>
+                                </select>
+                            </td>
+                            <td>
+                                <select
+                                    :value='assignment.agency'
+                                    class='form-select form-select-sm'
+                                    :disabled='saving'
+                                    @change='onFieldChange(assignment.id, "agency", ($event.target as HTMLSelectElement).value)'
+                                >
+                                    <option
+                                        v-for='agency in rowAgencyOptions(assignment.agency)'
+                                        :key='agency'
+                                        :value='agency'
+                                    >
+                                        {{ agency }}
+                                    </option>
+                                </select>
+                            </td>
+                            <td>
+                                <input
+                                    :value='assignment.timeOrdered'
+                                    type='datetime-local'
+                                    class='form-control form-control-sm'
+                                    :disabled='saving'
+                                    @change='onFieldChange(assignment.id, "timeOrdered", ($event.target as HTMLInputElement).value)'
+                                >
+                            </td>
+                            <td>
+                                <input
+                                    :value='assignment.eta ?? ""'
+                                    type='number'
+                                    min='0'
+                                    step='1'
+                                    class='form-control form-control-sm'
+                                    :disabled='saving'
+                                    @change='onEtaChange(assignment.id, ($event.target as HTMLInputElement).value)'
+                                >
+                            </td>
+                            <td>
+                                <select
+                                    :value='assignment.status'
+                                    class='form-select form-select-sm'
+                                    :disabled='saving'
+                                    @change='onStatusChange(assignment.id, ($event.target as HTMLSelectElement).value as ResourceAssignmentStatus)'
+                                >
+                                    <option
+                                        v-for='opt in statusOptions'
+                                        :key='opt.value'
+                                        :value='opt.value'
+                                    >
+                                        {{ opt.label }}
+                                    </option>
+                                </select>
+                            </td>
+                            <td>
+                                <input
+                                    :value='assignment.timeArrived'
+                                    type='datetime-local'
+                                    class='form-control form-control-sm'
+                                    :disabled='saving'
+                                    @change='onFieldChange(assignment.id, "timeArrived", ($event.target as HTMLInputElement).value)'
+                                >
+                            </td>
+                            <td>
+                                <button
+                                    type='button'
+                                    class='btn btn-outline-danger btn-sm'
+                                    title='Remove assignment'
+                                    :disabled='saving'
+                                    @click='removeAssignmentRecord(assignment.id)'
+                                >
+                                    ×
+                                </button>
                             </td>
                         </tr>
                     </tbody>
@@ -128,64 +316,141 @@
 </template>
 
 <script setup lang='ts'>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
+import { useIncident } from '../../composables/useIncident.ts';
+import { useResourceAssignments } from '../../composables/useResourceAssignments.ts';
+import { formatD4hSyncTime, loadD4hMeta, loadD4hRoster } from '../../lib/d4hRoster.ts';
+import type { D4HRosterMeta } from '../../lib/d4hTypes.ts';
+import { nowDatetimeLocal } from '../../lib/incidentInfo.ts';
 import {
-    filterAndSortExternalResources,
-    formatD4hSyncTime,
-    loadD4hMeta,
-    loadD4hRoster,
-} from '../../lib/d4hRoster.ts';
-import type { D4HExternalResource, D4HRosterMeta } from '../../lib/d4hTypes.ts';
+    buildAgencyOptions,
+    DEFAULT_AGENCY,
+    RESOURCE_ASSIGNMENT_STATUSES,
+    RESOURCE_TYPE_OPTIONS,
+    type ResourceAssignment,
+    type ResourceAssignmentStatus,
+} from '../../lib/resourceAssignments.ts';
+
+const { activeMission } = useIncident();
+const {
+    assignments,
+    loading,
+    saving,
+    statusMessage,
+    statusError,
+    blankResourceAssignmentForm,
+    loadForMission,
+    addAssignment,
+    removeAssignment,
+    updateAssignment,
+} = useResourceAssignments();
 
 const loadingRoster = ref(false);
 const meta = ref<D4HRosterMeta | null>(null);
-const externalResources = ref<D4HExternalResource[]>([]);
-const resourceFilter = ref('');
-const resourceSortBy = ref<'id' | 'name'>('name');
-const resourceSortDir = ref<'asc' | 'desc'>('asc');
+const agencyOptions = ref<string[]>(buildAgencyOptions([]));
 
-const visibleExternalResources = computed(() =>
-    filterAndSortExternalResources(
-        externalResources.value,
-        resourceFilter.value,
-        resourceSortBy.value,
-        resourceSortDir.value,
-    ),
-);
-
-const externalResourceWarnings = computed(() => {
-    const warnings = meta.value?.warnings ?? [];
-    return warnings.filter((w) => /external resource/i.test(w));
+const form = ref<Omit<ResourceAssignment, 'id'>>({
+    ...blankResourceAssignmentForm(),
+    timeOrdered: nowDatetimeLocal(),
 });
 
-function toggleResourceSort(key: 'id' | 'name'): void {
-    if (resourceSortBy.value === key) {
-        resourceSortDir.value = resourceSortDir.value === 'asc' ? 'desc' : 'asc';
-    } else {
-        resourceSortBy.value = key;
-        resourceSortDir.value = 'asc';
-    }
+const resourceTypeOptions = RESOURCE_TYPE_OPTIONS;
+const statusOptions = RESOURCE_ASSIGNMENT_STATUSES;
+
+const canCreate = computed(() =>
+    !!activeMission.value
+    && form.value.resourceIdentifier.trim().length > 0
+    && form.value.resource.trim().length > 0
+    && form.value.agency.trim().length > 0,
+);
+
+function resetForm(): void {
+    form.value = {
+        ...blankResourceAssignmentForm(),
+        timeOrdered: nowDatetimeLocal(),
+    };
 }
 
-async function refreshRoster(): Promise<void> {
+async function refreshAgencies(): Promise<void> {
     loadingRoster.value = true;
     try {
         const roster = await loadD4hRoster();
         meta.value = roster?.meta ?? await loadD4hMeta();
-        externalResources.value = roster?.externalResources ?? [];
+        agencyOptions.value = buildAgencyOptions(roster?.externalResources ?? []);
+        if (!agencyOptions.value.includes(form.value.agency)) {
+            form.value.agency = DEFAULT_AGENCY;
+        }
     } finally {
         loadingRoster.value = false;
     }
 }
 
+async function createAssignment(): Promise<void> {
+    if (!activeMission.value || !canCreate.value) return;
+
+    const etaRaw = form.value.eta;
+    const eta = etaRaw == null || Number.isNaN(Number(etaRaw))
+        ? null
+        : Number(etaRaw);
+
+    await addAssignment(activeMission.value, {
+        resourceIdentifier: form.value.resourceIdentifier.trim(),
+        resource: form.value.resource.trim(),
+        agency: form.value.agency.trim(),
+        timeOrdered: form.value.timeOrdered.trim(),
+        eta,
+        status: form.value.status,
+        timeArrived: form.value.timeArrived.trim(),
+    });
+
+    resetForm();
+}
+
+async function removeAssignmentRecord(id: string): Promise<void> {
+    if (!activeMission.value) return;
+    if (!window.confirm('Remove this resource assignment?')) return;
+    await removeAssignment(activeMission.value, id);
+}
+
+function rowAgencyOptions(currentAgency: string): string[] {
+    if (currentAgency && !agencyOptions.value.includes(currentAgency)) {
+        return [currentAgency, ...agencyOptions.value];
+    }
+    return agencyOptions.value;
+}
+
+async function onFieldChange(
+    id: string,
+    field: keyof Omit<ResourceAssignment, 'id' | 'eta' | 'status'>,
+    value: string,
+): Promise<void> {
+    if (!activeMission.value) return;
+    await updateAssignment(activeMission.value, id, { [field]: value });
+}
+
+async function onEtaChange(id: string, raw: string): Promise<void> {
+    if (!activeMission.value) return;
+    const eta = raw.trim() === '' || Number.isNaN(Number(raw)) ? null : Number(raw);
+    await updateAssignment(activeMission.value, id, { eta });
+}
+
+async function onStatusChange(id: string, status: ResourceAssignmentStatus): Promise<void> {
+    if (!activeMission.value) return;
+    await updateAssignment(activeMission.value, id, { status });
+}
+
+watch(() => activeMission.value?.guid, (guid) => {
+    void loadForMission(guid ? activeMission.value : null);
+}, { immediate: true });
+
 onMounted(() => {
-    void refreshRoster();
+    void refreshAgencies();
 });
 </script>
 
 <style scoped>
 .resources-table-scroll {
     max-height: 50vh;
-    overflow-y: auto;
+    overflow: auto;
 }
 </style>

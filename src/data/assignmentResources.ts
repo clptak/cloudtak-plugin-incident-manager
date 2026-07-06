@@ -5,7 +5,7 @@ export const ASSIGNMENT_RESOURCES = [
     'Boat',
     'Cavers',
     'Containment Team',
-    'Climbers',
+    'Technical Rescue',
     'Divers',
     'Dog Team',
     'Drone',
