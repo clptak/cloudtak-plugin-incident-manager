@@ -45,11 +45,11 @@
         </div>
 
         <p class='text-muted small mb-2 flex-shrink-0'>
-            Configure teams, incident command, and rescue management roles, drag them onto the chart,
-            then add D4H personnel. The org chart auto-saves in <strong>mission_schema.json</strong>.
-            Use <strong>Sync org chart to DataSync</strong> for ICS 201 log lines; teams with a
-            selected assignment CoT are linked via <code>entryUid</code> and the CoT remarks are
-            updated to match. Use
+            Create resource teams in the <strong>Resources</strong> tab, then drag them onto the chart
+            with incident command and rescue roles. Add D4H personnel from the palette. The org chart
+            auto-saves in <strong>mission_schema.json</strong>. Use
+            <strong>Sync org chart to DataSync</strong> for ICS 201 log lines; teams with a selected
+            assignment CoT are linked via <code>entryUid</code>. Use
             <strong>×</strong> to remove a node, or <strong>Clear canvas</strong> to start over.
         </p>
 
@@ -87,158 +87,83 @@
                         autocomplete='off'
                     >
 
-                    <div class='text-muted text-uppercase small mb-1 mt-1'>
-                        Teams
-                    </div>
-
-                    <div class='card card-sm mb-2'>
-                        <div class='card-body p-2'>
-                            <div class='mb-2'>
-                                <label class='form-label small mb-1'>Team number</label>
-                                <input
-                                    v-model.number='teamNumber'
-                                    type='number'
-                                    min='1'
-                                    class='form-control form-control-sm'
-                                >
-                            </div>
-                            <div class='mb-2'>
-                                <label class='form-label small mb-1'>Resource</label>
-                                <select
-                                    v-model='teamResourceName'
-                                    class='form-select form-select-sm'
-                                >
-                                    <option value=''>
-                                        — Resource —
-                                    </option>
-                                    <option
-                                        v-for='resource in filteredTeamResources'
-                                        :key='resource'
-                                        :value='resource'
-                                    >
-                                        {{ resource }}
-                                    </option>
-                                </select>
-                            </div>
-                            <div class='mb-2'>
-                                <label class='form-label small mb-1'>Assignment</label>
-                                <select
-                                    v-model='teamAssignmentUid'
-                                    class='form-select form-select-sm'
-                                    :disabled='!activeMission || loadingCots'
-                                >
-                                    <option value=''>
-                                        {{ assignmentSelectLabel }}
-                                    </option>
-                                    <option
-                                        v-for='cot in filteredMissionCots'
-                                        :key='cot.uid'
-                                        :value='cot.uid'
-                                    >
-                                        {{ cot.callsign }}
-                                    </option>
-                                </select>
-                            </div>
+                    <details class='palette-collapse mb-2'>
+                        <summary class='palette-collapse__summary'>
+                            Resource teams ({{ filteredResourceAssignments.length }})
+                        </summary>
+                        <div class='palette-collapse__body'>
                             <div
-                                class='card card-sm border-primary-subtle bg-light'
-                                draggable='true'
-                                style='cursor: grab;'
-                                @dragstart='onConfiguredTeamDragStart'
-                                @dragend='onPaletteDragEnd'
+                                v-if='!filteredResourceAssignments.length'
+                                class='text-muted small px-1 mb-2'
                             >
-                                <div class='card-body py-2 px-2 d-flex align-items-center gap-2'>
-                                    <IconUsers
-                                        :size='18'
-                                        stroke='1.5'
-                                    />
-                                    <div class='small'>
-                                        <div class='fw-semibold'>
-                                            {{ configuredTeamPreview.title }}
-                                        </div>
-                                        <div
-                                            class='text-muted'
-                                            style='font-size: 0.72rem;'
+                                <span v-if='!activeMission'>Select a mission in Create | Open.</span>
+                                <span v-else-if='!resourceAssignments.length'>
+                                    No resource teams yet — create them in the <strong>Resources</strong> tab.
+                                </span>
+                                <span v-else>No resource teams match your search.</span>
+                            </div>
+
+                            <div
+                                v-for='assignment in filteredResourceAssignments'
+                                :key='assignment.id'
+                                class='card card-sm mb-2'
+                            >
+                                <div class='card-body p-2'>
+                                    <div class='fw-semibold small text-truncate mb-1'>
+                                        {{ assignment.resourceIdentifier }}
+                                    </div>
+                                    <div class='mb-2'>
+                                        <label class='form-label small mb-1'>Assignment</label>
+                                        <select
+                                            :value='assignment.assignmentUid ?? ""'
+                                            class='form-select form-select-sm'
+                                            :disabled='!activeMission || loadingCots'
+                                            @change='onResourceTeamAssignmentChange(assignment.id, ($event.target as HTMLSelectElement).value)'
                                         >
-                                            {{ configuredTeamPreview.description }}
+                                            <option value=''>
+                                                {{ assignmentSelectLabel }}
+                                            </option>
+                                            <option
+                                                v-for='cot in filteredMissionCots'
+                                                :key='cot.uid'
+                                                :value='cot.uid'
+                                            >
+                                                {{ cot.callsign }}
+                                            </option>
+                                        </select>
+                                    </div>
+                                    <div
+                                        class='card card-sm border-primary-subtle bg-light'
+                                        draggable='true'
+                                        style='cursor: grab;'
+                                        @dragstart='onResourceTeamDragStart($event, assignment)'
+                                        @dragend='onPaletteDragEnd'
+                                    >
+                                        <div class='card-body py-2 px-2 d-flex align-items-center gap-2'>
+                                            <IconTag
+                                                :size='18'
+                                                stroke='1.5'
+                                            />
+                                            <div class='small min-width-0'>
+                                                <div
+                                                    class='text-muted'
+                                                    style='font-size: 0.72rem;'
+                                                >
+                                                    {{ resourceAssignmentDescription(assignment) }}
+                                                </div>
+                                            </div>
                                         </div>
+                                    </div>
+                                    <div
+                                        class='text-muted mt-1'
+                                        style='font-size: 0.68rem;'
+                                    >
+                                        Drag onto the chart
                                     </div>
                                 </div>
                             </div>
-                            <div
-                                class='text-muted mt-1'
-                                style='font-size: 0.68rem;'
-                            >
-                                Drag onto the chart
-                            </div>
                         </div>
-                    </div>
-
-                    <div
-                        v-if='filteredResourceAssignments.length'
-                        class='text-muted text-uppercase small mb-1 mt-2'
-                    >
-                        Resource teams
-                    </div>
-
-                    <div
-                        v-for='assignment in filteredResourceAssignments'
-                        :key='assignment.id'
-                        class='card card-sm mb-2'
-                    >
-                        <div class='card-body p-2'>
-                            <div class='fw-semibold small text-truncate mb-1'>
-                                {{ assignment.resourceIdentifier }}
-                            </div>
-                            <div class='mb-2'>
-                                <label class='form-label small mb-1'>Assignment</label>
-                                <select
-                                    :value='assignment.assignmentUid ?? ""'
-                                    class='form-select form-select-sm'
-                                    :disabled='!activeMission || loadingCots'
-                                    @change='onResourceTeamAssignmentChange(assignment.id, ($event.target as HTMLSelectElement).value)'
-                                >
-                                    <option value=''>
-                                        {{ assignmentSelectLabel }}
-                                    </option>
-                                    <option
-                                        v-for='cot in filteredMissionCots'
-                                        :key='cot.uid'
-                                        :value='cot.uid'
-                                    >
-                                        {{ cot.callsign }}
-                                    </option>
-                                </select>
-                            </div>
-                            <div
-                                class='card card-sm border-primary-subtle bg-light'
-                                draggable='true'
-                                style='cursor: grab;'
-                                @dragstart='onResourceTeamDragStart($event, assignment)'
-                                @dragend='onPaletteDragEnd'
-                            >
-                                <div class='card-body py-2 px-2 d-flex align-items-center gap-2'>
-                                    <IconTag
-                                        :size='18'
-                                        stroke='1.5'
-                                    />
-                                    <div class='small min-width-0'>
-                                        <div
-                                            class='text-muted'
-                                            style='font-size: 0.72rem;'
-                                        >
-                                            {{ resourceAssignmentDescription(assignment) }}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div
-                                class='text-muted mt-1'
-                                style='font-size: 0.68rem;'
-                            >
-                                Drag onto the chart
-                            </div>
-                        </div>
-                    </div>
+                    </details>
 
                     <details class='palette-collapse mb-2'>
                         <summary class='palette-collapse__summary'>
@@ -526,7 +451,6 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { HastyTeam } from '@tak-ps/vue-hasty-team';
 import { IconLifebuoy, IconShield, IconTag, IconUser, IconUsers, IconX } from '@tabler/icons-vue';
 import { useIncident } from '../../composables/useIncident.ts';
-import { ASSIGNMENT_RESOURCES } from '../../data/assignmentResources.ts';
 import type { RescueGroupLabel } from '../../data/rescueManagementPositions.ts';
 import type { RolePositionDef } from '../../data/rolePositionTypes.ts';
 import { formatD4hSyncTime, filterAndSortPaletteMembers, loadD4hMeta, loadD4hRoster, sortMembersByNameAsc } from '../../lib/d4hRoster.ts';
@@ -553,8 +477,6 @@ import {
 import {
     applyPaletteToRoot,
     appendPaletteDrop,
-    configuredTeamDescription,
-    configuredTeamTitle,
     deleteNodeFromTree,
     extractNodeById,
     treeHasContent,
@@ -577,9 +499,6 @@ const meta = ref<D4HRosterMeta | null>(null);
 const members = ref<D4HMember[]>([]);
 const missionCots = ref<MissionCotRef[]>([]);
 const paletteSearch = ref('');
-const teamNumber = ref(1);
-const teamResourceName = ref('');
-const teamAssignmentUid = ref('');
 const icsSlots = ref<Record<string, RoleSlotConfig>>(createEmptyIcsSlots());
 const rescueSlots = ref<Record<string, RoleSlotConfig>>(createEmptyRescueSlots());
 const syncingOrgChart = ref(false);
@@ -605,12 +524,6 @@ const filteredResourceAssignments = computed(() =>
     resourceAssignments.value.filter((a) => resourceAssignmentMatchesFilter(a, paletteSearch.value)),
 );
 
-const filteredTeamResources = computed(() => {
-    const q = paletteSearch.value.trim().toLowerCase();
-    if (!q) return [...ASSIGNMENT_RESOURCES];
-    return ASSIGNMENT_RESOURCES.filter((r) => r.toLowerCase().includes(q));
-});
-
 const filteredMissionCots = computed(() => {
     const q = paletteSearch.value.trim().toLowerCase();
     if (!q) return missionCots.value;
@@ -628,19 +541,6 @@ const filteredRescuePositions = computed(() =>
 const filteredRescueGroupLabels = computed(() =>
     filterRescueGroupLabels(paletteSearch.value),
 );
-
-const configuredTeamPreview = computed(() => {
-    const n = Math.max(1, Math.floor(teamNumber.value) || 1);
-    const resource = teamResourceName.value.trim();
-    const cot = missionCots.value.find((c) => c.uid === teamAssignmentUid.value);
-    return {
-        title: configuredTeamTitle(n),
-        description: configuredTeamDescription({
-            resourceName: resource || undefined,
-            assignmentCallsign: cot?.callsign,
-        }),
-    };
-});
 
 const assignmentSelectLabel = computed(() => {
     if (!activeMission.value) return 'Select a mission in Create | Open';
@@ -674,27 +574,6 @@ function onRolePositionDragStart(
 function onRescueGroupLabelDragStart(event: DragEvent, label: RescueGroupLabel): void {
     pendingDrop.value = fixedRescueLabelDrop(label);
     event.dataTransfer?.setData('text/plain', `rescue-label:${label.key}`);
-    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
-}
-
-function onConfiguredTeamDragStart(event: DragEvent): void {
-    const n = Math.max(1, Math.floor(teamNumber.value) || 1);
-    const resource = teamResourceName.value.trim();
-    const cot = missionCots.value.find((c) => c.uid === teamAssignmentUid.value);
-    const drop: PendingPaletteDrop = {
-        kind: 'configured-team',
-        teamNumber: n,
-        resourceName: resource || undefined,
-        assignmentUid: cot?.uid,
-        assignmentCallsign: cot?.callsign,
-        title: configuredTeamTitle(n),
-        description: configuredTeamDescription({
-            resourceName: resource || undefined,
-            assignmentCallsign: cot?.callsign,
-        }),
-    };
-    pendingDrop.value = drop;
-    event.dataTransfer?.setData('text/plain', `configured-team:${n}`);
     if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
 }
 
@@ -876,7 +755,6 @@ async function refreshRoster(): Promise<void> {
 }
 
 async function refreshMissionCots(): Promise<void> {
-    teamAssignmentUid.value = '';
     missionCots.value = [];
     if (!activeMission.value) return;
 
