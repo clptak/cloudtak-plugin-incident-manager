@@ -150,6 +150,123 @@
                 </div>
             </div>
 
+            <div
+                v-if='teams.length'
+                class='mb-3'
+            >
+                <h4 class='h5 mb-2'>
+                    Teams
+                </h4>
+                <div
+                    v-for='team in teams'
+                    :key='team.title'
+                    class='card mb-2'
+                >
+                    <div class='card-header py-2'>
+                        <strong>{{ team.title }}</strong>
+                        <span
+                            v-if='team.assignmentCallsign'
+                            class='text-muted ms-2'
+                        >{{ team.assignmentCallsign }}</span>
+                    </div>
+                    <div class='card-body py-2'>
+                        <div
+                            v-if='team.description'
+                            class='text-muted small mb-2'
+                        >
+                            {{ team.description }}
+                        </div>
+                        <ul
+                            v-if='team.children.length'
+                            class='list-unstyled mb-0 small'
+                        >
+                            <li
+                                v-for='(child, childIndex) in team.children'
+                                :key='`${team.title}-${childIndex}`'
+                            >
+                                {{ formatTeamRosterChild(child) }}
+                            </li>
+                        </ul>
+                        <div
+                            v-else
+                            class='text-muted small'
+                        >
+                            No roster entries on the org chart.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div
+                v-if='resourceAssignments.length'
+                class='mb-3'
+            >
+                <h4 class='h5 mb-2'>
+                    Resource Assignments
+                </h4>
+                <div
+                    v-for='assignment in resourceAssignments'
+                    :key='assignment.id'
+                    class='card mb-2'
+                >
+                    <div class='card-header py-2'>
+                        <strong>{{ assignment.resourceIdentifier }}</strong>
+                    </div>
+                    <div class='card-body py-2'>
+                        <dl class='row mb-0 small'>
+                            <template
+                                v-for='row in resourceAssignmentDetailRows(assignment)'
+                                :key='row.label'
+                            >
+                                <dt class='col-sm-4 text-muted'>
+                                    {{ row.label }}
+                                </dt>
+                                <dd class='col-sm-8 mb-1'>
+                                    {{ row.value }}
+                                </dd>
+                            </template>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+
+            <div
+                v-if='workAssignments.length'
+                class='mb-3'
+            >
+                <h4 class='h5 mb-2'>
+                    Work Assignments
+                </h4>
+                <div
+                    v-for='assignment in workAssignments'
+                    :key='assignment.id'
+                    class='card mb-2'
+                >
+                    <div class='card-header py-2'>
+                        <strong>Assignment {{ assignment.assignmentNumber }}</strong>
+                        <span
+                            v-if='assignment.teamLabel'
+                            class='text-muted ms-2'
+                        >{{ assignment.teamLabel }}</span>
+                    </div>
+                    <div class='card-body py-2'>
+                        <dl class='row mb-0 small'>
+                            <template
+                                v-for='row in workAssignmentDetailRows(assignment)'
+                                :key='row.label'
+                            >
+                                <dt class='col-sm-4 text-muted'>
+                                    {{ row.label }}
+                                </dt>
+                                <dd class='col-sm-8 mb-1'>
+                                    {{ row.value }}
+                                </dd>
+                            </template>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+
             <div class='table-responsive'>
                 <table class='table table-sm table-vcenter table-striped table-hover mb-0'>
                     <thead>
@@ -211,10 +328,21 @@ import {
     formatLocalTime,
 } from '../../lib/dashboardExport.ts';
 import {
+    dashboardTeamsFromOrgChart,
+    formatTeamRosterChild,
+    resourceAssignmentDetailRows,
+    workAssignmentDetailRows,
+    type DashboardTeamRoster,
+} from '../../lib/dashboardPanels.ts';
+import { loadD4hRoster } from '../../lib/d4hRoster.ts';
+import {
     initialInfoDetailRows,
     type IncidentInfoForm,
 } from '../../lib/incidentInfo.ts';
 import { loadMissionSchema, resolveIncidentInfoForm } from '../../lib/missionSchema.ts';
+import { loadOrgChartFromMission } from '../../lib/orgChartPersistence.ts';
+import { loadResourceAssignmentsFromMission } from '../../lib/resourceAssignmentPersistence.ts';
+import type { ResourceAssignment } from '../../lib/resourceAssignments.ts';
 import {
     displaySubjectNumber,
     parseSubjectsFromLogs,
@@ -222,6 +350,8 @@ import {
     SUBJECT_KEYWORD,
     type ParsedSubject,
 } from '../../lib/subjectInfo.ts';
+import { loadWorkAssignmentsFromMission } from '../../lib/workAssignmentPersistence.ts';
+import type { WorkAssignment } from '../../lib/workAssignments.ts';
 
 const { activeMission } = useIncident();
 
@@ -236,6 +366,9 @@ interface Row {
 const rows = ref<Row[]>([]);
 const subjects = ref<ParsedSubject[]>([]);
 const initialInfo = ref<IncidentInfoForm | null>(null);
+const teams = ref<DashboardTeamRoster[]>([]);
+const resourceAssignments = ref<ResourceAssignment[]>([]);
+const workAssignments = ref<WorkAssignment[]>([]);
 const loading = ref(false);
 const error = ref('');
 const sortAsc = ref(true);
@@ -296,7 +429,11 @@ const showInfoPanels = computed(
 );
 
 const canExport = computed(
-    () => showInfoPanels.value || displayRows.value.length > 0,
+    () => showInfoPanels.value
+        || teams.value.length > 0
+        || resourceAssignments.value.length > 0
+        || workAssignments.value.length > 0
+        || displayRows.value.length > 0,
 );
 
 function sortBy(): void {
@@ -393,7 +530,14 @@ function exportRows() {
 
 function exportCsv(): void {
     if (!activeMission.value || !canExport.value) return;
-    exportDashboardCsv(exportRows(), activeMission.value.name, subjects.value);
+    exportDashboardCsv(
+        exportRows(),
+        activeMission.value.name,
+        subjects.value,
+        teams.value,
+        resourceAssignments.value,
+        workAssignments.value,
+    );
 }
 
 async function exportPdf(): Promise<void> {
@@ -406,7 +550,15 @@ async function exportPdf(): Promise<void> {
             const logs = await sub.log.list({ refresh: true });
             info = resolveIncidentInfoForm(schema, logs);
         }
-        exportDashboardPdf(exportRows(), activeMission.value.name, subjects.value, info);
+        exportDashboardPdf(
+            exportRows(),
+            activeMission.value.name,
+            subjects.value,
+            info,
+            teams.value,
+            resourceAssignments.value,
+            workAssignments.value,
+        );
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
     }
@@ -416,11 +568,25 @@ async function refresh(): Promise<void> {
     if (!activeMission.value) return;
     loading.value = true; error.value = '';
     try {
-        const sub = await loadIncidentSubscription(activeMission.value);
+        const mission = activeMission.value;
+        const sub = await loadIncidentSubscription(mission);
         const { schema } = await loadMissionSchema(sub);
         const logs = await sub.log.list({ refresh: true });
+        const [orgChartLoaded, resourceLoaded, workLoaded, roster] = await Promise.all([
+            loadOrgChartFromMission(mission),
+            loadResourceAssignmentsFromMission(mission),
+            loadWorkAssignmentsFromMission(mission),
+            loadD4hRoster(),
+        ]);
+
         initialInfo.value = resolveIncidentInfoForm(schema, logs);
         subjects.value = parseSubjectsFromLogs(logs);
+        teams.value = dashboardTeamsFromOrgChart(
+            orgChartLoaded.tree,
+            roster?.members ?? [],
+        );
+        resourceAssignments.value = resourceLoaded.assignments;
+        workAssignments.value = workLoaded.assignments;
         rows.value = logs
             .filter((log: DBSubscriptionLog) => {
                 const kws = Array.isArray(log.keywords) ? log.keywords : [];
@@ -452,6 +618,9 @@ watch(activeMission, (m) => {
         rows.value = [];
         subjects.value = [];
         initialInfo.value = null;
+        teams.value = [];
+        resourceAssignments.value = [];
+        workAssignments.value = [];
     }
 }, { immediate: true });
 </script>

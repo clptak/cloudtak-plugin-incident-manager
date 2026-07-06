@@ -1,12 +1,20 @@
 import {
+    formatTeamRosterChild,
+    resourceAssignmentDetailRows,
+    workAssignmentDetailRows,
+    type DashboardTeamRoster,
+} from './dashboardPanels.ts';
+import {
     initialInfoDetailRows,
     type IncidentInfoForm,
 } from './incidentInfo.ts';
+import type { ResourceAssignment } from './resourceAssignments.ts';
 import {
     displaySubjectNumber,
     subjectDetailRows,
     type ParsedSubject,
 } from './subjectInfo.ts';
+import type { WorkAssignment } from './workAssignments.ts';
 
 /** Rows exported from the Dashboard log table. */
 export interface DashboardExportRow {
@@ -54,6 +62,9 @@ export function exportDashboardCsv(
     rows: DashboardExportRow[],
     missionName: string,
     subjects: ParsedSubject[] = [],
+    teams: DashboardTeamRoster[] = [],
+    resourceAssignments: ResourceAssignment[] = [],
+    workAssignments: WorkAssignment[] = [],
 ): void {
     const lines: string[] = [];
 
@@ -76,6 +87,40 @@ export function exportDashboardCsv(
         r.source,
         r.keywords.join('; '),
     ].map(csvEscape).join(',')));
+
+    if (teams.length) {
+        lines.push('');
+        lines.push(csvEscape('Teams'));
+        for (const team of teams) {
+            lines.push(csvEscape(team.title));
+            for (const child of team.children) {
+                lines.push(csvEscape(formatTeamRosterChild(child)));
+            }
+            lines.push('');
+        }
+    }
+
+    if (resourceAssignments.length) {
+        lines.push(csvEscape('Resource Assignments'));
+        for (const assignment of resourceAssignments) {
+            lines.push(csvEscape(assignment.resourceIdentifier));
+            for (const row of resourceAssignmentDetailRows(assignment)) {
+                lines.push([csvEscape(row.label), csvEscape(row.value)].join(','));
+            }
+            lines.push('');
+        }
+    }
+
+    if (workAssignments.length) {
+        lines.push(csvEscape('Work Assignments'));
+        for (const assignment of workAssignments) {
+            lines.push(csvEscape(`Assignment ${assignment.assignmentNumber}`));
+            for (const row of workAssignmentDetailRows(assignment)) {
+                lines.push([csvEscape(row.label), csvEscape(row.value)].join(','));
+            }
+            lines.push('');
+        }
+    }
 
     const blob = new Blob([lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
     downloadBlob(blob, `${safeFilename(missionName)}-dashboard.csv`);
@@ -179,6 +224,9 @@ function buildPdf(
     exportedAt: string,
     subjects: ParsedSubject[] = [],
     initialInfo?: IncidentInfoForm | null,
+    teams: DashboardTeamRoster[] = [],
+    resourceAssignments: ResourceAssignment[] = [],
+    workAssignments: WorkAssignment[] = [],
 ): string {
     const contentW = PAGE_W - MARGIN * 2;
     const colWidths = [
@@ -351,6 +399,66 @@ function buildPdf(
         }
     }
 
+    const hasPostLogSections = teams.length > 0
+        || resourceAssignments.length > 0
+        || workAssignments.length > 0;
+
+    if (hasPostLogSections) {
+        y -= 8;
+        addLine(MARGIN, y, PAGE_W - MARGIN, y);
+        y -= 12;
+    }
+
+    if (teams.length) {
+        addWrappedBlock('Teams', 0, 10, true);
+        y -= 4;
+        for (const team of teams) {
+            const teamTitle = team.assignmentCallsign
+                ? `${team.title} (${team.assignmentCallsign})`
+                : team.title;
+            addWrappedBlock(teamTitle, 0, FONT_SIZE, true);
+            if (team.description) {
+                addWrappedBlock(team.description, 8, FONT_SIZE, false);
+            }
+            if (team.children.length) {
+                for (const child of team.children) {
+                    addWrappedBlock(formatTeamRosterChild(child), 12);
+                }
+            } else {
+                addWrappedBlock('No roster entries', 12);
+            }
+            y -= 4;
+        }
+        addLine(MARGIN, y, PAGE_W - MARGIN, y);
+        y -= 12;
+    }
+
+    if (resourceAssignments.length) {
+        addWrappedBlock('Resource Assignments', 0, 10, true);
+        y -= 4;
+        for (const assignment of resourceAssignments) {
+            addWrappedBlock(assignment.resourceIdentifier, 0, FONT_SIZE, true);
+            for (const row of resourceAssignmentDetailRows(assignment)) {
+                addWrappedBlock(`${row.label}: ${row.value}`, 8);
+            }
+            y -= 4;
+        }
+        addLine(MARGIN, y, PAGE_W - MARGIN, y);
+        y -= 12;
+    }
+
+    if (workAssignments.length) {
+        addWrappedBlock('Work Assignments', 0, 10, true);
+        y -= 4;
+        for (const assignment of workAssignments) {
+            addWrappedBlock(`Assignment ${assignment.assignmentNumber}`, 0, FONT_SIZE, true);
+            for (const row of workAssignmentDetailRows(assignment)) {
+                addWrappedBlock(`${row.label}: ${row.value}`, 8);
+            }
+            y -= 4;
+        }
+    }
+
     // Serialize PDF objects
     const objects: string[] = [];
     const offsets: number[] = [0];
@@ -415,9 +523,21 @@ export function exportDashboardPdf(
     missionName: string,
     subjects: ParsedSubject[] = [],
     initialInfo?: IncidentInfoForm | null,
+    teams: DashboardTeamRoster[] = [],
+    resourceAssignments: ResourceAssignment[] = [],
+    workAssignments: WorkAssignment[] = [],
 ): void {
     const exportedAt = new Date().toLocaleString(undefined, LOCAL_TIME_OPTS);
-    const pdf = buildPdf(rows, missionName, exportedAt, subjects, initialInfo);
+    const pdf = buildPdf(
+        rows,
+        missionName,
+        exportedAt,
+        subjects,
+        initialInfo,
+        teams,
+        resourceAssignments,
+        workAssignments,
+    );
     const blob = new Blob([pdf], { type: 'application/pdf' });
     downloadBlob(blob, `${safeFilename(missionName)}-dashboard.pdf`);
 }
