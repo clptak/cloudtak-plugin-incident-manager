@@ -198,6 +198,12 @@ interface PdfDetailLine {
     bold: boolean;
 }
 
+interface PdfGridLine {
+    text: string;
+    size?: number;
+    bold?: boolean;
+}
+
 function detailSectionLines(
     title: string,
     rows: Array<{ label: string; value: string }>,
@@ -292,6 +298,55 @@ function buildPdf(
             lineY -= LINE_H;
         }
         y = lineY - ROW_VPAD + FONT_ASCENT;
+    }
+
+    function addThreeColumnSection(title: string, entries: PdfGridLine[][]): void {
+        if (!entries.length) return;
+
+        addWrappedBlock(title, 0, 10, true);
+        y -= 4;
+
+        const colCount = 3;
+        const colGap = 10;
+        const colW = (contentW - colGap * (colCount - 1)) / colCount;
+
+        for (let i = 0; i < entries.length; i += colCount) {
+            const rowEntries = entries.slice(i, i + colCount);
+            const rowLayouts = rowEntries.map((entry) => {
+                const wrapped: Array<{ text: string; size: number; bold: boolean }> = [];
+                for (const line of entry) {
+                    const size = line.size ?? FONT_SIZE;
+                    const bold = line.bold ?? false;
+                    const pieces = wrapText(line.text, colW - 6, size);
+                    for (const piece of pieces) wrapped.push({ text: piece, size, bold });
+                }
+                const lineCount = Math.max(wrapped.length, 1);
+                const rowHeight = lineCount * LINE_H + ROW_VPAD * 2;
+                return {
+                    wrapped: wrapped.length ? wrapped : [{ text: '', size: FONT_SIZE, bold: false }],
+                    rowHeight,
+                };
+            });
+
+            const rowHeight = Math.max(...rowLayouts.map((layout) => layout.rowHeight));
+            ensureSpace(rowHeight + 4);
+
+            const rowTop = y;
+            const firstBaseline = rowTop - ROW_VPAD - FONT_ASCENT;
+            for (let col = 0; col < rowLayouts.length; col++) {
+                const x = MARGIN + col * (colW + colGap);
+                let lineY = firstBaseline;
+                for (const line of rowLayouts[col].wrapped) {
+                    addText(x + 2, lineY, line.text, line.size, line.bold);
+                    lineY -= LINE_H;
+                }
+            }
+
+            y = rowTop - rowHeight - 4;
+        }
+
+        addLine(MARGIN, y, PAGE_W - MARGIN, y);
+        y -= 12;
     }
 
     // Title block on first page
@@ -434,29 +489,27 @@ function buildPdf(
     }
 
     if (resourceAssignments.length) {
-        addWrappedBlock('Resource Assignments', 0, 10, true);
-        y -= 4;
-        for (const assignment of resourceAssignments) {
-            addWrappedBlock(assignment.resourceIdentifier, 0, FONT_SIZE, true);
-            for (const row of resourceAssignmentDetailRows(assignment)) {
-                addWrappedBlock(`${row.label}: ${row.value}`, 8);
-            }
-            y -= 4;
-        }
-        addLine(MARGIN, y, PAGE_W - MARGIN, y);
-        y -= 12;
+        const entries = resourceAssignments.map((assignment) => [
+            { text: assignment.resourceIdentifier, bold: true, size: FONT_SIZE },
+            ...resourceAssignmentDetailRows(assignment).map((row) => ({
+                text: `${row.label}: ${row.value}`,
+                size: FONT_SIZE,
+                bold: false,
+            })),
+        ]);
+        addThreeColumnSection('Resource Assignments', entries);
     }
 
     if (workAssignments.length) {
-        addWrappedBlock('Work Assignments', 0, 10, true);
-        y -= 4;
-        for (const assignment of workAssignments) {
-            addWrappedBlock(`Assignment ${assignment.assignmentNumber}`, 0, FONT_SIZE, true);
-            for (const row of workAssignmentDetailRows(assignment)) {
-                addWrappedBlock(`${row.label}: ${row.value}`, 8);
-            }
-            y -= 4;
-        }
+        const entries = workAssignments.map((assignment) => [
+            { text: `Assignment ${assignment.assignmentNumber}`, bold: true, size: FONT_SIZE },
+            ...workAssignmentDetailRows(assignment).map((row) => ({
+                text: `${row.label}: ${row.value}`,
+                size: FONT_SIZE,
+                bold: false,
+            })),
+        ]);
+        addThreeColumnSection('Work Assignments', entries);
     }
 
     // Serialize PDF objects
