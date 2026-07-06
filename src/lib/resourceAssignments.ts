@@ -14,6 +14,9 @@ export interface ResourceAssignment {
     eta: number | null;
     status: ResourceAssignmentStatus;
     timeArrived: string;
+    /** Mission CoT uuid for assignment linkage (DataSync log entryUid). */
+    assignmentUid?: string;
+    assignmentCallsign?: string;
 }
 
 export const RESOURCE_ASSIGNMENT_STATUSES: { value: ResourceAssignmentStatus; label: string }[] = [
@@ -65,6 +68,9 @@ export function resourceAssignmentDescription(a: ResourceAssignment): string {
     if (a.eta != null && !Number.isNaN(a.eta)) {
         parts.push(`ETA ${a.eta}`);
     }
+    if (a.assignmentCallsign?.trim()) {
+        parts.push(`Assignment: ${a.assignmentCallsign.trim()}`);
+    }
     return parts.join(' · ');
 }
 
@@ -82,6 +88,8 @@ export function blankResourceAssignmentForm(): Omit<ResourceAssignment, 'id'> {
 
 /** Shape written to mission_schema.json → incident_response.resource_assignments[]. */
 export function resourceAssignmentToSchemaRecord(a: ResourceAssignment): ResourceAssignment {
+    const assignmentUid = a.assignmentUid?.trim() || undefined;
+    const assignmentCallsign = a.assignmentCallsign?.trim() || undefined;
     return {
         id: a.id,
         resourceIdentifier: a.resourceIdentifier.trim(),
@@ -91,6 +99,8 @@ export function resourceAssignmentToSchemaRecord(a: ResourceAssignment): Resourc
         eta: normalizeEta(a.eta),
         status: normalizeStatus(a.status),
         timeArrived: a.timeArrived.trim(),
+        assignmentUid,
+        assignmentCallsign: assignmentUid ? assignmentCallsign : undefined,
     };
 }
 
@@ -133,6 +143,8 @@ export function normalizeResourceAssignment(raw: unknown): ResourceAssignment | 
         eta: normalizeEta(r.eta ?? r.resource_order_expected_arrival_dtg),
         status: normalizeStatus(r.status),
         timeArrived: String(r.timeArrived ?? r.resource_arrived_dtg ?? '').trim(),
+        assignmentUid: String(r.assignmentUid ?? '').trim() || undefined,
+        assignmentCallsign: String(r.assignmentCallsign ?? '').trim() || undefined,
     };
 }
 
@@ -151,6 +163,7 @@ export function resourceAssignmentMatchesFilter(a: ResourceAssignment, query: st
         a.resource,
         a.agency,
         a.status,
+        a.assignmentCallsign,
     ].join(' ').toLowerCase();
     return hay.includes(q);
 }
@@ -166,6 +179,8 @@ export function resourceTeamPaletteDrop(a: ResourceAssignment): {
     eta: number | null;
     status: ResourceAssignmentStatus;
     timeArrived: string;
+    assignmentUid?: string;
+    assignmentCallsign?: string;
 } {
     return {
         kind: 'resource-team',
@@ -178,5 +193,7 @@ export function resourceTeamPaletteDrop(a: ResourceAssignment): {
         eta: a.eta,
         status: a.status,
         timeArrived: a.timeArrived,
+        assignmentUid: a.assignmentUid,
+        assignmentCallsign: a.assignmentCallsign,
     };
 }

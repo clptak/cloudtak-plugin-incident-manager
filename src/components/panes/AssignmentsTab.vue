@@ -183,27 +183,59 @@
                     <div
                         v-for='assignment in filteredResourceAssignments'
                         :key='assignment.id'
-                        class='card card-sm mb-2 border-primary-subtle'
-                        draggable='true'
-                        style='cursor: grab;'
-                        @dragstart='onResourceTeamDragStart($event, assignment)'
-                        @dragend='onPaletteDragEnd'
+                        class='card card-sm mb-2'
                     >
-                        <div class='card-body py-2 px-2 d-flex align-items-center gap-2'>
-                            <IconTag
-                                :size='18'
-                                stroke='1.5'
-                            />
-                            <div class='small min-width-0'>
-                                <div class='fw-semibold text-truncate'>
-                                    {{ assignment.resourceIdentifier }}
-                                </div>
-                                <div
-                                    class='text-muted'
-                                    style='font-size: 0.72rem;'
+                        <div class='card-body p-2'>
+                            <div class='fw-semibold small text-truncate mb-1'>
+                                {{ assignment.resourceIdentifier }}
+                            </div>
+                            <div class='mb-2'>
+                                <label class='form-label small mb-1'>Assignment</label>
+                                <select
+                                    :value='assignment.assignmentUid ?? ""'
+                                    class='form-select form-select-sm'
+                                    :disabled='!activeMission || loadingCots'
+                                    @change='onResourceTeamAssignmentChange(assignment.id, ($event.target as HTMLSelectElement).value)'
                                 >
-                                    {{ resourceAssignmentDescription(assignment) }}
+                                    <option value=''>
+                                        {{ assignmentSelectLabel }}
+                                    </option>
+                                    <option
+                                        v-for='cot in filteredMissionCots'
+                                        :key='cot.uid'
+                                        :value='cot.uid'
+                                    >
+                                        {{ cot.callsign }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div
+                                class='card card-sm border-primary-subtle bg-light'
+                                draggable='true'
+                                style='cursor: grab;'
+                                @dragstart='onResourceTeamDragStart($event, assignment)'
+                                @dragend='onPaletteDragEnd'
+                            >
+                                <div class='card-body py-2 px-2 d-flex align-items-center gap-2'>
+                                    <IconTag
+                                        :size='18'
+                                        stroke='1.5'
+                                    />
+                                    <div class='small min-width-0'>
+                                        <div
+                                            class='text-muted'
+                                            style='font-size: 0.72rem;'
+                                        >
+                                            {{ resourceAssignmentDescription(assignment) }}
+                                        </div>
+                                    </div>
                                 </div>
+                            </div>
+                            <div
+                                class='text-muted mt-1'
+                                style='font-size: 0.68rem;'
+                            >
+                                Drag onto the chart
                             </div>
                         </div>
                     </div>
@@ -535,7 +567,7 @@ import { formatPersonNameFirstLast } from '../../lib/personName.ts';
 import { listMissionCots, type MissionCotRef } from '../../lib/missionCots.ts';
 
 const { activeMission } = useIncident();
-const { assignments: resourceAssignments, loadForMission: loadResourceAssignments } = useResourceAssignments();
+const { assignments: resourceAssignments, loadForMission: loadResourceAssignments, updateAssignment: updateResourceAssignment } = useResourceAssignments();
 
 const teamTree = ref<HastyTreeNode>({});
 const pendingDrop = ref<PendingPaletteDrop | null>(null);
@@ -671,6 +703,15 @@ function onResourceTeamDragStart(event: DragEvent, assignment: ResourceAssignmen
     pendingDrop.value = drop;
     event.dataTransfer?.setData('text/plain', `resource-team:${assignment.id}`);
     if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+}
+
+async function onResourceTeamAssignmentChange(id: string, uid: string): Promise<void> {
+    if (!activeMission.value) return;
+    const cot = missionCots.value.find((c) => c.uid === uid);
+    await updateResourceAssignment(activeMission.value, id, {
+        assignmentUid: uid || undefined,
+        assignmentCallsign: cot?.callsign || undefined,
+    });
 }
 
 function onMemberDragStart(event: DragEvent, m: D4HMember): void {

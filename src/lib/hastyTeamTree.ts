@@ -55,6 +55,8 @@ export type PendingPaletteDrop =
         eta: number | null;
         status: 'current' | 'planned';
         timeArrived: string;
+        assignmentUid?: string;
+        assignmentCallsign?: string;
     }
     | { kind: 'member'; d4hMemberId: number; title: string; description: string }
     | { kind: 'position'; resourceName: string; title: string; description: string }
@@ -181,6 +183,8 @@ export function teamNodeFromPaletteDrop(
             eta: pending.eta,
             assignmentStatus: pending.status,
             timeArrived: pending.timeArrived,
+            assignmentUid: pending.assignmentUid,
+            assignmentCallsign: pending.assignmentCallsign,
         });
     }
 
