@@ -152,46 +152,68 @@
 
             <div
                 v-if='teams.length'
-                class='mb-3'
+                class='card mb-3'
             >
-                <h4 class='h5 mb-2'>
-                    Teams
-                </h4>
                 <div
-                    v-for='team in teams'
-                    :key='team.title'
-                    class='card mb-2'
+                    class='card-header py-2 d-flex align-items-center cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='teamsExpanded'
+                    @click='teamsExpanded = !teamsExpanded'
+                    @keydown.enter.prevent='teamsExpanded = !teamsExpanded'
+                    @keydown.space.prevent='teamsExpanded = !teamsExpanded'
                 >
-                    <div class='card-header py-2'>
-                        <strong>{{ team.title }}</strong>
-                        <span
-                            v-if='team.assignmentCallsign'
-                            class='text-muted ms-2'
-                        >{{ team.assignmentCallsign }}</span>
-                    </div>
-                    <div class='card-body py-2'>
-                        <div
-                            v-if='team.description'
-                            class='text-muted small mb-2'
-                        >
-                            {{ team.description }}
+                    <h4 class='h5 mb-0'>
+                        Teams
+                    </h4>
+                    <span class='text-muted small ms-2'>({{ teams.length }})</span>
+                    <IconChevronDown
+                        class='ms-auto transition-transform'
+                        :class='{ "rotate-180": !teamsExpanded }'
+                        :size='18'
+                        stroke='1.5'
+                    />
+                </div>
+                <div
+                    v-show='teamsExpanded'
+                    class='card-body py-2'
+                >
+                    <div
+                        v-for='team in teams'
+                        :key='team.title'
+                        class='card mb-2'
+                    >
+                        <div class='card-header py-2'>
+                            <strong>{{ team.title }}</strong>
+                            <span
+                                v-if='team.assignmentCallsign'
+                                class='text-muted ms-2'
+                            >{{ team.assignmentCallsign }}</span>
                         </div>
-                        <ul
-                            v-if='team.children.length'
-                            class='list-unstyled mb-0 small'
-                        >
-                            <li
-                                v-for='(child, childIndex) in team.children'
-                                :key='`${team.title}-${childIndex}`'
+                        <div class='card-body py-2'>
+                            <div
+                                v-if='team.description'
+                                class='text-muted small mb-2'
                             >
-                                {{ formatTeamRosterChild(child) }}
-                            </li>
-                        </ul>
-                        <div
-                            v-else
-                            class='text-muted small'
-                        >
-                            No roster entries on the org chart.
+                                {{ team.description }}
+                            </div>
+                            <ul
+                                v-if='team.children.length'
+                                class='list-unstyled mb-0 small'
+                            >
+                                <li
+                                    v-for='(child, childIndex) in team.children'
+                                    :key='`${team.title}-${childIndex}`'
+                                >
+                                    {{ formatTeamRosterChild(child) }}
+                                </li>
+                            </ul>
+                            <div
+                                v-else
+                                class='text-muted small'
+                            >
+                                No roster entries on the org chart.
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -199,70 +221,114 @@
 
             <div
                 v-if='resourceAssignments.length'
-                class='mb-3'
+                class='card mb-3'
             >
-                <h4 class='h5 mb-2'>
-                    Resource Assignments
-                </h4>
                 <div
-                    v-for='assignment in resourceAssignments'
-                    :key='assignment.id'
-                    class='card mb-2'
+                    class='card-header py-2 d-flex align-items-center cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='resourceAssignmentsExpanded'
+                    @click='resourceAssignmentsExpanded = !resourceAssignmentsExpanded'
+                    @keydown.enter.prevent='resourceAssignmentsExpanded = !resourceAssignmentsExpanded'
+                    @keydown.space.prevent='resourceAssignmentsExpanded = !resourceAssignmentsExpanded'
                 >
-                    <div class='card-header py-2'>
-                        <strong>{{ assignment.resourceIdentifier }}</strong>
-                    </div>
-                    <div class='card-body py-2'>
-                        <dl class='row mb-0 small'>
-                            <template
-                                v-for='row in resourceAssignmentDetailRows(assignment)'
-                                :key='row.label'
-                            >
-                                <dt class='col-sm-4 text-muted'>
-                                    {{ row.label }}
-                                </dt>
-                                <dd class='col-sm-8 mb-1'>
-                                    {{ row.value }}
-                                </dd>
-                            </template>
-                        </dl>
+                    <h4 class='h5 mb-0'>
+                        Resource Assignments
+                    </h4>
+                    <span class='text-muted small ms-2'>({{ resourceAssignments.length }})</span>
+                    <IconChevronDown
+                        class='ms-auto transition-transform'
+                        :class='{ "rotate-180": !resourceAssignmentsExpanded }'
+                        :size='18'
+                        stroke='1.5'
+                    />
+                </div>
+                <div
+                    v-show='resourceAssignmentsExpanded'
+                    class='card-body py-2'
+                >
+                    <div
+                        v-for='assignment in resourceAssignments'
+                        :key='assignment.id'
+                        class='card mb-2'
+                    >
+                        <div class='card-header py-2'>
+                            <strong>{{ assignment.resourceIdentifier }}</strong>
+                        </div>
+                        <div class='card-body py-2'>
+                            <dl class='row mb-0 small'>
+                                <template
+                                    v-for='row in resourceAssignmentDetailRows(assignment)'
+                                    :key='row.label'
+                                >
+                                    <dt class='col-sm-4 text-muted'>
+                                        {{ row.label }}
+                                    </dt>
+                                    <dd class='col-sm-8 mb-1'>
+                                        {{ row.value }}
+                                    </dd>
+                                </template>
+                            </dl>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <div
                 v-if='workAssignments.length'
-                class='mb-3'
+                class='card mb-3'
             >
-                <h4 class='h5 mb-2'>
-                    Work Assignments
-                </h4>
                 <div
-                    v-for='assignment in workAssignments'
-                    :key='assignment.id'
-                    class='card mb-2'
+                    class='card-header py-2 d-flex align-items-center cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='workAssignmentsExpanded'
+                    @click='workAssignmentsExpanded = !workAssignmentsExpanded'
+                    @keydown.enter.prevent='workAssignmentsExpanded = !workAssignmentsExpanded'
+                    @keydown.space.prevent='workAssignmentsExpanded = !workAssignmentsExpanded'
                 >
-                    <div class='card-header py-2'>
-                        <strong>Assignment {{ assignment.assignmentNumber }}</strong>
-                        <span
-                            v-if='assignment.teamLabel'
-                            class='text-muted ms-2'
-                        >{{ assignment.teamLabel }}</span>
-                    </div>
-                    <div class='card-body py-2'>
-                        <dl class='row mb-0 small'>
-                            <template
-                                v-for='row in workAssignmentDetailRows(assignment)'
-                                :key='row.label'
-                            >
-                                <dt class='col-sm-4 text-muted'>
-                                    {{ row.label }}
-                                </dt>
-                                <dd class='col-sm-8 mb-1'>
-                                    {{ row.value }}
-                                </dd>
-                            </template>
-                        </dl>
+                    <h4 class='h5 mb-0'>
+                        Work Assignments
+                    </h4>
+                    <span class='text-muted small ms-2'>({{ workAssignments.length }})</span>
+                    <IconChevronDown
+                        class='ms-auto transition-transform'
+                        :class='{ "rotate-180": !workAssignmentsExpanded }'
+                        :size='18'
+                        stroke='1.5'
+                    />
+                </div>
+                <div
+                    v-show='workAssignmentsExpanded'
+                    class='card-body py-2'
+                >
+                    <div
+                        v-for='assignment in workAssignments'
+                        :key='assignment.id'
+                        class='card mb-2'
+                    >
+                        <div class='card-header py-2'>
+                            <strong>Assignment {{ assignment.assignmentNumber }}</strong>
+                            <span
+                                v-if='assignment.teamLabel'
+                                class='text-muted ms-2'
+                            >{{ assignment.teamLabel }}</span>
+                        </div>
+                        <div class='card-body py-2'>
+                            <dl class='row mb-0 small'>
+                                <template
+                                    v-for='row in workAssignmentDetailRows(assignment)'
+                                    :key='row.label'
+                                >
+                                    <dt class='col-sm-4 text-muted'>
+                                        {{ row.label }}
+                                    </dt>
+                                    <dd class='col-sm-8 mb-1'>
+                                        {{ row.value }}
+                                    </dd>
+                                </template>
+                            </dl>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -319,6 +385,7 @@
 
 <script setup lang='ts'>
 import { ref, reactive, computed, watch, onMounted } from 'vue';
+import { IconChevronDown } from '@tabler/icons-vue';
 import type { DBSubscriptionLog } from '../../../../../src/database.ts';
 import { useIncident } from '../../composables/useIncident.ts';
 import { loadIncidentSubscription } from '../../lib/incidentSubscription.ts';
@@ -369,6 +436,9 @@ const initialInfo = ref<IncidentInfoForm | null>(null);
 const teams = ref<DashboardTeamRoster[]>([]);
 const resourceAssignments = ref<ResourceAssignment[]>([]);
 const workAssignments = ref<WorkAssignment[]>([]);
+const teamsExpanded = ref(true);
+const resourceAssignmentsExpanded = ref(true);
+const workAssignmentsExpanded = ref(true);
 const loading = ref(false);
 const error = ref('');
 const sortAsc = ref(true);
@@ -624,3 +694,13 @@ watch(activeMission, (m) => {
     }
 }, { immediate: true });
 </script>
+
+<style scoped>
+.transition-transform {
+    transition: transform 0.2s ease;
+}
+
+.rotate-180 {
+    transform: rotate(180deg);
+}
+</style>
