@@ -53,7 +53,7 @@
 
             <div
                 class='tab-content flex-grow-1 min-height-0'
-                :class='activeHTab === "assignments" || activeHTab === "resources"
+                :class='activeHTab === "assignments"
                     ? "overflow-hidden d-flex flex-column"
                     : "overflow-auto"'
             >
@@ -74,10 +74,7 @@
                     v-if='activeHTab === "assignments"'
                     class='h-100 min-height-0'
                 />
-                <ResourcesTab
-                    v-if='activeHTab === "resources"'
-                    class='h-100 min-height-0'
-                />
+                <ResourcesTab v-if='activeHTab === "resources"' />
             </div>
         </div>
     </div>

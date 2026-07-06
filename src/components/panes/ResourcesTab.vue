@@ -1,6 +1,6 @@
 <template>
-    <div class='d-flex flex-column h-100 min-height-0 overflow-hidden'>
-        <div class='d-flex flex-wrap align-items-center gap-2 mb-2 flex-shrink-0'>
+    <div>
+        <div class='d-flex flex-wrap align-items-center gap-2 mb-2'>
             <h3 class='mb-0'>
                 Resources
             </h3>
@@ -22,7 +22,7 @@
             </div>
         </div>
 
-        <p class='text-muted small mb-2 flex-shrink-0'>
+        <p class='text-muted small mb-2'>
             External agencies from the D4H <strong>External Resource Tracker</strong>
             (Intelligence → Resources). Sync in the <strong>D4H</strong> plugin first, then
             refresh here.
@@ -30,7 +30,7 @@
 
         <div
             v-if='!loadingRoster && !meta'
-            class='alert alert-info small mb-2 flex-shrink-0'
+            class='alert alert-info small mb-2'
         >
             No D4H roster in this browser. Open the <strong>D4H</strong> plugin, configure
             Team Manager, and run <strong>Sync now</strong>, then click <strong>Refresh D4H</strong>.
@@ -38,7 +38,7 @@
 
         <div
             v-else-if='!loadingRoster && !externalResources.length'
-            class='alert alert-warning small mb-2 flex-shrink-0'
+            class='alert alert-warning small mb-2'
         >
             No external resources in the cached D4H roster. Run <strong>Sync now</strong> in the
             D4H plugin (uses the D4H search API), then click <strong>Refresh D4H</strong>.
@@ -46,7 +46,7 @@
 
         <div
             v-if='externalResourceWarnings.length'
-            class='alert alert-warning small py-2 mb-2 flex-shrink-0'
+            class='alert alert-warning small py-2 mb-2'
         >
             <div
                 v-for='(warning, i) in externalResourceWarnings'
@@ -58,9 +58,9 @@
 
         <div
             v-if='externalResources.length'
-            class='card flex-grow-1 min-height-0 d-flex flex-column'
+            class='card mb-0'
         >
-            <div class='card-header py-2 px-3 d-flex align-items-center gap-2 flex-wrap flex-shrink-0'>
+            <div class='card-header py-2 px-3 d-flex align-items-center gap-2 flex-wrap'>
                 <span class='small fw-semibold'>
                     External resources ({{ visibleExternalResources.length }}<span
                         v-if='visibleExternalResources.length !== externalResources.length'
@@ -76,7 +76,7 @@
                     autocomplete='off'
                 >
             </div>
-            <div class='table-responsive flex-grow-1 min-height-0 overflow-auto'>
+            <div class='resources-table-scroll'>
                 <table class='table table-sm table-hover mb-0 small'>
                     <thead class='sticky-top bg-body'>
                         <tr>
@@ -182,3 +182,10 @@ onMounted(() => {
     void refreshRoster();
 });
 </script>
+
+<style scoped>
+.resources-table-scroll {
+    max-height: 50vh;
+    overflow-y: auto;
+}
+</style>
