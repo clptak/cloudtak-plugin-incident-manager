@@ -2,7 +2,7 @@
     <div class='d-flex flex-column h-100 min-height-0 overflow-hidden'>
         <div class='d-flex flex-wrap align-items-center gap-2 mb-2 flex-shrink-0'>
             <h3 class='mb-0'>
-                Assignments
+                Organizational Status
             </h3>
             <span
                 v-if='meta?.fetchedAt'

@@ -25,7 +25,7 @@
         <p class='text-muted small mb-2'>
             Create and manage resource team assignments. Each record is saved to
             <strong>mission_schema.json</strong> (<code>incident_response.resource_assignments</code>)
-            and appears in the <strong>Assignments</strong> palette by Resource Identifier.
+            and appears in the <strong>Organization</strong> palette by Resource Identifier.
         </p>
 
         <div

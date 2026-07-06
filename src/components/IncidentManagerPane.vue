@@ -127,7 +127,7 @@ const hTabs = [
     { key: 'main', label: 'Main' },
     { key: 'dashboard', label: 'Dashboard' },
     { key: 'task', label: 'Tasks' },
-    { key: 'assignments', label: 'Assignments' },
+    { key: 'assignments', label: 'Organization' },
     { key: 'resources', label: 'Resources' },
 ] as const;
 
