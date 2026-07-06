@@ -72,7 +72,7 @@ function rosterEntryForNode(
     }
 
     if (self.type === 'role') {
-        const name = formatPersonNameFirstLast(self.assigneeName);
+        const name = formatPersonNameFirstLast(self.assigneeName ?? '');
         const title = (self.roleTitle ?? self.title).trim();
         const ref = refForMemberId(refs, self.d4hMemberId);
         const label = title && name ? `${title}: ${name}` : (name || title);
