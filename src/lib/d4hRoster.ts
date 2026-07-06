@@ -1,5 +1,10 @@
 import KV from '../../../../src/base/kv.ts';
-import type { D4HRoster, D4HRosterMeta, D4HMember } from './d4hTypes.ts';
+import type {
+    D4HRoster,
+    D4HRosterMeta,
+    D4HMember,
+    D4HExternalResource,
+} from './d4hTypes.ts';
 
 export const D4H_ROSTER_KEY = 'd4h:roster';
 export const D4H_META_KEY = 'd4h:meta';
@@ -74,4 +79,35 @@ export function filterAndSortPaletteMembers(
     query: string,
 ): D4HMember[] {
     return sortMembersByRefAsc(members.filter((m) => memberMatchesPaletteFilter(m, query)));
+}
+
+export function externalResourceMatchesFilter(r: D4HExternalResource, query: string): boolean {
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    return r.name.toLowerCase().includes(q) || String(r.id).includes(q);
+}
+
+export function sortExternalResources(
+    resources: D4HExternalResource[],
+    sortBy: 'id' | 'name',
+    sortDir: 'asc' | 'desc',
+): D4HExternalResource[] {
+    const dir = sortDir === 'asc' ? 1 : -1;
+    return [...resources].sort((a, b) => {
+        if (sortBy === 'id') return (a.id - b.id) * dir;
+        return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) * dir;
+    });
+}
+
+export function filterAndSortExternalResources(
+    resources: D4HExternalResource[],
+    query: string,
+    sortBy: 'id' | 'name',
+    sortDir: 'asc' | 'desc',
+): D4HExternalResource[] {
+    return sortExternalResources(
+        resources.filter((r) => externalResourceMatchesFilter(r, query)),
+        sortBy,
+        sortDir,
+    );
 }

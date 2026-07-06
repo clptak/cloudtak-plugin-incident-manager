@@ -30,6 +30,12 @@ export interface D4HEquipment {
     status?: string;
 }
 
+/** External Resource Tracker agency (Intelligence → Resources). */
+export interface D4HExternalResource {
+    id: number;
+    name: string;
+}
+
 export interface D4HRosterMeta {
     fetchedAt: string;
     region: string;
@@ -37,6 +43,7 @@ export interface D4HRosterMeta {
     contextId: number;
     memberCount: number;
     equipmentCount: number;
+    externalResourceCount?: number;
     warnings: string[];
 }
 
@@ -44,4 +51,5 @@ export interface D4HRoster {
     meta: D4HRosterMeta;
     members: D4HMember[];
     equipment: D4HEquipment[];
+    externalResources?: D4HExternalResource[];
 }
