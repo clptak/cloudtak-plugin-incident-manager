@@ -1,7 +1,12 @@
 # cloudtak-plugin-incidentManager
 
 A CloudTAK floating-pane plugin: a SAR Incident Manager, porting the Incident
-Manager tab from the ccsosar-tak Electron app into native CloudTAK Vue.
+Manager tab from a legacy SAR TAK Electron app into native CloudTAK Vue.
+
+## Branches
+
+- **`main`** — generic defaults for public use (neutral labels, placeholders, and docs).
+- **`ccso`** — agency-specific fork with Coconino/CCSO labels, default agencies, patrol-report wording, and reference PDFs.
 
 ## What it is
 
@@ -33,7 +38,9 @@ horizontal **Main / Task / Dashboard** tabs.
 
 ## Installation (VPS / Docker Compose)
 
-This is a **build-time** CloudTAK web plugin. It is not a separate container or service. To install it on a VPS, you rebuild the CloudTAK `api` image with the plugin repo included in `WEB_PLUGINS`.
+This is a **build-time** CloudTAK web plugin. It is not a separate container or service. To install it on a VPS, you rebuild the CloudTAK web/API image with the plugin repo included in `WEB_PLUGINS`.
+
+**Service name:** Examples below use `api` as the Docker Compose service that builds the CloudTAK web image. Your deployment may name this service differently (e.g. `web`, `cloudtak`, `cloudtak-api`). Substitute your service name in `docker compose build … <service>` and in `docker-compose.override.yml`.
 
 If you do not already have CloudTAK running on your VPS, start with the official docs: `https://docs.cloudtak.io/deploy/`.
 
@@ -52,7 +59,7 @@ If you do not already have CloudTAK running on your VPS, start with the official
 cd ~/CloudTAK
 ```
 
-3. Rebuild the `api` image with this plugin pinned to a known release tag:
+3. Rebuild the web/API service (shown as `api` below) with this plugin pinned to a known release tag:
 
 ```bash
 docker compose build \
@@ -70,7 +77,7 @@ docker compose up -d
 
 If you later run `./cloudtak.sh update` or `docker compose build` without re-supplying `WEB_PLUGINS`, the plugin will not be included in the rebuilt image. The most reliable approach is to persist it in `docker-compose.override.yml` next to your `docker-compose.yml`.
 
-Create or edit `docker-compose.override.yml` and add this under the `api` service:
+Create or edit `docker-compose.override.yml` and add this under your web/API service (shown as `api`):
 
 ```yaml
 services:
@@ -99,14 +106,14 @@ WEB_PLUGINS="https://github.com/org/plugin-a.git,https://github.com/org/plugin-b
 
 ### Updating the plugin
 
-To update, change the pinned tag/commit in `WEB_PLUGINS`, rebuild the `api` image, restart CloudTAK, and hard refresh your browser.
+To update, change the pinned tag/commit in `WEB_PLUGINS`, rebuild the web/API service, restart CloudTAK, and hard refresh your browser.
 
 ### Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| No “Incident Manager” menu entry | Plugin is not in the image you are running | Rebuild `api` with `WEB_PLUGINS` and restart (`docker compose up -d`) |
-| It worked before, but disappeared after an update | `WEB_PLUGINS` was not persisted | Add the `docker-compose.override.yml` snippet above, then rebuild `api` |
+| No “Incident Manager” menu entry | Plugin is not in the image you are running | Rebuild the web/API service with `WEB_PLUGINS` and restart (`docker compose up -d`) |
+| It worked before, but disappeared after an update | `WEB_PLUGINS` was not persisted | Add the `docker-compose.override.yml` snippet above, then rebuild the web/API service |
 | `docker compose build` fails when cloning plugin | VPS/network blocks outbound HTTPS | Verify the VPS can reach `https://github.com/` and try the build again |
 | Pane loads but mission actions fail | You are not subscribed / not authorized for the mission | Subscribe to the mission on the map (mission password if required) |
 | UI looks unchanged after rebuild | Browser cache | Hard refresh (Ctrl+Shift+R / Cmd+Shift+R) |

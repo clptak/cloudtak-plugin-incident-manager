@@ -4,11 +4,11 @@ import { kwValue } from './subjectInfo.ts';
 
 export const INITIAL_INFO_KEYWORD = 'initial-information';
 
-/** Activity number — e.g. A22012345 */
+/** Activity number — e.g. A12345678 */
 export const ACTIVITY_NUMBER_RE = /A\d\d0\d\d\d\d\d/g;
-/** Department report number — e.g. S2201234 */
+/** Department report number — e.g. R1234567 */
 export const REPORT_NUMBER_RE = /S\d\d0\d\d\d\d/g;
-/** DEMA mission number — e.g. 2025-12345 */
+/** State mission number — e.g. 2025-12345 */
 export const DEMA_MISSION_RE = /^20\d\d-\d\d\d\d\d$/;
 
 export interface IncidentInfoForm {
@@ -139,7 +139,7 @@ export function buildIncidentInfoContent(f: IncidentInfoForm): string {
     if (f.incidentName.trim()) parts.push(`Incident: ${f.incidentName.trim()}`);
     if (f.eventId.trim()) parts.push(`Activity: ${f.eventId.trim()}`);
     if (f.incidentId.trim()) parts.push(`Report: ${f.incidentId.trim()}`);
-    if (f.demaMission.trim()) parts.push(`DEMA: ${f.demaMission.trim()}`);
+    if (f.demaMission.trim()) parts.push(`State Mission: ${f.demaMission.trim()}`);
     if (f.icCoordinator.trim()) parts.push(`IC Coordinator: ${f.icCoordinator.trim()}`);
     const conclusion = datetimeLocalToIso(f.incidentConclusionTime);
     if (conclusion) parts.push(`Conclusion: ${conclusion}`);
@@ -291,7 +291,7 @@ export function initialInfoDetailRows(form: IncidentInfoForm): IncidentDetailRow
         rows.push({ label: 'Department Report Number', value: form.incidentId.trim() });
     }
     if (hasDisplayValue(form.demaMission)) {
-        rows.push({ label: 'DEMA Mission Number', value: form.demaMission.trim() });
+        rows.push({ label: 'State Mission Number', value: form.demaMission.trim() });
     }
     if (hasDisplayValue(form.icCoordinator)) {
         rows.push({ label: 'IC Coordinator', value: form.icCoordinator.trim() });

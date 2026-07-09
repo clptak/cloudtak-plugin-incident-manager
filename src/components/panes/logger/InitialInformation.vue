@@ -24,7 +24,7 @@
                             v-model='incidentForm.eventId'
                             type='text'
                             class='form-control form-control-sm'
-                            placeholder='e.g. A22012345'
+                            placeholder='e.g. A12345678'
                         >
                     </div>
                     <div class='col-md-6'>
@@ -33,11 +33,11 @@
                             v-model='incidentForm.incidentId'
                             type='text'
                             class='form-control form-control-sm'
-                            placeholder='e.g. S2201234'
+                            placeholder='e.g. R1234567'
                         >
                     </div>
                     <div class='col-md-6'>
-                        <label class='form-label'>DEMA Mission Number</label>
+                        <label class='form-label'>State Mission Number</label>
                         <input
                             v-model='incidentForm.demaMission'
                             type='text'
@@ -108,7 +108,7 @@
                     v-if='demaInvalid'
                     class='form-text text-warning mt-2'
                 >
-                    Fix the DEMA mission number format before saving.
+                    Fix the state mission number format before saving.
                 </div>
 
                 <button

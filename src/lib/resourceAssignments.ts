@@ -24,25 +24,13 @@ export const RESOURCE_ASSIGNMENT_STATUSES: { value: ResourceAssignmentStatus; la
     { value: 'current', label: 'Current' },
 ];
 
-export const FIXED_AGENCIES = [
-    'Coconino County Sheriff Search and Rescue',
-    "Coconino County Sheriff's Office",
-] as const;
-
-export const DEFAULT_AGENCY = FIXED_AGENCIES[0];
+export const DEFAULT_AGENCY = '';
 
 export const RESOURCE_TYPE_OPTIONS = [...ASSIGNMENT_RESOURCES] as string[];
 
 export function buildAgencyOptions(d4hExternalResources: D4HExternalResource[]): string[] {
     const seen = new Set<string>();
     const out: string[] = [];
-
-    for (const name of FIXED_AGENCIES) {
-        if (!seen.has(name)) {
-            seen.add(name);
-            out.push(name);
-        }
-    }
 
     const d4hNames = [...d4hExternalResources]
         .map((r) => r.name.trim())

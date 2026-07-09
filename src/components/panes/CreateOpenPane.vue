@@ -111,7 +111,7 @@
                             v-model='form.locationInfo'
                             class='form-control'
                             rows='2'
-                            placeholder='e.g. Oak Creek Canyon, near Slide Rock'
+                            placeholder='e.g. National Forest, near trailhead'
                         />
                     </div>
                     <div class='col-md-8'>
@@ -123,7 +123,7 @@
                             v-model='form.coords'
                             type='text'
                             class='form-control'
-                            placeholder='35.1862, -111.6404 or 35 11 10 -111 38 25'
+                            placeholder='40.0150, -105.2705 or 40 00 54 -105 16 14'
                         >
                         <div class='form-text'>
                             Supports decimal degrees, DMS, DM, and MPS.

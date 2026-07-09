@@ -4,7 +4,7 @@
             <h3 class='card-title mb-0'>
                 Generate Report Template
             </h3>
-            <span class='badge bg-blue-lt ms-auto'>CCSO Patrol Report</span>
+            <span class='badge bg-blue-lt ms-auto'>Patrol Report</span>
         </div>
         <div class='card-body'>
             <p class='text-muted small mb-3'>
@@ -118,8 +118,8 @@ function reportHeaderLines(
     generatedAt: number,
 ): string[] {
     return [
-        `Patrol DR # ${reportNumber}`,
-        `Deputy ${icCoordinator} #`,
+        `Report # ${reportNumber}`,
+        `Coordinator ${icCoordinator}`,
         `C: ${formatGenerationDate(generatedAt)}`,
         '',
     ];

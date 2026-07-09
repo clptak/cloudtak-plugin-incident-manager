@@ -1,5 +1,5 @@
 /**
- * Multi-format coordinate parser, ported from ccsosar-tak Initial_Response.html.
+ * Multi-format coordinate parser, ported from a legacy SAR TAK app.
  * Supports: MPS Hexagon (lon,lat), decimal degrees, DMS, decimal minutes (DM).
  * Returns decimal degrees { lat, lng } or null if unparseable.
  */

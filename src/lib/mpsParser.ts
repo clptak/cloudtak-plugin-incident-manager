@@ -1,6 +1,5 @@
 /**
- * MPS / CFS Call Notes "Remarks" parser, ported from
- * ccsosar-tak/pages/Initial_Response.html (getMpsRows and helpers).
+ * MPS / CFS Call Notes "Remarks" parser, ported from a legacy SAR TAK app.
  *
  * Produces timestamped log rows suitable for posting to a CloudTAK mission as
  * mission-log entries. The header/folder/"Save Mission JSON" logic from the

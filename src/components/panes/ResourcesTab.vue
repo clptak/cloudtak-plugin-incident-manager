@@ -55,7 +55,7 @@
                             v-model='form.resourceIdentifier'
                             type='text'
                             class='form-control form-control-sm'
-                            placeholder='e.g. YCSO GROUND TEAM 1'
+                            placeholder='e.g. SO GROUND TEAM 1'
                             autocomplete='off'
                             :disabled='!activeMission || saving'
                         >
@@ -86,6 +86,9 @@
                             class='form-select form-select-sm'
                             :disabled='!activeMission || saving'
                         >
+                            <option value=''>
+                                — Select agency —
+                            </option>
                             <option
                                 v-for='agency in agencyOptions'
                                 :key='agency'

@@ -296,11 +296,11 @@ function hasResourcesKeyword(keywords: string[]): boolean {
  * ```
  * ETA: "1800"
  * Notes: Ground team to access and stabilize
- * Agency: YCSO
+ * Agency: SO
  * Status: Current
  * Arrived: false
  * Date / Time Ordered: 2026-06-27T23:00:00Z
- * Resource Identifier: YCSO GROUND TEAM 1
+ * Resource Identifier: SO GROUND TEAM 1
  * ```
  *
  * Also accepts pipe lines:
