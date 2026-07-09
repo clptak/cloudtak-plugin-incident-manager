@@ -1,88 +1,157 @@
 <template>
-    <div class='d-flex gap-3 p-3 h-100 w-100'>
-        <!-- ── Left: vertical nav (always visible) ── -->
+    <div class='d-flex flex-column gap-2 p-2 p-md-3 h-100 w-100'>
+        <!-- Mobile: offcanvas nav -->
         <div
-            class='nav flex-column nav-pills flex-shrink-0'
-            style='min-width: 160px;'
+            id='incident-manager-nav'
+            class='offcanvas offcanvas-start d-md-none'
+            tabindex='-1'
+            aria-labelledby='incident-manager-nav-label'
         >
-            <template
-                v-for='item in navItems'
-                :key='item.key'
-            >
-                <div
-                    v-if='item.kind === "header"'
-                    class='text-muted text-uppercase fw-bold px-2 mt-3 mb-1'
-                    style='font-size: 0.72rem; letter-spacing: 0.04em;'
+            <div class='offcanvas-header'>
+                <h5
+                    id='incident-manager-nav-label'
+                    class='offcanvas-title'
                 >
-                    {{ item.label }}
-                </div>
+                    Sections
+                </h5>
                 <button
-                    v-else
                     type='button'
-                    class='nav-link text-start'
-                    :class='{ active: activeKey === item.key && activeHTab === "main", "py-1": item.kind === "sub" }'
-                    :style='item.kind === "sub" ? "padding-left: 1.25rem;" : ""'
-                    @click='selectKey(item.key)'
+                    class='btn-close'
+                    data-bs-dismiss='offcanvas'
+                    aria-label='Close navigation'
+                />
+            </div>
+            <div class='offcanvas-body p-2 nav flex-column nav-pills'>
+                <template
+                    v-for='item in navItems'
+                    :key='item.key'
                 >
-                    {{ item.label }}
-                </button>
-            </template>
+                    <div
+                        v-if='item.kind === "header"'
+                        class='text-muted text-uppercase fw-bold px-2 mt-3 mb-1'
+                        style='font-size: 0.72rem; letter-spacing: 0.04em;'
+                    >
+                        {{ item.label }}
+                    </div>
+                    <button
+                        v-else
+                        type='button'
+                        class='nav-link text-start'
+                        :class='{ active: activeKey === item.key && activeHTab === "main", "py-1": item.kind === "sub" }'
+                        :style='item.kind === "sub" ? "padding-left: 1.25rem;" : ""'
+                        data-bs-dismiss='offcanvas'
+                        data-bs-target='#incident-manager-nav'
+                        @click='selectKey(item.key)'
+                    >
+                        {{ item.label }}
+                    </button>
+                </template>
+            </div>
         </div>
 
-        <!-- ── Right: horizontal tabs + content ── -->
-        <div
-            class='flex-fill d-flex flex-column min-height-0'
-            style='min-width: 0;'
-        >
-            <ul class='nav nav-tabs mb-3'>
-                <li
-                    v-for='tab in hTabs'
-                    :key='tab.key'
-                    class='nav-item'
-                >
-                    <button
-                        type='button'
-                        class='nav-link'
-                        :class='{ active: activeHTab === tab.key }'
-                        @click='activeHTab = tab.key'
-                    >
-                        {{ tab.label }}
-                    </button>
-                </li>
-            </ul>
-
+        <div class='d-flex gap-2 gap-md-3 flex-grow-1 min-height-0'>
+            <!-- Desktop: vertical nav -->
             <div
-                class='tab-content flex-grow-1 min-height-0'
-                :class='activeHTab === "organization"
-                    ? "overflow-hidden d-flex flex-column"
-                    : "overflow-auto"'
+                class='nav flex-column nav-pills flex-shrink-0 d-none d-md-flex'
+                style='min-width: 160px;'
             >
-                <!-- Main: shows the active vertical pane -->
-                <div v-if='activeHTab === "main"'>
-                    <CreateOpenPane v-if='activeKey === "create-open"' />
-                    <ResourcesTab v-else-if='activeKey === "resources"' />
-                    <AssignmentsTab v-else-if='activeKey === "work-assignments"' />
-                    <CasiePane v-else-if='activeKey === "casie"' />
-                    <WrapUpPane v-else-if='activeKey === "wrapup"' />
-                    <LoggerPane
+                <template
+                    v-for='item in navItems'
+                    :key='item.key'
+                >
+                    <div
+                        v-if='item.kind === "header"'
+                        class='text-muted text-uppercase fw-bold px-2 mt-3 mb-1'
+                        style='font-size: 0.72rem; letter-spacing: 0.04em;'
+                    >
+                        {{ item.label }}
+                    </div>
+                    <button
                         v-else
-                        :sub='activeKey'
-                    />
+                        type='button'
+                        class='nav-link text-start'
+                        :class='{ active: activeKey === item.key && activeHTab === "main", "py-1": item.kind === "sub" }'
+                        :style='item.kind === "sub" ? "padding-left: 1.25rem;" : ""'
+                        @click='selectKey(item.key)'
+                    >
+                        {{ item.label }}
+                    </button>
+                </template>
+            </div>
+
+            <!-- Content column -->
+            <div
+                class='flex-fill d-flex flex-column min-height-0'
+                style='min-width: 0;'
+            >
+                <div class='d-md-none d-flex align-items-center mb-1'>
+                    <TablerIconButton
+                        title='Open navigation'
+                        data-bs-toggle='offcanvas'
+                        data-bs-target='#incident-manager-nav'
+                    >
+                        <IconMenu2
+                            :size='24'
+                            stroke='1'
+                        />
+                    </TablerIconButton>
+                    <span class='text-muted small ms-2 text-truncate'>
+                        {{ activeNavLabel }}
+                    </span>
                 </div>
 
-                <DashboardTab v-if='activeHTab === "dashboard"' />
-                <TaskTab v-if='activeHTab === "task"' />
-                <OrganizationTab
-                    v-if='activeHTab === "organization"'
-                    class='h-100 min-height-0'
-                />
+                <ul class='nav nav-tabs mb-2 mb-md-3 flex-nowrap overflow-auto'>
+                    <li
+                        v-for='tab in hTabs'
+                        :key='tab.key'
+                        class='nav-item'
+                    >
+                        <button
+                            type='button'
+                            class='nav-link text-nowrap'
+                            :class='{ active: activeHTab === tab.key }'
+                            @click='activeHTab = tab.key'
+                        >
+                            {{ tab.label }}
+                        </button>
+                    </li>
+                </ul>
+
+                <div
+                    class='tab-content flex-grow-1 min-height-0'
+                    :class='activeHTab === "organization"
+                        ? "overflow-hidden d-flex flex-column"
+                        : "overflow-auto"'
+                >
+                    <!-- Main: shows the active vertical pane -->
+                    <div v-if='activeHTab === "main"'>
+                        <CreateOpenPane v-if='activeKey === "create-open"' />
+                        <ResourcesTab v-else-if='activeKey === "resources"' />
+                        <AssignmentsTab v-else-if='activeKey === "work-assignments"' />
+                        <CasiePane v-else-if='activeKey === "casie"' />
+                        <WrapUpPane v-else-if='activeKey === "wrapup"' />
+                        <LoggerPane
+                            v-else
+                            :sub='activeKey'
+                        />
+                    </div>
+
+                    <DashboardTab v-if='activeHTab === "dashboard"' />
+                    <TaskTab v-if='activeHTab === "task"' />
+                    <OrganizationTab
+                        v-if='activeHTab === "organization"'
+                        class='h-100 min-height-0'
+                    />
+                </div>
             </div>
         </div>
     </div>
 </template>
 
 <script setup lang='ts'>
-import { ref, watch, onMounted, defineAsyncComponent } from 'vue';
+import { ref, watch, onMounted, defineAsyncComponent, computed } from 'vue';
+import { TablerIconButton } from '@tak-ps/vue-tabler';
+import { IconMenu2 } from '@tabler/icons-vue';
 import {
     SESSION_NAV_KEY,
     useIncident,
@@ -189,6 +258,15 @@ function saveNavToSession(activeKey: string, activeHTab: string): void {
 const savedNav = loadNavFromSession();
 const activeKey = ref<string>(savedNav.activeKey);
 const activeHTab = ref<string>(savedNav.activeHTab);
+
+const activeNavLabel = computed(() => {
+    if (activeHTab.value !== 'main') {
+        const tab = hTabs.find((item) => item.key === activeHTab.value);
+        return tab?.label ?? 'Main';
+    }
+    const item = navItems.find((entry) => entry.kind !== 'header' && entry.key === activeKey.value);
+    return item?.label ?? 'Create | Open';
+});
 
 const { restoreActiveMissionOnMap } = useIncident();
 
