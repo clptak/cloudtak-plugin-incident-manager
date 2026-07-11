@@ -23,7 +23,10 @@
             @dragover.prevent='dragOverContainer'
             @drop.prevent='droppedRoot'
         >
-            <div class='d-flex align-items-center justify-content-center'>
+            <div
+                class='d-flex align-items-center justify-content-center'
+                :style='childrenBandStyle'
+            >
                 <div
                     v-if='normalizedSelf'
                     @mousedown.stop
@@ -44,14 +47,12 @@
             <!-- Arrow connections between parent and children -->
             <div
                 v-if='normalizedSelf && normalizedChildren.length > 0'
-                class='d-flex align-items-center justify-content-center position-relative'
-                style='height: 60px; margin: 20px 0;'
+                :style='connectorBandStyle'
             >
                 <svg
                     :width='containerWidth'
                     :height='60'
-                    class='position-absolute'
-                    style='top: 0; left: 50%; transform: translateX(-50%);'
+                    class='d-block'
                 >
                     <!-- Vertical line from parent -->
                     <line
@@ -97,35 +98,38 @@
             </div>
 
             <div
-                class='d-flex align-items-start justify-content-center'
-                :style='{ width: `${containerWidth}px`, margin: "0 auto" }'
+                class='d-flex align-items-start'
+                :style='childrenBandStyle'
             >
-                <HastyTeam
+                <div
                     v-for='(child, index) in normalizedChildren'
-                    :id='child.self.id'
                     :key='child.self.id'
-                    class='flex-shrink-0 d-flex flex-column align-items-center'
-                    :style='{ width: `${childSubtreeWidths[index]}px` }'
-                    :model-value='child'
-                    nested
-                    @dragstart.stop='setDragging(child.self.id)'
-                    @dragend='setDragging(null)'
-                    @dragenter.prevent.stop='over.add(child.self.id)'
-                    @dragover.prevent.stop='over.add(child.self.id)'
-                    @dragexit.prevent.stop='over.delete(child.self.id)'
-                    @drop.prevent.stop='droppedNode(child.self.id)'
-                    @drop:root='forwardDropRoot'
-                    @drop:node='forwardDropNode'
+                    class='flex-shrink-0'
+                    :style='columnStyle(index)'
                 >
-                    <template #block='blockProps'>
-                        <slot
-                            name='block'
-                            :node='blockProps.node'
-                            :dragover='blockProps.dragover'
-                            :dragging-self='blockProps.draggingSelf'
-                        />
-                    </template>
-                </HastyTeam>
+                    <HastyTeam
+                        :id='child.self.id'
+                        :model-value='child'
+                        nested
+                        @dragstart.stop='setDragging(child.self.id)'
+                        @dragend='setDragging(null)'
+                        @dragenter.prevent.stop='over.add(child.self.id)'
+                        @dragover.prevent.stop='over.add(child.self.id)'
+                        @dragexit.prevent.stop='over.delete(child.self.id)'
+                        @drop.prevent.stop='droppedNode(child.self.id)'
+                        @drop:root='forwardDropRoot'
+                        @drop:node='forwardDropNode'
+                    >
+                        <template #block='blockProps'>
+                            <slot
+                                name='block'
+                                :node='blockProps.node'
+                                :dragover='blockProps.dragover'
+                                :dragging-self='blockProps.draggingSelf'
+                            />
+                        </template>
+                    </HastyTeam>
+                </div>
             </div>
         </div>
 
@@ -168,12 +172,14 @@
     <!-- Nested child wrapper — natural sizing, no scroll/zoom/pan -->
     <div
         v-else
-        class='d-flex flex-column align-items-center w-100'
         @mousedown.stop
         @dragover.prevent='dragOverContainer'
         @drop.prevent='droppedRoot'
     >
-        <div class='d-flex align-items-center justify-content-center'>
+        <div
+            class='d-flex align-items-center justify-content-center'
+            :style='childrenBandStyle'
+        >
             <div
                 v-if='normalizedSelf'
                 @mousedown.stop
@@ -194,14 +200,12 @@
         <!-- Arrow connections between parent and children -->
         <div
             v-if='normalizedSelf && normalizedChildren.length > 0'
-            class='d-flex align-items-center justify-content-center position-relative'
-            style='height: 60px; margin: 20px 0;'
+            :style='connectorBandStyle'
         >
             <svg
                 :width='containerWidth'
                 :height='60'
-                class='position-absolute'
-                style='top: 0; left: 50%; transform: translateX(-50%);'
+                class='d-block'
             >
                 <line
                     :x1='containerWidth / 2'
@@ -240,35 +244,38 @@
         </div>
 
         <div
-            class='d-flex align-items-start justify-content-center'
-            :style='{ width: `${containerWidth}px`, margin: "0 auto" }'
+            class='d-flex align-items-start'
+            :style='childrenBandStyle'
         >
-            <HastyTeam
+            <div
                 v-for='(child, index) in normalizedChildren'
-                :id='child.self.id'
                 :key='child.self.id'
-                class='flex-shrink-0 d-flex flex-column align-items-center'
-                :style='{ width: `${childSubtreeWidths[index]}px` }'
-                :model-value='child'
-                nested
-                @dragstart.stop='setDragging(child.self.id)'
-                @dragend='setDragging(null)'
-                @dragenter.prevent.stop='over.add(child.self.id)'
-                @dragover.prevent.stop='over.add(child.self.id)'
-                @dragexit.prevent.stop='over.delete(child.self.id)'
-                @drop.prevent.stop='droppedNode(child.self.id)'
-                @drop:root='forwardDropRoot'
-                @drop:node='forwardDropNode'
+                class='flex-shrink-0'
+                :style='columnStyle(index)'
             >
-                <template #block='blockProps'>
-                    <slot
-                        name='block'
-                        :node='blockProps.node'
-                        :dragover='blockProps.dragover'
-                        :dragging-self='blockProps.draggingSelf'
-                    />
-                </template>
-            </HastyTeam>
+                <HastyTeam
+                    :id='child.self.id'
+                    :model-value='child'
+                    nested
+                    @dragstart.stop='setDragging(child.self.id)'
+                    @dragend='setDragging(null)'
+                    @dragenter.prevent.stop='over.add(child.self.id)'
+                    @dragover.prevent.stop='over.add(child.self.id)'
+                    @dragexit.prevent.stop='over.delete(child.self.id)'
+                    @drop.prevent.stop='droppedNode(child.self.id)'
+                    @drop:root='forwardDropRoot'
+                    @drop:node='forwardDropNode'
+                >
+                    <template #block='blockProps'>
+                        <slot
+                            name='block'
+                            :node='blockProps.node'
+                            :dragover='blockProps.dragover'
+                            :dragging-self='blockProps.draggingSelf'
+                        />
+                    </template>
+                </HastyTeam>
+            </div>
         </div>
     </div>
 </template>
@@ -386,6 +393,28 @@ const containerWidth = computed(() => {
     if (!normalizedChildren.value.length) return childOuterWidth.value;
     return childSubtreeWidths.value.reduce((sum, w) => sum + w, 0);
 });
+
+const childrenBandStyle = computed(() => {
+    if (!normalizedChildren.value.length) return undefined;
+    return {
+        width: `${containerWidth.value}px`,
+        margin: '0 auto',
+    };
+});
+
+const connectorBandStyle = computed(() => ({
+    width: `${containerWidth.value}px`,
+    height: '60px',
+    margin: '20px auto',
+}));
+
+function columnStyle(index: number) {
+    const width = childSubtreeWidths.value[index];
+    return {
+        width: `${width}px`,
+        flex: `0 0 ${width}px`,
+    };
+}
 
 // Methods for arrow positioning
 function getChildLineX(index: number): number {

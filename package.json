@@ -1,6 +1,6 @@
 {
   "name": "cloudtak-plugin-incident-manager",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "CloudTAK floating-pane plugin: SAR Incident Manager (Create/Open missions, Logger, Dashboard)",
   "type": "module",
   "license": "MIT",
