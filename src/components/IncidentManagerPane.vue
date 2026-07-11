@@ -1,5 +1,5 @@
 <template>
-    <div class='d-flex flex-column gap-2 p-2 p-md-3 h-100 w-100'>
+    <div class='incident-manager-pane d-flex flex-column gap-2 p-2 p-md-3 h-100 w-100 overflow-hidden min-height-0'>
         <!-- Mobile: offcanvas nav -->
         <div
             id='incident-manager-nav'
@@ -32,10 +32,10 @@
             </div>
         </div>
 
-        <div class='d-flex gap-2 gap-md-3 flex-grow-1 min-height-0'>
+        <div class='incident-manager-body d-flex gap-2 gap-md-3 flex-grow-1 min-height-0 overflow-hidden'>
             <!-- Desktop: vertical nav -->
             <div
-                class='incident-side-nav flex-shrink-0 d-none d-md-flex'
+                class='incident-side-nav incident-side-nav--desktop flex-shrink-0 d-none d-md-flex'
                 style='min-width: 160px;'
             >
                 <IncidentNavList
@@ -48,7 +48,7 @@
 
             <!-- Content column -->
             <div
-                class='flex-fill d-flex flex-column min-height-0'
+                class='flex-fill d-flex flex-column min-height-0 overflow-hidden'
                 style='min-width: 0;'
             >
                 <div class='d-md-none d-flex align-items-center mb-1'>
@@ -67,7 +67,7 @@
                     </span>
                 </div>
 
-                <ul class='nav nav-tabs incident-h-tabs mb-2 mb-md-3 flex-nowrap overflow-auto'>
+                <ul class='nav nav-tabs incident-h-tabs flex-shrink-0 mb-2 mb-md-3 flex-nowrap overflow-auto'>
                     <li
                         v-for='tab in hTabs'
                         :key='tab.key'
