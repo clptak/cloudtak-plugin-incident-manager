@@ -389,14 +389,15 @@ async function refreshAgencies(): Promise<void> {
 
 async function createAssignment(): Promise<void> {
     if (!requireActiveMission()) return;
-    if (!canCreate.value) return;
+    const mission = activeMission.value;
+    if (!mission || !canCreate.value) return;
 
     const etaRaw = form.value.eta;
     const eta = etaRaw == null || Number.isNaN(Number(etaRaw))
         ? null
         : Number(etaRaw);
 
-    await addAssignment(activeMission.value, {
+    await addAssignment(mission, {
         resourceIdentifier: form.value.resourceIdentifier.trim(),
         resource: form.value.resource.trim(),
         agency: form.value.agency.trim(),

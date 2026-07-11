@@ -120,12 +120,10 @@
                         @drop:root='forwardDropRoot'
                         @drop:node='forwardDropNode'
                     >
-                        <template #block='blockProps'>
+                        <template #block='slotProps'>
                             <slot
                                 name='block'
-                                :node='blockProps.node'
-                                :dragover='blockProps.dragover'
-                                :dragging-self='blockProps.draggingSelf'
+                                v-bind='slotProps'
                             />
                         </template>
                     </HastyTeam>
@@ -144,19 +142,28 @@
                     title='Zoom in'
                     @click.stop='zoom = Math.min(zoom + 0.1, 3)'
                 >
-                    <IconZoomIn :size='32' stroke='1' />
+                    <IconZoomIn
+                        :size='32'
+                        stroke='1'
+                    />
                 </TablerIconButton>
                 <TablerIconButton
                     title='Reset view'
                     @click.stop='resetView'
                 >
-                    <IconFocusCentered :size='32' stroke='1' />
+                    <IconFocusCentered
+                        :size='32'
+                        stroke='1'
+                    />
                 </TablerIconButton>
                 <TablerIconButton
                     title='Zoom out'
                     @click.stop='zoom = Math.max(zoom - 0.1, 0.2)'
                 >
-                    <IconZoomOut :size='32' stroke='1' />
+                    <IconZoomOut
+                        :size='32'
+                        stroke='1'
+                    />
                 </TablerIconButton>
             </slot>
         </div>
@@ -266,12 +273,10 @@
                     @drop:root='forwardDropRoot'
                     @drop:node='forwardDropNode'
                 >
-                    <template #block='blockProps'>
+                    <template #block='slotProps'>
                         <slot
                             name='block'
-                            :node='blockProps.node'
-                            :dragover='blockProps.dragover'
-                            :dragging-self='blockProps.draggingSelf'
+                            v-bind='slotProps'
                         />
                     </template>
                 </HastyTeam>
@@ -282,9 +287,34 @@
 
 <script setup lang='ts'>
 import { computed, inject, onBeforeUnmount, onMounted, provide, ref, useTemplateRef, watch } from 'vue';
-import type { Ref } from 'vue';
+import type { PropType, Ref } from 'vue';
 import { TablerIconButton } from '@tak-ps/vue-tabler';
 import { IconZoomIn, IconZoomOut, IconFocusCentered } from '@tabler/icons-vue';
+
+interface HastyNodeSelf {
+    id: string;
+    type?: string;
+    title?: string;
+    description?: string;
+    roleCategory?: string;
+    [key: string]: unknown;
+}
+
+interface HastyTreeNode {
+    self?: HastyNodeSelf | null;
+    children?: HastyTreeNode[];
+}
+
+type BlockSlotProps = {
+    node: HastyNodeSelf | null;
+    dragover: boolean;
+    draggingSelf: boolean;
+};
+
+defineSlots<{
+    block(props: BlockSlotProps): unknown;
+    controls(): unknown;
+}>();
 
 defineOptions({
     name: 'HastyTeam'
@@ -304,7 +334,7 @@ const containerRef = useTemplateRef('container');
 
 const props = defineProps({
     modelValue: {
-        type: Object,
+        type: Object as PropType<HastyTreeNode>,
         required: true
     },
     debug: {
@@ -358,7 +388,10 @@ function setDragging(id: string | null) {
 const over = ref(new Set());
 const childOuterWidth = computed(() => activeSizing.value.nodeWidth + activeSizing.value.nodeMarginX * 2);
 const normalizedSelf = computed(() => props.modelValue?.self ?? null);
-const normalizedChildren = computed(() => Array.isArray(props.modelValue?.children) ? props.modelValue.children : []);
+const normalizedChildren = computed(() => {
+    const children = Array.isArray(props.modelValue?.children) ? props.modelValue.children : [];
+    return children.filter((child): child is HastyTreeNode & { self: HastyNodeSelf } => Boolean(child.self?.id));
+});
 
 watch(
     () => props.modelValue,
@@ -379,10 +412,10 @@ watch(
  * A leaf node occupies childOuterWidth; a node with children occupies
  * the sum of its children's subtree widths.
  */
-function getSubtreeWidth(node): number {
+function getSubtreeWidth(node: HastyTreeNode): number {
     const children = Array.isArray(node?.children) ? node.children : [];
     if (children.length === 0) return childOuterWidth.value;
-    return children.reduce((sum, child) => sum + getSubtreeWidth(child), 0);
+    return children.reduce((sum: number, child: HastyTreeNode) => sum + getSubtreeWidth(child), 0);
 }
 
 const childSubtreeWidths = computed<number[]>(() =>
@@ -434,7 +467,7 @@ const childrenEndX = computed<number>(() => {
     return getChildLineX(normalizedChildren.value.length - 1);
 });
 
-function getArrowPoints(index) {
+function getArrowPoints(index: number): string {
     const x = getChildLineX(index);
     const y = 60;
     // Create a small downward-pointing triangle
@@ -499,8 +532,11 @@ function endPan() {
     window.removeEventListener('mouseleave', endPan);
 }
 
-function wheel(event) {
-    zoom.value += event.wheelDelta * 0.001
+function wheel(event: WheelEvent): void {
+    const delta = 'wheelDelta' in event && typeof event.wheelDelta === 'number'
+        ? event.wheelDelta
+        : -event.deltaY;
+    zoom.value += delta * 0.001;
 }
 
 function resetView() {
@@ -531,7 +567,7 @@ function droppedNode(id: string) {
         return;
     }
 
-    if (node.children.some(child => child.self.id === dragged)) {
+    if ((node.children ?? []).some((child: HastyTreeNode) => child.self?.id === dragged)) {
         // If the node is already a child, we don't need to do anything
         return;
     } else {
@@ -551,19 +587,19 @@ function droppedRoot() {
     }
 }
 
-function forwardDropRoot(node) {
+function forwardDropRoot(node: HastyTreeNode): void {
     emit('drop:root', node);
 }
 
-function forwardDropNode(node) {
-    emit('drop:node', node);
+function forwardDropNode(payload: { node: HastyTreeNode; draggedId: string | null }): void {
+    emit('drop:node', payload);
 }
 
-function searchTreeById(node, id) {
+function searchTreeById(node: HastyTreeNode | null, id: string): HastyTreeNode | null {
     if (!node || !node.self) return null;
     if (node.self.id === id) return node;
 
-    for (const child of node.children || [] ) {
+    for (const child of node.children || []) {
         const result = searchTreeById(child, id);
         if (result) return result;
     }
@@ -571,17 +607,17 @@ function searchTreeById(node, id) {
     return null;
 }
 
-function hasValidModelShape(value) {
-    return Boolean(value) && typeof value === 'object' && 'self' in value && Array.isArray(value.children);
+function hasValidModelShape(value: unknown): value is HastyTreeNode {
+    return value != null && typeof value === 'object' && 'self' in value && Array.isArray((value as HastyTreeNode).children);
 }
 
-function getModelRoot() {
+function getModelRoot(): HastyTreeNode {
     return hasValidModelShape(props.modelValue)
         ? props.modelValue
         : normalizeModel(props.modelValue);
 }
 
-function normalizeModel(value) {
+function normalizeModel(value: Partial<HastyTreeNode> | null | undefined): HastyTreeNode {
     return {
         self: value?.self ?? null,
         children: Array.isArray(value?.children) ? value.children : [],
