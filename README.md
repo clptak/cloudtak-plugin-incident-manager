@@ -73,6 +73,34 @@ docker compose build \
 docker compose up -d
 ```
 
+### Important: local plugin copy on the VPS
+
+Many Docker Compose stacks (including `tak-stack`) **copy the whole CloudTAK tree into the image** before running `bin/plugin.ts`. If `api/web/plugins/incident-manager/` already exists on the VPS, CloudTAK **skips cloning** from `WEB_PLUGINS` and uses that local folder instead.
+
+Before rebuilding, update the local plugin checkout on the VPS:
+
+```bash
+cd ~/tak-stack/CloudTAK/api/web/plugins/incident-manager   # adjust path if different
+git fetch --tags
+git checkout ccso          # or main for the generic branch
+git pull
+git checkout v0.1.4-ccso # ccso branch release with Docker build fixes (or v0.1.3 on main)
+```
+
+Verify the fix is present (should show `const mission = activeMission.value`, not `activeMission.value.name` directly):
+
+```bash
+sed -n '609,615p' src/components/panes/DashboardTab.vue
+```
+
+Then rebuild from your stack directory:
+
+```bash
+cd ~/tak-stack
+docker compose build cloudtak-api --no-cache
+docker compose up -d
+```
+
 ### Persist the plugin across future rebuilds (recommended)
 
 If you later run `./cloudtak.sh update` or `docker compose build` without re-supplying `WEB_PLUGINS`, the plugin will not be included in the rebuilt image. The most reliable approach is to persist it in `docker-compose.override.yml` next to your `docker-compose.yml`.
@@ -114,7 +142,7 @@ To update, change the pinned tag/commit in `WEB_PLUGINS`, rebuild the web/API se
 |---|---|---|
 | No “Incident Manager” menu entry | Plugin is not in the image you are running | Rebuild the web/API service with `WEB_PLUGINS` and restart (`docker compose up -d`) |
 | It worked before, but disappeared after an update | `WEB_PLUGINS` was not persisted | Add the `docker-compose.override.yml` snippet above, then rebuild the web/API service |
-| `docker compose build` fails when cloning plugin | VPS/network blocks outbound HTTPS | Verify the VPS can reach `https://github.com/` and try the build again |
+| `docker compose build` fails vue-tsc on incident-manager | VPS is building a stale local plugin copy (wrong branch/commit) | Update the local plugin checkout (see above), verify `DashboardTab.vue`, then rebuild with `--no-cache` |
 | Pane loads but mission actions fail | You are not subscribed / not authorized for the mission | Subscribe to the mission on the map (mission password if required) |
 | UI looks unchanged after rebuild | Browser cache | Hard refresh (Ctrl+Shift+R / Cmd+Shift+R) |
 
