@@ -13,25 +13,42 @@
     border: 0;
     border-radius: var(--bs-border-radius, 0.25rem);
     background: transparent;
-    color: var(--bs-nav-link-color, var(--bs-link-color, #6c7a91));
     text-align: start;
-    font-size: var(--bs-nav-link-font-size, 1rem);
     line-height: 1.4;
+}
+
+.incident-side-nav .incident-nav-item {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: color-mix(in srgb, var(--tblr-body-color, var(--bs-body-color)) 88%, transparent);
 }
 
 .incident-side-nav .incident-nav-item:hover,
 .incident-side-nav .incident-nav-item:focus-visible {
     background: var(--bs-nav-link-hover-bg, rgba(0, 0, 0, 0.04));
-    color: var(--bs-nav-link-hover-color, var(--bs-link-hover-color, #1e293b));
+    color: var(--tblr-body-color, var(--bs-body-color));
 }
 
 .incident-side-nav .incident-nav-item.active {
     background: var(--bs-nav-pills-link-active-bg, var(--bs-primary, #206bc4));
     color: var(--bs-nav-pills-link-active-color, #fff);
+    font-weight: 600;
 }
 
 .incident-side-nav .incident-nav-sub {
     padding-inline-start: 1.75rem;
+    font-size: var(--bs-nav-link-font-size, 1rem);
+    font-weight: 400;
+    color: var(--bs-nav-link-color, var(--bs-link-color, #6c7a91));
+}
+
+.incident-side-nav .incident-nav-sub:hover,
+.incident-side-nav .incident-nav-sub:focus-visible {
+    color: var(--bs-nav-link-hover-color, var(--bs-link-hover-color, #1e293b));
+}
+
+.incident-side-nav .incident-nav-sub.active {
+    font-weight: 600;
 }
 
 .incident-side-nav .incident-nav-section-header {
@@ -41,11 +58,11 @@
     margin-top: 0.75rem;
     padding-block: 0.25rem;
     cursor: default;
-    font-size: 0.72rem;
+    font-size: 0.9375rem;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    font-weight: 700;
-    color: var(--bs-secondary-color, #6c7a91);
+    font-weight: 600;
+    color: color-mix(in srgb, var(--tblr-body-color, var(--bs-body-color)) 92%, transparent);
     background: transparent;
 }
 
@@ -73,6 +90,26 @@
     padding: 0;
     border: 0;
     background: transparent;
-    color: var(--bs-secondary-color, #6c7a91);
+    color: color-mix(in srgb, var(--tblr-body-color, var(--bs-body-color)) 75%, transparent);
     line-height: 1;
+}
+
+.incident-h-tabs .nav-link {
+    color: color-mix(in srgb, var(--tblr-body-color, var(--bs-body-color)) 88%, transparent);
+    font-weight: 500;
+}
+
+.incident-h-tabs .nav-link:hover,
+.incident-h-tabs .nav-link:focus-visible {
+    color: var(--tblr-body-color, var(--bs-body-color));
+}
+
+.incident-h-tabs .nav-link.active {
+    color: var(--tblr-body-color, var(--bs-body-color));
+    font-weight: 600;
+}
+
+.incident-mobile-nav-label {
+    color: color-mix(in srgb, var(--tblr-body-color, var(--bs-body-color)) 90%, transparent);
+    font-weight: 500;
 }

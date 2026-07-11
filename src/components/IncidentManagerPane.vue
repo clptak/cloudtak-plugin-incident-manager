@@ -62,12 +62,12 @@
                             stroke='1'
                         />
                     </TablerIconButton>
-                    <span class='text-muted small ms-2 text-truncate'>
+                    <span class='incident-mobile-nav-label small ms-2 text-truncate'>
                         {{ activeNavLabel }}
                     </span>
                 </div>
 
-                <ul class='nav nav-tabs mb-2 mb-md-3 flex-nowrap overflow-auto'>
+                <ul class='nav nav-tabs incident-h-tabs mb-2 mb-md-3 flex-nowrap overflow-auto'>
                     <li
                         v-for='tab in hTabs'
                         :key='tab.key'
