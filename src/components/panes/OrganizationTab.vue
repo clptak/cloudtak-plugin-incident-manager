@@ -383,6 +383,7 @@
                     >
                         <template #block='{ node, dragover, draggingSelf }'>
                             <div
+                                v-if='node'
                                 class='card shadow-sm'
                                 style='width: 200px;'
                                 :class='{

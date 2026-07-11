@@ -608,10 +608,11 @@ function exportRows() {
 
 function exportCsv(): void {
     if (!requireActiveMission()) return;
-    if (!canExport.value) return;
+    const mission = activeMission.value;
+    if (!mission || !canExport.value) return;
     exportDashboardCsv(
         exportRows(),
-        activeMission.value.name,
+        mission.name,
         subjects.value,
         teams.value,
         resourceAssignments.value,
@@ -621,18 +622,19 @@ function exportCsv(): void {
 
 async function exportPdf(): Promise<void> {
     if (!requireActiveMission()) return;
-    if (!canExport.value) return;
+    const mission = activeMission.value;
+    if (!mission || !canExport.value) return;
     try {
         let info = initialInfo.value;
         if (!info) {
-            const sub = await loadIncidentSubscription(activeMission.value);
+            const sub = await loadIncidentSubscription(mission);
             const { schema } = await loadMissionSchema(sub);
             const logs = await sub.log.list({ refresh: true });
             info = resolveIncidentInfoForm(schema, logs);
         }
         exportDashboardPdf(
             exportRows(),
-            activeMission.value.name,
+            mission.name,
             subjects.value,
             info,
             teams.value,
