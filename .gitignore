@@ -1,6 +1,7 @@
 context/*
 skills/*
 node_modules/
+cloudtak-plugin-incident-manager
 .DS_Store
 docs/build-plan.md
 docs/ICS-234-CG-Work-Analysis-Matrix.pdf
