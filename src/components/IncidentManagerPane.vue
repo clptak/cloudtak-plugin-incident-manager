@@ -26,13 +26,11 @@
                     v-for='item in navItems'
                     :key='item.key'
                 >
-                    <div
+                    <NavSectionHeader
                         v-if='item.kind === "header"'
-                        class='text-muted text-uppercase fw-bold px-2 mt-3 mb-1'
-                        style='font-size: 0.72rem; letter-spacing: 0.04em;'
-                    >
-                        {{ item.label }}
-                    </div>
+                        :label='item.label'
+                        :help-key='item.helpKey'
+                    />
                     <button
                         v-else
                         type='button'
@@ -59,13 +57,11 @@
                     v-for='item in navItems'
                     :key='item.key'
                 >
-                    <div
+                    <NavSectionHeader
                         v-if='item.kind === "header"'
-                        class='text-muted text-uppercase fw-bold px-2 mt-3 mb-1'
-                        style='font-size: 0.72rem; letter-spacing: 0.04em;'
-                    >
-                        {{ item.label }}
-                    </div>
+                        :label='item.label'
+                        :help-key='item.helpKey'
+                    />
                     <button
                         v-else
                         type='button'
@@ -152,6 +148,8 @@
 import { ref, watch, onMounted, defineAsyncComponent, computed } from 'vue';
 import { TablerIconButton } from '@tak-ps/vue-tabler';
 import { IconMenu2 } from '@tabler/icons-vue';
+import NavSectionHeader from './NavSectionHeader.vue';
+import type { NavSectionHelpKey } from '../lib/navSectionHelp.ts';
 import {
     SESSION_NAV_KEY,
     useIncident,
@@ -172,12 +170,13 @@ interface NavEntry {
     kind: 'item' | 'header' | 'sub';
     key: string;
     label: string;
+    helpKey?: NavSectionHelpKey;
 }
 
 const navItems: NavEntry[] = [
     { kind: 'item', key: 'create-open', label: 'Create | Open' },
 
-    { kind: 'header', key: 'h-initial', label: 'Initial Response' },
+    { kind: 'header', key: 'h-initial', label: 'Initial Response', helpKey: 'route-location-search' },
     { kind: 'sub', key: 'initial-information', label: 'Initial Information' },
     { kind: 'sub', key: 'subject-info', label: 'Subject Information' },
     { kind: 'sub', key: 'search-urgency', label: 'Search Urgency' },
@@ -186,7 +185,7 @@ const navItems: NavEntry[] = [
     { kind: 'sub', key: 'work-assignments', label: 'Assignments' },
     { kind: 'sub', key: 'ics-201', label: 'ICS 201' },
 
-    { kind: 'header', key: 'h-area', label: 'Area Search' },
+    { kind: 'header', key: 'h-area', label: 'Area Search', helpKey: 'area-search' },
     { kind: 'sub', key: 'search-scenarios', label: 'Search Scenarios' },
     { kind: 'sub', key: 'search-area', label: 'Search Area' },
     { kind: 'sub', key: 'risk-assessment', label: 'Risk Assessment' },

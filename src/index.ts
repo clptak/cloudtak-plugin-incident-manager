@@ -2,7 +2,7 @@ import type { App } from 'vue';
 import { defineAsyncComponent, defineComponent, h, markRaw, onMounted } from 'vue';
 import type { PluginAPI, PluginInstance, PluginStatic } from '../../../plugin.ts';
 import { useAppStore } from '../../../src/stores/app.ts';
-import { IconClipboardList } from '@tabler/icons-vue';
+import { IconTarget } from '@tabler/icons-vue';
 import MenuTemplate from './lib/MenuTemplate.vue';
 
 const IncidentManagerPane = defineAsyncComponent(
@@ -67,7 +67,7 @@ export default class IncidentManagerPlugin implements PluginInstance {
             route: ROUTE_NAME,
             tooltip: 'SAR Incident Manager',
             description: 'Create/open missions, logger, dashboard',
-            icon: markRaw(IconClipboardList) as unknown as MenuItemIconType,
+            icon: markRaw(IconTarget) as unknown as MenuItemIconType,
         } as MenuItemConfig);
     }
 
