@@ -225,8 +225,8 @@
             <button
                 type='button'
                 class='btn btn-outline-secondary btn-sm'
-                :disabled='!activeMission || loading || refreshing'
-                @click='refreshSources'
+                :disabled='loading || refreshing'
+                @click='onRefreshSources'
             >
                 {{ refreshing ? 'Refreshing…' : 'Refresh from mission' }}
             </button>
@@ -288,8 +288,8 @@
                     <button
                         type='button'
                         class='btn btn-outline-primary btn-sm'
-                        :disabled='uploading || !activeMission'
-                        @click='addPdfToDataSync'
+                        :disabled='uploading'
+                        @click='onAddPdfToDataSync'
                     >
                         {{ uploading ? 'Uploading…' : 'Add SAR-Briefing.pdf to DataSync' }}
                     </button>
@@ -318,7 +318,7 @@ import {
 } from '../../../lib/sarBriefingPdf.ts';
 import { downloadPdfBytes, uploadMissionFile } from '../../../lib/missionUpload.ts';
 
-const { activeMission } = useIncident();
+const { activeMission, requireActiveMission } = useIncident();
 
 const form = reactive<IrBriefingForm>(blankIrBriefingForm());
 const loading = ref(false);
@@ -414,6 +414,11 @@ async function loadAll(preserveBriefingFields = false): Promise<void> {
     }
 }
 
+async function onRefreshSources(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await refreshSources();
+}
+
 async function refreshSources(): Promise<void> {
     refreshing.value = true;
     try {
@@ -449,6 +454,11 @@ async function downloadPdf(): Promise<void> {
     } finally {
         exporting.value = false;
     }
+}
+
+async function onAddPdfToDataSync(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await addPdfToDataSync();
 }
 
 async function addPdfToDataSync(): Promise<void> {

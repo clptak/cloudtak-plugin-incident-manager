@@ -141,8 +141,8 @@
             <div class='mt-3'>
                 <button
                     class='btn btn-primary btn-sm mt-2'
-                    :disabled='!activeMission || posting || !filledCount'
-                    @click='send'
+                    :disabled='posting || !filledCount'
+                    @click='onSend'
                 >
                     {{ posting ? 'Saving…' : `Save ${filledCount} scenario${filledCount === 1 ? "" : "s"} to DataSync` }}
                 </button>
@@ -182,7 +182,7 @@ import { reactive, ref, computed, onMounted, watch } from 'vue';
 import Subscription from '../../../../../../src/base/subscription.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 
-const { activeMission } = useIncident();
+const { activeMission, requireActiveMission } = useIncident();
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'] as const;
 const SCENARIO_KEYWORD = 'search-scenario';
@@ -364,6 +364,11 @@ function buildKeywords(key: string, d: Draft): string[] {
     if (d.responsiveness) kws.push(`responsiveness:${d.responsiveness}`);
     if (d.priority != null) kws.push(`priority:${d.priority}`);
     return kws;
+}
+
+async function onSend(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await send();
 }
 
 async function send(): Promise<void> {

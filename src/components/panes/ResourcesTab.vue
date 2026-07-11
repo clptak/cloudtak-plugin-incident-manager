@@ -334,7 +334,7 @@ import {
     type ResourceAssignmentStatus,
 } from '../../lib/resourceAssignments.ts';
 
-const { activeMission } = useIncident();
+const { activeMission, requireActiveMission } = useIncident();
 const {
     assignments,
     loading,
@@ -361,8 +361,7 @@ const resourceTypeOptions = RESOURCE_TYPE_OPTIONS;
 const statusOptions = RESOURCE_ASSIGNMENT_STATUSES;
 
 const canCreate = computed(() =>
-    !!activeMission.value
-    && form.value.resourceIdentifier.trim().length > 0
+    form.value.resourceIdentifier.trim().length > 0
     && form.value.resource.trim().length > 0
     && form.value.agency.trim().length > 0,
 );
@@ -389,7 +388,8 @@ async function refreshAgencies(): Promise<void> {
 }
 
 async function createAssignment(): Promise<void> {
-    if (!activeMission.value || !canCreate.value) return;
+    if (!requireActiveMission()) return;
+    if (!canCreate.value) return;
 
     const etaRaw = form.value.eta;
     const eta = etaRaw == null || Number.isNaN(Number(etaRaw))

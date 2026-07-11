@@ -62,8 +62,8 @@
         <div class='mt-3 d-flex flex-wrap align-items-center gap-2'>
             <button
                 class='btn btn-primary btn-sm'
-                :disabled='!activeMission || saving || (!filledRowCount && !pendingDeletions)'
-                @click='save'
+                :disabled='saving || (!filledRowCount && !pendingDeletions)'
+                @click='onSave'
             >
                 {{ saving ? 'Saving…' : `Save ${filledRowCount} objective${filledRowCount === 1 ? '' : 's'} to DataSync` }}
             </button>
@@ -202,8 +202,8 @@
                     <button
                         type='button'
                         class='btn btn-outline-primary btn-sm'
-                        :disabled='uploading || !filledRowCount || !activeMission'
-                        @click='addPdfToDataSync'
+                        :disabled='uploading || !filledRowCount'
+                        @click='onAddPdfToDataSync'
                     >
                         {{ uploading ? 'Uploading…' : 'Add ICS-234.PDF to DataSync' }}
                     </button>
@@ -312,7 +312,7 @@ import {
     type SavedObjectiveRow,
 } from '../../../lib/incidentPost.ts';
 
-const { activeMission } = useIncident();
+const { activeMission, requireActiveMission } = useIncident();
 
 const rows = ref<ObjectiveRow[]>(blankObjectiveRows());
 const visibleCount = ref(1);
@@ -581,6 +581,11 @@ async function upsertCell(
     }
 }
 
+async function onSave(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await save();
+}
+
 async function save(): Promise<void> {
     if (!activeMission.value || (!filledRowCount.value && !pendingDeletions.value)) return;
     saving.value = true;
@@ -685,6 +690,11 @@ async function downloadPdf(): Promise<void> {
     } finally {
         exporting.value = false;
     }
+}
+
+async function onAddPdfToDataSync(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await addPdfToDataSync();
 }
 
 async function addPdfToDataSync(): Promise<void> {

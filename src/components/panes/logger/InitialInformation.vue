@@ -113,8 +113,8 @@
 
                 <button
                     class='btn btn-primary btn-sm mt-3'
-                    :disabled='!activeMission || savingIncident || demaInvalid'
-                    @click='saveIncidentInfo'
+                    :disabled='savingIncident || demaInvalid'
+                    @click='onSaveIncidentInfo'
                 >
                     {{ savingIncident ? 'Saving…' : 'Save to DataSync' }}
                 </button>
@@ -290,8 +290,8 @@
                         <button
                             type='button'
                             class='btn btn-success'
-                            :disabled='!selectedCount || !activeMission || posting'
-                            @click='postLogs'
+                            :disabled='!selectedCount || posting'
+                            @click='onPostLogs'
                         >
                             {{ posting ? 'Posting…' : `Post ${selectedCount} entr${selectedCount === 1 ? "y" : "ies"} to DataSync` }}
                         </button>
@@ -339,7 +339,7 @@ import {
 } from '../../../lib/missionSchema.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 
-const { activeMission, setActiveMission } = useIncident();
+const { activeMission, setActiveMission, requireActiveMission } = useIncident();
 
 const incidentForm = reactive<IncidentInfoForm>(blankIncidentInfoForm());
 const missionSchema = ref<MissionSchema | null>(null);
@@ -461,6 +461,11 @@ async function loadIncidentInfo(): Promise<void> {
     }
 }
 
+async function onSaveIncidentInfo(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await saveIncidentInfo();
+}
+
 async function saveIncidentInfo(): Promise<void> {
     if (!activeMission.value || demaInvalid.value) return;
     savingIncident.value = true;
@@ -577,6 +582,11 @@ function parse(): void {
 function toDtg(raw: string): string | undefined {
     const ms = Date.parse(raw);
     return Number.isNaN(ms) ? undefined : new Date(ms).toISOString();
+}
+
+async function onPostLogs(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await postLogs();
 }
 
 async function postLogs(): Promise<void> {

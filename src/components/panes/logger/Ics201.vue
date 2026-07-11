@@ -411,16 +411,16 @@
             <button
                 type='button'
                 class='btn btn-outline-secondary btn-sm'
-                :disabled='!activeMission || loading || refreshing'
-                @click='refreshSources'
+                :disabled='loading || refreshing'
+                @click='onRefreshSources'
             >
                 {{ refreshing ? 'Refreshing…' : 'Refresh from mission' }}
             </button>
             <button
                 type='button'
                 class='btn btn-outline-primary btn-sm'
-                :disabled='!activeMission || saving'
-                @click='saveToMission'
+                :disabled='saving'
+                @click='onSaveToMission'
             >
                 {{ saving ? 'Saving…' : 'Save to mission log' }}
             </button>
@@ -482,8 +482,8 @@
                     <button
                         type='button'
                         class='btn btn-outline-primary btn-sm'
-                        :disabled='uploading || !activeMission'
-                        @click='addPdfToDataSync'
+                        :disabled='uploading'
+                        @click='onAddPdfToDataSync'
                     >
                         {{ uploading ? 'Uploading…' : 'Add ICS-201.pdf to DataSync' }}
                     </button>
@@ -514,7 +514,7 @@ import {
 } from '../../../lib/ics201Pdf.ts';
 import { downloadPdfBytes, uploadMissionFile } from '../../../lib/missionUpload.ts';
 
-const { activeMission } = useIncident();
+const { activeMission, requireActiveMission } = useIncident();
 
 const form = reactive<Ics201Form>(blankIcs201Form());
 const sources = reactive<Ics201Sources>({
@@ -663,6 +663,11 @@ async function loadAll(preserveUserFields = false): Promise<void> {
     }
 }
 
+async function onRefreshSources(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await refreshSources();
+}
+
 async function refreshSources(): Promise<void> {
     refreshing.value = true;
     try {
@@ -675,6 +680,11 @@ async function refreshSources(): Promise<void> {
     } finally {
         refreshing.value = false;
     }
+}
+
+async function onSaveToMission(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await saveToMission();
 }
 
 async function saveToMission(): Promise<void> {
@@ -729,6 +739,11 @@ async function downloadPdf(): Promise<void> {
     } finally {
         exporting.value = false;
     }
+}
+
+async function onAddPdfToDataSync(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await addPdfToDataSync();
 }
 
 async function addPdfToDataSync(): Promise<void> {

@@ -39,7 +39,7 @@
                         :style='item.kind === "sub" ? "padding-left: 1.25rem;" : ""'
                         data-bs-dismiss='offcanvas'
                         data-bs-target='#incident-manager-nav'
-                        @click='selectKey(item.key)'
+                        @click='selectKeyGuarded(item.key)'
                     >
                         {{ item.label }}
                     </button>
@@ -68,7 +68,7 @@
                         class='nav-link text-start'
                         :class='{ active: activeKey === item.key && activeHTab === "main", "py-1": item.kind === "sub" }'
                         :style='item.kind === "sub" ? "padding-left: 1.25rem;" : ""'
-                        @click='selectKey(item.key)'
+                        @click='selectKeyGuarded(item.key)'
                     >
                         {{ item.label }}
                     </button>
@@ -106,7 +106,7 @@
                             type='button'
                             class='nav-link text-nowrap'
                             :class='{ active: activeHTab === tab.key }'
-                            @click='activeHTab = tab.key'
+                            @click='selectHTabGuarded(tab.key)'
                         >
                             {{ tab.label }}
                         </button>
@@ -142,13 +142,15 @@
             </div>
         </div>
     </div>
+    <MissionRequiredModal />
 </template>
 
 <script setup lang='ts'>
-import { onMounted, defineAsyncComponent, computed } from 'vue';
+import { onMounted, defineAsyncComponent, computed, watch } from 'vue';
 import { TablerIconButton } from '@tak-ps/vue-tabler';
 import { IconMenu2 } from '@tabler/icons-vue';
 import NavSectionHeader from './NavSectionHeader.vue';
+import MissionRequiredModal from './MissionRequiredModal.vue';
 import type { NavSectionHelpKey } from '../lib/navSectionHelp.ts';
 import { useIncident } from '../composables/useIncident.ts';
 
@@ -202,7 +204,11 @@ const hTabs = [
 const {
     activeKey,
     activeHTab,
-    selectKey,
+    activeMission,
+    selectKeyGuarded,
+    selectHTabGuarded,
+    openNoMissionModal,
+    isMissionRequiredView,
     restoreActiveMissionOnMap,
 } = useIncident();
 
@@ -213,6 +219,12 @@ const activeNavLabel = computed(() => {
     }
     const item = navItems.find((entry) => entry.kind !== 'header' && entry.key === activeKey.value);
     return item?.label ?? 'Create | Open';
+});
+
+watch([activeKey, activeHTab], () => {
+    if (activeMission.value) return;
+    if (!isMissionRequiredView(activeKey.value, activeHTab.value)) return;
+    openNoMissionModal();
 });
 
 onMounted(() => {

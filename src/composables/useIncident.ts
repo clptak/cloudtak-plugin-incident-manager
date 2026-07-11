@@ -132,8 +132,62 @@ const savedNav = loadNavFromSession();
 const activeKey = ref(savedNav.activeKey);
 const activeHTab = ref(savedNav.activeHTab);
 
+const MISSION_EXEMPT_NAV_KEYS = new Set(['create-open', 'casie']);
+
+const noMissionModalOpen = ref(false);
+
+export function isMissionRequiredView(key: string, htab: string): boolean {
+    if (htab === 'dashboard' || htab === 'organization') return true;
+    if (htab !== 'main') return false;
+    return !MISSION_EXEMPT_NAV_KEYS.has(key);
+}
+
+function selectKey(key: string): void {
+    activeKey.value = key;
+    activeHTab.value = 'main';
+}
+
+function openNoMissionModal(): void {
+    noMissionModalOpen.value = true;
+}
+
+function closeNoMissionModal(): void {
+    noMissionModalOpen.value = false;
+}
+
+function requireActiveMission(): boolean {
+    if (activeMission.value) return true;
+    openNoMissionModal();
+    return false;
+}
+
+function selectKeyGuarded(key: string): void {
+    if (activeMission.value || !isMissionRequiredView(key, 'main')) {
+        selectKey(key);
+        return;
+    }
+    openNoMissionModal();
+}
+
+function selectHTabGuarded(htab: string): void {
+    if (activeMission.value || !isMissionRequiredView(activeKey.value, htab)) {
+        activeHTab.value = htab;
+        return;
+    }
+    openNoMissionModal();
+}
+
+function goToCreateOpen(): void {
+    closeNoMissionModal();
+    selectKey('create-open');
+}
+
 watch([activeKey, activeHTab], ([key, htab]) => {
     saveNavToSession(key, htab);
+});
+
+watch(activeMission, (m) => {
+    if (m) closeNoMissionModal();
 });
 
 export function useIncident() {
@@ -167,17 +221,20 @@ export function useIncident() {
         }
     }
 
-    function selectKey(key: string): void {
-        activeKey.value = key;
-        activeHTab.value = 'main';
-    }
-
     return {
         activeMission,
         activeKey,
         activeHTab,
+        noMissionModalOpen,
         setActiveMission,
         selectKey,
+        selectKeyGuarded,
+        selectHTabGuarded,
+        requireActiveMission,
+        openNoMissionModal,
+        closeNoMissionModal,
+        goToCreateOpen,
+        isMissionRequiredView,
         restoreActiveMissionOnMap,
     };
 }

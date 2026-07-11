@@ -13,8 +13,8 @@
 
             <button
                 class='btn btn-primary'
-                :disabled='!activeMission || loading'
-                @click='generate'
+                :disabled='loading'
+                @click='onGenerate'
             >
                 {{ loading ? 'Generating…' : 'Generate from active mission' }}
             </button>
@@ -84,7 +84,7 @@ import {
     type MissionSchema,
 } from '../../lib/missionSchema.ts';
 
-const { activeMission } = useIncident();
+const { activeMission, requireActiveMission } = useIncident();
 
 const loading = ref(false);
 const error = ref('');
@@ -188,6 +188,11 @@ function assignmentLines(data: { text: string; datetime: string } | null): strin
         sentence,
         '',
     ];
+}
+
+async function onGenerate(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await generate();
 }
 
 async function generate(): Promise<void> {

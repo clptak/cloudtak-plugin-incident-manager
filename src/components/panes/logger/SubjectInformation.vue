@@ -393,8 +393,8 @@
                 <button
                     type='button'
                     class='btn btn-primary btn-sm'
-                    :disabled='!activeMission || posting || !filledCount'
-                    @click='send'
+                    :disabled='posting || !filledCount'
+                    @click='onSend'
                 >
                     {{ posting ? 'Sending…' : `Send ${filledCount} subject${filledCount === 1 ? '' : 's'} to DataSync` }}
                 </button>
@@ -450,7 +450,7 @@ import {
     type SubjectForm,
 } from '../../../lib/subjectInfo.ts';
 
-const { activeMission } = useIncident();
+const { activeMission, requireActiveMission } = useIncident();
 
 const MAX_SUBJECTS = SUBJECT_NUMBERS.length;
 
@@ -713,6 +713,11 @@ watch(() => activeMission.value?.guid, () => {
     void loadSent();
     void loadMissionAssets();
 });
+
+async function onSend(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await send();
+}
 
 async function send(): Promise<void> {
     if (!activeMission.value || !filledCount.value) return;

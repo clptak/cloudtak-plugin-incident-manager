@@ -7,8 +7,8 @@
             <button
                 type='button'
                 class='btn btn-outline-primary btn-sm ms-auto'
-                :disabled='loadingCots || !activeMission'
-                @click='refreshMissionCots'
+                :disabled='loadingCots'
+                @click='onRefreshMissionCots'
             >
                 {{ loadingCots ? 'Loading…' : 'Refresh map objects' }}
             </button>
@@ -153,7 +153,7 @@
                     <button
                         type='button'
                         class='btn btn-primary btn-sm'
-                        :disabled='!activeMission || saving'
+                        :disabled='saving'
                         @click='onAddClick'
                     >
                         {{ saving ? 'Saving…' : 'Add assignment' }}
@@ -283,8 +283,8 @@
                                     type='button'
                                     class='btn btn-outline-success btn-sm w-100'
                                     title='Send start to DataSync'
-                                    :disabled='saving || sending || !activeMission'
-                                    @click='sendStart(row.id)'
+                                    :disabled='saving || sending'
+                                    @click='onSendStart(row.id)'
                                 >
                                     Start
                                 </button>
@@ -294,8 +294,8 @@
                                     type='button'
                                     class='btn btn-outline-primary btn-sm w-100'
                                     title='Send completion to DataSync'
-                                    :disabled='saving || sending || !activeMission'
-                                    @click='sendComplete(row.id)'
+                                    :disabled='saving || sending'
+                                    @click='onSendComplete(row.id)'
                                 >
                                     Complete
                                 </button>
@@ -383,7 +383,7 @@ import { isValidAssignmentNumber } from '../../lib/workAssignments.ts';
 
 const SETUP_REMINDER_KEY = 'incident-manager:assignments-setup-reminder-dismissed';
 
-const { activeMission, selectKey } = useIncident();
+const { activeMission, selectKey, requireActiveMission } = useIncident();
 const {
     assignments: resourceTeams,
     loading: loadingResourceTeams,
@@ -493,6 +493,11 @@ function onFormAssignmentChange(): void {
     form.value.assignmentCallsign = callsignForUid(form.value.assignmentUid);
 }
 
+async function onRefreshMissionCots(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await refreshMissionCots();
+}
+
 async function refreshMissionCots(): Promise<void> {
     missionCots.value = [];
     if (!activeMission.value) return;
@@ -525,7 +530,8 @@ async function addRow(): Promise<void> {
 }
 
 async function onAddClick(): Promise<void> {
-    if (!activeMission.value || saving.value) return;
+    if (!requireActiveMission()) return;
+    if (saving.value) return;
     if (!teamOptions.value.length) {
         openNoResourcesModalIfEmpty();
         return;
@@ -570,6 +576,16 @@ async function onRowAssignmentChange(id: string, uid: string): Promise<void> {
         assignmentUid: uid,
         assignmentCallsign: callsignForUid(uid),
     });
+}
+
+async function onSendStart(id: string): Promise<void> {
+    if (!requireActiveMission()) return;
+    await sendStart(id);
+}
+
+async function onSendComplete(id: string): Promise<void> {
+    if (!requireActiveMission()) return;
+    await sendComplete(id);
 }
 
 async function sendStart(id: string): Promise<void> {

@@ -20,8 +20,8 @@
                 <button
                     type='button'
                     class='btn btn-outline-success btn-sm'
-                    :disabled='!activeMission || !hasCanvas || syncingOrgChart'
-                    @click='syncOrgChart'
+                    :disabled='!hasCanvas || syncingOrgChart'
+                    @click='onSyncOrgChart'
                 >
                     {{ syncingOrgChart ? 'Syncing…' : 'Sync org chart to DataSync' }}
                 </button>
@@ -498,7 +498,7 @@ import { loadOrgChartFromMission, saveOrgChartToMission } from '../../lib/orgCha
 import { formatPersonNameFirstLast } from '../../lib/personName.ts';
 import { listMissionCots, type MissionCotRef } from '../../lib/missionCots.ts';
 
-const { activeMission } = useIncident();
+const { activeMission, requireActiveMission } = useIncident();
 const { assignments: resourceAssignments, loadForMission: loadResourceAssignments, updateAssignment: updateResourceAssignment } = useResourceAssignments();
 
 const teamTree = ref<HastyTreeNode>({});
@@ -723,6 +723,11 @@ async function persistOrgChart(): Promise<void> {
             savingOrgChart.value = false;
         }
     }
+}
+
+async function onSyncOrgChart(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await syncOrgChart();
 }
 
 async function syncOrgChart(): Promise<void> {

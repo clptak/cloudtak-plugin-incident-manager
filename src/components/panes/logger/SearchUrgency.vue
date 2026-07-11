@@ -99,8 +99,8 @@
             <div class='mt-3'>
                 <button
                     class='btn btn-primary btn-sm'
-                    :disabled='!activeMission || posting || !valid'
-                    @click='send'
+                    :disabled='posting || !valid'
+                    @click='onSend'
                 >
                     {{ posting ? 'Sending…' : 'Send to DataSync' }}
                 </button>
@@ -159,7 +159,7 @@ interface Factor {
     helpLines: HelpLine[];
 }
 
-const { activeMission } = useIncident();
+const { activeMission, requireActiveMission } = useIncident();
 
 const factors = reactive<Factor[]>([
     {
@@ -277,6 +277,11 @@ const statusError = ref(false);
 function reset(): void {
     factors.forEach((f) => (f.value = 1));
     status.value = '';
+}
+
+async function onSend(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await send();
 }
 
 async function send(): Promise<void> {

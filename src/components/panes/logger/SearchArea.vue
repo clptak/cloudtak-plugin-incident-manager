@@ -38,7 +38,7 @@
                         <button
                             class='btn btn-primary'
                             :disabled='!canSetIpp || settingIpp'
-                            @click='setIpp'
+                            @click='onSetIpp'
                         >
                             {{ settingIpp ? 'Setting…' : 'Set IPP' }}
                         </button>
@@ -159,7 +159,7 @@
                     <button
                         class='btn btn-orange text-white btn-sm mt-2'
                         :disabled='!canPushTheoretical || pushing'
-                        @click='pushTheoretical'
+                        @click='onPushTheoretical'
                     >
                         Add to DataSync
                     </button>
@@ -296,7 +296,7 @@
                     <button
                         class='btn btn-primary btn-sm mt-3'
                         :disabled='!canPushLpb || pushing'
-                        @click='pushLpb'
+                        @click='onPushLpb'
                     >
                         {{ pushing ? 'Sending…' : (category === 'Other' ? 'Add rings to DataSync' : 'Add selected rings to DataSync') }}
                     </button>
@@ -353,7 +353,7 @@
                     <button
                         class='btn btn-primary btn-sm mt-2'
                         :disabled='!canAddSubjective || pushing'
-                        @click='addSubjective'
+                        @click='onAddSubjective'
                     >
                         Add to DataSync
                     </button>
@@ -414,7 +414,7 @@
                     <button
                         class='btn btn-primary btn-sm mt-2'
                         :disabled='!segmentUids.length || pushing'
-                        @click='addSegments'
+                        @click='onAddSegments'
                     >
                         Add {{ segmentUids.length }} segment{{ segmentUids.length === 1 ? '' : 's' }} to DataSync
                     </button>
@@ -492,7 +492,7 @@
                     class='btn btn-outline-primary btn-sm'
                     :disabled='loadingFeatures'
                     title='Reload markers and polygons from the active DataSync mission'
-                    @click='refreshFeatures'
+                    @click='onRefreshFeatures'
                 >
                     {{ loadingFeatures ? 'Loading…' : 'Refresh map objects' }}
                 </button>
@@ -563,7 +563,7 @@ interface AzlpbEntry {
     qAmi: number; qBmi: number; qCmi: number; qDmi: number;
 }
 
-const { activeMission } = useIncident();
+const { activeMission, requireActiveMission } = useIncident();
 const table = azlpb as AzlpbEntry[];
 
 const ippInput = ref('');
@@ -776,6 +776,11 @@ async function loadFeatures(sub?: LoadedSub): Promise<void> {
 onMounted(() => { void loadAreas(); void loadFeatures(); });
 watch(() => activeMission.value?.guid, () => { void loadAreas(); void loadFeatures(); });
 
+async function onRefreshFeatures(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await refreshFeatures();
+}
+
 async function refreshFeatures(): Promise<void> {
     if (!activeMission.value) return;
     status.value = '';
@@ -786,7 +791,7 @@ async function refreshFeatures(): Promise<void> {
 // ---- IPP -------------------------------------------------------------------
 
 const canSetIpp = computed(
-    () => !!activeMission.value && (!!ipp.value || !!selectedObjectUid.value),
+    () => !!ipp.value || !!selectedObjectUid.value,
 );
 
 /** Center for ring math: selected object, typed coordinates, or recalled IPP marker. */
@@ -819,6 +824,11 @@ async function writeAreaLog(sub: LoadedSub, key: string, content: string, uuid: 
     };
     if (existing?.logId) await log.update(existing.logId, body);
     else await log.create(body);
+}
+
+async function onSetIpp(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await setIpp();
 }
 
 async function setIpp(): Promise<void> {
@@ -858,11 +868,11 @@ async function setIpp(): Promise<void> {
 // ---- Theoretical & Statistical (rings around the IPP) ----------------------
 
 const canPushLpb = computed(() => {
-    if (!ippCenter.value || !activeMission.value) return false;
+    if (!ippCenter.value) return false;
     if (category.value === OTHER_CATEGORY) return otherRingMiles.value.length > 0;
     return quartiles.some((q) => q.selected);
 });
-const canPushTheoretical = computed(() => !!ippCenter.value && !!activeMission.value && theoreticalMiles.value > 0);
+const canPushTheoretical = computed(() => !!ippCenter.value && theoreticalMiles.value > 0);
 
 /** Push (or update) a ring feature AND its referencing log entry. */
 async function upsertRing(
@@ -890,6 +900,11 @@ async function upsertRing(
     await writeAreaLog(sub, key, label, uuid);
 }
 
+async function onPushTheoretical(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await pushTheoretical();
+}
+
 async function pushTheoretical(): Promise<void> {
     if (!ippCenter.value || !activeMission.value) return;
     pushing.value = true; status.value = ''; statusError.value = false;
@@ -907,6 +922,11 @@ async function pushTheoretical(): Promise<void> {
     } finally {
         pushing.value = false;
     }
+}
+
+async function onPushLpb(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await pushLpb();
 }
 
 async function pushLpb(): Promise<void> {
@@ -953,7 +973,12 @@ async function pushLpb(): Promise<void> {
 
 // ---- Subjective & Segments (reference existing mission polygons) -----------
 
-const canAddSubjective = computed(() => !!activeMission.value && !!subjectiveUid.value);
+const canAddSubjective = computed(() => !!subjectiveUid.value);
+
+async function onAddSubjective(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await addSubjective();
+}
 
 async function addSubjective(): Promise<void> {
     if (!activeMission.value || !subjectiveUid.value) return;
@@ -971,6 +996,11 @@ async function addSubjective(): Promise<void> {
     } finally {
         pushing.value = false;
     }
+}
+
+async function onAddSegments(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await addSegments();
 }
 
 async function addSegments(): Promise<void> {

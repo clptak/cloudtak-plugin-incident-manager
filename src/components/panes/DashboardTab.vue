@@ -20,8 +20,8 @@
             </button>
             <button
                 class='btn btn-outline-primary btn-sm'
-                :disabled='!activeMission || loading'
-                @click='refresh'
+                :disabled='loading'
+                @click='onRefresh'
             >
                 {{ loading ? 'Loading…' : 'Refresh' }}
             </button>
@@ -428,7 +428,7 @@ import {
 import { loadWorkAssignmentsFromMission } from '../../lib/workAssignmentPersistence.ts';
 import type { WorkAssignment } from '../../lib/workAssignments.ts';
 
-const { activeMission } = useIncident();
+const { activeMission, requireActiveMission } = useIncident();
 
 interface Row {
     rawTime: string;
@@ -607,7 +607,8 @@ function exportRows() {
 }
 
 function exportCsv(): void {
-    if (!activeMission.value || !canExport.value) return;
+    if (!requireActiveMission()) return;
+    if (!canExport.value) return;
     exportDashboardCsv(
         exportRows(),
         activeMission.value.name,
@@ -619,7 +620,8 @@ function exportCsv(): void {
 }
 
 async function exportPdf(): Promise<void> {
-    if (!activeMission.value || !canExport.value) return;
+    if (!requireActiveMission()) return;
+    if (!canExport.value) return;
     try {
         let info = initialInfo.value;
         if (!info) {
@@ -640,6 +642,11 @@ async function exportPdf(): Promise<void> {
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
     }
+}
+
+async function onRefresh(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await refresh();
 }
 
 async function refresh(): Promise<void> {
