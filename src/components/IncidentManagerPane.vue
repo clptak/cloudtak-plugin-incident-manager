@@ -145,16 +145,12 @@
 </template>
 
 <script setup lang='ts'>
-import { ref, watch, onMounted, defineAsyncComponent, computed } from 'vue';
+import { onMounted, defineAsyncComponent, computed } from 'vue';
 import { TablerIconButton } from '@tak-ps/vue-tabler';
 import { IconMenu2 } from '@tabler/icons-vue';
 import NavSectionHeader from './NavSectionHeader.vue';
 import type { NavSectionHelpKey } from '../lib/navSectionHelp.ts';
-import {
-    SESSION_NAV_KEY,
-    useIncident,
-    type PaneNavState,
-} from '../composables/useIncident.ts';
+import { useIncident } from '../composables/useIncident.ts';
 
 const CreateOpenPane = defineAsyncComponent(() => import('./panes/CreateOpenPane.vue'));
 const LoggerPane = defineAsyncComponent(() => import('./panes/LoggerPane.vue'));
@@ -203,63 +199,12 @@ const hTabs = [
     { key: 'organization', label: 'Organization' },
 ] as const;
 
-const navKeys = new Set(
-    navItems.filter((item) => item.kind !== 'header').map((item) => item.key),
-);
-
-type HTabKey = typeof hTabs[number]['key'];
-
-function isHTabKey(value: string): value is HTabKey {
-    return hTabs.some((tab) => tab.key === value);
-}
-
-function loadNavFromSession(): { activeKey: string; activeHTab: HTabKey } {
-    try {
-        const raw = sessionStorage.getItem(SESSION_NAV_KEY);
-        if (!raw) return { activeKey: 'create-open', activeHTab: 'main' };
-        const parsed: unknown = JSON.parse(raw);
-        if (!parsed || typeof parsed !== 'object') {
-            return { activeKey: 'create-open', activeHTab: 'main' };
-        }
-        let key = (parsed as PaneNavState).activeKey;
-        let htab = (parsed as PaneNavState).activeHTab;
-        // Legacy: org chart tab was stored as `assignments` before Organization / work-assignments split.
-        if (htab === 'assignments') htab = 'organization';
-        // Resources moved from horizontal tab into Main vertical nav.
-        if (htab === 'resources') {
-            htab = 'main';
-            key = 'resources';
-        }
-        // Assignments moved from horizontal tab into Main vertical nav.
-        if (htab === 'work-assignments') {
-            htab = 'main';
-            key = 'work-assignments';
-        }
-        // Wrap Up split into section header + Generate Report Template sub-pane.
-        if (key === 'wrapup') key = 'generate-report-template';
-        return {
-            activeKey: navKeys.has(key) ? key : 'create-open',
-            activeHTab: isHTabKey(htab) ? htab : 'main',
-        };
-    } catch {
-        return { activeKey: 'create-open', activeHTab: 'main' };
-    }
-}
-
-function saveNavToSession(activeKey: string, activeHTab: string): void {
-    try {
-        sessionStorage.setItem(
-            SESSION_NAV_KEY,
-            JSON.stringify({ activeKey, activeHTab }),
-        );
-    } catch {
-        // ignore quota / private-mode errors
-    }
-}
-
-const savedNav = loadNavFromSession();
-const activeKey = ref<string>(savedNav.activeKey);
-const activeHTab = ref<string>(savedNav.activeHTab);
+const {
+    activeKey,
+    activeHTab,
+    selectKey,
+    restoreActiveMissionOnMap,
+} = useIncident();
 
 const activeNavLabel = computed(() => {
     if (activeHTab.value !== 'main') {
@@ -270,19 +215,7 @@ const activeNavLabel = computed(() => {
     return item?.label ?? 'Create | Open';
 });
 
-const { restoreActiveMissionOnMap } = useIncident();
-
-watch([activeKey, activeHTab], ([key, htab]) => {
-    saveNavToSession(key, htab);
-});
-
 onMounted(() => {
     void restoreActiveMissionOnMap();
 });
-
-function selectKey(key: string): void {
-    activeKey.value = key;
-    // match reference behavior: choosing a pane returns you to Main
-    activeHTab.value = 'main';
-}
 </script>

@@ -153,8 +153,8 @@
                     <button
                         type='button'
                         class='btn btn-primary btn-sm'
-                        :disabled='!canAdd || saving'
-                        @click='addRow'
+                        :disabled='!activeMission || saving'
+                        @click='onAddClick'
                     >
                         {{ saving ? 'Saving…' : 'Add assignment' }}
                     </button>
@@ -316,6 +316,58 @@
                 </table>
             </div>
         </div>
+
+        <div
+            v-if='noResourcesModalOpen'
+            class='modal modal-blur show d-block'
+            tabindex='-1'
+            role='dialog'
+            @click.self='closeNoResourcesModal'
+        >
+            <div
+                class='modal-dialog modal-dialog-centered'
+                role='document'
+            >
+                <div class='modal-content'>
+                    <div class='modal-header'>
+                        <h5 class='modal-title'>
+                            Mission resources needed
+                        </h5>
+                        <button
+                            type='button'
+                            class='btn-close'
+                            aria-label='Close'
+                            @click='closeNoResourcesModal'
+                        />
+                    </div>
+                    <div class='modal-body'>
+                        <p class='mb-0'>
+                            Please create your mission
+                            <button
+                                type='button'
+                                class='btn btn-link p-0 align-baseline'
+                                @click='goToResources'
+                            >
+                                resources
+                            </button>.
+                        </p>
+                    </div>
+                    <div class='modal-footer'>
+                        <button
+                            type='button'
+                            class='btn btn-secondary'
+                            @click='closeNoResourcesModal'
+                        >
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div
+            v-if='noResourcesModalOpen'
+            class='modal-backdrop fade show'
+        />
     </div>
 </template>
 
@@ -331,8 +383,14 @@ import { isValidAssignmentNumber } from '../../lib/workAssignments.ts';
 
 const SETUP_REMINDER_KEY = 'incident-manager:assignments-setup-reminder-dismissed';
 
-const { activeMission } = useIncident();
-const { assignments: resourceTeams, loadForMission: loadResourceTeams } = useResourceAssignments();
+const { activeMission, selectKey } = useIncident();
+const {
+    assignments: resourceTeams,
+    loading: loadingResourceTeams,
+    loadForMission: loadResourceTeams,
+} = useResourceAssignments();
+
+const noResourcesModalOpen = ref(false);
 
 const setupReminderDismissed = ref(
     localStorage.getItem(SETUP_REMINDER_KEY) === '1',
@@ -342,6 +400,23 @@ function dismissSetupReminder(): void {
     setupReminderDismissed.value = true;
     localStorage.setItem(SETUP_REMINDER_KEY, '1');
 }
+
+function closeNoResourcesModal(): void {
+    noResourcesModalOpen.value = false;
+}
+
+function openNoResourcesModalIfEmpty(): void {
+    if (!activeMission.value) return;
+    if (loadingResourceTeams.value) return;
+    if (resourceTeams.value.length > 0) return;
+    noResourcesModalOpen.value = true;
+}
+
+function goToResources(): void {
+    closeNoResourcesModal();
+    selectKey('resources');
+}
+
 const {
     assignments,
     loading,
@@ -449,6 +524,16 @@ async function addRow(): Promise<void> {
     resetForm();
 }
 
+async function onAddClick(): Promise<void> {
+    if (!activeMission.value || saving.value) return;
+    if (!teamOptions.value.length) {
+        openNoResourcesModalIfEmpty();
+        return;
+    }
+    if (!canAdd.value) return;
+    await addRow();
+}
+
 async function removeRow(id: string): Promise<void> {
     if (!activeMission.value) return;
     if (!window.confirm('Remove this assignment?')) return;
@@ -496,6 +581,14 @@ async function sendComplete(id: string): Promise<void> {
     if (!activeMission.value) return;
     await sendPhaseLog(activeMission.value, id, 'completed');
 }
+
+watch(loadingResourceTeams, (loading) => {
+    if (!loading) openNoResourcesModalIfEmpty();
+});
+
+watch(resourceTeams, (teams) => {
+    if (teams.length > 0) closeNoResourcesModal();
+});
 
 watch(() => activeMission.value?.guid, (guid) => {
     const mission = guid ? activeMission.value : null;
