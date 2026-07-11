@@ -14,6 +14,34 @@
             </button>
         </div>
 
+        <div
+            v-if='!setupReminderDismissed'
+            class='border rounded p-2 mb-3 bg-body-secondary small'
+        >
+            <div class='d-flex gap-2'>
+                <IconInfoCircle
+                    :size='18'
+                    stroke='1.5'
+                    class='text-azure flex-shrink-0 mt-1'
+                />
+                <div>
+                    Before creating mission assignments, attach your assignments (lines, polygons)
+                    to this DataSync Mission. If assignments or segments were drawn in other GIS systems,
+                    import the GeoJSON file from that platform. If the Caltopo Sync plugin is installed,
+                    you can create a sync pair to import them into this DataSync.
+                </div>
+            </div>
+            <div class='text-end mt-1'>
+                <button
+                    type='button'
+                    class='btn btn-link btn-sm p-0 text-muted'
+                    @click='dismissSetupReminder'
+                >
+                    Do not remind me
+                </button>
+            </div>
+        </div>
+
         <p class='text-muted small mb-2'>
             Log field assignments to DataSync. Teams come from the <strong>Resources</strong> tab.
             Each log links to the selected map object via <code>entryUid</code>.
@@ -293,6 +321,7 @@
 
 <script setup lang='ts'>
 import { computed, onMounted, ref, watch } from 'vue';
+import { IconInfoCircle } from '@tabler/icons-vue';
 import { useIncident } from '../../composables/useIncident.ts';
 import { useResourceAssignments } from '../../composables/useResourceAssignments.ts';
 import { useWorkAssignments } from '../../composables/useWorkAssignments.ts';
@@ -300,8 +329,19 @@ import { nowDatetimeLocal } from '../../lib/incidentInfo.ts';
 import { listMissionCots, type MissionCotRef } from '../../lib/missionCots.ts';
 import { isValidAssignmentNumber } from '../../lib/workAssignments.ts';
 
+const SETUP_REMINDER_KEY = 'incident-manager:assignments-setup-reminder-dismissed';
+
 const { activeMission } = useIncident();
 const { assignments: resourceTeams, loadForMission: loadResourceTeams } = useResourceAssignments();
+
+const setupReminderDismissed = ref(
+    localStorage.getItem(SETUP_REMINDER_KEY) === '1',
+);
+
+function dismissSetupReminder(): void {
+    setupReminderDismissed.value = true;
+    localStorage.setItem(SETUP_REMINDER_KEY, '1');
+}
 const {
     assignments,
     loading,
