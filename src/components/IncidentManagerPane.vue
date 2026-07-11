@@ -125,7 +125,7 @@
                         <ResourcesTab v-else-if='activeKey === "resources"' />
                         <AssignmentsTab v-else-if='activeKey === "work-assignments"' />
                         <CasiePane v-else-if='activeKey === "casie"' />
-                        <WrapUpPane v-else-if='activeKey === "wrapup"' />
+                        <WrapUpPane v-else-if='activeKey === "generate-report-template"' />
                         <LoggerPane
                             v-else
                             :sub='activeKey'
@@ -192,7 +192,8 @@ const navItems: NavEntry[] = [
     { kind: 'sub', key: 'incident-post', label: 'Incident POST' },
     { kind: 'sub', key: 'casie', label: 'CASIE' },
 
-    { kind: 'item', key: 'wrapup', label: 'Wrap Up' },
+    { kind: 'header', key: 'h-wrapup', label: 'Wrap Up' },
+    { kind: 'sub', key: 'generate-report-template', label: 'Generate Report Template' },
 ];
 
 const hTabs = [
@@ -234,6 +235,8 @@ function loadNavFromSession(): { activeKey: string; activeHTab: HTabKey } {
             htab = 'main';
             key = 'work-assignments';
         }
+        // Wrap Up split into section header + Generate Report Template sub-pane.
+        if (key === 'wrapup') key = 'generate-report-template';
         return {
             activeKey: navKeys.has(key) ? key : 'create-open',
             activeHTab: isHTabKey(htab) ? htab : 'main',
