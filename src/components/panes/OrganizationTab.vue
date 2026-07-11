@@ -377,6 +377,7 @@
                 <div class='card-body p-0 flex-grow-1 min-height-0 assignments-chart'>
                     <HastyTeam
                         v-model='teamTree'
+                        :node-width='200'
                         @drop:root='onDropRoot'
                         @drop:node='onDropNode'
                     >
@@ -458,7 +459,7 @@
 
 <script setup lang='ts'>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { HastyTeam } from '@tak-ps/vue-hasty-team';
+import { HastyTeam } from '../../vendor/vue-hasty-team/index.ts';
 import { IconLifebuoy, IconShield, IconTag, IconUser, IconUsers, IconX } from '@tabler/icons-vue';
 import { useIncident } from '../../composables/useIncident.ts';
 import type { RescueGroupLabel } from '../../data/rescueManagementPositions.ts';

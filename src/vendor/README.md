@@ -28,3 +28,23 @@ Verify no external imports (should print nothing):
 ```bash
 grep -oE 'from["'"'"'][^./][^"'"'"']*["'"'"']' src/vendor/pdf-lib.esm.min.js
 ```
+
+## vue-hasty-team (org chart)
+
+Vendored from [@tak-ps/vue-hasty-team](https://github.com/dfpc-coe/vue-hasty-team) v3.70.0 with a layout fix for 3-wide sibling rows (explicit column widths so SVG connectors align with node cards).
+
+CloudTAK Docker builds only run `npm install` in `api/web/`, so `@tak-ps/vue-hasty-team` is not available as a peer dependency at build time. Vendoring keeps the Organization tab self-contained.
+
+- `vue-hasty-team/HastyTeamRoot.vue` — patched `HastyTeam` component (`nodeWidth` / `nodeMarginX` props).
+- `vue-hasty-team/index.ts` — re-exports `HastyTeam`.
+
+### Updating
+
+Copy from a vue-hasty-team checkout at v3.70.0 or later:
+
+```bash
+cp ../vue-hasty-team/components/HastyTeamRoot.vue src/vendor/vue-hasty-team/HastyTeamRoot.vue
+```
+
+Prefer contributing fixes upstream first, then refresh the vendored copy.
+
