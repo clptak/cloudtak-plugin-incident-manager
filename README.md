@@ -63,7 +63,7 @@ cd ~/CloudTAK
 
 ```bash
 docker compose build \
-  --build-arg WEB_PLUGINS="https://github.com/clptak/cloudtak-plugin-incidentManager.git#v0.1.1" \
+  --build-arg WEB_PLUGINS="https://github.com/clptak/cloudtak-plugin-incident-manager.git#v0.1.1" \
   api
 ```
 
@@ -84,13 +84,13 @@ services:
   api:
     build:
       args:
-        WEB_PLUGINS: "https://github.com/clptak/cloudtak-plugin-incidentManager.git#v0.1.1"
+        WEB_PLUGINS: "https://github.com/clptak/cloudtak-plugin-incident-manager.git#v0.1.1"
 ```
 
 If you already use `WEB_PLUGINS` for other plugins, set it to a **comma-separated list** of git URLs (no spaces):
 
 ```text
-WEB_PLUGINS="https://github.com/org/plugin-a.git,https://github.com/org/plugin-b.git,https://github.com/clptak/cloudtak-plugin-incidentManager.git#v0.1.1"
+WEB_PLUGINS="https://github.com/org/plugin-a.git,https://github.com/org/plugin-b.git,https://github.com/clptak/cloudtak-plugin-incident-manager.git#v0.1.1"
 ```
 
 ### Verify it worked
