@@ -1,26 +1,36 @@
 <template>
-    <div
-        class='d-flex align-items-center gap-1 px-2 mt-3 mb-1 text-muted text-uppercase fw-bold'
-        style='font-size: 0.72rem; letter-spacing: 0.04em;'
-    >
-        <span>{{ label }}</span>
-        <div
-            v-if='helpKey'
-            class='d-inline-flex'
-            style='text-transform: none;'
+    <div class='incident-nav-section-header'>
+        <button
+            type='button'
+            class='incident-nav-section-toggle'
+            :aria-expanded='expanded'
+            :aria-label='`${expanded ? "Collapse" : "Expand"} ${label} section`'
+            @click='emit("toggle")'
         >
-            <button
-                type='button'
-                class='btn btn-link btn-sm p-0 text-muted lh-1 border-0'
-                :aria-label='helpContent?.ariaLabel'
-                @click.stop='helpOpen = true'
-            >
-                <IconInfoCircle
-                    :size='16'
-                    stroke='1.5'
-                />
-            </button>
-        </div>
+            <IconChevronDown
+                v-if='expanded'
+                :size='14'
+                stroke='1.5'
+            />
+            <IconChevronRight
+                v-else
+                :size='14'
+                stroke='1.5'
+            />
+            <span>{{ label }}</span>
+        </button>
+        <button
+            v-if='helpKey'
+            type='button'
+            class='incident-nav-section-help'
+            :aria-label='helpContent?.ariaLabel'
+            @click.stop='helpOpen = true'
+        >
+            <IconInfoCircle
+                :size='16'
+                stroke='1.5'
+            />
+        </button>
     </div>
 
     <div
@@ -94,12 +104,17 @@
 
 <script setup lang='ts'>
 import { computed, ref } from 'vue';
-import { IconInfoCircle } from '@tabler/icons-vue';
+import { IconChevronDown, IconChevronRight, IconInfoCircle } from '@tabler/icons-vue';
 import { NAV_SECTION_HELP, type NavSectionHelpKey } from '../lib/navSectionHelp.ts';
 
 const props = defineProps<{
     label: string;
+    expanded: boolean;
     helpKey?: NavSectionHelpKey;
+}>();
+
+const emit = defineEmits<{
+    toggle: [];
 }>();
 
 const helpOpen = ref(false);

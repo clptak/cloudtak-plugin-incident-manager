@@ -1,0 +1,78 @@
+.incident-side-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.incident-side-nav .incident-nav-item,
+.incident-side-nav .incident-nav-section-header {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 0.35rem 1rem;
+    border: 0;
+    border-radius: var(--bs-border-radius, 0.25rem);
+    background: transparent;
+    color: var(--bs-nav-link-color, var(--bs-link-color, #6c7a91));
+    text-align: start;
+    font-size: var(--bs-nav-link-font-size, 1rem);
+    line-height: 1.4;
+}
+
+.incident-side-nav .incident-nav-item:hover,
+.incident-side-nav .incident-nav-item:focus-visible {
+    background: var(--bs-nav-link-hover-bg, rgba(0, 0, 0, 0.04));
+    color: var(--bs-nav-link-hover-color, var(--bs-link-hover-color, #1e293b));
+}
+
+.incident-side-nav .incident-nav-item.active {
+    background: var(--bs-nav-pills-link-active-bg, var(--bs-primary, #206bc4));
+    color: var(--bs-nav-pills-link-active-color, #fff);
+}
+
+.incident-side-nav .incident-nav-sub {
+    padding-inline-start: 1.75rem;
+}
+
+.incident-side-nav .incident-nav-section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: 0.75rem;
+    padding-block: 0.25rem;
+    cursor: default;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--bs-secondary-color, #6c7a91);
+    background: transparent;
+}
+
+.incident-side-nav .incident-nav-section-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    text-align: start;
+}
+
+.incident-side-nav .incident-nav-section-help {
+    display: inline-flex;
+    flex-shrink: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--bs-secondary-color, #6c7a91);
+    line-height: 1;
+}

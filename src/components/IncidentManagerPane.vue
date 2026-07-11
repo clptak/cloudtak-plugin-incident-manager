@@ -21,58 +21,29 @@
                     aria-label='Close navigation'
                 />
             </div>
-            <div class='offcanvas-body p-2 nav flex-column nav-pills'>
-                <template
-                    v-for='item in navItems'
-                    :key='item.key'
-                >
-                    <NavSectionHeader
-                        v-if='item.kind === "header"'
-                        :label='item.label'
-                        :help-key='item.helpKey'
-                    />
-                    <button
-                        v-else
-                        type='button'
-                        class='nav-link text-start'
-                        :class='{ active: activeKey === item.key && activeHTab === "main", "py-1": item.kind === "sub" }'
-                        :style='item.kind === "sub" ? "padding-left: 1.25rem;" : ""'
-                        data-bs-dismiss='offcanvas'
-                        data-bs-target='#incident-manager-nav'
-                        @click='selectKeyGuarded(item.key)'
-                    >
-                        {{ item.label }}
-                    </button>
-                </template>
+            <div class='offcanvas-body p-2 incident-side-nav'>
+                <IncidentNavList
+                    mobile
+                    :section-expanded='sectionExpanded'
+                    :active-key='activeKey'
+                    :active-h-tab='activeHTab'
+                    @toggle-section='toggleSection'
+                />
             </div>
         </div>
 
         <div class='d-flex gap-2 gap-md-3 flex-grow-1 min-height-0'>
             <!-- Desktop: vertical nav -->
             <div
-                class='nav flex-column nav-pills flex-shrink-0 d-none d-md-flex'
+                class='incident-side-nav flex-shrink-0 d-none d-md-flex'
                 style='min-width: 160px;'
             >
-                <template
-                    v-for='item in navItems'
-                    :key='item.key'
-                >
-                    <NavSectionHeader
-                        v-if='item.kind === "header"'
-                        :label='item.label'
-                        :help-key='item.helpKey'
-                    />
-                    <button
-                        v-else
-                        type='button'
-                        class='nav-link text-start'
-                        :class='{ active: activeKey === item.key && activeHTab === "main", "py-1": item.kind === "sub" }'
-                        :style='item.kind === "sub" ? "padding-left: 1.25rem;" : ""'
-                        @click='selectKeyGuarded(item.key)'
-                    >
-                        {{ item.label }}
-                    </button>
-                </template>
+                <IncidentNavList
+                    :section-expanded='sectionExpanded'
+                    :active-key='activeKey'
+                    :active-h-tab='activeHTab'
+                    @toggle-section='toggleSection'
+                />
             </div>
 
             <!-- Content column -->
@@ -146,12 +117,17 @@
 </template>
 
 <script setup lang='ts'>
-import { onMounted, defineAsyncComponent, computed, watch } from 'vue';
+import { onMounted, defineAsyncComponent, computed, ref, watch } from 'vue';
 import { TablerIconButton } from '@tak-ps/vue-tabler';
 import { IconMenu2 } from '@tabler/icons-vue';
-import NavSectionHeader from './NavSectionHeader.vue';
+import IncidentNavList from './IncidentNavList.vue';
 import MissionRequiredModal from './MissionRequiredModal.vue';
-import type { NavSectionHelpKey } from '../lib/navSectionHelp.ts';
+import './incidentSideNav.css';
+import {
+    ALL_NAV_ITEMS,
+    NAV_SECTIONS,
+    sectionKeyForNavItem,
+} from '../lib/incidentNav.ts';
 import { useIncident } from '../composables/useIncident.ts';
 
 const CreateOpenPane = defineAsyncComponent(() => import('./panes/CreateOpenPane.vue'));
@@ -164,35 +140,38 @@ const AssignmentsTab = defineAsyncComponent(() => import('./panes/AssignmentsTab
 const OrganizationTab = defineAsyncComponent(() => import('./panes/OrganizationTab.vue'));
 const ResourcesTab = defineAsyncComponent(() => import('./panes/ResourcesTab.vue'));
 
-interface NavEntry {
-    kind: 'item' | 'header' | 'sub';
-    key: string;
-    label: string;
-    helpKey?: NavSectionHelpKey;
+const SESSION_NAV_SECTIONS_KEY = 'incident-manager:nav-sections-expanded';
+
+const DEFAULT_SECTION_EXPANDED: Record<string, boolean> = Object.fromEntries(
+    NAV_SECTIONS.map((section) => [section.key, true]),
+);
+
+function loadSectionExpandedFromSession(): Record<string, boolean> {
+    const merged = { ...DEFAULT_SECTION_EXPANDED };
+    try {
+        const raw = sessionStorage.getItem(SESSION_NAV_SECTIONS_KEY);
+        if (!raw) return merged;
+        const parsed: unknown = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return merged;
+        for (const section of NAV_SECTIONS) {
+            const value = (parsed as Record<string, unknown>)[section.key];
+            if (typeof value === 'boolean') {
+                merged[section.key] = value;
+            }
+        }
+    } catch {
+        // ignore corrupt session data
+    }
+    return merged;
 }
 
-const navItems: NavEntry[] = [
-    { kind: 'item', key: 'create-open', label: 'Create | Open' },
-
-    { kind: 'header', key: 'h-initial', label: 'Initial Response', helpKey: 'route-location-search' },
-    { kind: 'sub', key: 'initial-information', label: 'Initial Information' },
-    { kind: 'sub', key: 'subject-info', label: 'Subject Information' },
-    { kind: 'sub', key: 'search-urgency', label: 'Search Urgency' },
-    { kind: 'sub', key: 'ir-briefing', label: 'IR Briefing' },
-    { kind: 'sub', key: 'resources', label: 'Resources' },
-    { kind: 'sub', key: 'work-assignments', label: 'Assignments' },
-    { kind: 'sub', key: 'ics-201', label: 'ICS 201' },
-
-    { kind: 'header', key: 'h-area', label: 'Area Search', helpKey: 'area-search' },
-    { kind: 'sub', key: 'search-scenarios', label: 'Search Scenarios' },
-    { kind: 'sub', key: 'search-area', label: 'Search Area' },
-    { kind: 'sub', key: 'risk-assessment', label: 'Risk Assessment' },
-    { kind: 'sub', key: 'incident-post', label: 'Incident POST' },
-    { kind: 'sub', key: 'casie', label: 'CASIE' },
-
-    { kind: 'header', key: 'h-wrapup', label: 'Wrap Up' },
-    { kind: 'sub', key: 'generate-report-template', label: 'Generate Report Template' },
-];
+function saveSectionExpandedToSession(state: Record<string, boolean>): void {
+    try {
+        sessionStorage.setItem(SESSION_NAV_SECTIONS_KEY, JSON.stringify(state));
+    } catch {
+        // ignore quota / private-mode errors
+    }
+}
 
 const hTabs = [
     { key: 'main', label: 'Main' },
@@ -205,21 +184,46 @@ const {
     activeKey,
     activeHTab,
     activeMission,
-    selectKeyGuarded,
     selectHTabGuarded,
     openNoMissionModal,
     isMissionRequiredView,
     restoreActiveMissionOnMap,
 } = useIncident();
 
+const sectionExpanded = ref(loadSectionExpandedFromSession());
+
+function toggleSection(key: string): void {
+    sectionExpanded.value = {
+        ...sectionExpanded.value,
+        [key]: !sectionExpanded.value[key],
+    };
+}
+
+function expandSectionForActiveKey(key: string): void {
+    const sectionKey = sectionKeyForNavItem(key);
+    if (!sectionKey || sectionExpanded.value[sectionKey] !== false) return;
+    sectionExpanded.value = {
+        ...sectionExpanded.value,
+        [sectionKey]: true,
+    };
+}
+
 const activeNavLabel = computed(() => {
     if (activeHTab.value !== 'main') {
         const tab = hTabs.find((item) => item.key === activeHTab.value);
         return tab?.label ?? 'Main';
     }
-    const item = navItems.find((entry) => entry.kind !== 'header' && entry.key === activeKey.value);
+    const item = ALL_NAV_ITEMS.find((entry) => entry.key === activeKey.value);
     return item?.label ?? 'Create | Open';
 });
+
+watch(sectionExpanded, (state) => {
+    saveSectionExpandedToSession(state);
+}, { deep: true });
+
+watch(activeKey, (key) => {
+    expandSectionForActiveKey(key);
+}, { immediate: true });
 
 watch([activeKey, activeHTab], () => {
     if (activeMission.value) return;
