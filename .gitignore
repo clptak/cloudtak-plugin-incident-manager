@@ -16,3 +16,4 @@ docs/*.pdf
 docs/*.md
 docs/*.txt
 sar-publications-scraper.js
+docs/publications.json
