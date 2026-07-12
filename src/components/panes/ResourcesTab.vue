@@ -45,6 +45,30 @@
 
         <div class='card mb-3'>
             <div class='card-header py-2 small fw-semibold'>
+                Default agency
+            </div>
+            <div class='card-body py-2'>
+                <label class='form-label small mb-1'>Default agency</label>
+                <input
+                    v-model='defaultAgencyInput'
+                    type='text'
+                    class='form-control form-control-sm'
+                    placeholder='Your agency name'
+                    autocomplete='organization'
+                    :disabled='!activeMission || saving || savingDefaultAgency'
+                    @blur='onDefaultAgencyBlur'
+                >
+                <p
+                    v-if='defaultAgencyHint'
+                    class='text-muted small mb-0 mt-2'
+                >
+                    {{ defaultAgencyHint }}
+                </p>
+            </div>
+        </div>
+
+        <div class='card mb-3'>
+            <div class='card-header py-2 small fw-semibold'>
                 New resource assignment
             </div>
             <div class='card-body'>
@@ -327,7 +351,7 @@ import type { D4HRosterMeta } from '../../lib/d4hTypes.ts';
 import { nowDatetimeLocal } from '../../lib/incidentInfo.ts';
 import {
     buildAgencyOptions,
-    DEFAULT_AGENCY,
+    resolveEffectiveDefaultAgency,
     RESOURCE_ASSIGNMENT_STATUSES,
     RESOURCE_TYPE_OPTIONS,
     type ResourceAssignment,
@@ -337,6 +361,7 @@ import {
 const { activeMission, requireActiveMission } = useIncident();
 const {
     assignments,
+    defaultAgency,
     loading,
     saving,
     statusMessage,
@@ -346,11 +371,16 @@ const {
     addAssignment,
     removeAssignment,
     updateAssignment,
+    updateDefaultAgency,
 } = useResourceAssignments();
 
 const loadingRoster = ref(false);
+const savingDefaultAgency = ref(false);
 const meta = ref<D4HRosterMeta | null>(null);
-const agencyOptions = ref<string[]>(buildAgencyOptions([]));
+const d4hExternalResources = ref<{ id: number; name: string }[]>([]);
+const defaultAgencyInput = ref('');
+const agencyOptions = ref<string[]>([]);
+const lastEffectiveDefaultAgency = ref('');
 
 const form = ref<Omit<ResourceAssignment, 'id'>>({
     ...blankResourceAssignmentForm(),
@@ -360,16 +390,51 @@ const form = ref<Omit<ResourceAssignment, 'id'>>({
 const resourceTypeOptions = RESOURCE_TYPE_OPTIONS;
 const statusOptions = RESOURCE_ASSIGNMENT_STATUSES;
 
+const d4hContextName = computed(() => (meta.value?.contextName ?? '').trim());
+
+const effectiveDefaultAgency = computed(() =>
+    resolveEffectiveDefaultAgency(defaultAgency.value, d4hContextName.value),
+);
+
+const defaultAgencyHint = computed(() => {
+    const override = defaultAgency.value.trim();
+    const d4h = d4hContextName.value;
+    if (override && d4h && override !== d4h) {
+        return `Override active. D4H team: ${d4h}.`;
+    }
+    if (override) {
+        return 'Saved on this mission as default_agency in mission_schema.json.';
+    }
+    if (d4h) {
+        return `Using D4H team: ${d4h}. Enter a value above to override.`;
+    }
+    return 'Enter your agency name, or sync D4H to pull it automatically.';
+});
+
 const canCreate = computed(() =>
     form.value.resourceIdentifier.trim().length > 0
     && form.value.resource.trim().length > 0
     && form.value.agency.trim().length > 0,
 );
 
+function rebuildAgencyOptions(): void {
+    agencyOptions.value = buildAgencyOptions(d4hExternalResources.value, effectiveDefaultAgency.value);
+}
+
+function applyEffectiveDefaultToForm(force = false): void {
+    const effective = effectiveDefaultAgency.value;
+    if (!effective) return;
+    if (force || !form.value.agency.trim() || form.value.agency === lastEffectiveDefaultAgency.value) {
+        form.value.agency = effective;
+    }
+    lastEffectiveDefaultAgency.value = effective;
+}
+
 function resetForm(): void {
     form.value = {
         ...blankResourceAssignmentForm(),
         timeOrdered: nowDatetimeLocal(),
+        agency: effectiveDefaultAgency.value,
     };
 }
 
@@ -378,12 +443,26 @@ async function refreshAgencies(): Promise<void> {
     try {
         const roster = await loadD4hRoster();
         meta.value = roster?.meta ?? await loadD4hMeta();
-        agencyOptions.value = buildAgencyOptions(roster?.externalResources ?? []);
-        if (!agencyOptions.value.includes(form.value.agency)) {
-            form.value.agency = DEFAULT_AGENCY;
-        }
+        d4hExternalResources.value = roster?.externalResources ?? [];
+        rebuildAgencyOptions();
+        applyEffectiveDefaultToForm();
     } finally {
         loadingRoster.value = false;
+    }
+}
+
+async function onDefaultAgencyBlur(): Promise<void> {
+    if (!activeMission.value) return;
+    const next = defaultAgencyInput.value.trim();
+    if (next === defaultAgency.value.trim()) return;
+
+    savingDefaultAgency.value = true;
+    try {
+        await updateDefaultAgency(activeMission.value, next);
+        rebuildAgencyOptions();
+        applyEffectiveDefaultToForm(true);
+    } finally {
+        savingDefaultAgency.value = false;
     }
 }
 
@@ -443,9 +522,22 @@ async function onStatusChange(id: string, status: ResourceAssignmentStatus): Pro
     await updateAssignment(activeMission.value, id, { status });
 }
 
-watch(() => activeMission.value?.guid, (guid) => {
-    void loadForMission(guid ? activeMission.value : null);
+watch(() => activeMission.value?.guid, async (guid) => {
+    await loadForMission(guid ? activeMission.value : null);
+    defaultAgencyInput.value = defaultAgency.value;
+    applyEffectiveDefaultToForm(true);
 }, { immediate: true });
+
+watch(defaultAgency, (value) => {
+    defaultAgencyInput.value = value;
+    rebuildAgencyOptions();
+    applyEffectiveDefaultToForm();
+});
+
+watch(effectiveDefaultAgency, () => {
+    rebuildAgencyOptions();
+    applyEffectiveDefaultToForm();
+});
 
 onMounted(() => {
     void refreshAgencies();

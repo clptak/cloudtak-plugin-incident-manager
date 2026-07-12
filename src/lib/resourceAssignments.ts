@@ -28,9 +28,28 @@ export const DEFAULT_AGENCY = '';
 
 export const RESOURCE_TYPE_OPTIONS = [...ASSIGNMENT_RESOURCES] as string[];
 
-export function buildAgencyOptions(d4hExternalResources: D4HExternalResource[]): string[] {
+/** Mission override wins; D4H team/org name is the fallback when override is empty. */
+export function resolveEffectiveDefaultAgency(
+    schemaDefaultAgency: string,
+    d4hContextName?: string,
+): string {
+    const override = schemaDefaultAgency.trim();
+    if (override) return override;
+    return (d4hContextName ?? '').trim();
+}
+
+export function buildAgencyOptions(
+    d4hExternalResources: D4HExternalResource[],
+    effectiveDefaultAgency = '',
+): string[] {
     const seen = new Set<string>();
     const out: string[] = [];
+
+    const home = effectiveDefaultAgency.trim();
+    if (home) {
+        seen.add(home);
+        out.push(home);
+    }
 
     const d4hNames = [...d4hExternalResources]
         .map((r) => r.name.trim())

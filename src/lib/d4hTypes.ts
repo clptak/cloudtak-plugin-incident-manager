@@ -41,6 +41,8 @@ export interface D4HRosterMeta {
     region: string;
     context: string;
     contextId: number;
+    /** Team/org display name from D4H sync (GET /v3/{context}/{contextId} → title). */
+    contextName?: string;
     memberCount: number;
     equipmentCount: number;
     externalResourceCount?: number;

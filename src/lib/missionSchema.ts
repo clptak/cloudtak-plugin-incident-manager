@@ -42,6 +42,8 @@ export interface MissionSchema {
     coordinates: [number, number];
     sar_coordinators: string;
     assisting_agencies: string;
+    /** Per-mission default agency override (Resources tab); falls back to D4H contextName when empty. */
+    default_agency: string;
     subject_located: Record<string, unknown>;
     tak_missions: unknown[];
     caltopo_maps: unknown[];

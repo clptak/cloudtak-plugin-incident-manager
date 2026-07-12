@@ -14,6 +14,14 @@ import {
     type ResourceAssignment,
 } from './resourceAssignments.ts';
 
+export function defaultAgencyFromSchema(schema: MissionSchema): string {
+    return String(schema.default_agency ?? '').trim();
+}
+
+export function applyDefaultAgencyToSchema(schema: MissionSchema, defaultAgency: string): void {
+    schema.default_agency = defaultAgency.trim();
+}
+
 export function resourceAssignmentsFromSchema(schema: MissionSchema): ResourceAssignment[] {
     const ir = schema.incident_response as Record<string, unknown> | undefined;
     return resourceAssignmentsFromSchemaValue(ir?.resource_assignments);
@@ -37,11 +45,12 @@ export function applyResourceAssignmentsToSchema(
 
 export async function loadResourceAssignmentsFromMission(
     mission: ActiveMission,
-): Promise<{ assignments: ResourceAssignment[]; contentHash?: string }> {
+): Promise<{ assignments: ResourceAssignment[]; defaultAgency: string; contentHash?: string }> {
     const sub = await loadIncidentSubscription(mission);
     const loaded = await loadMissionSchema(sub);
     return {
         assignments: resourceAssignmentsFromSchema(loaded.schema),
+        defaultAgency: defaultAgencyFromSchema(loaded.schema),
         contentHash: loaded.contentHash,
     };
 }
@@ -50,11 +59,15 @@ export async function saveResourceAssignmentsToMission(
     mission: ActiveMission,
     assignments: ResourceAssignment[],
     contentHash?: string,
+    defaultAgency?: string,
 ): Promise<string | undefined> {
     const sub = await loadIncidentSubscription(mission);
     const loaded = await loadMissionSchema(sub);
 
     applyResourceAssignmentsToSchema(loaded.schema, assignments);
+    if (defaultAgency !== undefined) {
+        applyDefaultAgencyToSchema(loaded.schema, defaultAgency);
+    }
     applyMissionContextToSchema(loaded.schema, mission.name);
 
     const saved = await saveMissionSchema(sub, loaded.schema, {
