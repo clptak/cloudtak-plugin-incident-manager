@@ -16,8 +16,8 @@ const IncidentManagerFloatShell = defineAsyncComponent(
 const IncidentManagerPane = defineAsyncComponent(
     () => import('./components/IncidentManagerPane.vue')
 );
-const RestoreMinimizedChip = defineAsyncComponent(
-    () => import('./components/RestoreMinimizedChip.vue')
+const IncidentManagerTaskbarChip = defineAsyncComponent(
+    () => import('./components/IncidentManagerTaskbarChip.vue')
 );
 
 const ROUTE_NAME = 'home-menu-incident-manager';
@@ -35,7 +35,7 @@ export default class IncidentManagerPlugin implements PluginInstance {
         bindFloatMinimize({
             api,
             shell: IncidentManagerFloatShell as unknown as HostFloatComponent,
-            restoreChip: RestoreMinimizedChip as unknown as HostBottomBarComponent,
+            restoreChip: IncidentManagerTaskbarChip as unknown as HostBottomBarComponent,
         });
 
         this.api.routes.add({

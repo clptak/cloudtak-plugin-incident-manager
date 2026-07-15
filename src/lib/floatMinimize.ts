@@ -3,7 +3,7 @@ import type { PluginAPI } from '../../../../plugin.ts';
 import { useFloatStore } from '../../../../src/stores/float.ts';
 
 export const PANE_UID = 'incident-manager';
-export const BOTTOM_BAR_KEY = 'incident-manager-minimized';
+export const BOTTOM_BAR_KEY = 'incident-manager';
 
 type HostFloatComponent = Parameters<ReturnType<typeof useFloatStore>['add']>[0]['component'];
 type BottomBarComponent = Parameters<PluginAPI['bottomBar']['add']>[0]['component'];
@@ -36,6 +36,7 @@ export function bindFloatMinimize(opts: {
     api = opts.api;
     shellComponent = opts.shell;
     restoreChipComponent = opts.restoreChip;
+    ensureBottomBarChip();
 }
 
 export function isMinimized(): boolean {
@@ -77,6 +78,18 @@ function showFloat(geometry: PaneGeometry): void {
     });
 }
 
+function ensureBottomBarChip(): void {
+    if (!restoreChipComponent || !api) return;
+    try {
+        api.bottomBar.add({
+            key: BOTTOM_BAR_KEY,
+            component: restoreChipComponent,
+        });
+    } catch {
+        // Map / bottom bar may not be loaded yet — retry on open/minimize
+    }
+}
+
 function clearBottomBarChip(): void {
     try {
         requireApi().bottomBar.remove(BOTTOM_BAR_KEY);
@@ -91,8 +104,12 @@ function clearBottomBarChip(): void {
  */
 export function openDesktopPane(): void {
     const pluginApi = requireApi();
+    ensureBottomBarChip();
     if (minimized) {
-        restoreDesktopPane();
+        minimized = false;
+        if (!pluginApi.float.has(PANE_UID)) {
+            showFloat(savedGeometry ?? DEFAULT_GEOMETRY);
+        }
         return;
     }
     if (pluginApi.float.has(PANE_UID)) return;
@@ -101,26 +118,16 @@ export function openDesktopPane(): void {
 
 export function minimizeDesktopPane(): void {
     const pluginApi = requireApi();
+    ensureBottomBarChip();
     if (!pluginApi.float.has(PANE_UID) || minimized) return;
-    if (!restoreChipComponent) {
-        throw new Error('floatMinimize restore chip not configured');
-    }
 
     savedGeometry = readGeometry();
     pluginApi.float.remove(PANE_UID);
     minimized = true;
-    pluginApi.bottomBar.add({
-        key: BOTTOM_BAR_KEY,
-        component: restoreChipComponent,
-    });
 }
 
 export function restoreDesktopPane(): void {
-    const pluginApi = requireApi();
-    clearBottomBarChip();
-    minimized = false;
-    if (pluginApi.float.has(PANE_UID)) return;
-    showFloat(savedGeometry ?? DEFAULT_GEOMETRY);
+    openDesktopPane();
 }
 
 export function cleanupFloatMinimize(): void {
