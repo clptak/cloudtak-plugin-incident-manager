@@ -1,74 +1,99 @@
-# Minimize a CloudTAK floating pane to the bottom status bar
+# Persistent bottom status bar + float minimize (CloudTAK plugins)
 
-Plugin-only pattern (no CloudTAK core changes) to get a desktop float “out of the way” of the map, then restore it to the same size and position — with a **permanent** bottom-bar launcher so you can open the plugin anytime without minimizing first.
+Plugin-only pattern (no CloudTAK core changes) for:
 
-**Reference implementation:** this repo — `src/lib/floatMinimize.ts`, `src/components/MinimizePaneAction.vue`, `src/components/IncidentManagerTaskbarChip.vue`, `src/components/IncidentManagerFloatShell.vue`, `src/index.ts`.
+1. A **permanent launcher chip** on the map bottom status bar (open your UI anytime), and
+2. Optional **minimize** on a desktop floating pane (hide for map work, reopen at the same size/position).
 
-## Behavior
+**Reference implementation:** this repo —
 
-1. On plugin `enable()`, register a chip on the **bottom map status bar** and leave it there for the life of the plugin.
-2. Chip click (or the plugin menu item) opens/restores the desktop float — **no-op if already visible**.
-3. A **Minimize** control in the float header snapshots live `x / y / width / height` and removes the float (map is clear). The taskbar chip stays.
-4. Tapping the chip again re-opens the float at the saved geometry.
-5. On `disable()`, remove the chip and any open float.
+- [`src/lib/floatMinimize.ts`](src/lib/floatMinimize.ts)
+- [`src/components/IncidentManagerTaskbarChip.vue`](src/components/IncidentManagerTaskbarChip.vue)
+- [`src/components/MinimizePaneAction.vue`](src/components/MinimizePaneAction.vue)
+- [`src/components/IncidentManagerFloatShell.vue`](src/components/IncidentManagerFloatShell.vue)
+- [`src/index.ts`](src/index.ts)
 
-Mobile stays on your normal `MenuTemplate` / menu route — this pattern is for **desktop floats** only.
+## Shared status bar (multiple plugins)
 
-```text
-[Plugin enable] -------------------> [Bottom bar chip stays]
-[Bottom bar chip] --tap-----------> [Floating pane]
-[Floating pane] --minimize-------> [Map clear] (chip still there)
-[Bottom bar chip] --tap-----------> [Floating pane at prior geometry]
+CloudTAK’s map chrome has a fixed bottom bar (`--map-bottom-bar-size`, ~50px). The **centre slot** is a list of plugin-registered Vue components:
+
+```ts
+api.bottomBar.add({ key: 'my-unique-key', component: MyChip });
+api.bottomBar.remove('my-unique-key');
 ```
 
-## Host APIs (already in CloudTAK)
+Each enabled plugin can add **one (or more) chips**. They sit side-by-side in the centre. Keys must be unique across plugins; duplicates are skipped with a console warning.
+
+| Do | Don’t |
+|----|--------|
+| Register on `enable()`, remove on `disable()` | Register only while minimized (users can’t launch without finding the menu first) |
+| Use a namespaced key (`d4h`, `caltopo-sync`, `incident-manager`) | Reuse another plugin’s key |
+| Keep the chip compact (icon + short label) | Tall padding that overflows the 50px bar |
+| Call `add` again safely if map wasn’t ready (`ensure…` + host skip-duplicates) | Remove the chip when opening/restoring the float |
+
+Incident Manager’s key is `incident-manager` (`BOTTOM_BAR_KEY`). Copy that idea; do not reuse that string.
+
+## Behavior (this plugin)
+
+1. On `enable()`, register the taskbar chip once; it stays for the life of the plugin.
+2. Chip click → `openDesktopPane()` (open/restore; **no-op if already visible**).
+3. Float header **Minimize** snapshots `x/y/width/height`, removes the float; **chip stays**.
+4. Chip / menu again → float returns at saved geometry.
+5. On `disable()`, remove chip + float.
+
+Desktop floats only. Mobile keeps `MenuTemplate` / menu route.
+
+```text
+[Plugin A enable] --> chip A in centre bar
+[Plugin B enable] --> chip A | chip B
+chip A tap ---------> Plugin A float
+float Minimize -----> map free, chip A still there
+chip A tap ---------> Plugin A float (prior geometry)
+[Plugin A disable] -> chip A gone; chip B remains
+```
+
+## Host APIs
 
 | API | Role |
 |-----|------|
-| Float store `add` / `api.float.remove` / `api.float.has` | Create/tear down / presence. Prefer the store (or a custom shell) if you need a non-text title (e.g. icon + name). `api.float.add` always wraps `FloatingGeneric`. |
-| `api.bottomBar.add({ key, component })` / `api.bottomBar.remove(key)` | Centre slot of the map status bar — register **once** on enable. |
+| `api.bottomBar.add` / `remove` | Permanent (or temporary) centre chips |
+| Float store `add` / `api.float.remove` / `has` | Desktop pane; prefer store + custom shell for icon+title (`api.float.add` always wraps `FloatingGeneric`) |
 
-Live geometry is maintained by the host `FloatingPane` in the Pinia float store. The public plugin API has no `float.get()`, so read geometry via:
+Read live geometry (no `float.get()` on the public API):
 
 ```ts
-import { useFloatStore } from '../../../src/stores/float.ts'; // adjust depth for your file
+import { useFloatStore } from '../../../src/stores/float.ts'; // adjust path depth
 
 const pane = useFloatStore(api.pinia).panes.get(YOUR_PANE_UID);
 // pane.x, pane.y, pane.width, pane.height
 ```
 
-Deep-importing host stores is the same pattern many CloudTAK plugins already use; it does not require editing CloudTAK.
+## Porting checklist (another plugin)
 
-## Why remount is OK
+Minimal **launcher-only** (no minimize):
 
-Minimize uses `float.remove` + later `float.add`, so your pane **Vue component remounts**. Anything only in component-local `ref`s is lost.
+1. Add `MyPluginTaskbarChip.vue` — button calling your `open…()`.
+2. On `enable()`: `api.bottomBar.add({ key: 'my-plugin', component: MyChip })`.
+3. On `disable()`: `api.bottomBar.remove('my-plugin')`.
+4. Chip click opens your float (or navigates your menu route on mobile).
 
-Survive remount by keeping important state in:
-
-- Module-scope refs / a small store (this plugin’s `useIncident` composable), and/or
-- `sessionStorage` / mission persistence
-
-Unsaved in-field drafts that are not persisted yet will reset. Design for that, or persist on blur/change if it matters.
-
-## File checklist
+Full **launcher + minimize** (match this repo):
 
 | Piece | Purpose |
 |-------|---------|
-| `lib/floatMinimize.ts` (or similar) | Module controller: bind API + shell + chip, open / minimize / cleanup, hold `savedGeometry` + `minimized`; register chip on bind |
-| Custom float shell (optional) | `FloatingPane` + title/icon + minimize action + pane body (skips `FloatingGeneric`) |
-| `MinimizePaneAction.vue` | Header action: IconMinus → `minimizeDesktopPane()` |
-| `*TaskbarChip.vue` | Permanent bottom-bar chip: click → `openDesktopPane()` |
-| Plugin `enable()` / `disable()` | `bind…` on enable (registers chip); `cleanup…` on disable (removes chip) |
+| `lib/floatMinimize.ts` (rename/adapt) | Bind API + shell + chip; `open` / `minimize` / `cleanup`; `savedGeometry` + `minimized`; `ensureBottomBarChip()` on bind and on open/minimize |
+| Float shell (optional) | Custom `FloatingPane` header (icon + title) + minimize action + body |
+| `MinimizePaneAction.vue` | Header `IconMinus` → minimize |
+| `*TaskbarChip.vue` | Permanent centre chip → `openDesktopPane()` |
+| `enable` / `disable` | Bind (registers chip); cleanup (removes chip) |
 
-Use **unique** `PANE_UID` and `BOTTOM_BAR_KEY` strings per plugin (e.g. both `my-plugin`) so two plugins do not collide.
+Use distinct `PANE_UID` and `BOTTOM_BAR_KEY` (often the same string, e.g. `my-plugin`).
 
-## Controller sketch
+## Controller sketch (persistent chip)
 
-Keep callbacks in a module so the Vue chip needs no props. Register the chip once; minimize/open must **not** add/remove it.
+Register once; **never** remove on open/restore — only on cleanup.
 
 ```ts
-// lib/floatMinimize.ts (conceptual)
-
 const PANE_UID = 'my-plugin';
 const BOTTOM_BAR_KEY = 'my-plugin';
 const DEFAULT_GEOMETRY = { width: 800, height: 600, x: 80, y: 60 };
@@ -114,7 +139,7 @@ export function openDesktopPane() {
     if (!api.float.has(PANE_UID)) showFloat(savedGeometry ?? DEFAULT_GEOMETRY);
     return;
   }
-  if (api.float.has(PANE_UID)) return; // already open
+  if (api.float.has(PANE_UID)) return;
   showFloat(savedGeometry ?? DEFAULT_GEOMETRY);
 }
 
@@ -124,38 +149,17 @@ export function minimizeDesktopPane() {
   savedGeometry = readGeometry();
   api.float.remove(PANE_UID);
   minimized = true;
-  // chip stays registered
+  // chip stays
 }
 
 export function cleanupFloatMinimize() {
-  try { api?.bottomBar.remove(BOTTOM_BAR_KEY); } catch { /* map may be gone */ }
+  try { api?.bottomBar.remove(BOTTOM_BAR_KEY); } catch { /* */ }
   minimized = false;
   if (api?.float.has(PANE_UID)) api.float.remove(PANE_UID);
 }
 ```
 
-### Header minimize button
-
-```vue
-<template>
-  <TablerIconButton
-    title='Minimize to status bar'
-    @click='minimizeDesktopPane'
-  >
-    <IconMinus :size='24' stroke='1' />
-  </TablerIconButton>
-</template>
-
-<script setup lang='ts'>
-import { IconMinus } from '@tabler/icons-vue';
-import { TablerIconButton } from '@tak-ps/vue-tabler';
-import { minimizeDesktopPane } from '../lib/floatMinimize.ts';
-</script>
-```
-
 ### Permanent taskbar chip
-
-Keep it compact (status bar is ~50px). Outline button + short label works well over the dark bar:
 
 ```vue
 <template>
@@ -171,19 +175,22 @@ Keep it compact (status bar is ~50px). Outline button + short label works well o
 </template>
 ```
 
-## Wire into the plugin class
+### Header minimize (optional)
 
-On `enable()`:
+```vue
+<template>
+  <TablerIconButton
+    title='Minimize to status bar'
+    @click='minimizeDesktopPane'
+  >
+    <IconMinus :size='24' stroke='1' />
+  </TablerIconButton>
+</template>
+```
 
-1. `bindFloatMinimize({ api, shell, restoreChip })` — registers the permanent chip.
-2. Desktop menu route `onMounted`: if not mobile → `openDesktopPane()` then navigate home so the side menu goes compact.
+Match host Close control: `size=24`, `stroke=1`.
 
-On `disable()`:
-
-1. `cleanupFloatMinimize()` so the chip does not linger after the plugin is torn down.
-2. Remove menu / routes as you already do.
-
-Example (abbreviated):
+## Wire in `enable` / `disable`
 
 ```ts
 async enable() {
@@ -192,56 +199,51 @@ async enable() {
     shell: MyFloatShell as unknown as HostFloatComponent,
     restoreChip: MyTaskbarChip as unknown as HostBottomBarComponent,
   });
-
-  // routes… onMounted desktop:
-  //   openDesktopPane();
-  //   void api.router.replace({ name: 'home' });
+  // menu + routes… desktop onMounted: openDesktopPane(); router.replace({ name: 'home' });
 }
 
 async disable() {
   this.api.menu.remove('my-plugin');
   cleanupFloatMinimize();
-  // removeRoute…
 }
 ```
 
 ### Duplicate Vue `Component` types
 
-If the plugin has its own `node_modules/vue` while the host typechecks against `api/web/node_modules/vue`, assigning async components into float / `bottomBar.add` can fail `vue-tsc`. Cast through the host API types (as in this plugin’s `src/index.ts`):
+If plugin `node_modules/vue` diverges from host `api/web/node_modules/vue`, cast through host API types:
 
 ```ts
 type HostFloatComponent = Parameters<PluginAPI['float']['add']>[0]['component'];
 type HostBottomBarComponent = Parameters<PluginAPI['bottomBar']['add']>[0]['component'];
 ```
 
+## Why remount is OK
+
+Minimize `remove` + later `add` remounts the pane. Survive via module-scope state / `sessionStorage` / mission persistence (this plugin: `useIncident`). Unsaved local field drafts may reset.
+
 ## Pitfalls
 
-- **Re-`float.add` while open resets geometry.** Always `has(uid)` early-return before adding again.
-- **Close (X) vs Minimize.** Host Close deletes the float and does not notify the plugin. Chip stays; user can reopen from the taskbar. If you care about “closed vs minimized,” treat X the same as minimize only if you hook it — by default X just removes the float; next open still uses `savedGeometry` if you last minimized.
-- **Permanent chip.** Do not remove the chip on restore/open — only on plugin `disable`.
-- **Key uniqueness.** Bottom bar skips duplicate keys with a console warning — use a namespaced key; `ensureBottomBarChip` is idempotent.
-- **Mobile.** Skip float minimize; keep `MenuTemplate` / full menu route.
+- **Shared centre bar.** Every plugin’s chip is always visible to everyone; keep labels short.
+- **Unique keys.** Collisions = silent skip.
+- **Don’t tie chip lifetime to minimize.** Persistent launcher = add on enable, remove on disable only.
+- **Re-`add` while open resets geometry.** `has(uid)` early-return.
+- **Close (X)** does not notify the plugin; chip remains so users can reopen.
+- **Mobile:** no bottom-bar float pattern; use menu route / `MenuTemplate`.
 
-## Style notes (match host chrome)
+## Out of scope
 
-- Minimize control: same size/stroke as the host Close (`IconX` is `size=24`, `stroke=1`) via `TablerIconButton`.
-- Chip: light outline on the dark translucent status bar; avoid tall padding so it stays inside `--map-bottom-bar-size` (~50px).
+- Toggle closed on chip click while open (here: no-op; use Minimize).
+- Geometry across full page reload (`sessionStorage` if you need it).
+- Core `minimized` + `v-show` (hide without remount).
 
-## What this does *not* do
-
-- Toggle the float closed when tapping the chip while open (click is a no-op if already visible; use Minimize to hide).
-- Persist geometry across full page reload (optional enhancement: mirror `savedGeometry` in `sessionStorage`).
-- Hide the float without remounting (that would need a CloudTAK `minimized` flag + `v-show` on floats).
-- Minimize side-menu / mobile `TablerModal` shells — different host model.
-
-## Copy reference from this repo
+## Copy from this repo
 
 ```text
 src/lib/floatMinimize.ts
-src/components/MinimizePaneAction.vue
 src/components/IncidentManagerTaskbarChip.vue
+src/components/MinimizePaneAction.vue
 src/components/IncidentManagerFloatShell.vue
-src/index.ts          # bind + openDesktopPane + cleanupFloatMinimize
+src/index.ts
 ```
 
-Rename UIDs, labels, and icons for your plugin; keep the open / minimize / permanent-chip / cleanup lifecycle the same.
+Rename keys, labels, and icons; keep **persistent chip on enable / remove on disable**, and optional minimize that leaves the chip in place.
