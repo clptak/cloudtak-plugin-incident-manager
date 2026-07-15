@@ -4,12 +4,22 @@ import type { PluginAPI, PluginInstance, PluginStatic } from '../../../plugin.ts
 import { useAppStore } from '../../../src/stores/app.ts';
 import { IconTarget } from '@tabler/icons-vue';
 import MenuTemplate from './lib/MenuTemplate.vue';
+import {
+    bindFloatMinimize,
+    cleanupFloatMinimize,
+    openDesktopPane,
+} from './lib/floatMinimize.ts';
 
 const IncidentManagerPane = defineAsyncComponent(
     () => import('./components/IncidentManagerPane.vue')
 );
+const MinimizePaneAction = defineAsyncComponent(
+    () => import('./components/MinimizePaneAction.vue')
+);
+const RestoreMinimizedChip = defineAsyncComponent(
+    () => import('./components/RestoreMinimizedChip.vue')
+);
 
-const PANE_UID = 'incident-manager';
 const ROUTE_NAME = 'home-menu-incident-manager';
 
 export default class IncidentManagerPlugin implements PluginInstance {
@@ -19,22 +29,15 @@ export default class IncidentManagerPlugin implements PluginInstance {
         return new IncidentManagerPlugin(api);
     }
 
-    private open(): void {
-        // Re-opening focuses the existing pane (float store keys on uid)
-        this.api.float.add({
-            uid: PANE_UID,
-            name: 'Incident Manager',
-            component: IncidentManagerPane,
-            width: 980,
-            height: 640,
-            x: 80,
-            y: 60,
-        });
-    }
-
     async enable(): Promise<void> {
         const api = this.api;
-        const openFloat = () => this.open();
+
+        bindFloatMinimize({
+            api,
+            pane: IncidentManagerPane as unknown as HostFloatComponent,
+            actions: MinimizePaneAction as unknown as HostFloatComponent,
+            restoreChip: RestoreMinimizedChip as unknown as HostBottomBarComponent,
+        });
 
         this.api.routes.add({
             path: 'incident-manager',
@@ -45,7 +48,7 @@ export default class IncidentManagerPlugin implements PluginInstance {
                     const appStore = useAppStore(api.pinia);
                     onMounted(() => {
                         if (!appStore.isMobileDetected) {
-                            openFloat();
+                            openDesktopPane();
                             void api.router.replace({ name: 'home' });
                         }
                     });
@@ -73,7 +76,7 @@ export default class IncidentManagerPlugin implements PluginInstance {
 
     async disable(): Promise<void> {
         this.api.menu.remove('incident-manager');
-        this.api.float.remove(PANE_UID);
+        cleanupFloatMinimize();
         if (this.api.router.hasRoute(ROUTE_NAME)) {
             this.api.router.removeRoute(ROUTE_NAME);
         }
@@ -82,5 +85,7 @@ export default class IncidentManagerPlugin implements PluginInstance {
 
 type MenuItemIconType = NonNullable<Parameters<PluginAPI['menu']['add']>[0]['icon']>;
 type MenuItemConfig = Parameters<PluginAPI['menu']['add']>[0];
+type HostFloatComponent = Parameters<PluginAPI['float']['add']>[0]['component'];
+type HostBottomBarComponent = Parameters<PluginAPI['bottomBar']['add']>[0]['component'];
 
 export const _typecheck = IncidentManagerPlugin as unknown as PluginStatic;
