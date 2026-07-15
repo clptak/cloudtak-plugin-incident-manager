@@ -35,6 +35,7 @@ horizontal **Main / Task / Dashboard** tabs.
 - Mission map features: `mapStore.worker.conn.sendCOT(feature)` with
   `properties.dest = [{ 'mission-guid': guid }]`.
 - Caltopo: `window.__cloudtakCaltopo.createMap(...)` runtime contract.
+- **Minimize float → bottom status bar** (plugin-only pattern for other float plugins): see [float-minimize-to-bottom-bar.md](./float-minimize-to-bottom-bar.md).
 
 ## Installation (VPS / Docker Compose)
 
