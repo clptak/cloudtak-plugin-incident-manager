@@ -41,10 +41,14 @@
                     </TablerIconButton>
                     <div v-else />
 
-                    <div
-                        class='strong user-select-none text-break px-2'
-                        v-text='name'
-                    />
+                    <div class='strong user-select-none text-break px-2 d-flex align-items-center gap-2'>
+                        <IconTarget
+                            class='flex-shrink-0'
+                            :size='22'
+                            stroke='1.5'
+                        />
+                        <span v-text='name' />
+                    </div>
                 </div>
                 <div class='col-auto btn-list align-items-center'>
                     <slot name='buttons' />
@@ -79,7 +83,8 @@ import {
 
 import {
     IconCircleX,
-    IconCircleArrowLeft
+    IconCircleArrowLeft,
+    IconTarget,
 } from '@tabler/icons-vue';
 
 import { useRouter } from 'vue-router'

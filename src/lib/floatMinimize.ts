@@ -1,11 +1,11 @@
+import { markRaw } from 'vue';
 import type { PluginAPI } from '../../../../plugin.ts';
 import { useFloatStore } from '../../../../src/stores/float.ts';
 
 export const PANE_UID = 'incident-manager';
 export const BOTTOM_BAR_KEY = 'incident-manager-minimized';
 
-type FloatAddOpts = Parameters<PluginAPI['float']['add']>[0];
-type HostComponent = FloatAddOpts['component'];
+type HostFloatComponent = Parameters<ReturnType<typeof useFloatStore>['add']>[0]['component'];
 type BottomBarComponent = Parameters<PluginAPI['bottomBar']['add']>[0]['component'];
 
 export type PaneGeometry = {
@@ -23,21 +23,18 @@ export const DEFAULT_GEOMETRY: PaneGeometry = {
 };
 
 let api: PluginAPI | null = null;
-let paneComponent: HostComponent | null = null;
-let actionsComponent: HostComponent | null = null;
+let shellComponent: HostFloatComponent | null = null;
 let restoreChipComponent: BottomBarComponent | null = null;
 let savedGeometry: PaneGeometry | null = null;
 let minimized = false;
 
 export function bindFloatMinimize(opts: {
     api: PluginAPI;
-    pane: HostComponent;
-    actions: HostComponent;
+    shell: HostFloatComponent;
     restoreChip: BottomBarComponent;
 }): void {
     api = opts.api;
-    paneComponent = opts.pane;
-    actionsComponent = opts.actions;
+    shellComponent = opts.shell;
     restoreChipComponent = opts.restoreChip;
 }
 
@@ -64,14 +61,15 @@ function readGeometry(): PaneGeometry {
 
 function showFloat(geometry: PaneGeometry): void {
     const pluginApi = requireApi();
-    if (!paneComponent || !actionsComponent) {
-        throw new Error('floatMinimize pane/actions not configured');
+    if (!shellComponent) {
+        throw new Error('floatMinimize shell not configured');
     }
-    pluginApi.float.add({
+    // Use the float store directly (not api.float.add) so we can supply a custom
+    // FloatingPane shell with IconTarget in the title — api.float always wraps FloatingGeneric.
+    useFloatStore(pluginApi.pinia).add({
         uid: PANE_UID,
         name: 'Incident Manager',
-        component: paneComponent,
-        actions: actionsComponent,
+        component: markRaw(shellComponent),
         width: geometry.width,
         height: geometry.height,
         x: geometry.x,

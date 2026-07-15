@@ -10,11 +10,11 @@ import {
     openDesktopPane,
 } from './lib/floatMinimize.ts';
 
+const IncidentManagerFloatShell = defineAsyncComponent(
+    () => import('./components/IncidentManagerFloatShell.vue')
+);
 const IncidentManagerPane = defineAsyncComponent(
     () => import('./components/IncidentManagerPane.vue')
-);
-const MinimizePaneAction = defineAsyncComponent(
-    () => import('./components/MinimizePaneAction.vue')
 );
 const RestoreMinimizedChip = defineAsyncComponent(
     () => import('./components/RestoreMinimizedChip.vue')
@@ -34,8 +34,7 @@ export default class IncidentManagerPlugin implements PluginInstance {
 
         bindFloatMinimize({
             api,
-            pane: IncidentManagerPane as unknown as HostFloatComponent,
-            actions: MinimizePaneAction as unknown as HostFloatComponent,
+            shell: IncidentManagerFloatShell as unknown as HostFloatComponent,
             restoreChip: RestoreMinimizedChip as unknown as HostBottomBarComponent,
         });
 
