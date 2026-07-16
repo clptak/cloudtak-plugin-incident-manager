@@ -111,7 +111,7 @@
                     :class='{ "opacity-50": !openable(1) }'
                     @click='toggle("theoretical", 1)'
                 >
-                    <h3 class='card-title mb-0 d-flex align-items-center'>
+                    <h3 class='card-title mb-0 d-flex align-items-center flex-grow-1'>
                         <span class='me-2'>{{ expanded === 'theoretical' ? '▾' : '▸' }}</span>
                         Theoretical Search Area
                         <span
@@ -122,6 +122,12 @@
                             v-else-if='!openable(1)'
                             class='ms-2'
                         >🔒</span>
+                        <span
+                            class='ms-auto d-inline-flex'
+                            @click.stop
+                        >
+                            <NavHelpButton help-key='theoretical-search-area' />
+                        </span>
                     </h3>
                 </div>
                 <div
@@ -174,7 +180,7 @@
                     :class='{ "opacity-50": !openable(2) }'
                     @click='toggle("statistical", 2)'
                 >
-                    <h3 class='card-title mb-0 d-flex align-items-center'>
+                    <h3 class='card-title mb-0 d-flex align-items-center flex-grow-1'>
                         <span class='me-2'>{{ expanded === 'statistical' ? '▾' : '▸' }}</span>
                         Statistical Search Area (LPB)
                         <span
@@ -185,6 +191,12 @@
                             v-else-if='!openable(2)'
                             class='ms-2'
                         >🔒</span>
+                        <span
+                            class='ms-auto d-inline-flex'
+                            @click.stop
+                        >
+                            <NavHelpButton help-key='statistical-search-area' />
+                        </span>
                     </h3>
                 </div>
                 <div
@@ -311,7 +323,7 @@
                     :class='{ "opacity-50": !openable(3) }'
                     @click='toggle("subjective", 3)'
                 >
-                    <h3 class='card-title mb-0 d-flex align-items-center'>
+                    <h3 class='card-title mb-0 d-flex align-items-center flex-grow-1'>
                         <span class='me-2'>{{ expanded === 'subjective' ? '▾' : '▸' }}</span>
                         Subjective Search Area
                         <span
@@ -322,6 +334,12 @@
                             v-else-if='!openable(3)'
                             class='ms-2'
                         >🔒</span>
+                        <span
+                            class='ms-auto d-inline-flex'
+                            @click.stop
+                        >
+                            <NavHelpButton help-key='subjective-search-area' />
+                        </span>
                     </h3>
                 </div>
                 <div
@@ -368,7 +386,7 @@
                     :class='{ "opacity-50": !openable(4) }'
                     @click='toggle("segments", 4)'
                 >
-                    <h3 class='card-title mb-0 d-flex align-items-center'>
+                    <h3 class='card-title mb-0 d-flex align-items-center flex-grow-1'>
                         <span class='me-2'>{{ expanded === 'segments' ? '▾' : '▸' }}</span>
                         Segments
                         <span
@@ -379,6 +397,12 @@
                             v-else-if='!openable(4)'
                             class='ms-2'
                         >🔒</span>
+                        <span
+                            class='ms-auto d-inline-flex'
+                            @click.stop
+                        >
+                            <NavHelpButton help-key='segmenting-search-area' />
+                        </span>
                     </h3>
                 </div>
                 <div
@@ -518,6 +542,7 @@ import { circleRing, milesToMeters, MILES_TO_METERS } from '../../../lib/rings.t
 import { pushPolygonToMission, pushPointToMission, deletePolygonFromMission } from '../../../lib/missionFeatures.ts';
 import type { RingStyle } from '../../../lib/missionFeatures.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
+import NavHelpButton from '../../NavHelpButton.vue';
 
 const SEARCH_AREA_KEYWORD = 'search-area';
 const IPP_KEY = 'ipp';

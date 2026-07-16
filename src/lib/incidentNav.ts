@@ -3,6 +3,7 @@ import type { NavSectionHelpKey } from './navSectionHelp.ts';
 export interface NavSectionItem {
     key: string;
     label: string;
+    helpKey?: NavSectionHelpKey;
 }
 
 export interface NavSection {
@@ -38,7 +39,7 @@ export const NAV_SECTIONS: NavSection[] = [
         helpKey: 'area-search',
         items: [
             { key: 'search-scenarios', label: 'Search Scenarios' },
-            { key: 'search-area', label: 'Search Area' },
+            { key: 'search-area', label: 'Search Area', helpKey: 'establishing-search-area' },
             { key: 'risk-assessment', label: 'Risk Assessment' },
             { key: 'incident-post', label: 'Incident POST' },
             { key: 'casie', label: 'CASIE' },

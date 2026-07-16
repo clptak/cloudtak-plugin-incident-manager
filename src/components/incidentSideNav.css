@@ -58,6 +58,26 @@
     color: var(--bs-nav-link-color, var(--bs-link-color, #6c7a91));
 }
 
+.incident-side-nav .incident-nav-item-row {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    width: 100%;
+}
+
+.incident-side-nav .incident-nav-item-row .incident-nav-item {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.incident-side-nav .incident-nav-item-row--with-help {
+    padding-inline-end: 0.5rem;
+}
+
+.incident-side-nav .incident-nav-item-row .incident-nav-section-help {
+    padding-inline-end: 0.25rem;
+}
+
 .incident-side-nav .incident-nav-sub:hover,
 .incident-side-nav .incident-nav-sub:focus-visible {
     color: var(--bs-nav-link-hover-color, var(--bs-link-hover-color, #1e293b));
