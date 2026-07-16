@@ -85,6 +85,16 @@ function closeHelp(): void {
 </script>
 
 <style scoped>
+.modal {
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.help-markdown {
+    text-transform: none;
+    letter-spacing: normal;
+}
+
 .help-markdown :deep(h2) {
     font-size: 1.15rem;
     margin-top: 1rem;

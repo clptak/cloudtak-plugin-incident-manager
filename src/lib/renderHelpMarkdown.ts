@@ -37,6 +37,28 @@ function renderTable(rows: string[]): string {
     return `<div class="table-responsive"><table class="table table-sm">${thead}${tbody}</table></div>`;
 }
 
+function isBlockStart(trimmed: string, nextLine: string | undefined): boolean {
+    if (trimmed === '') return true;
+    if (/^#{1,3}\s+/.test(trimmed)) return true;
+    if (/^[-*+–—]\s+/.test(trimmed)) return true;
+    if (/^\d+\.\s+/.test(trimmed)) return true;
+    if (trimmed.includes('|') && nextLine !== undefined && isTableSeparator(nextLine)) return true;
+    return false;
+}
+
+/** Append soft-wrapped continuation lines onto the current text. */
+function consumeContinuations(lines: string[], start: number): { text: string; next: number } {
+    const parts: string[] = [];
+    let i = start;
+    while (i < lines.length) {
+        const t = lines[i].trim();
+        if (isBlockStart(t, lines[i + 1])) break;
+        parts.push(t);
+        i += 1;
+    }
+    return { text: parts.join(' '), next: i };
+}
+
 export interface ParsedHelpMarkdown {
     title: string | null;
     /** Markdown with the first H1 removed (if present). */
@@ -109,8 +131,10 @@ export function renderHelpMarkdown(markdown: string): string {
                 const t = lines[i].trim();
                 const m = /^[-*+–—]\s+(.+)$/.exec(t);
                 if (!m) break;
-                items.push(`<li>${renderInline(m[1])}</li>`);
                 i += 1;
+                const cont = consumeContinuations(lines, i);
+                items.push(`<li>${renderInline(`${m[1]} ${cont.text}`.trim())}</li>`);
+                i = cont.next;
             }
             html.push(`<ul>${items.join('')}</ul>`);
             continue;
@@ -123,27 +147,19 @@ export function renderHelpMarkdown(markdown: string): string {
                 const t = lines[i].trim();
                 const m = /^(\d+)\.\s+(.+)$/.exec(t);
                 if (!m) break;
-                items.push(`<li>${renderInline(m[2])}</li>`);
                 i += 1;
+                const cont = consumeContinuations(lines, i);
+                items.push(`<li>${renderInline(`${m[2]} ${cont.text}`.trim())}</li>`);
+                i = cont.next;
             }
             html.push(`<ol>${items.join('')}</ol>`);
             continue;
         }
 
         // Paragraph (consume continuation lines until blank / block)
-        const para: string[] = [trimmed];
-        i += 1;
-        while (i < lines.length) {
-            const t = lines[i].trim();
-            if (t === '') break;
-            if (/^#{1,3}\s+/.test(t)) break;
-            if (/^[-*+–—]\s+/.test(t)) break;
-            if (/^\d+\.\s+/.test(t)) break;
-            if (t.includes('|') && i + 1 < lines.length && isTableSeparator(lines[i + 1])) break;
-            para.push(t);
-            i += 1;
-        }
-        html.push(`<p>${renderInline(para.join(' '))}</p>`);
+        const cont = consumeContinuations(lines, i);
+        html.push(`<p>${renderInline(cont.text)}</p>`);
+        i = cont.next;
     }
 
     return html.join('\n');
