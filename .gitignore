@@ -15,6 +15,13 @@ docs/Lost Person Form CCSO Fillable.pdf
 docs/Sign In Roster Form 062818 2.pdf
 docs/*.pdf
 docs/*.md
+!docs/area_search.md
+!docs/route_and_location_search.md
+!docs/establishing_search_area_0_main.md
+!docs/establishing_search_area_1_theoretical.md
+!docs/establishing_search_area_2_statistical.md
+!docs/establishing_search_area_3_subjective.md
+!docs/segmenting.md
 docs/*.txt
 node sar-publications-scraper.js
 docs/attribution_example.html
