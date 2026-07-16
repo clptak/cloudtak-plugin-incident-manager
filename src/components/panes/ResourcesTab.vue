@@ -68,8 +68,14 @@
         </div>
 
         <div class='card mb-3'>
-            <div class='card-header py-2 small fw-semibold'>
-                New resource assignment
+            <div class='card-header py-2 small fw-semibold d-flex align-items-center gap-2'>
+                <span>New resource assignment</span>
+                <span
+                    class='ms-auto d-inline-flex'
+                    @click.stop
+                >
+                    <NavHelpButton help-key='resource-summary' />
+                </span>
             </div>
             <div class='card-body'>
                 <div class='row g-2'>
@@ -349,6 +355,7 @@ import { useResourceAssignments } from '../../composables/useResourceAssignments
 import { formatD4hSyncTime, loadD4hMeta, loadD4hRoster } from '../../lib/d4hRoster.ts';
 import type { D4HRosterMeta } from '../../lib/d4hTypes.ts';
 import { nowDatetimeLocal } from '../../lib/incidentInfo.ts';
+import NavHelpButton from '../NavHelpButton.vue';
 import {
     buildAgencyOptions,
     resolveEffectiveDefaultAgency,

@@ -5,6 +5,7 @@ import theoreticalSearchAreaMd from '../../docs/establishing_search_area_1_theor
 import statisticalSearchAreaMd from '../../docs/establishing_search_area_2_statistical.md?raw';
 import subjectiveSearchAreaMd from '../../docs/establishing_search_area_3_subjective.md?raw';
 import segmentingSearchAreaMd from '../../docs/segmenting.md?raw';
+import resourceSummaryMd from '../../docs/resource_summary.md?raw';
 
 export type NavSectionHelpKey =
     | 'area-search'
@@ -13,7 +14,8 @@ export type NavSectionHelpKey =
     | 'theoretical-search-area'
     | 'statistical-search-area'
     | 'subjective-search-area'
-    | 'segmenting-search-area';
+    | 'segmenting-search-area'
+    | 'resource-summary';
 
 export interface NavSectionHelpDoc {
     markdown: string;
@@ -48,5 +50,9 @@ export const NAV_SECTION_HELP: Record<NavSectionHelpKey, NavSectionHelpDoc> = {
     'segmenting-search-area': {
         markdown: segmentingSearchAreaMd,
         ariaLabel: 'About Segmenting the Search Area',
+    },
+    'resource-summary': {
+        markdown: resourceSummaryMd,
+        ariaLabel: 'About Resource Summary',
     },
 };
