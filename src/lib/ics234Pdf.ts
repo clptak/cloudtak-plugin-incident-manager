@@ -179,6 +179,38 @@ function drawGridLines(page: PDFPage): void {
     drawVLine(page, LAYOUT.footer.dateTime.x, LAYOUT.footer.name.y, footerTop);
 }
 
+// #region agent log
+function agentScanNonWinAnsi(label: string, text: string, hypothesisId: string): void {
+    const s = String(text ?? '');
+    const offenders: Array<{ ch: string; hex: string; index: number }> = [];
+    for (let i = 0; i < s.length;) {
+        const cp = s.codePointAt(i)!;
+        const ch = String.fromCodePoint(cp);
+        if (cp > 255) offenders.push({ ch, hex: `0x${cp.toString(16)}`, index: i });
+        i += ch.length;
+    }
+    if (!offenders.length) return;
+    fetch('http://127.0.0.1:7627/ingest/45700870-a64c-4e23-b841-0db3851123a5', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '05df6e' },
+        body: JSON.stringify({
+            sessionId: '05df6e',
+            runId: 'pre-fix',
+            hypothesisId,
+            location: 'ics234Pdf.ts:agentScanNonWinAnsi',
+            message: 'non-WinAnsi chars in ICS-234 field',
+            data: {
+                label,
+                preview: s.slice(0, 120),
+                offenders: offenders.slice(0, 10),
+                offenderCount: offenders.length,
+            },
+            timestamp: Date.now(),
+        }),
+    }).catch(() => {});
+}
+// #endregion
+
 function wrapLines(text: string, font: PDFFont, maxWidth: number): string[] {
     const normalized = String(text ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
     if (!normalized) return [];
@@ -191,7 +223,31 @@ function wrapLines(text: string, font: PDFFont, maxWidth: number): string[] {
         let line = words[0];
         for (let i = 1; i < words.length; i++) {
             const next = `${line} ${words[i]}`;
-            if (font.widthOfTextAtSize(next, FONT_SIZE) <= maxWidth) {
+            // #region agent log
+            let nextWidth: number;
+            try {
+                nextWidth = font.widthOfTextAtSize(next, FONT_SIZE);
+            } catch (err) {
+                fetch('http://127.0.0.1:7627/ingest/45700870-a64c-4e23-b841-0db3851123a5', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '05df6e' },
+                    body: JSON.stringify({
+                        sessionId: '05df6e',
+                        runId: 'pre-fix',
+                        hypothesisId: 'D',
+                        location: 'ics234Pdf.ts:wrapLines',
+                        message: 'widthOfTextAtSize threw',
+                        data: {
+                            err: err instanceof Error ? err.message : String(err),
+                            snippet: next.slice(0, 80),
+                        },
+                        timestamp: Date.now(),
+                    }),
+                }).catch(() => {});
+                throw err;
+            }
+            if (nextWidth <= maxWidth) {
+            // #endregion
                 line = next;
             } else {
                 lines.push(line);
@@ -265,6 +321,13 @@ function drawFormContent(
     pageNum: number,
     pageCount: number,
 ): void {
+    // #region agent log
+    agentScanNonWinAnsi('header.incidentName', header.incidentName, 'B');
+    agentScanNonWinAnsi('header.incidentLocation', header.incidentLocation, 'B');
+    agentScanNonWinAnsi('header.preparedByName', header.preparedByName, 'B');
+    agentScanNonWinAnsi('header.preparedByTitle', header.preparedByTitle, 'B');
+    agentScanNonWinAnsi('header.preparedBySignature', header.preparedBySignature, 'B');
+    // #endregion
     drawSingleLine(page, font, header.incidentName, LAYOUT.header.incidentName);
     drawSingleLine(page, font, header.incidentLocation, LAYOUT.header.incidentLocation);
     drawSingleLine(page, font, formatDatetimeForPdf(header.operationalPeriodFrom), LAYOUT.header.periodFrom);
@@ -275,9 +338,17 @@ function drawFormContent(
         const row = rows[i];
         if (!rowHasContent(row)) continue;
         const rects = matrixRowRect(i);
-        drawWrappedCell(page, font, row.objective.trim(), rects.objective);
-        drawWrappedCell(page, font, formatStrategiesForPdf(row.strategies), rects.strategy);
-        drawWrappedCell(page, font, formatTacticsForPdf(row.strategies), rects.tactic);
+        const objective = row.objective.trim();
+        const strategies = formatStrategiesForPdf(row.strategies);
+        const tactics = formatTacticsForPdf(row.strategies);
+        // #region agent log
+        agentScanNonWinAnsi(`row[${i}].objective`, objective, 'A');
+        agentScanNonWinAnsi(`row[${i}].strategies`, strategies, 'A');
+        agentScanNonWinAnsi(`row[${i}].tactics`, tactics, 'A');
+        // #endregion
+        drawWrappedCell(page, font, objective, rects.objective);
+        drawWrappedCell(page, font, strategies, rects.strategy);
+        drawWrappedCell(page, font, tactics, rects.tactic);
     }
 
     drawSingleLine(page, font, header.preparedByName, LAYOUT.footer.name);
@@ -318,6 +389,26 @@ export async function buildIcs234Pdf(
     header: Ics234Header,
     visibleCount = MAX_OBJECTIVES,
 ): Promise<Uint8Array> {
+    // #region agent log
+    fetch('http://127.0.0.1:7627/ingest/45700870-a64c-4e23-b841-0db3851123a5', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '05df6e' },
+        body: JSON.stringify({
+            sessionId: '05df6e',
+            runId: 'pre-fix',
+            hypothesisId: 'E',
+            location: 'ics234Pdf.ts:buildIcs234Pdf',
+            message: 'ICS-234 build start',
+            data: {
+                incidentNameLen: (header.incidentName || '').length,
+                rowCount: rows.length,
+                visibleCount,
+                filledRows: rows.filter((r) => rowHasContent(r)).length,
+            },
+            timestamp: Date.now(),
+        }),
+    }).catch(() => {});
+    // #endregion
     const templateBytes = await loadTemplateBytes();
     const templateDoc = await PDFDocument.load(templateBytes);
     const outDoc = await PDFDocument.create();
@@ -325,7 +416,26 @@ export async function buildIcs234Pdf(
 
     // Single form page for up to MAX_OBJECTIVES rows; extend here if paginating later.
     const pageCount = 1;
-    await buildFormPage(templateDoc, outDoc, font, header, rows, visibleCount, 1, pageCount);
+    try {
+        await buildFormPage(templateDoc, outDoc, font, header, rows, visibleCount, 1, pageCount);
+    } catch (err) {
+        // #region agent log
+        fetch('http://127.0.0.1:7627/ingest/45700870-a64c-4e23-b841-0db3851123a5', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '05df6e' },
+            body: JSON.stringify({
+                sessionId: '05df6e',
+                runId: 'pre-fix',
+                hypothesisId: 'A',
+                location: 'ics234Pdf.ts:buildIcs234Pdf:catch',
+                message: 'ICS-234 build failed',
+                data: { err: err instanceof Error ? err.message : String(err) },
+                timestamp: Date.now(),
+            }),
+        }).catch(() => {});
+        // #endregion
+        throw err;
+    }
 
     return outDoc.save();
 }
