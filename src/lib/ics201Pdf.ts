@@ -14,6 +14,7 @@ import {
     type Ics201Form,
     type Ics201Sources,
 } from './ics201.ts';
+import { toPdfWinAnsiText } from './pdfWinAnsiText.ts';
 
 export const ICS201_MISSION_FILENAME = 'ICS-201.pdf';
 
@@ -165,7 +166,7 @@ function agentScanNonWinAnsi(label: string, text: string, hypothesisId: string):
 // #endregion
 
 function wrapLines(text: string, font: PDFFont, maxWidth: number): string[] {
-    const normalized = String(text ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+    const normalized = toPdfWinAnsiText(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
     if (!normalized) return [];
 
     const lines: string[] = [];
@@ -226,7 +227,7 @@ function whiteOutField(page: PDFPage, layout: FieldLayout): void {
 }
 
 function drawSingleLine(page: PDFPage, font: PDFFont, text: string, layout: FieldLayout): void {
-    const trimmed = text.trim();
+    const trimmed = toPdfWinAnsiText(text).trim();
     if (!trimmed) return;
     page.drawText(trimmed, {
         x: layout.x + CELL_PAD,
@@ -354,7 +355,7 @@ async function embedTemplatePage(
 
 /** Word-wrap collapsed action text to one PDF row width (no embedded line breaks). */
 function wrapActionToRowWidth(text: string, font: PDFFont, maxWidth: number): string[] {
-    const collapsed = collapseActionText(text);
+    const collapsed = toPdfWinAnsiText(collapseActionText(text));
     if (!collapsed) return [];
     const words = collapsed.split(' ').filter(Boolean);
     if (!words.length) return [];
@@ -498,7 +499,23 @@ export async function buildIcs201Pdf(
         throw err;
     }
 
-    return outDoc.save();
+    const bytes = await outDoc.save();
+    // #region agent log
+    fetch('http://127.0.0.1:7627/ingest/45700870-a64c-4e23-b841-0db3851123a5', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '05df6e' },
+        body: JSON.stringify({
+            sessionId: '05df6e',
+            runId: 'post-fix',
+            hypothesisId: 'C',
+            location: 'ics201Pdf.ts:buildIcs201Pdf:success',
+            message: 'ICS-201 build succeeded',
+            data: { byteLength: bytes.length },
+            timestamp: Date.now(),
+        }),
+    }).catch(() => {});
+    // #endregion
+    return bytes;
 }
 
 export function defaultIcs201Filename(incidentName: string): string {

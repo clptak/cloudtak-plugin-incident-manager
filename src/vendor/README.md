@@ -11,6 +11,7 @@ Vendoring keeps ICS 234 PDF export self-contained with no CloudTAK changes:
 
 - `pdf-lib.esm.min.js` — self-contained pdf-lib ESM bundle. Prefixed with
   `/* eslint-disable */` because CloudTAK lints `./plugins/` with its own ESLint config.
+  Strip the trailing `//# sourceMappingURL=...` line after copying (the `.map` is not vendored).
 - `pdf-lib.esm.min.d.ts` — minimal types for `src/lib/ics234Pdf.ts`.
 
 ## Updating

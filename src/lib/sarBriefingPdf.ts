@@ -6,6 +6,7 @@ import {
 import type { PDFFont, PDFPage } from '../vendor/pdf-lib.esm.min.js';
 import templateUrl from '../assets/sar-briefing-template.pdf?url';
 import type { BriefingSubjectColumn, IrBriefingForm } from './irBriefing.ts';
+import { toPdfWinAnsiText } from './pdfWinAnsiText.ts';
 
 export const SAR_BRIEFING_MISSION_FILENAME = 'SAR-Briefing.pdf';
 
@@ -129,7 +130,7 @@ function getFieldLayout(form: BriefingPdfForm, fieldName: string): FieldLayout |
 }
 
 function wrapLines(text: string, font: PDFFont, maxWidth: number): string[] {
-    const normalized = String(text ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+    const normalized = toPdfWinAnsiText(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
     if (!normalized) return [];
 
     const lines: string[] = [];
@@ -168,7 +169,7 @@ function whiteOutField(page: PDFPage, layout: FieldLayout): void {
 }
 
 function drawSingleLine(page: PDFPage, font: PDFFont, text: string, layout: FieldLayout): void {
-    const trimmed = text.trim();
+    const trimmed = toPdfWinAnsiText(text).trim();
     if (!trimmed) return;
     page.drawText(trimmed, {
         x: layout.x + CELL_PAD,
