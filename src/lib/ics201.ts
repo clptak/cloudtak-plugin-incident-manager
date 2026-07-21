@@ -24,6 +24,8 @@ import {
     resolveIppLatLng,
 } from './irBriefing.ts';
 import { organizationFromOrgChartLogs } from './orgChartExport.ts';
+import { loadResourceAssignmentsFromMission } from './resourceAssignmentPersistence.ts';
+import type { ResourceAssignment } from './resourceAssignments.ts';
 
 export const ICS201_KEYWORD = 'ics-201';
 export const RESOURCES_KEYWORD = 'resources';
@@ -388,6 +390,47 @@ export function resourcesFromLogs(logs: MissionLogLike[]): Ics201ResourceRow[] {
     return padResources(entries.slice(0, MAX_RESOURCE_ROWS).map((e) => e.row));
 }
 
+/** Map Resources-screen mission assignments (mission_schema.json) to ICS 201 resource rows. */
+export function resourceRowsFromAssignments(assignments: ResourceAssignment[]): Ics201ResourceRow[] {
+    return assignments.slice(0, MAX_RESOURCE_ROWS).map((a) => {
+        const noteParts = [
+            a.agency.trim(),
+            a.status === 'planned' ? 'Status: Planned' : '',
+            a.assignmentCallsign?.trim() ? `Assignment: ${a.assignmentCallsign.trim()}` : '',
+        ].filter(Boolean);
+        return {
+            resource: a.resource.trim(),
+            identifier: a.resourceIdentifier.trim(),
+            dateTimeOrdered: formatResourceOrdered(a.timeOrdered),
+            eta: a.eta != null ? String(a.eta) : '',
+            arrived: !!a.timeArrived.trim(),
+            notes: noteParts.join('; '),
+        };
+    });
+}
+
+function resourceRowKey(row: Ics201ResourceRow): string {
+    return row.identifier.trim().toLowerCase();
+}
+
+/** Assignment rows first, then log rows not already present (by identifier), padded. */
+export function mergeResourceRows(
+    assignmentRows: Ics201ResourceRow[],
+    logRows: Ics201ResourceRow[],
+): Ics201ResourceRow[] {
+    const rows = [...assignmentRows];
+    const seen = new Set(assignmentRows.map(resourceRowKey).filter(Boolean));
+    for (const row of logRows) {
+        if (rows.length >= MAX_RESOURCE_ROWS) break;
+        if (!resourceRowHasContent(row)) continue;
+        const key = resourceRowKey(row);
+        if (key && seen.has(key)) continue;
+        if (key) seen.add(key);
+        rows.push(row);
+    }
+    return padResources(rows);
+}
+
 function hasExactKeyword(keywords: string[], keyword: string): boolean {
     const target = keyword.toLowerCase();
     return keywords.some((k) => k.toLowerCase() === target);
@@ -602,7 +645,22 @@ export async function loadIcs201FromMission(
     if (postObjectives) form.objectives = postObjectives;
 
     form.actions = actionsFromLogsAndPost(logs, objectiveRows);
-    form.resources = resourcesFromLogs(logs);
+
+    // Resource Summary: mission resource assignments (Resources screen →
+    // mission_schema.json) first, then legacy `resources`-tagged logs.
+    let assignmentRows: Ics201ResourceRow[] = [];
+    try {
+        const { assignments } = await loadResourceAssignmentsFromMission({
+            guid: missionGuid,
+            name: missionName ?? '',
+            missionToken,
+        });
+        assignmentRows = resourceRowsFromAssignments(assignments);
+    } catch {
+        // mission_schema.json may be absent or unreadable; log rows still apply
+    }
+    form.resources = mergeResourceRows(assignmentRows, resourcesFromLogs(logs));
+    const autoResources = form.resources;
 
     if (!form.situationSummary.trim()) {
         form.situationSummary = situationFromIrBriefingLogs(logs);
@@ -640,6 +698,10 @@ export async function loadIcs201FromMission(
         if (!form.organizationNotes.trim() && orgChart.organizationNotes) {
             form.organizationNotes = orgChart.organizationNotes;
         }
+        // Saved forms serialize blank resource rows; don't let them wipe auto-fill.
+        if (!resourceRowsHaveContent(form.resources)) {
+            form.resources = autoResources;
+        }
     }
 
     return { form, sources };
@@ -672,15 +734,19 @@ function actionRowsHaveContent(rows: Ics201ActionRow[]): boolean {
     return rows.some((r) => r.time.trim() || r.actions.trim());
 }
 
-function resourceRowsHaveContent(rows: Ics201ResourceRow[]): boolean {
-    return rows.some((r) => (
+function resourceRowHasContent(r: Ics201ResourceRow): boolean {
+    return !!(
         r.resource.trim()
         || r.identifier.trim()
         || r.dateTimeOrdered.trim()
         || r.eta.trim()
         || r.arrived
         || r.notes.trim()
-    ));
+    );
+}
+
+function resourceRowsHaveContent(rows: Ics201ResourceRow[]): boolean {
+    return rows.some(resourceRowHasContent);
 }
 
 export async function saveIcs201ToMission(

@@ -401,7 +401,8 @@
                     </table>
                 </div>
                 <div class='form-text mt-1'>
-                    Prefills from mission logs tagged <code>RESOURCES</code>
+                    Prefills from Mission Resource assignments (Resources screen)
+                    and mission logs tagged <code>RESOURCES</code>
                     (one resource per log: Agency, Resource Identifier, Date / Time Ordered, ETA, Arrived, Notes).
                 </div>
             </div>

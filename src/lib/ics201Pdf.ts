@@ -133,7 +133,12 @@ function layoutsForField(
     }
 }
 
-function wrapLines(text: string, font: PDFFont, maxWidth: number): string[] {
+function wrapLines(
+    text: string,
+    font: PDFFont,
+    maxWidth: number,
+    fontSize: number = FONT_SIZE,
+): string[] {
     const normalized = toPdfWinAnsiText(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
     if (!normalized) return [];
 
@@ -147,7 +152,7 @@ function wrapLines(text: string, font: PDFFont, maxWidth: number): string[] {
         let line = words[0];
         for (let i = 1; i < words.length; i++) {
             const next = `${line} ${words[i]}`;
-            if (font.widthOfTextAtSize(next, FONT_SIZE) <= maxWidth) {
+            if (font.widthOfTextAtSize(next, fontSize) <= maxWidth) {
                 line = next;
             } else {
                 lines.push(line);
@@ -199,12 +204,67 @@ function drawWrapped(page: PDFPage, font: PDFFont, text: string, layout: FieldLa
     }
 }
 
+/** Candidate sizes for shrink-to-fit cells (largest first). */
+const FIT_FONT_SIZES = [9, 8, 7, 6, 5] as const;
+
+/**
+ * Wrap the text into the cell, stepping the font size down until every line
+ * fits the cell width and all lines fit the cell height. Falls back to the
+ * smallest size (truncated) when even that overflows.
+ */
+function drawFitted(page: PDFPage, font: PDFFont, text: string, layout: FieldLayout): void {
+    const collapsed = toPdfWinAnsiText(text).replace(/\s+/g, ' ').trim();
+    if (!collapsed) return;
+    const contentW = Math.max(4, layout.w - CELL_PAD * 2);
+    const contentH = Math.max(4, layout.h - CELL_PAD * 2);
+
+    let size: number = FIT_FONT_SIZES[FIT_FONT_SIZES.length - 1];
+    let lines: string[] | null = null;
+    for (const candidate of FIT_FONT_SIZES) {
+        const lineHeight = candidate + 2;
+        const maxLines = Math.max(1, Math.floor(contentH / lineHeight));
+        const wrapped = wrapLines(collapsed, font, contentW, candidate);
+        const fitsWidth = wrapped.every(
+            (line) => font.widthOfTextAtSize(line, candidate) <= contentW,
+        );
+        if (fitsWidth && wrapped.length <= maxLines) {
+            size = candidate;
+            lines = wrapped;
+            break;
+        }
+    }
+    if (!lines) {
+        const lineHeight = size + 2;
+        const maxLines = Math.max(1, Math.floor(contentH / lineHeight));
+        lines = wrapLines(collapsed, font, contentW, size).slice(0, maxLines);
+    }
+
+    const lineHeight = size + 2;
+    const blockH = lines.length * lineHeight;
+    // Center the block vertically inside the cell.
+    const topOffset = Math.max(CELL_PAD, (layout.h - blockH) / 2 + (lineHeight - size) / 2);
+    let y = layout.y + layout.h - topOffset - size;
+    for (const line of lines) {
+        if (line) {
+            page.drawText(line, {
+                x: layout.x + CELL_PAD,
+                y,
+                size,
+                font,
+            });
+        }
+        y -= lineHeight;
+    }
+}
+
+type PaintMode = 'single' | 'wrapped' | 'fit';
+
 function paintLayouts(
     pages: PDFPage[],
     font: PDFFont,
     layouts: FieldLayout[],
     value: string,
-    wrapped: boolean,
+    mode: PaintMode,
 ): void {
     const trimmed = value.trim();
     if (!trimmed) return;
@@ -212,7 +272,8 @@ function paintLayouts(
         const page = pages[layout.pageIndex];
         if (!page) continue;
         whiteOutField(page, layout);
-        if (wrapped) drawWrapped(page, font, value, layout);
+        if (mode === 'wrapped') drawWrapped(page, font, value, layout);
+        else if (mode === 'fit') drawFitted(page, font, value, layout);
         else drawSingleLine(page, font, value, layout);
     }
 }
@@ -224,9 +285,11 @@ function paintNamedField(
     fieldName: string,
     value: string,
     pageOverride?: number,
+    fit = false,
 ): void {
     const layouts = layoutsForField(form, fieldName, pageOverride);
-    paintLayouts(pages, font, layouts, value, WRAPPED_FIELDS.has(fieldName));
+    const mode: PaintMode = fit ? 'fit' : (WRAPPED_FIELDS.has(fieldName) ? 'wrapped' : 'single');
+    paintLayouts(pages, font, layouts, value, mode);
 }
 
 function notesFieldName(rowIndex: number): string {
@@ -236,11 +299,19 @@ function notesFieldName(rowIndex: number): string {
     return `Notes locationassignmentstatusRow${n}`;
 }
 
+interface PaintJob {
+    name: string;
+    value: string;
+    page?: number;
+    /** Shrink-to-fit cells (resource rows) — wrap and reduce font size to fit. */
+    fit?: boolean;
+}
+
 function collectPaintJobs(
     form: Ics201Form,
     sources: Pick<Ics201Sources, 'missionName' | 'missionGuid'>,
-): Array<{ name: string; value: string; page?: number }> {
-    const jobs: Array<{ name: string; value: string; page?: number }> = [
+): PaintJob[] {
+    const jobs: PaintJob[] = [
         { name: 'Incident Name', value: form.incidentName },
         { name: 'Incident Number', value: form.incidentNumber },
         { name: 'Date', value: form.date },
@@ -273,12 +344,12 @@ function collectPaintJobs(
         if (!row) continue;
         const n = i + 1;
         jobs.push(
-            { name: `ResourceRow${n}`, value: row.resource, page: 3 },
-            { name: `Resource IdentifierRow${n}`, value: row.identifier, page: 3 },
-            { name: `DateTime OrderedRow${n}`, value: row.dateTimeOrdered, page: 3 },
-            { name: `ETARow${n}`, value: row.eta, page: 3 },
+            { name: `ResourceRow${n}`, value: row.resource, page: 3, fit: true },
+            { name: `Resource IdentifierRow${n}`, value: row.identifier, page: 3, fit: true },
+            { name: `DateTime OrderedRow${n}`, value: row.dateTimeOrdered, page: 3, fit: true },
+            { name: `ETARow${n}`, value: row.eta, page: 3, fit: true },
             { name: `Check Box${n}`, value: row.arrived ? 'X' : '', page: 3 },
-            { name: notesFieldName(i), value: row.notes, page: 3 },
+            { name: notesFieldName(i), value: row.notes, page: 3, fit: true },
         );
     }
 
@@ -390,7 +461,7 @@ export async function buildIcs201Pdf(
     }
 
     for (const job of collectPaintJobs(form, sources)) {
-        paintNamedField(pages, font, pdfForm, job.name, job.value, job.page);
+        paintNamedField(pages, font, pdfForm, job.name, job.value, job.page, job.fit);
     }
     paintActionRows(pages, font, pdfForm, form.actions);
 
