@@ -43,7 +43,10 @@
             {{ statusMessage }}
         </div>
 
-        <div class='card mb-3'>
+        <div
+            v-if='!infoDismissed'
+            class='card mb-3'
+        >
             <div class='card-header py-2 small fw-semibold d-flex align-items-center'>
                 <IconInfoCircle
                     :size='16'
@@ -59,6 +62,15 @@
                     @click.prevent='selectHTabGuarded("organization")'
                 >Organization Tab</a>
                 to create your ICS 201 Organizational Chart and Team Assignments
+                <div class='mt-2'>
+                    <button
+                        type='button'
+                        class='btn btn-outline-secondary btn-sm'
+                        @click='dismissInfo'
+                    >
+                        Do not remind me
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -417,6 +429,27 @@ const {
     updateAssignment,
     updateDefaultAgency,
 } = useResourceAssignments();
+
+const RESOURCES_INFO_DISMISSED_KEY = 'incident-manager:resources-info-dismissed';
+
+function loadInfoDismissed(): boolean {
+    try {
+        return localStorage.getItem(RESOURCES_INFO_DISMISSED_KEY) === 'true';
+    } catch {
+        return false;
+    }
+}
+
+const infoDismissed = ref(loadInfoDismissed());
+
+function dismissInfo(): void {
+    infoDismissed.value = true;
+    try {
+        localStorage.setItem(RESOURCES_INFO_DISMISSED_KEY, 'true');
+    } catch {
+        // ignore quota / private-mode errors
+    }
+}
 
 const defaultAgencyExpanded = ref(true);
 const loadingRoster = ref(false);
