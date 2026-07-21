@@ -36,13 +36,12 @@ const VALID_NAV_KEYS = new Set([
     'ics-201',
     'search-scenarios',
     'search-area',
-    'risk-assessment',
     'incident-post',
     'casie',
     'generate-report-template',
 ]);
 
-const VALID_HTAB_KEYS = new Set(['main', 'dashboard', 'task', 'organization']);
+const VALID_HTAB_KEYS = new Set(['main', 'dashboard', 'task', 'organization', 'risk-assessment']);
 
 function loadNavFromSession(): PaneNavState {
     try {
@@ -68,6 +67,11 @@ function loadNavFromSession(): PaneNavState {
         }
         // Wrap Up split into section header + Generate Report Template sub-pane.
         if (key === 'wrapup') key = 'generate-report-template';
+        // Risk Assessment moved from Main vertical nav into a horizontal tab.
+        if (key === 'risk-assessment') {
+            key = 'create-open';
+            if (htab === 'main') htab = 'risk-assessment';
+        }
         return {
             activeKey: VALID_NAV_KEYS.has(key) ? key : 'create-open',
             activeHTab: VALID_HTAB_KEYS.has(htab) ? htab : 'main',
@@ -137,7 +141,7 @@ const MISSION_EXEMPT_NAV_KEYS = new Set(['create-open', 'casie']);
 const noMissionModalOpen = ref(false);
 
 export function isMissionRequiredView(key: string, htab: string): boolean {
-    if (htab === 'dashboard' || htab === 'organization') return true;
+    if (htab === 'dashboard' || htab === 'organization' || htab === 'risk-assessment') return true;
     if (htab !== 'main') return false;
     return !MISSION_EXEMPT_NAV_KEYS.has(key);
 }

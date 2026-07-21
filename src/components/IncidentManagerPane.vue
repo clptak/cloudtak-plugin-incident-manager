@@ -109,6 +109,10 @@
                         v-if='activeHTab === "organization"'
                         class='h-100 min-height-0'
                     />
+                    <LoggerPane
+                        v-if='activeHTab === "risk-assessment"'
+                        sub='risk-assessment'
+                    />
                 </div>
             </div>
         </div>
@@ -178,6 +182,7 @@ const hTabs = [
     { key: 'dashboard', label: 'Dashboard' },
     { key: 'task', label: 'Tasks' },
     { key: 'organization', label: 'Organization' },
+    { key: 'risk-assessment', label: 'Risk Assessment' },
 ] as const;
 
 const {
