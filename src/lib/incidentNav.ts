@@ -39,7 +39,6 @@ export const NAV_SECTIONS: NavSection[] = [
         label: 'Area Search',
         helpKey: 'area-search',
         items: [
-            { key: 'search-scenarios', label: 'Search Scenarios' },
             { key: 'search-area', label: 'Search Area', helpKey: 'establishing-search-area' },
             { key: 'risk-assessment', label: 'Risk Assessment' },
             { key: 'incident-post', label: 'Incident POST' },
