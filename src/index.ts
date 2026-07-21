@@ -22,6 +22,9 @@ const IncidentManagerTaskbarChip = defineAsyncComponent(
 const ResourcesTaskbarChip = defineAsyncComponent(
     () => import('./components/ResourcesTaskbarChip.vue')
 );
+const AssignmentsTaskbarChip = defineAsyncComponent(
+    () => import('./components/AssignmentsTaskbarChip.vue')
+);
 
 const ROUTE_NAME = 'home-menu-incident-manager';
 
@@ -40,6 +43,7 @@ export default class IncidentManagerPlugin implements PluginInstance {
             shell: IncidentManagerFloatShell as unknown as HostFloatComponent,
             restoreChip: IncidentManagerTaskbarChip as unknown as HostBottomBarComponent,
             resourcesChip: ResourcesTaskbarChip as unknown as HostBottomBarComponent,
+            assignmentsChip: AssignmentsTaskbarChip as unknown as HostBottomBarComponent,
         });
 
         this.api.routes.add({

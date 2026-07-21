@@ -5,6 +5,7 @@ import { useFloatStore } from '../../../../src/stores/float.ts';
 export const PANE_UID = 'incident-manager';
 export const BOTTOM_BAR_KEY = 'incident-manager';
 export const RESOURCES_BOTTOM_BAR_KEY = 'incident-manager-resources';
+export const ASSIGNMENTS_BOTTOM_BAR_KEY = 'incident-manager-assignments';
 
 type HostFloatComponent = Parameters<ReturnType<typeof useFloatStore>['add']>[0]['component'];
 type BottomBarComponent = Parameters<PluginAPI['bottomBar']['add']>[0]['component'];
@@ -27,6 +28,7 @@ let api: PluginAPI | null = null;
 let shellComponent: HostFloatComponent | null = null;
 let restoreChipComponent: BottomBarComponent | null = null;
 let resourcesChipComponent: BottomBarComponent | null = null;
+let assignmentsChipComponent: BottomBarComponent | null = null;
 let savedGeometry: PaneGeometry | null = null;
 let minimized = false;
 
@@ -35,11 +37,13 @@ export function bindFloatMinimize(opts: {
     shell: HostFloatComponent;
     restoreChip: BottomBarComponent;
     resourcesChip?: BottomBarComponent;
+    assignmentsChip?: BottomBarComponent;
 }): void {
     api = opts.api;
     shellComponent = opts.shell;
     restoreChipComponent = opts.restoreChip;
     resourcesChipComponent = opts.resourcesChip ?? null;
+    assignmentsChipComponent = opts.assignmentsChip ?? null;
     ensureBottomBarChip();
 }
 
@@ -95,6 +99,12 @@ function ensureBottomBarChip(): void {
                 component: resourcesChipComponent,
             });
         }
+        if (assignmentsChipComponent) {
+            api.bottomBar.add({
+                key: ASSIGNMENTS_BOTTOM_BAR_KEY,
+                component: assignmentsChipComponent,
+            });
+        }
     } catch {
         // Map / bottom bar may not be loaded yet — retry on open/minimize
     }
@@ -104,6 +114,7 @@ function clearBottomBarChip(): void {
     try {
         requireApi().bottomBar.remove(BOTTOM_BAR_KEY);
         requireApi().bottomBar.remove(RESOURCES_BOTTOM_BAR_KEY);
+        requireApi().bottomBar.remove(ASSIGNMENTS_BOTTOM_BAR_KEY);
     } catch {
         // Map / bottom bar may not be loaded during teardown
     }
