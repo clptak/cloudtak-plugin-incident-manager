@@ -12,6 +12,19 @@
             </span>
             <div class='ms-auto d-flex gap-2'>
                 <button
+                    v-if='infoDismissed'
+                    type='button'
+                    class='btn btn-outline-secondary btn-sm d-inline-flex align-items-center'
+                    title='Show information'
+                    aria-label='Show information'
+                    @click='restoreInfo'
+                >
+                    <IconInfoCircle
+                        :size='16'
+                        stroke='1.5'
+                    />
+                </button>
+                <button
                     type='button'
                     class='btn btn-outline-secondary btn-sm'
                     :disabled='loadingRoster'
@@ -446,6 +459,15 @@ function dismissInfo(): void {
     infoDismissed.value = true;
     try {
         localStorage.setItem(RESOURCES_INFO_DISMISSED_KEY, 'true');
+    } catch {
+        // ignore quota / private-mode errors
+    }
+}
+
+function restoreInfo(): void {
+    infoDismissed.value = false;
+    try {
+        localStorage.removeItem(RESOURCES_INFO_DISMISSED_KEY);
     } catch {
         // ignore quota / private-mode errors
     }
