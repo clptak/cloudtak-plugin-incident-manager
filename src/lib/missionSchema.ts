@@ -84,6 +84,8 @@ export interface MissionSchema {
     };
     /** Assignments tab org chart (HastyTeam tree); stored in mission_schema.json. */
     assignments_org_chart?: Record<string, unknown>;
+    /** Risk assessments keyed by assignment CoT uid (complacency_assessments map). */
+    risk?: Record<string, unknown>;
     [key: string]: unknown;
 }
 

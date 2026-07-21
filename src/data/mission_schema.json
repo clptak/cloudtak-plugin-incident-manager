@@ -167,5 +167,8 @@
         "text": "",
         "datetime": ""
     },
-    "assignments_org_chart": {}
+    "assignments_org_chart": {},
+    "risk": {
+        "complacency_assessments": {}
+    }
 }
