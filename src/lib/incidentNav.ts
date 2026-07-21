@@ -27,6 +27,7 @@ export const NAV_SECTIONS: NavSection[] = [
             { key: 'initial-information', label: 'Initial Information' },
             { key: 'subject-info', label: 'Subject Information' },
             { key: 'search-urgency', label: 'Search Urgency' },
+            { key: 'search-scenarios', label: 'Search Scenarios' },
             { key: 'ir-briefing', label: 'IR Briefing' },
             { key: 'resources', label: 'Resources' },
             { key: 'work-assignments', label: 'Assignments' },
