@@ -49,13 +49,10 @@ export function riskLevelForScore(score: number): RiskLevel {
     return { label: 'HIGH COMPLACENCY', recommendation: 'Stop and Think', band: 'red' };
 }
 
-export interface ComplacencyRiskAssessment {
-    /** CoT uid of the assignment map object; empty for free-text (new) tactics. */
-    assignmentUid: string;
-    /** Work assignment record id from incident_response.work_assignments. */
-    tacticAssignmentId: string;
-    tacticLabel: string;
-    description: string;
+/** One person's assessment of a tactic. */
+export interface ComplacencyRiskRespondent {
+    id: string;
+    name: string;
     repetition: number;
     confidence: number;
     experience: number;
@@ -65,6 +62,20 @@ export interface ComplacencyRiskAssessment {
     band: RiskBand;
     assessedAt: string;
 }
+
+/** A tactic entry keyed by assignment CoT uid (or `tactic:<uuid>`), with one row per respondent. */
+export interface ComplacencyRiskEntry {
+    /** CoT uid of the assignment map object; empty for free-text (new) tactics. */
+    assignmentUid: string;
+    /** Work assignment record id from incident_response.work_assignments. */
+    tacticAssignmentId: string;
+    tacticLabel: string;
+    description: string;
+    respondents: ComplacencyRiskRespondent[];
+}
+
+/** Map keyed by assignment CoT uid (or `tactic:<uuid>` for free-text tactics). */
+export type ComplacencyRiskMap = Record<string, ComplacencyRiskEntry>;
 
 /** Storage key inside risk.complacency_assessments for a new (non-assignment) tactic. */
 export function newTacticKey(): string {
@@ -77,7 +88,7 @@ function normalizeFactor(value: unknown, max: number): number | null {
     return n;
 }
 
-export function normalizeRiskAssessment(raw: unknown): ComplacencyRiskAssessment | null {
+function normalizeRespondent(raw: unknown): ComplacencyRiskRespondent | null {
     if (!raw || typeof raw !== 'object') return null;
     const r = raw as Record<string, unknown>;
 
@@ -90,10 +101,8 @@ export function normalizeRiskAssessment(raw: unknown): ComplacencyRiskAssessment
     const level = riskLevelForScore(score);
 
     return {
-        assignmentUid: String(r.assignmentUid ?? '').trim(),
-        tacticAssignmentId: String(r.tacticAssignmentId ?? '').trim(),
-        tacticLabel: String(r.tacticLabel ?? '').trim(),
-        description: String(r.description ?? '').trim(),
+        id: String(r.id ?? '').trim() || crypto.randomUUID(),
+        name: String(r.name ?? '').trim(),
         repetition,
         confidence,
         experience,
@@ -105,15 +114,66 @@ export function normalizeRiskAssessment(raw: unknown): ComplacencyRiskAssessment
     };
 }
 
-/** Map keyed by assignment CoT uid (or `tactic:<uuid>` for free-text tactics). */
-export type ComplacencyRiskMap = Record<string, ComplacencyRiskAssessment>;
+/**
+ * Accepts the current shape (respondents array) and the legacy single-assessment
+ * shape (factors at the entry top level), which migrates to one unnamed respondent.
+ */
+export function normalizeRiskEntry(raw: unknown): ComplacencyRiskEntry | null {
+    if (!raw || typeof raw !== 'object') return null;
+    const r = raw as Record<string, unknown>;
+
+    let respondents: ComplacencyRiskRespondent[];
+    if (Array.isArray(r.respondents)) {
+        respondents = r.respondents
+            .map(normalizeRespondent)
+            .filter((x): x is ComplacencyRiskRespondent => x != null);
+    } else {
+        const legacy = normalizeRespondent(r);
+        respondents = legacy ? [legacy] : [];
+    }
+    if (!respondents.length) return null;
+
+    return {
+        assignmentUid: String(r.assignmentUid ?? '').trim(),
+        tacticAssignmentId: String(r.tacticAssignmentId ?? '').trim(),
+        tacticLabel: String(r.tacticLabel ?? '').trim(),
+        description: String(r.description ?? '').trim(),
+        respondents,
+    };
+}
 
 export function riskAssessmentsFromSchemaValue(value: unknown): ComplacencyRiskMap {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
     const out: ComplacencyRiskMap = {};
     for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
-        const normalized = normalizeRiskAssessment(raw);
+        const normalized = normalizeRiskEntry(raw);
         if (key.trim() && normalized) out[key.trim()] = normalized;
     }
     return out;
+}
+
+const BAND_SEVERITY: Record<RiskBand, number> = { green: 0, amber: 1, red: 2 };
+
+/** Center of the Safety Zone (40-59); ties within a band break by distance from here. */
+const SAFETY_ZONE_CENTER = 50;
+
+function severity(r: ComplacencyRiskRespondent): [number, number] {
+    return [BAND_SEVERITY[r.band], Math.abs(r.score - SAFETY_ZONE_CENTER)];
+}
+
+/** Most severe respondent assessment for the tactic's rollup headline. */
+export function worstRespondent(entry: ComplacencyRiskEntry): ComplacencyRiskRespondent | null {
+    let worst: ComplacencyRiskRespondent | null = null;
+    for (const r of entry.respondents) {
+        if (!worst) {
+            worst = r;
+            continue;
+        }
+        const [band, dist] = severity(r);
+        const [worstBand, worstDist] = severity(worst);
+        if (band > worstBand || (band === worstBand && dist > worstDist)) {
+            worst = r;
+        }
+    }
+    return worst;
 }

@@ -3,7 +3,7 @@
 import type { ActiveMission } from '../composables/useIncident.ts';
 import {
     riskAssessmentsFromSchemaValue,
-    type ComplacencyRiskAssessment,
+    type ComplacencyRiskEntry,
     type ComplacencyRiskMap,
 } from './complacencyRisk.ts';
 import { loadIncidentSubscription, subscriptionMissionToken } from './incidentSubscription.ts';
@@ -23,7 +23,7 @@ export function riskAssessmentsFromSchema(schema: MissionSchema): ComplacencyRis
 export function riskAssessmentForUid(
     schema: MissionSchema,
     uid: string,
-): ComplacencyRiskAssessment | null {
+): ComplacencyRiskEntry | null {
     return riskAssessmentsFromSchema(schema)[uid] ?? null;
 }
 

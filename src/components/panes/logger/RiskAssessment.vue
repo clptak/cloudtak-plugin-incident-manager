@@ -9,8 +9,8 @@
             <div class='card-body'>
                 <p class='text-muted small mb-3'>
                     Risk = Repetition &times; Confidence &times; Experience
-                    (Craig E. Geis, California Training Institute). Assess each tactic
-                    before deploying resources.
+                    (Craig E. Geis, California Training Institute). Each respondent
+                    assesses the tactic for themselves before deploying.
                 </p>
 
                 <div
@@ -58,7 +58,7 @@
                     </div>
                 </div>
 
-                <div class='mb-3'>
+                <div class='mb-2'>
                     <label class='form-label small mb-1'>Description</label>
                     <textarea
                         v-model='description'
@@ -67,6 +67,17 @@
                         placeholder='Task being assessed, conditions, team notes…'
                         :disabled='busy'
                     />
+                </div>
+
+                <div class='mb-3'>
+                    <label class='form-label small mb-1'>Respondent</label>
+                    <input
+                        v-model='respondentName'
+                        type='text'
+                        class='form-control form-control-sm'
+                        placeholder='Name or callsign of the person assessing'
+                        :disabled='busy'
+                    >
                 </div>
 
                 <div class='row g-2 mb-3'>
@@ -176,7 +187,7 @@
                         :disabled='!canSave || busy'
                         @click='onSave'
                     >
-                        {{ saving ? 'Saving…' : (editingKey ? 'Update assessment' : 'Save assessment') }}
+                        {{ saving ? 'Saving…' : (editingRespondentId ? 'Update assessment' : 'Save assessment') }}
                     </button>
                     <button
                         type='button'
@@ -210,7 +221,7 @@
                     Loading…
                 </div>
                 <div
-                    v-else-if='!savedRows.length'
+                    v-else-if='!savedGroups.length'
                     class='p-3 text-muted small'
                 >
                     No assessments saved yet.
@@ -222,7 +233,7 @@
                     <table class='table table-sm table-vcenter mb-0'>
                         <thead>
                             <tr>
-                                <th>Tactic</th>
+                                <th>Respondent</th>
                                 <th style='width: 70px;'>
                                     Risk
                                 </th>
@@ -230,44 +241,81 @@
                                 <th class='d-none d-md-table-cell'>
                                     R &times; C &times; E
                                 </th>
-                                <th style='width: 110px;' />
+                                <th style='width: 120px;' />
                             </tr>
                         </thead>
-                        <tbody>
-                            <tr
-                                v-for='row in savedRows'
-                                :key='row.key'
-                            >
-                                <td>
-                                    <div>{{ row.assessment.tacticLabel || '(untitled tactic)' }}</div>
+                        <tbody
+                            v-for='group in savedGroups'
+                            :key='group.key'
+                        >
+                            <tr class='bg-body-secondary'>
+                                <td colspan='3'>
+                                    <div class='fw-semibold'>
+                                        {{ group.entry.tacticLabel || '(untitled tactic)' }}
+                                        <span
+                                            v-if='group.worst'
+                                            class='badge ms-2'
+                                            :class='bandBadgeClass(group.worst.band)'
+                                        >Worst: {{ group.worst.score }} — {{ group.worst.level }}</span>
+                                    </div>
                                     <div
-                                        v-if='row.assessment.description'
+                                        v-if='group.entry.description'
                                         class='text-muted small'
                                     >
-                                        {{ row.assessment.description }}
+                                        {{ group.entry.description }}
                                     </div>
                                 </td>
+                                <td class='d-none d-md-table-cell text-muted small'>
+                                    {{ group.entry.respondents.length }}
+                                    respondent{{ group.entry.respondents.length === 1 ? '' : 's' }}
+                                </td>
+                                <td class='text-end'>
+                                    <button
+                                        type='button'
+                                        class='btn btn-outline-primary btn-sm me-1'
+                                        :disabled='busy'
+                                        title='Add a respondent for this tactic'
+                                        @click='onAddRespondent(group.key)'
+                                    >
+                                        + Respondent
+                                    </button>
+                                    <button
+                                        type='button'
+                                        class='btn btn-outline-danger btn-sm'
+                                        :disabled='busy'
+                                        title='Delete this tactic and all its assessments'
+                                        @click='onDeleteTactic(group.key)'
+                                    >
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr
+                                v-for='resp in group.entry.respondents'
+                                :key='resp.id'
+                            >
+                                <td>{{ resp.name || '(unnamed)' }}</td>
                                 <td class='fw-bold'>
-                                    {{ row.assessment.score }}
+                                    {{ resp.score }}
                                 </td>
                                 <td>
                                     <span
                                         class='badge'
-                                        :class='bandBadgeClass(row.assessment.band)'
-                                    >{{ row.assessment.level }}</span>
+                                        :class='bandBadgeClass(resp.band)'
+                                    >{{ resp.level }}</span>
                                     <div class='text-muted small'>
-                                        {{ row.assessment.recommendation }}
+                                        {{ resp.recommendation }}
                                     </div>
                                 </td>
                                 <td class='d-none d-md-table-cell text-muted small'>
-                                    {{ row.assessment.repetition }} &times; {{ row.assessment.confidence }} &times; {{ row.assessment.experience }}
+                                    {{ resp.repetition }} &times; {{ resp.confidence }} &times; {{ resp.experience }}
                                 </td>
                                 <td class='text-end'>
                                     <button
                                         type='button'
                                         class='btn btn-outline-secondary btn-sm me-1'
                                         :disabled='busy'
-                                        @click='onEdit(row.key)'
+                                        @click='onEdit(group.key, resp.id)'
                                     >
                                         Edit
                                     </button>
@@ -275,7 +323,7 @@
                                         type='button'
                                         class='btn btn-outline-danger btn-sm'
                                         :disabled='busy'
-                                        @click='onDelete(row.key)'
+                                        @click='onDeleteRespondent(group.key, resp.id)'
                                     >
                                         Delete
                                     </button>
@@ -299,8 +347,10 @@ import {
     REPETITION_OPTIONS,
     newTacticKey,
     riskLevelForScore,
-    type ComplacencyRiskAssessment,
+    worstRespondent,
+    type ComplacencyRiskEntry,
     type ComplacencyRiskMap,
+    type ComplacencyRiskRespondent,
     type RiskBand,
 } from '../../../lib/complacencyRisk.ts';
 import {
@@ -321,11 +371,14 @@ const statusError = ref(false);
 const tacticChoice = ref('');
 const newTacticLabel = ref('');
 const description = ref('');
+const respondentName = ref('');
 const repetition = ref(0);
 const confidence = ref(0);
 const experience = ref(0);
-/** Set when editing an existing entry keyed by `tactic:<uuid>` (no assignment uid). */
+/** Set when editing a saved tactic keyed by `tactic:<uuid>` (no assignment uid). */
 const editingKey = ref('');
+/** Set when editing an existing respondent row (upsert target survives a rename). */
+const editingRespondentId = ref('');
 
 const busy = computed(() => loading.value || saving.value);
 
@@ -353,12 +406,13 @@ const result = computed(() => {
 
 const canSave = computed(() => {
     if (!result.value || !tacticLabel.value) return false;
+    if (!respondentName.value.trim()) return false;
     return tacticChoice.value !== '';
 });
 
-const savedRows = computed(() => Object.entries(assessments.value)
-    .map(([key, assessment]) => ({ key, assessment }))
-    .sort((a, b) => a.assessment.tacticLabel.localeCompare(b.assessment.tacticLabel)));
+const savedGroups = computed(() => Object.entries(assessments.value)
+    .map(([key, entry]) => ({ key, entry, worst: worstRespondent(entry) }))
+    .sort((a, b) => a.entry.tacticLabel.localeCompare(b.entry.tacticLabel)));
 
 function bandBadgeClass(band: RiskBand): string {
     if (band === 'green') return 'bg-green-lt text-green';
@@ -376,18 +430,29 @@ function resetForm(): void {
     tacticChoice.value = '';
     newTacticLabel.value = '';
     description.value = '';
+    respondentName.value = '';
     repetition.value = 0;
     confidence.value = 0;
     experience.value = 0;
     editingKey.value = '';
+    editingRespondentId.value = '';
     statusMessage.value = '';
 }
 
-function loadIntoForm(assessment: ComplacencyRiskAssessment): void {
-    description.value = assessment.description;
-    repetition.value = assessment.repetition;
-    confidence.value = assessment.confidence;
-    experience.value = assessment.experience;
+function clearRespondentFields(): void {
+    respondentName.value = '';
+    repetition.value = 0;
+    confidence.value = 0;
+    experience.value = 0;
+    editingRespondentId.value = '';
+}
+
+/** Storage key for the tactic currently selected in the form, if it already exists. */
+function keyForCurrentTactic(): string | null {
+    const assignment = selectedAssignment.value;
+    if (assignment) return assignment.assignmentUid;
+    if (editingKey.value) return editingKey.value;
+    return null;
 }
 
 async function load(): Promise<void> {
@@ -413,28 +478,48 @@ async function load(): Promise<void> {
 
 watch(activeMission, load, { immediate: true });
 
-/** Pre-load the saved assessment when an already-assessed assignment is selected. */
+/** Pre-fill the tactic description when an already-assessed assignment is selected. */
 watch(tacticChoice, (choice) => {
     editingKey.value = '';
+    editingRespondentId.value = '';
     if (choice === '__new__' || !choice) return;
     const assignment = assignments.value.find((a) => a.id === choice);
     const existing = assignment ? assessments.value[assignment.assignmentUid] : undefined;
-    if (existing) loadIntoForm(existing);
+    if (existing) description.value = existing.description;
 });
 
-function onEdit(key: string): void {
-    const assessment = assessments.value[key];
-    if (!assessment) return;
+function selectTacticByKey(key: string): boolean {
+    const entry = assessments.value[key];
+    if (!entry) return false;
 
-    if (assessment.tacticAssignmentId
-        && assignments.value.some((a) => a.id === assessment.tacticAssignmentId)) {
-        tacticChoice.value = assessment.tacticAssignmentId;
+    if (entry.tacticAssignmentId
+        && assignments.value.some((a) => a.id === entry.tacticAssignmentId)) {
+        tacticChoice.value = entry.tacticAssignmentId;
     } else {
         tacticChoice.value = '__new__';
-        newTacticLabel.value = assessment.tacticLabel;
+        newTacticLabel.value = entry.tacticLabel;
         editingKey.value = key;
     }
-    loadIntoForm(assessment);
+    description.value = entry.description;
+    return true;
+}
+
+function onAddRespondent(key: string): void {
+    if (!selectTacticByKey(key)) return;
+    clearRespondentFields();
+    statusMessage.value = '';
+}
+
+function onEdit(key: string, respondentId: string): void {
+    const entry = assessments.value[key];
+    const resp = entry?.respondents.find((r) => r.id === respondentId);
+    if (!resp || !selectTacticByKey(key)) return;
+
+    respondentName.value = resp.name;
+    repetition.value = resp.repetition;
+    confidence.value = resp.confidence;
+    experience.value = resp.experience;
+    editingRespondentId.value = respondentId;
     statusMessage.value = '';
 }
 
@@ -463,13 +548,13 @@ async function onSave(): Promise<void> {
     if (!requireActiveMission() || !result.value || !canSave.value) return;
 
     const assignment = selectedAssignment.value;
-    const key = assignment?.assignmentUid || editingKey.value || newTacticKey();
+    const key = keyForCurrentTactic() ?? newTacticKey();
+    const existing = assessments.value[key];
+    const name = respondentName.value.trim();
 
-    const assessment: ComplacencyRiskAssessment = {
-        assignmentUid: assignment?.assignmentUid ?? '',
-        tacticAssignmentId: assignment?.id ?? '',
-        tacticLabel: tacticLabel.value,
-        description: description.value.trim(),
+    const respondent: ComplacencyRiskRespondent = {
+        id: editingRespondentId.value || crypto.randomUUID(),
+        name,
         repetition: repetition.value,
         confidence: confidence.value,
         experience: experience.value,
@@ -480,24 +565,62 @@ async function onSave(): Promise<void> {
         assessedAt: new Date().toISOString(),
     };
 
+    // Upsert: match the row being edited, else an existing respondent with the same name.
+    const respondents = [...(existing?.respondents ?? [])];
+    const idx = respondents.findIndex((r) => (
+        editingRespondentId.value
+            ? r.id === editingRespondentId.value
+            : r.name.toLowerCase() === name.toLowerCase()
+    ));
+    if (idx >= 0) {
+        respondent.id = respondents[idx].id;
+        respondents[idx] = respondent;
+    } else {
+        respondents.push(respondent);
+    }
+
+    const entry: ComplacencyRiskEntry = {
+        assignmentUid: assignment?.assignmentUid ?? existing?.assignmentUid ?? '',
+        tacticAssignmentId: assignment?.id ?? existing?.tacticAssignmentId ?? '',
+        tacticLabel: tacticLabel.value,
+        description: description.value.trim(),
+        respondents,
+    };
+
     await persist(
-        { ...assessments.value, [key]: assessment },
-        `Saved risk assessment for "${assessment.tacticLabel}" (${assessment.level}).`,
+        { ...assessments.value, [key]: entry },
+        `Saved ${name}'s assessment of "${entry.tacticLabel}" (${respondent.level}).`,
     );
-    if (!statusError.value) resetFormKeepStatus();
+    if (!statusError.value) {
+        editingKey.value = key.startsWith('tactic:') ? key : '';
+        clearRespondentFields();
+    }
 }
 
-function resetFormKeepStatus(): void {
-    const msg = statusMessage.value;
-    resetForm();
-    statusMessage.value = msg;
+async function onDeleteRespondent(key: string, respondentId: string): Promise<void> {
+    if (!requireActiveMission()) return;
+    const entry = assessments.value[key];
+    if (!entry) return;
+
+    const respondents = entry.respondents.filter((r) => r.id !== respondentId);
+    const removed = entry.respondents.find((r) => r.id === respondentId);
+    const next = { ...assessments.value };
+    if (respondents.length) {
+        next[key] = { ...entry, respondents };
+    } else {
+        delete next[key];
+    }
+    await persist(
+        next,
+        `Deleted ${removed?.name || 'respondent'}'s assessment of "${entry.tacticLabel}".`,
+    );
 }
 
-async function onDelete(key: string): Promise<void> {
+async function onDeleteTactic(key: string): Promise<void> {
     if (!requireActiveMission()) return;
     const next = { ...assessments.value };
-    const label = next[key]?.tacticLabel || 'assessment';
+    const label = next[key]?.tacticLabel || 'tactic';
     delete next[key];
-    await persist(next, `Deleted risk assessment for "${label}".`);
+    await persist(next, `Deleted all risk assessments for "${label}".`);
 }
 </script>
