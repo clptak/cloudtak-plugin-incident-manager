@@ -133,38 +133,6 @@ function layoutsForField(
     }
 }
 
-// #region agent log
-function agentScanNonWinAnsi(label: string, text: string, hypothesisId: string): void {
-    const s = String(text ?? '');
-    const offenders: Array<{ ch: string; hex: string; index: number }> = [];
-    for (let i = 0; i < s.length;) {
-        const cp = s.codePointAt(i)!;
-        const ch = String.fromCodePoint(cp);
-        if (cp > 255) offenders.push({ ch, hex: `0x${cp.toString(16)}`, index: i });
-        i += ch.length;
-    }
-    if (!offenders.length) return;
-    fetch('http://127.0.0.1:7627/ingest/45700870-a64c-4e23-b841-0db3851123a5', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '05df6e' },
-        body: JSON.stringify({
-            sessionId: '05df6e',
-            runId: 'pre-fix',
-            hypothesisId,
-            location: 'ics201Pdf.ts:agentScanNonWinAnsi',
-            message: 'non-WinAnsi chars in ICS-201 field',
-            data: {
-                label,
-                preview: s.slice(0, 120),
-                offenders: offenders.slice(0, 10),
-                offenderCount: offenders.length,
-            },
-            timestamp: Date.now(),
-        }),
-    }).catch(() => {});
-}
-// #endregion
-
 function wrapLines(text: string, font: PDFFont, maxWidth: number): string[] {
     const normalized = toPdfWinAnsiText(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
     if (!normalized) return [];
@@ -179,31 +147,7 @@ function wrapLines(text: string, font: PDFFont, maxWidth: number): string[] {
         let line = words[0];
         for (let i = 1; i < words.length; i++) {
             const next = `${line} ${words[i]}`;
-            // #region agent log
-            let nextWidth: number;
-            try {
-                nextWidth = font.widthOfTextAtSize(next, FONT_SIZE);
-            } catch (err) {
-                fetch('http://127.0.0.1:7627/ingest/45700870-a64c-4e23-b841-0db3851123a5', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '05df6e' },
-                    body: JSON.stringify({
-                        sessionId: '05df6e',
-                        runId: 'pre-fix',
-                        hypothesisId: 'D',
-                        location: 'ics201Pdf.ts:wrapLines',
-                        message: 'widthOfTextAtSize threw',
-                        data: {
-                            err: err instanceof Error ? err.message : String(err),
-                            snippet: next.slice(0, 80),
-                        },
-                        timestamp: Date.now(),
-                    }),
-                }).catch(() => {});
-                throw err;
-            }
-            if (nextWidth <= maxWidth) {
-            // #endregion
+            if (font.widthOfTextAtSize(next, FONT_SIZE) <= maxWidth) {
                 line = next;
             } else {
                 lines.push(line);
@@ -429,27 +373,6 @@ export async function buildIcs201Pdf(
     form: Ics201Form,
     sources: Pick<Ics201Sources, 'missionName' | 'missionGuid'>,
 ): Promise<Uint8Array> {
-    // #region agent log
-    fetch('http://127.0.0.1:7627/ingest/45700870-a64c-4e23-b841-0db3851123a5', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '05df6e' },
-        body: JSON.stringify({
-            sessionId: '05df6e',
-            runId: 'pre-fix',
-            hypothesisId: 'E',
-            location: 'ics201Pdf.ts:buildIcs201Pdf',
-            message: 'ICS-201 build start',
-            data: {
-                missionNameLen: (sources.missionName || '').length,
-                incidentNameLen: (form.incidentName || '').length,
-                actionCount: form.actions?.length ?? 0,
-                resourceCount: form.resources?.length ?? 0,
-            },
-            timestamp: Date.now(),
-        }),
-    }).catch(() => {});
-    agentScanNonWinAnsi('sources.missionName', sources.missionName || '', 'E');
-    // #endregion
     const templateBytes = await loadTemplateBytes();
     const templateDoc = await PDFDocument.load(templateBytes);
     const templatePdf = templateDoc as PDFDocument & {
@@ -466,56 +389,12 @@ export async function buildIcs201Pdf(
         pages.push(await embedTemplatePage(templateDoc, outDoc, pageIndex));
     }
 
-    try {
-        for (const job of collectPaintJobs(form, sources)) {
-            // #region agent log
-            agentScanNonWinAnsi(`job:${job.name}`, job.value, 'C');
-            // #endregion
-            paintNamedField(pages, font, pdfForm, job.name, job.value, job.page);
-        }
-        // #region agent log
-        for (let i = 0; i < form.actions.length; i++) {
-            agentScanNonWinAnsi(`actions[${i}].time`, form.actions[i].time, 'C');
-            agentScanNonWinAnsi(`actions[${i}].actions`, form.actions[i].actions, 'C');
-        }
-        // #endregion
-        paintActionRows(pages, font, pdfForm, form.actions);
-    } catch (err) {
-        // #region agent log
-        fetch('http://127.0.0.1:7627/ingest/45700870-a64c-4e23-b841-0db3851123a5', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '05df6e' },
-            body: JSON.stringify({
-                sessionId: '05df6e',
-                runId: 'pre-fix',
-                hypothesisId: 'C',
-                location: 'ics201Pdf.ts:buildIcs201Pdf:catch',
-                message: 'ICS-201 build failed',
-                data: { err: err instanceof Error ? err.message : String(err) },
-                timestamp: Date.now(),
-            }),
-        }).catch(() => {});
-        // #endregion
-        throw err;
+    for (const job of collectPaintJobs(form, sources)) {
+        paintNamedField(pages, font, pdfForm, job.name, job.value, job.page);
     }
+    paintActionRows(pages, font, pdfForm, form.actions);
 
-    const bytes = await outDoc.save();
-    // #region agent log
-    fetch('http://127.0.0.1:7627/ingest/45700870-a64c-4e23-b841-0db3851123a5', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '05df6e' },
-        body: JSON.stringify({
-            sessionId: '05df6e',
-            runId: 'post-fix',
-            hypothesisId: 'C',
-            location: 'ics201Pdf.ts:buildIcs201Pdf:success',
-            message: 'ICS-201 build succeeded',
-            data: { byteLength: bytes.length },
-            timestamp: Date.now(),
-        }),
-    }).catch(() => {});
-    // #endregion
-    return bytes;
+    return outDoc.save();
 }
 
 export function defaultIcs201Filename(incidentName: string): string {
