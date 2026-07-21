@@ -44,10 +44,46 @@
         </div>
 
         <div class='card mb-3'>
-            <div class='card-header py-2 small fw-semibold'>
-                Default agency
+            <div class='card-header py-2 small fw-semibold d-flex align-items-center'>
+                <IconInfoCircle
+                    :size='16'
+                    stroke='1.5'
+                    class='me-1'
+                />
+                <span>Information</span>
             </div>
-            <div class='card-body py-2'>
+            <div class='card-body py-2 small'>
+                Utilize the
+                <a
+                    href='#'
+                    @click.prevent='selectHTabGuarded("organization")'
+                >Organization Tab</a>
+                to create your ICS 201 Organizational Chart and Team Assignments
+            </div>
+        </div>
+
+        <div class='card mb-3'>
+            <div
+                class='card-header py-2 small fw-semibold d-flex align-items-center cursor-pointer user-select-none'
+                role='button'
+                tabindex='0'
+                :aria-expanded='defaultAgencyExpanded'
+                @click='defaultAgencyExpanded = !defaultAgencyExpanded'
+                @keydown.enter.prevent='defaultAgencyExpanded = !defaultAgencyExpanded'
+                @keydown.space.prevent='defaultAgencyExpanded = !defaultAgencyExpanded'
+            >
+                <span>Default agency</span>
+                <IconChevronDown
+                    class='ms-auto transition-transform'
+                    :class='{ "rotate-180": defaultAgencyExpanded }'
+                    :size='18'
+                    stroke='1.5'
+                />
+            </div>
+            <div
+                v-show='defaultAgencyExpanded'
+                class='card-body py-2'
+            >
                 <label class='form-label small mb-1'>Default agency</label>
                 <input
                     v-model='defaultAgencyInput'
@@ -350,6 +386,7 @@
 
 <script setup lang='ts'>
 import { computed, onMounted, ref, watch } from 'vue';
+import { IconChevronDown, IconInfoCircle } from '@tabler/icons-vue';
 import { useIncident } from '../../composables/useIncident.ts';
 import { useResourceAssignments } from '../../composables/useResourceAssignments.ts';
 import { formatD4hSyncTime, loadD4hMeta, loadD4hRoster } from '../../lib/d4hRoster.ts';
@@ -365,7 +402,7 @@ import {
     type ResourceAssignmentStatus,
 } from '../../lib/resourceAssignments.ts';
 
-const { activeMission, requireActiveMission } = useIncident();
+const { activeMission, requireActiveMission, selectHTabGuarded } = useIncident();
 const {
     assignments,
     defaultAgency,
@@ -381,6 +418,7 @@ const {
     updateDefaultAgency,
 } = useResourceAssignments();
 
+const defaultAgencyExpanded = ref(true);
 const loadingRoster = ref(false);
 const savingDefaultAgency = ref(false);
 const meta = ref<D4HRosterMeta | null>(null);
@@ -555,5 +593,13 @@ onMounted(() => {
 .resources-table-scroll {
     max-height: 50vh;
     overflow: auto;
+}
+
+.rotate-180 {
+    transform: rotate(-180deg);
+}
+
+.transition-transform {
+    transition: transform 0.2s ease-out;
 }
 </style>
