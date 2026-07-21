@@ -248,6 +248,75 @@ export function orgChartLinesFromTree(tree: HastyTreeNode): OrgChartExportLine[]
     return lines;
 }
 
+/** ICS section chiefs that can have units/teams beneath them on the ICS 201. */
+export type Ics201SectionKey = 'plan' | 'ops' | 'fin' | 'log';
+
+export const ICS201_SECTION_KEYS: readonly Ics201SectionKey[] = ['plan', 'ops', 'fin', 'log'];
+
+export interface Ics201TreeOrganization {
+    /** Assignee name per §9 officer/chief box. */
+    roles: Partial<Record<Exclude<Ics201OrgField, 'organizationNotes'>, string>>;
+    /** Collapsed unit lines under each section chief (one per team/role/person). */
+    sections: Record<Ics201SectionKey, string[]>;
+    /** Lines for nodes not under any section chief. */
+    notes: string[];
+}
+
+function isSectionKey(key: string): key is Ics201SectionKey {
+    return (ICS201_SECTION_KEYS as readonly string[]).includes(key);
+}
+
+/**
+ * Read the live org chart tree into ICS 201 §9 values: officer boxes, unit lines
+ * grouped under the nearest ancestor section chief, and leftover notes lines.
+ * Team-like nodes collapse their subtree into one line, as in the DataSync export.
+ */
+export function ics201OrganizationFromTree(tree: HastyTreeNode): Ics201TreeOrganization {
+    const result: Ics201TreeOrganization = {
+        roles: {},
+        sections: { plan: [], ops: [], fin: [], log: [] },
+        notes: [],
+    };
+
+    const pushLine = (section: Ics201SectionKey | null, content: string): void => {
+        const trimmed = content.trim();
+        if (!trimmed) return;
+        (section ? result.sections[section] : result.notes).push(trimmed);
+    };
+
+    const visit = (node: HastyTreeNode, section: Ics201SectionKey | null): void => {
+        if (!node.self) {
+            for (const child of node.children ?? []) visit(child, section);
+            return;
+        }
+
+        const self = node.self;
+
+        if (isTeamLikeNode(self)) {
+            pushLine(section, teamLineContent(self, node));
+            return;
+        }
+
+        const pdfField = self.type === 'role' ? pdfFieldForRole(self) : undefined;
+        if (pdfField) {
+            const assignee = personNameForExport(self.assigneeName);
+            if (assignee && !result.roles[pdfField]) {
+                result.roles[pdfField] = assignee;
+            }
+            const icsKey = incidentCommandRoleKey(self, pdfField);
+            const nextSection = icsKey && isSectionKey(icsKey) ? icsKey : section;
+            for (const child of node.children ?? []) visit(child, nextSection);
+            return;
+        }
+
+        pushLine(section, notesLineForNode(self));
+        for (const child of node.children ?? []) visit(child, section);
+    };
+
+    visit(tree, null);
+    return result;
+}
+
 export function buildOrgChartLogKeywords(line: OrgChartExportLine): string[] {
     const kws = [
         ORG_CHART_KEYWORD,

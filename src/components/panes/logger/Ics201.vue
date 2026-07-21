@@ -293,6 +293,12 @@
                             type='text'
                             class='form-control form-control-sm'
                         >
+                        <textarea
+                            v-model='form.planningSectionUnits'
+                            class='form-control form-control-sm mt-1'
+                            rows='3'
+                            placeholder='Planning Section teams/personnel (one per line)'
+                        />
                     </div>
                     <div class='col-md-6'>
                         <label class='form-label small mb-1'>Operations Section Chief</label>
@@ -301,6 +307,12 @@
                             type='text'
                             class='form-control form-control-sm'
                         >
+                        <textarea
+                            v-model='form.operationsSectionUnits'
+                            class='form-control form-control-sm mt-1'
+                            rows='3'
+                            placeholder='Operations Section teams/personnel (one per line)'
+                        />
                     </div>
                     <div class='col-md-6'>
                         <label class='form-label small mb-1'>Finance/Admin Section Chief</label>
@@ -309,6 +321,12 @@
                             type='text'
                             class='form-control form-control-sm'
                         >
+                        <textarea
+                            v-model='form.financeSectionUnits'
+                            class='form-control form-control-sm mt-1'
+                            rows='3'
+                            placeholder='Finance/Admin Section teams/personnel (one per line)'
+                        />
                     </div>
                     <div class='col-md-6'>
                         <label class='form-label small mb-1'>Logistics Section Chief</label>
@@ -317,6 +335,12 @@
                             type='text'
                             class='form-control form-control-sm'
                         >
+                        <textarea
+                            v-model='form.logisticsSectionUnits'
+                            class='form-control form-control-sm mt-1'
+                            rows='3'
+                            placeholder='Logistics Section teams/personnel (one per line)'
+                        />
                     </div>
                     <div class='col-12'>
                         <label class='form-label small mb-1'>Organization Notes</label>
@@ -326,6 +350,11 @@
                             rows='2'
                         />
                     </div>
+                </div>
+                <div class='form-text mt-1'>
+                    Prefills from the Organization tab chart: positions fill the officer/chief
+                    boxes and each section&apos;s teams appear under its Section Chief on the PDF.
+                    Anything not under a Section Chief goes to Organization Notes.
                 </div>
             </div>
         </div>

@@ -23,7 +23,15 @@ import {
     nowBriefingTime,
     resolveIppLatLng,
 } from './irBriefing.ts';
-import { organizationFromOrgChartLogs } from './orgChartExport.ts';
+import {
+    ics201OrganizationFromTree,
+    organizationFromOrgChartLogs,
+    type Ics201TreeOrganization,
+} from './orgChartExport.ts';
+import { loadIncidentSubscription } from './incidentSubscription.ts';
+import { loadMissionSchema } from './missionSchema.ts';
+import { orgChartFromSchemaValue } from './orgChartPersistence.ts';
+import { treeHasContent } from './hastyTeamTree.ts';
 import { loadResourceAssignmentsFromMission } from './resourceAssignmentPersistence.ts';
 import type { ResourceAssignment } from './resourceAssignments.ts';
 
@@ -76,6 +84,11 @@ export interface Ics201Form {
     operationsSectionChief: string;
     financeSectionChief: string;
     logisticsSectionChief: string;
+    /** Teams/personnel under each section chief (§9), one per line. */
+    planningSectionUnits: string;
+    operationsSectionUnits: string;
+    financeSectionUnits: string;
+    logisticsSectionUnits: string;
     organizationNotes: string;
     resources: Ics201ResourceRow[];
     logId?: string;
@@ -128,6 +141,10 @@ export function blankIcs201Form(): Ics201Form {
         operationsSectionChief: '',
         financeSectionChief: '',
         logisticsSectionChief: '',
+        planningSectionUnits: '',
+        operationsSectionUnits: '',
+        financeSectionUnits: '',
+        logisticsSectionUnits: '',
         organizationNotes: '',
         resources: Array.from({ length: MAX_RESOURCE_ROWS }, blankResourceRow),
     };
@@ -600,6 +617,31 @@ function parsePostTag(tag: string): {
     return null;
 }
 
+/**
+ * Read the Organization tab chart from mission_schema.json without the
+ * migration/save side effects of loadOrgChartFromMission.
+ */
+async function loadIcs201OrgFromTree(
+    missionGuid: string,
+    missionName?: string,
+    missionToken?: string,
+): Promise<Ics201TreeOrganization | null> {
+    try {
+        const sub = await loadIncidentSubscription({
+            guid: missionGuid,
+            name: missionName ?? '',
+            missionToken,
+        });
+        const { schema } = await loadMissionSchema(sub);
+        const tree = orgChartFromSchemaValue(schema.assignments_org_chart);
+        if (!treeHasContent(tree)) return null;
+        return ics201OrganizationFromTree(tree);
+    } catch {
+        // mission_schema.json may be absent or unreadable; log fallback applies
+        return null;
+    }
+}
+
 export interface LoadedIcs201 {
     form: Ics201Form;
     sources: Ics201Sources;
@@ -666,7 +708,16 @@ export async function loadIcs201FromMission(
         form.situationSummary = situationFromIrBriefingLogs(logs);
     }
 
-    const orgChart = organizationFromOrgChartLogs(logs);
+    // §9 Current Organization: prefer the live Organization tab chart
+    // (assignments_org_chart in mission_schema.json); fall back to synced
+    // `ics-org` logs for missions without a chart.
+    const treeOrg = await loadIcs201OrgFromTree(missionGuid, missionName, missionToken);
+    const orgChart = treeOrg
+        ? {
+            ...treeOrg.roles,
+            organizationNotes: treeOrg.notes.join('\n'),
+        }
+        : organizationFromOrgChartLogs(logs);
     if (orgChart.incidentCommanders) form.incidentCommanders = orgChart.incidentCommanders;
     if (orgChart.liaisonOfficer) form.liaisonOfficer = orgChart.liaisonOfficer;
     if (orgChart.safetyOfficer) form.safetyOfficer = orgChart.safetyOfficer;
@@ -676,6 +727,13 @@ export async function loadIcs201FromMission(
     if (orgChart.financeSectionChief) form.financeSectionChief = orgChart.financeSectionChief;
     if (orgChart.logisticsSectionChief) form.logisticsSectionChief = orgChart.logisticsSectionChief;
     if (orgChart.organizationNotes) form.organizationNotes = orgChart.organizationNotes;
+    const autoSectionUnits = {
+        planningSectionUnits: treeOrg ? treeOrg.sections.plan.join('\n') : '',
+        operationsSectionUnits: treeOrg ? treeOrg.sections.ops.join('\n') : '',
+        financeSectionUnits: treeOrg ? treeOrg.sections.fin.join('\n') : '',
+        logisticsSectionUnits: treeOrg ? treeOrg.sections.log.join('\n') : '',
+    };
+    Object.assign(form, autoSectionUnits);
 
     const saved = latestIcs201FromLogs(logs);
     if (saved) {
@@ -698,6 +756,10 @@ export async function loadIcs201FromMission(
         if (!form.organizationNotes.trim() && orgChart.organizationNotes) {
             form.organizationNotes = orgChart.organizationNotes;
         }
+        if (!form.planningSectionUnits.trim()) form.planningSectionUnits = autoSectionUnits.planningSectionUnits;
+        if (!form.operationsSectionUnits.trim()) form.operationsSectionUnits = autoSectionUnits.operationsSectionUnits;
+        if (!form.financeSectionUnits.trim()) form.financeSectionUnits = autoSectionUnits.financeSectionUnits;
+        if (!form.logisticsSectionUnits.trim()) form.logisticsSectionUnits = autoSectionUnits.logisticsSectionUnits;
         // Saved forms serialize blank resource rows; don't let them wipe auto-fill.
         if (!resourceRowsHaveContent(form.resources)) {
             form.resources = autoResources;
@@ -720,6 +782,18 @@ export function mergeIcs201Sources(current: Ics201Form, loaded: Ics201Form): Ics
         incidentCommanders: current.incidentCommanders.trim()
             ? current.incidentCommanders
             : loaded.incidentCommanders,
+        planningSectionUnits: current.planningSectionUnits.trim()
+            ? current.planningSectionUnits
+            : loaded.planningSectionUnits,
+        operationsSectionUnits: current.operationsSectionUnits.trim()
+            ? current.operationsSectionUnits
+            : loaded.operationsSectionUnits,
+        financeSectionUnits: current.financeSectionUnits.trim()
+            ? current.financeSectionUnits
+            : loaded.financeSectionUnits,
+        logisticsSectionUnits: current.logisticsSectionUnits.trim()
+            ? current.logisticsSectionUnits
+            : loaded.logisticsSectionUnits,
         situationSummary: current.situationSummary.trim()
             ? current.situationSummary
             : loaded.situationSummary,

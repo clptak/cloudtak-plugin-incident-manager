@@ -31,6 +31,17 @@ const SITUATION_FIELD = '5 Situation Summary and Health and Safety Briefing for 
 const OBJECTIVES_FIELD = '7 Current and Planned Objectives';
 const ORG_NOTES_FIELD = '9 Current Organization fill in additional organization as appropriate Incident Commanders Operations Section Chief Planning Section Chief Logistics Section Chief FinanceAdministration Section Chief Safety Officer Public Information Officer Liaison Officer';
 
+/**
+ * §9 chief boxes by *printed* title. The template's AcroForm field names are
+ * swapped vs the printed box titles: the field named "Planning Section
+ * Chief_2" sits under the printed "Operations Section Chief" box, and so on
+ * (printed left-to-right: Ops, Plan, Log, Fin).
+ */
+const OPS_CHIEF_FIELD = 'Planning Section Chief_2';
+const PLAN_CHIEF_FIELD = 'Operations Section Chief_2';
+const LOG_CHIEF_FIELD = 'FinanceAdministration Section Chief';
+const FIN_CHIEF_FIELD = 'Logistics Section Chief';
+
 /** Single-widget fields and their template page index (0-based). */
 const SINGLE_FIELD_PAGES: Record<string, number> = {
     [MAP_SKETCH_FIELD]: 0,
@@ -323,11 +334,13 @@ function collectPaintJobs(
         { name: 'Liaison Officer', value: form.liaisonOfficer },
         { name: 'Safety Officer', value: form.safetyOfficer },
         { name: 'Public Information Officer', value: form.publicInformationOfficer },
-        { name: 'Planning Section Chief_2', value: form.planningSectionChief },
-        { name: 'Operations Section Chief_2', value: form.operationsSectionChief },
-        { name: 'FinanceAdministration Section Chief', value: form.financeSectionChief },
-        { name: 'Logistics Section Chief', value: form.logisticsSectionChief },
-        { name: ORG_NOTES_FIELD, value: form.organizationNotes },
+        // Template quirk: §9 chief field names are swapped vs the printed box
+        // titles (printed order Ops, Plan, Log, Fin; field-name order Plan,
+        // Ops, Fin, Log). Map by printed title, not field name.
+        { name: OPS_CHIEF_FIELD, value: form.operationsSectionChief },
+        { name: PLAN_CHIEF_FIELD, value: form.planningSectionChief },
+        { name: LOG_CHIEF_FIELD, value: form.logisticsSectionChief },
+        { name: FIN_CHIEF_FIELD, value: form.financeSectionChief },
     ];
 
     for (const suffix of ['', '_2', '_3', '_4']) {
@@ -439,6 +452,77 @@ function paintActionRows(
     }
 }
 
+/** §9 unit columns: section-units form field paired with its chief box field. */
+const ORG_SECTION_COLUMNS: Array<{
+    chiefField: string;
+    units: (form: Ics201Form) => string;
+}> = [
+    { chiefField: OPS_CHIEF_FIELD, units: (f) => f.operationsSectionUnits },
+    { chiefField: PLAN_CHIEF_FIELD, units: (f) => f.planningSectionUnits },
+    { chiefField: LOG_CHIEF_FIELD, units: (f) => f.logisticsSectionUnits },
+    { chiefField: FIN_CHIEF_FIELD, units: (f) => f.financeSectionUnits },
+];
+
+/**
+ * Fill the §9 Current Organization area (big box under the chief row):
+ * each section's teams/personnel wrap in a column aligned under its chief box,
+ * and leftover organization notes draw full-width below the deepest column.
+ */
+function paintOrganizationSection(
+    pages: PDFPage[],
+    font: PDFFont,
+    form: BriefingPdfForm,
+    ics201: Ics201Form,
+): void {
+    const areaLayout = layoutsForField(form, ORG_NOTES_FIELD)[0];
+    const page = areaLayout ? pages[areaLayout.pageIndex] : undefined;
+    if (!areaLayout || !page) {
+        paintNamedField(pages, font, form, ORG_NOTES_FIELD, ics201.organizationNotes);
+        return;
+    }
+
+    const notes = ics201.organizationNotes.trim();
+    const columns = ORG_SECTION_COLUMNS
+        .map((col) => ({
+            text: col.units(ics201).trim(),
+            chiefLayout: layoutsForField(form, col.chiefField)[0],
+        }))
+        .filter((col) => col.text && col.chiefLayout);
+    if (!notes && !columns.length) return;
+
+    whiteOutField(page, areaLayout);
+
+    const topBaseline = areaLayout.y + areaLayout.h - CELL_PAD - FONT_SIZE;
+    const bottomY = areaLayout.y + CELL_PAD;
+    let lowestColumnY = Number.POSITIVE_INFINITY;
+
+    for (const col of columns) {
+        const colX = col.chiefLayout.x + CELL_PAD;
+        const colW = col.chiefLayout.w - CELL_PAD * 2;
+        let y = topBaseline;
+        for (const line of wrapLines(col.text, font, colW)) {
+            if (y < bottomY) break;
+            if (line) {
+                page.drawText(line, { x: colX, y, size: FONT_SIZE, font });
+            }
+            y -= LINE_HEIGHT;
+        }
+        lowestColumnY = Math.min(lowestColumnY, y);
+    }
+
+    if (!notes) return;
+    let y = columns.length
+        ? lowestColumnY - LINE_HEIGHT
+        : topBaseline;
+    for (const line of wrapLines(notes, font, areaLayout.w - CELL_PAD * 2)) {
+        if (y < bottomY) break;
+        if (line) {
+            page.drawText(line, { x: areaLayout.x + CELL_PAD, y, size: FONT_SIZE, font });
+        }
+        y -= LINE_HEIGHT;
+    }
+}
+
 /** Paint ICS 201 values onto the template using measured AcroForm widget boxes. */
 export async function buildIcs201Pdf(
     form: Ics201Form,
@@ -463,6 +547,7 @@ export async function buildIcs201Pdf(
     for (const job of collectPaintJobs(form, sources)) {
         paintNamedField(pages, font, pdfForm, job.name, job.value, job.page, job.fit);
     }
+    paintOrganizationSection(pages, font, pdfForm, form);
     paintActionRows(pages, font, pdfForm, form.actions);
 
     return outDoc.save();
