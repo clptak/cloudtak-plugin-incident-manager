@@ -29,6 +29,7 @@ export const NAV_SECTIONS: NavSection[] = [
             { key: 'search-urgency', label: 'Search Urgency' },
             { key: 'search-scenarios', label: 'Search Scenarios' },
             { key: 'ir-briefing', label: 'IR Briefing' },
+            { key: 'incident-post', label: 'Incident POST' },
             { key: 'resources', label: 'Resources' },
             { key: 'work-assignments', label: 'Assignments' },
             { key: 'ics-201', label: 'ICS 201' },
@@ -41,7 +42,6 @@ export const NAV_SECTIONS: NavSection[] = [
         items: [
             { key: 'search-area', label: 'Search Area', helpKey: 'establishing-search-area' },
             { key: 'risk-assessment', label: 'Risk Assessment' },
-            { key: 'incident-post', label: 'Incident POST' },
             { key: 'casie', label: 'CASIE' },
         ],
     },
