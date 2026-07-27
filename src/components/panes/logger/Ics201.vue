@@ -183,11 +183,111 @@
                 </h4>
             </div>
             <div class='card-body py-2'>
-                <textarea
-                    v-model='form.objectives'
-                    class='form-control form-control-sm'
-                    rows='4'
-                />
+                <div class='mb-3'>
+                    <label class='form-label small mb-1'>
+                        Current Objectives
+                    </label>
+                    <div
+                        v-for='(text, i) in form.currentObjectives'
+                        :key='`current-obj-${i}`'
+                        class='input-group input-group-sm mb-2'
+                    >
+                        <span class='input-group-text text-muted'>
+                            {{ i + 1 }}
+                        </span>
+                        <input
+                            v-model='form.currentObjectives[i]'
+                            type='text'
+                            class='form-control form-control-sm'
+                            :placeholder='`Current objective ${i + 1}`'
+                        >
+                        <button
+                            v-if='form.currentObjectives.length > 1'
+                            type='button'
+                            class='btn btn-outline-danger btn-sm'
+                            :aria-label='`Remove current objective ${i + 1}`'
+                            @click='removeCurrentObjective(i)'
+                        >
+                            <IconX
+                                :size='16'
+                                stroke='1.5'
+                            />
+                        </button>
+                    </div>
+                    <button
+                        type='button'
+                        class='btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1'
+                        @click='addCurrentObjective'
+                    >
+                        <IconPlus
+                            :size='16'
+                            stroke='1.5'
+                        />
+                        Add current objective
+                    </button>
+                </div>
+
+                <div>
+                    <label class='form-label small mb-1'>
+                        Planned Objectives
+                    </label>
+                    <div
+                        v-for='(row, i) in form.plannedObjectives'
+                        :key='`planned-obj-${i}`'
+                        class='row g-2 mb-2 align-items-center'
+                    >
+                        <div class='col'>
+                            <div class='input-group input-group-sm'>
+                                <span class='input-group-text text-muted'>
+                                    {{ i + 1 }}
+                                </span>
+                                <input
+                                    v-model='row.text'
+                                    type='text'
+                                    class='form-control form-control-sm'
+                                    :placeholder='`Planned objective ${i + 1}`'
+                                >
+                            </div>
+                        </div>
+                        <div class='col-auto'>
+                            <input
+                                v-model='row.date'
+                                type='date'
+                                class='form-control form-control-sm'
+                                aria-label='Planned date'
+                            >
+                        </div>
+                        <div class='col-auto'>
+                            <button
+                                v-if='form.plannedObjectives.length > 1'
+                                type='button'
+                                class='btn btn-outline-danger btn-sm'
+                                :aria-label='`Remove planned objective ${i + 1}`'
+                                @click='removePlannedObjective(i)'
+                            >
+                                <IconX
+                                    :size='16'
+                                    stroke='1.5'
+                                />
+                            </button>
+                        </div>
+                    </div>
+                    <button
+                        type='button'
+                        class='btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1'
+                        @click='addPlannedObjective'
+                    >
+                        <IconPlus
+                            :size='16'
+                            stroke='1.5'
+                        />
+                        Add planned objective
+                    </button>
+                </div>
+                <div class='form-text mt-2'>
+                    Prefills from Incident POST objectives tagged Current / Planned.
+                    PDF groups planned rows by date (e.g. “Planned Objectives for 7/5/12:”).
+                </div>
             </div>
         </div>
 
@@ -525,14 +625,16 @@
 
 <script setup lang='ts'>
 import { ref, reactive, computed, onMounted, watch } from 'vue';
-import { IconChevronDown } from '@tabler/icons-vue';
+import { IconChevronDown, IconPlus, IconX } from '@tabler/icons-vue';
 import Subscription from '../../../../../../src/base/subscription.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import {
     blankIcs201Form,
+    blankPlannedObjective,
     loadIcs201FromMission,
     mergeIcs201Sources,
     saveIcs201ToMission,
+    syncObjectivesSnapshot,
     type Ics201Form,
     type Ics201Sources,
 } from '../../../lib/ics201.ts';
@@ -560,6 +662,31 @@ const uploading = ref(false);
 const pdfExpanded = ref(true);
 const status = ref('');
 const statusError = ref(false);
+
+function ensureObjectiveEditors(): void {
+    if (!form.currentObjectives.length) form.currentObjectives.push('');
+    if (!form.plannedObjectives.length) form.plannedObjectives.push(blankPlannedObjective());
+}
+
+function addCurrentObjective(): void {
+    form.currentObjectives.push('');
+}
+
+function removeCurrentObjective(index: number): void {
+    form.currentObjectives.splice(index, 1);
+    ensureObjectiveEditors();
+}
+
+function addPlannedObjective(): void {
+    form.plannedObjectives.push(blankPlannedObjective());
+}
+
+function removePlannedObjective(index: number): void {
+    form.plannedObjectives.splice(index, 1);
+    ensureObjectiveEditors();
+}
+
+ensureObjectiveEditors();
 
 function lastFilledIndex(hasContent: (i: number) => boolean, length: number): number {
     for (let i = length - 1; i >= 0; i--) {
@@ -607,6 +734,7 @@ async function loadWeatherIfNeeded(preserveExisting: boolean): Promise<void> {
 async function loadAll(preserveUserFields = false): Promise<void> {
     if (!activeMission.value) {
         Object.assign(form, blankIcs201Form());
+        ensureObjectiveEditors();
         sources.ippLatLng = null;
         sources.missionName = '';
         sources.missionGuid = '';
@@ -631,6 +759,8 @@ async function loadAll(preserveUserFields = false): Promise<void> {
             signature: form.signature,
             preparedDateTime: form.preparedDateTime,
             objectives: form.objectives,
+            currentObjectives: [...form.currentObjectives],
+            plannedObjectives: form.plannedObjectives.map((r) => ({ ...r })),
             actions: form.actions.map((r) => ({ ...r })),
             incidentCommanders: form.incidentCommanders,
             liaisonOfficer: form.liaisonOfficer,
@@ -668,6 +798,8 @@ async function loadAll(preserveUserFields = false): Promise<void> {
             form.signature = preserved.signature;
             form.preparedDateTime = preserved.preparedDateTime;
             form.objectives = preserved.objectives;
+            form.currentObjectives = preserved.currentObjectives;
+            form.plannedObjectives = preserved.plannedObjectives;
             form.actions = preserved.actions;
             form.incidentCommanders = preserved.incidentCommanders;
             form.liaisonOfficer = preserved.liaisonOfficer;
@@ -683,6 +815,9 @@ async function loadAll(preserveUserFields = false): Promise<void> {
         } else {
             Object.assign(form, loaded.form);
         }
+
+        ensureObjectiveEditors();
+        syncObjectivesSnapshot(form);
 
         await loadWeatherIfNeeded(preserveUserFields);
     } catch (err) {
@@ -739,9 +874,12 @@ async function saveToMission(): Promise<void> {
 }
 
 async function generatePdfBytes(): Promise<Uint8Array> {
+    syncObjectivesSnapshot(form);
     return buildIcs201Pdf(
         {
             ...form,
+            currentObjectives: [...form.currentObjectives],
+            plannedObjectives: form.plannedObjectives.map((r) => ({ ...r })),
             actions: form.actions.map((r) => ({ ...r })),
             resources: form.resources.map((r) => ({ ...r })),
         },

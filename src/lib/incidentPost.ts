@@ -8,6 +8,18 @@ export const DEFAULT_OBJECTIVE = 'Provide for safety of incident personnel and p
 
 export const POST_KEYWORDS = ['incident-post', 'risk-assessment'] as const;
 
+/** Exact keywords on objective logs for ICS 201 §7 current/planned split. */
+export const OBJECTIVE_CURRENT_KEYWORD = 'current';
+export const OBJECTIVE_PLANNED_KEYWORD = 'planned';
+export const OBJECTIVE_PLANNED_DATE_PREFIX = 'planned-date:';
+
+export type ObjectiveStatus = 'current' | 'planned';
+
+export const OBJECTIVE_STATUSES: { value: ObjectiveStatus; label: string }[] = [
+    { value: 'current', label: 'Current' },
+    { value: 'planned', label: 'Planned' },
+];
+
 export function hasPostKeyword(keywords: string[]): boolean {
     return keywords.some((k) => (POST_KEYWORDS as readonly string[]).includes(k));
 }
@@ -28,6 +40,9 @@ export interface ObjectiveRow {
     objectiveId?: string;
     strategies: StrategyCell[];
     legacy: boolean;
+    status: ObjectiveStatus;
+    /** YYYY-MM-DD when status is planned; empty otherwise. */
+    plannedDate: string;
 }
 
 export interface SavedObjectiveRow {
@@ -35,6 +50,8 @@ export interface SavedObjectiveRow {
     objective: string;
     strategies: StrategyCell[];
     legacy: boolean;
+    status: ObjectiveStatus;
+    plannedDate: string;
 }
 
 export function blankTactic(): TacticCell {
@@ -50,6 +67,8 @@ export function blankObjectiveRows(): ObjectiveRow[] {
         objective: '',
         strategies: [blankStrategy()],
         legacy: false,
+        status: 'current',
+        plannedDate: '',
     }));
     rows[0].objective = DEFAULT_OBJECTIVE;
     return rows;
@@ -57,6 +76,44 @@ export function blankObjectiveRows(): ObjectiveRow[] {
 
 export function objectiveKeyword(obj: number): string {
     return `objective:${obj}`;
+}
+
+export function plannedDateKeyword(isoDate: string): string {
+    return `${OBJECTIVE_PLANNED_DATE_PREFIX}${isoDate.trim()}`;
+}
+
+export function normalizeObjectiveStatus(value: unknown): ObjectiveStatus {
+    return value === 'planned' ? 'planned' : 'current';
+}
+
+/** Parse status + planned date from an objective mission-log keyword list. */
+export function parseObjectiveStatusFromKeywords(keywords: string[]): {
+    status: ObjectiveStatus;
+    plannedDate: string;
+} {
+    const kws = keywords.map((k) => String(k).trim()).filter(Boolean);
+    const hasPlanned = kws.some((k) => k.toLowerCase() === OBJECTIVE_PLANNED_KEYWORD);
+    const hasCurrent = kws.some((k) => k.toLowerCase() === OBJECTIVE_CURRENT_KEYWORD);
+    const dateKw = kws.find((k) => k.toLowerCase().startsWith(OBJECTIVE_PLANNED_DATE_PREFIX));
+    const plannedDate = dateKw
+        ? dateKw.slice(OBJECTIVE_PLANNED_DATE_PREFIX.length).trim()
+        : '';
+    if (hasPlanned) return { status: 'planned', plannedDate };
+    if (hasCurrent) return { status: 'current', plannedDate: '' };
+    return { status: 'current', plannedDate: '' };
+}
+
+/** Keywords for an objective log (status + optional planned date). */
+export function buildObjectiveLogKeywords(obj: number, row: Pick<ObjectiveRow, 'status' | 'plannedDate'>): string[] {
+    const kws = ['incident-post', objectiveKeyword(obj)];
+    if (row.status === 'planned') {
+        kws.push(OBJECTIVE_PLANNED_KEYWORD);
+        const date = row.plannedDate.trim();
+        if (date) kws.push(plannedDateKeyword(date));
+    } else {
+        kws.push(OBJECTIVE_CURRENT_KEYWORD);
+    }
+    return kws;
 }
 
 export function strategyKeyword(obj: number, strat: number): string {

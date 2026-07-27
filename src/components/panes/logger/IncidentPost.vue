@@ -37,6 +37,39 @@
                         placeholder='Desired Outcome'
                     />
                 </div>
+                <div class='row g-2 mb-2 align-items-end'>
+                    <div class='col-auto'>
+                        <label class='form-label small mb-1'>
+                            Current / Planned
+                        </label>
+                        <select
+                            v-model='rows[i - 1].status'
+                            class='form-select form-select-sm'
+                            @change='onObjectiveStatusChange(i - 1)'
+                        >
+                            <option
+                                v-for='opt in objectiveStatusOptions'
+                                :key='opt.value'
+                                :value='opt.value'
+                            >
+                                {{ opt.label }}
+                            </option>
+                        </select>
+                    </div>
+                    <div
+                        v-if='rows[i - 1].status === "planned"'
+                        class='col-auto'
+                    >
+                        <label class='form-label small mb-1'>
+                            Planned date
+                        </label>
+                        <input
+                            v-model='rows[i - 1].plannedDate'
+                            type='date'
+                            class='form-control form-control-sm'
+                        >
+                    </div>
+                </div>
                 <ObjectiveStrategies
                     v-model='rows[i - 1].strategies'
                     @delete-id='queueDelete'
@@ -293,14 +326,17 @@ import { resolveMissionIppLocation } from '../../../lib/missionIpp.ts';
 import { downloadPdfBytes, uploadMissionFile } from '../../../lib/missionUpload.ts';
 import {
     MAX_OBJECTIVES,
+    OBJECTIVE_STATUSES,
     hasPostKeyword,
     blankObjectiveRows,
+    buildObjectiveLogKeywords,
     countEmptySavedCells,
     ensureStrategy,
     ensureTactic,
     formatStrategiesForDisplay,
     formatTacticsForDisplay,
     objectiveKeyword,
+    parseObjectiveStatusFromKeywords,
     rowHasContent,
     rowHasSavedData,
     stripObjectiveContent,
@@ -318,6 +354,13 @@ const rows = ref<ObjectiveRow[]>(blankObjectiveRows());
 const visibleCount = ref(1);
 const savedRows = ref<SavedObjectiveRow[]>([]);
 const pendingDeleteIds = ref<string[]>([]);
+const objectiveStatusOptions = OBJECTIVE_STATUSES;
+
+function onObjectiveStatusChange(index: number): void {
+    const row = rows.value[index];
+    if (!row) return;
+    if (row.status !== 'planned') row.plannedDate = '';
+}
 
 const loading = ref(false);
 const saving = ref(false);
@@ -471,6 +514,9 @@ async function loadRows(): Promise<void> {
             if (parsed.kind === 'objective') {
                 row.objective = stripObjectiveContent(content);
                 row.objectiveId = id;
+                const statusMeta = parseObjectiveStatusFromKeywords(kws);
+                row.status = statusMeta.status;
+                row.plannedDate = statusMeta.plannedDate;
             } else if (parsed.kind === 'strategy' && parsed.strat) {
                 const strategy = ensureStrategy(row, parsed.strat - 1);
                 strategy.text = stripStrategyContent(content);
@@ -502,6 +548,8 @@ async function loadRows(): Promise<void> {
                     })),
                 })),
                 legacy: row.legacy,
+                status: row.status,
+                plannedDate: row.plannedDate,
             });
         }
         savedRows.value = saved;
@@ -545,6 +593,7 @@ async function upsertCell(
     contentLabel: string,
     id: string | undefined,
     counters: { created: number; updated: number; deleted: number; failed: number },
+    extraKeywords?: string[],
 ): Promise<string | undefined> {
     if (!text) {
         if (id) {
@@ -560,10 +609,14 @@ async function upsertCell(
         return undefined;
     }
 
+    const keywords = extraKeywords?.length
+        ? extraKeywords
+        : ['incident-post', keyword];
+
     const body = {
         dtg: new Date().toISOString(),
         content: `${contentLabel}: ${text}`,
-        keywords: ['incident-post', keyword],
+        keywords,
     };
 
     try {
@@ -620,6 +673,7 @@ async function save(): Promise<void> {
                 `Objective ${objNum}`,
                 row.objectiveId,
                 counters,
+                buildObjectiveLogKeywords(objNum, row),
             );
 
             for (let si = 0; si < row.strategies.length; si++) {

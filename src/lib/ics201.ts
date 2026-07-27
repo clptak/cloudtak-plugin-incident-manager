@@ -9,6 +9,7 @@ import {
     formatTacticsForPdf,
     hasPostKeyword,
     MAX_OBJECTIVES,
+    parseObjectiveStatusFromKeywords,
     rowHasContent,
     type ObjectiveRow,
 } from './incidentPost.ts';
@@ -50,6 +51,12 @@ export interface Ics201ActionRow {
     actions: string;
 }
 
+export interface Ics201PlannedObjective {
+    text: string;
+    /** YYYY-MM-DD */
+    date: string;
+}
+
 export interface Ics201ResourceRow {
     resource: string;
     identifier: string;
@@ -74,7 +81,10 @@ export interface Ics201Form {
     positionTitle: string;
     signature: string;
     preparedDateTime: string;
+    /** Derived PDF snapshot of currentObjectives + plannedObjectives. */
     objectives: string;
+    currentObjectives: string[];
+    plannedObjectives: Ics201PlannedObjective[];
     actions: Ics201ActionRow[];
     incidentCommanders: string;
     liaisonOfficer: string;
@@ -132,6 +142,8 @@ export function blankIcs201Form(): Ics201Form {
         signature: '',
         preparedDateTime: `${nowBriefingDate()} ${nowBriefingTime()}`,
         objectives: '',
+        currentObjectives: [],
+        plannedObjectives: [],
         actions: Array.from({ length: MAX_ACTION_ROWS }, blankActionRow),
         incidentCommanders: '',
         liaisonOfficer: '',
@@ -148,6 +160,117 @@ export function blankIcs201Form(): Ics201Form {
         organizationNotes: '',
         resources: Array.from({ length: MAX_RESOURCE_ROWS }, blankResourceRow),
     };
+}
+
+export function blankPlannedObjective(): Ics201PlannedObjective {
+    return { text: '', date: '' };
+}
+
+/** Format YYYY-MM-DD (or loose date) as M/D/YY for ICS forms. */
+export function formatPlannedObjectiveDateDisplay(isoDate: string): string {
+    const raw = isoDate.trim();
+    if (!raw) return '';
+    const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) {
+        const year = Number(m[1]) % 100;
+        return `${Number(m[2])}/${Number(m[3])}/${String(year).padStart(2, '0')}`;
+    }
+    return raw;
+}
+
+/**
+ * ICS 201 §7 text: Current Objectives numbered list, then Planned Objectives
+ * grouped by date (first-seen order).
+ */
+export function formatObjectivesForPdf(
+    currentObjectives: string[],
+    plannedObjectives: Ics201PlannedObjective[],
+): string {
+    const blocks: string[] = [];
+    const current = currentObjectives.map((t) => t.trim()).filter(Boolean);
+    if (current.length) {
+        blocks.push('Current Objectives:');
+        current.forEach((text, i) => {
+            blocks.push(`${i + 1}. ${text}`);
+        });
+    }
+
+    const planned = plannedObjectives
+        .map((row) => ({ text: row.text.trim(), date: row.date.trim() }))
+        .filter((row) => row.text);
+    if (planned.length) {
+        const groups: { date: string; items: string[] }[] = [];
+        const indexByDate = new Map<string, number>();
+        for (const row of planned) {
+            const key = row.date;
+            let idx = indexByDate.get(key);
+            if (idx === undefined) {
+                idx = groups.length;
+                indexByDate.set(key, idx);
+                groups.push({ date: key, items: [] });
+            }
+            groups[idx].items.push(row.text);
+        }
+        for (const group of groups) {
+            if (blocks.length) blocks.push('');
+            const display = formatPlannedObjectiveDateDisplay(group.date);
+            blocks.push(display ? `Planned Objectives for ${display}:` : 'Planned Objectives:');
+            group.items.forEach((text, i) => {
+                blocks.push(`${i + 1}. ${text}`);
+            });
+        }
+    }
+
+    return blocks.join('\n');
+}
+
+/** Sync the derived `objectives` PDF snapshot from structured lists. */
+export function syncObjectivesSnapshot(form: Ics201Form): void {
+    form.objectives = formatObjectivesForPdf(form.currentObjectives, form.plannedObjectives);
+}
+
+export function objectivesListsHaveContent(
+    currentObjectives: string[],
+    plannedObjectives: Ics201PlannedObjective[],
+): boolean {
+    if (currentObjectives.some((t) => t.trim())) return true;
+    return plannedObjectives.some((row) => row.text.trim());
+}
+
+/**
+ * Normalize structured objective fields from a partial / legacy payload.
+ * Prefer currentObjectives/plannedObjectives; migrate legacy `objectives` string.
+ */
+export function normalizeObjectivesFromPartial(partial: Partial<Ics201Form>): {
+    currentObjectives: string[];
+    plannedObjectives: Ics201PlannedObjective[];
+    objectives: string;
+} {
+    const hasStructured = Array.isArray(partial.currentObjectives)
+        || Array.isArray(partial.plannedObjectives);
+
+    let currentObjectives: string[] = [];
+    let plannedObjectives: Ics201PlannedObjective[] = [];
+
+    if (hasStructured) {
+        currentObjectives = (partial.currentObjectives ?? [])
+            .map((t) => String(t ?? ''));
+        plannedObjectives = (partial.plannedObjectives ?? []).map((row) => ({
+            text: String(row?.text ?? ''),
+            date: String(row?.date ?? ''),
+        }));
+    } else if (typeof partial.objectives === 'string' && partial.objectives.trim()) {
+        currentObjectives = partial.objectives
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean)
+            .map((line) => line.replace(/^\d+\.\s*/, ''));
+    }
+
+    const objectives = formatObjectivesForPdf(currentObjectives, plannedObjectives)
+        || (typeof partial.objectives === 'string' ? partial.objectives : '');
+
+    return { currentObjectives, plannedObjectives, objectives };
 }
 
 /** Map/Sketch text block: TAK mission, IPP, weather, comms. */
@@ -247,9 +370,30 @@ function padResources(rows: Ics201ResourceRow[] | undefined): Ics201ResourceRow[
 }
 
 export function applyPartialIcs201Form(base: Ics201Form, partial: Partial<Ics201Form>): Ics201Form {
+    const hasStructuredKey = 'currentObjectives' in partial || 'plannedObjectives' in partial;
+    let objectivesNorm: {
+        currentObjectives: string[];
+        plannedObjectives: Ics201PlannedObjective[];
+        objectives: string;
+    };
+    if (hasStructuredKey) {
+        objectivesNorm = normalizeObjectivesFromPartial({
+            currentObjectives: partial.currentObjectives ?? [],
+            plannedObjectives: partial.plannedObjectives ?? [],
+        });
+    } else if (typeof partial.objectives === 'string') {
+        objectivesNorm = normalizeObjectivesFromPartial({ objectives: partial.objectives });
+    } else {
+        objectivesNorm = {
+            currentObjectives: base.currentObjectives,
+            plannedObjectives: base.plannedObjectives,
+            objectives: base.objectives,
+        };
+    }
     return {
         ...base,
         ...partial,
+        ...objectivesNorm,
         actions: padActions(partial.actions ?? base.actions),
         resources: padResources(partial.resources ?? base.resources),
         logId: partial.logId ?? base.logId,
@@ -540,14 +684,23 @@ export function actionsFromLogsAndPost(
     return padActions(rows);
 }
 
-function objectivesFromPost(objectiveRows: ObjectiveRow[]): string {
-    const lines: string[] = [];
+function objectivesFromPost(objectiveRows: ObjectiveRow[]): {
+    currentObjectives: string[];
+    plannedObjectives: Ics201PlannedObjective[];
+} {
+    const currentObjectives: string[] = [];
+    const plannedObjectives: Ics201PlannedObjective[] = [];
     for (const row of objectiveRows) {
         if (!rowHasContent(row)) continue;
         const obj = row.objective.trim();
-        if (obj) lines.push(obj);
+        if (!obj) continue;
+        if (row.status === 'planned') {
+            plannedObjectives.push({ text: obj, date: row.plannedDate.trim() });
+        } else {
+            currentObjectives.push(obj);
+        }
     }
-    return lines.join('\n');
+    return { currentObjectives, plannedObjectives };
 }
 
 function situationFromIrBriefingLogs(logs: MissionLogLike[]): string {
@@ -575,9 +728,12 @@ function loadObjectiveRowsFromLogs(logs: MissionLogLike[]): ObjectiveRow[] {
 
         const row = fresh[parsed.obj - 1];
         const content = (log.content ?? '').replace(/^(Objective|Strategy|Tactic):\s*/i, '').trim();
-        if (parsed.kind === 'objective') {
-            row.objective = content;
-        } else if (parsed.kind === 'strategy' && parsed.strat) {
+            if (parsed.kind === 'objective') {
+                row.objective = content;
+                const statusMeta = parseObjectiveStatusFromKeywords(kws);
+                row.status = statusMeta.status;
+                row.plannedDate = statusMeta.plannedDate;
+            } else if (parsed.kind === 'strategy' && parsed.strat) {
             ensureStrategy(row, parsed.strat - 1).text = content;
         } else if (parsed.kind === 'tactic' && parsed.strat && parsed.tac) {
             const strategy = ensureStrategy(row, parsed.strat - 1);
@@ -684,7 +840,14 @@ export async function loadIcs201FromMission(
 
     const objectiveRows = loadObjectiveRowsFromLogs(logs);
     const postObjectives = objectivesFromPost(objectiveRows);
-    if (postObjectives) form.objectives = postObjectives;
+    if (objectivesListsHaveContent(
+        postObjectives.currentObjectives,
+        postObjectives.plannedObjectives,
+    )) {
+        form.currentObjectives = postObjectives.currentObjectives;
+        form.plannedObjectives = postObjectives.plannedObjectives;
+        syncObjectivesSnapshot(form);
+    }
 
     form.actions = actionsFromLogsAndPost(logs, objectiveRows);
 
@@ -760,6 +923,18 @@ export async function loadIcs201FromMission(
         if (!form.operationsSectionUnits.trim()) form.operationsSectionUnits = autoSectionUnits.operationsSectionUnits;
         if (!form.financeSectionUnits.trim()) form.financeSectionUnits = autoSectionUnits.financeSectionUnits;
         if (!form.logisticsSectionUnits.trim()) form.logisticsSectionUnits = autoSectionUnits.logisticsSectionUnits;
+        // Saved forms may wipe auto-filled objectives with empty structured lists.
+        if (!objectivesListsHaveContent(form.currentObjectives, form.plannedObjectives)) {
+            if (objectivesListsHaveContent(
+                postObjectives.currentObjectives,
+                postObjectives.plannedObjectives,
+            )) {
+                form.currentObjectives = postObjectives.currentObjectives;
+                form.plannedObjectives = postObjectives.plannedObjectives;
+            }
+        }
+        syncObjectivesSnapshot(form);
+
         // Saved forms serialize blank resource rows; don't let them wipe auto-fill.
         if (!resourceRowsHaveContent(form.resources)) {
             form.resources = autoResources;
@@ -771,7 +946,11 @@ export async function loadIcs201FromMission(
 
 /** Refresh auto-filled sources while preserving user-edited fields. */
 export function mergeIcs201Sources(current: Ics201Form, loaded: Ics201Form): Ics201Form {
-    return {
+    const keepObjectives = objectivesListsHaveContent(
+        current.currentObjectives,
+        current.plannedObjectives,
+    ) || current.objectives.trim();
+    const merged: Ics201Form = {
         ...current,
         incidentName: loaded.incidentName || current.incidentName,
         incidentNumber: loaded.incidentNumber || current.incidentNumber,
@@ -797,11 +976,19 @@ export function mergeIcs201Sources(current: Ics201Form, loaded: Ics201Form): Ics
         situationSummary: current.situationSummary.trim()
             ? current.situationSummary
             : loaded.situationSummary,
-        objectives: current.objectives.trim() ? current.objectives : loaded.objectives,
+        currentObjectives: keepObjectives
+            ? current.currentObjectives
+            : loaded.currentObjectives,
+        plannedObjectives: keepObjectives
+            ? current.plannedObjectives
+            : loaded.plannedObjectives,
+        objectives: keepObjectives ? current.objectives : loaded.objectives,
         actions: actionRowsHaveContent(current.actions) ? current.actions : loaded.actions,
         resources: resourceRowsHaveContent(current.resources) ? current.resources : loaded.resources,
         logId: current.logId ?? loaded.logId,
     };
+    syncObjectivesSnapshot(merged);
+    return merged;
 }
 
 function actionRowsHaveContent(rows: Ics201ActionRow[]): boolean {
@@ -828,6 +1015,7 @@ export async function saveIcs201ToMission(
     form: Ics201Form,
     missionToken?: string,
 ): Promise<string> {
+    syncObjectivesSnapshot(form);
     const sub = await Subscription.load(missionGuid, { token: missionToken ?? '' });
     const body = {
         dtg: new Date().toISOString(),

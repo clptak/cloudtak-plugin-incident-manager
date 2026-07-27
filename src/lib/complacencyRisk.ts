@@ -88,7 +88,7 @@ function normalizeFactor(value: unknown, max: number): number | null {
     return n;
 }
 
-function normalizeRespondent(raw: unknown): ComplacencyRiskRespondent | null {
+export function normalizeComplacencyRespondent(raw: unknown): ComplacencyRiskRespondent | null {
     if (!raw || typeof raw !== 'object') return null;
     const r = raw as Record<string, unknown>;
 
@@ -115,8 +115,7 @@ function normalizeRespondent(raw: unknown): ComplacencyRiskRespondent | null {
 }
 
 /**
- * Accepts the current shape (respondents array) and the legacy single-assessment
- * shape (factors at the entry top level), which migrates to one unnamed respondent.
+ * Legacy complacency-only entry shape. Prefer normalizeTacticRiskEntry in tacticRisk.ts.
  */
 export function normalizeRiskEntry(raw: unknown): ComplacencyRiskEntry | null {
     if (!raw || typeof raw !== 'object') return null;
@@ -125,10 +124,10 @@ export function normalizeRiskEntry(raw: unknown): ComplacencyRiskEntry | null {
     let respondents: ComplacencyRiskRespondent[];
     if (Array.isArray(r.respondents)) {
         respondents = r.respondents
-            .map(normalizeRespondent)
+            .map(normalizeComplacencyRespondent)
             .filter((x): x is ComplacencyRiskRespondent => x != null);
     } else {
-        const legacy = normalizeRespondent(r);
+        const legacy = normalizeComplacencyRespondent(r);
         respondents = legacy ? [legacy] : [];
     }
     if (!respondents.length) return null;
@@ -153,15 +152,13 @@ export function riskAssessmentsFromSchemaValue(value: unknown): ComplacencyRiskM
 }
 
 const BAND_SEVERITY: Record<RiskBand, number> = { green: 0, amber: 1, red: 2 };
-
-/** Center of the Safety Zone (40-59); ties within a band break by distance from here. */
 const SAFETY_ZONE_CENTER = 50;
 
 function severity(r: ComplacencyRiskRespondent): [number, number] {
     return [BAND_SEVERITY[r.band], Math.abs(r.score - SAFETY_ZONE_CENTER)];
 }
 
-/** Most severe respondent assessment for the tactic's rollup headline. */
+/** @deprecated Prefer worstComplacencyRespondent from tacticRisk.ts */
 export function worstRespondent(entry: ComplacencyRiskEntry): ComplacencyRiskRespondent | null {
     let worst: ComplacencyRiskRespondent | null = null;
     for (const r of entry.respondents) {

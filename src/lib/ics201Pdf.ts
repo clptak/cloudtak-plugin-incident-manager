@@ -8,6 +8,7 @@ import templateUrl from '../assets/ics-201-template.pdf?url';
 import {
     buildMapSketchText,
     collapseActionText,
+    formatObjectivesForPdf,
     MAX_ACTION_ROWS,
     MAX_RESOURCE_ROWS,
     type Ics201ActionRow,
@@ -329,7 +330,7 @@ function collectPaintJobs(
         { name: 'Time', value: form.time },
         { name: MAP_SKETCH_FIELD, value: buildMapSketchText(form, sources) },
         { name: SITUATION_FIELD, value: form.situationSummary },
-        { name: OBJECTIVES_FIELD, value: form.objectives },
+        { name: OBJECTIVES_FIELD, value: formatObjectivesForPdf(form.currentObjectives, form.plannedObjectives) || form.objectives },
         { name: 'Incident Commanders', value: form.incidentCommanders },
         { name: 'Liaison Officer', value: form.liaisonOfficer },
         { name: 'Safety Officer', value: form.safetyOfficer },
