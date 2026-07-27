@@ -95,7 +95,6 @@
                         <CreateOpenPane v-if='activeKey === "create-open"' />
                         <ResourcesTab v-else-if='activeKey === "resources"' />
                         <AssignmentsTab v-else-if='activeKey === "work-assignments"' />
-                        <CasiePane v-else-if='activeKey === "casie"' />
                         <WrapUpPane v-else-if='activeKey === "generate-report-template"' />
                         <LoggerPane
                             v-else
@@ -105,6 +104,7 @@
 
                     <DashboardTab v-if='activeHTab === "dashboard"' />
                     <TaskTab v-if='activeHTab === "task"' />
+                    <CasiePane v-if='activeHTab === "casie"' />
                     <OrganizationTab
                         v-if='activeHTab === "organization"'
                         class='h-100 min-height-0'
@@ -181,6 +181,7 @@ const hTabs = [
     { key: 'main', label: 'Main' },
     { key: 'dashboard', label: 'Dashboard' },
     { key: 'task', label: 'Tasks' },
+    { key: 'casie', label: 'CASIE' },
     { key: 'organization', label: 'Organization' },
     { key: 'risk-assessment', label: 'Risk Assessment' },
 ] as const;

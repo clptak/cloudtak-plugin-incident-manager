@@ -37,11 +37,10 @@ const VALID_NAV_KEYS = new Set([
     'search-scenarios',
     'search-area',
     'incident-post',
-    'casie',
     'generate-report-template',
 ]);
 
-const VALID_HTAB_KEYS = new Set(['main', 'dashboard', 'task', 'organization', 'risk-assessment']);
+const VALID_HTAB_KEYS = new Set(['main', 'dashboard', 'task', 'casie', 'organization', 'risk-assessment']);
 
 function loadNavFromSession(): PaneNavState {
     try {
@@ -71,6 +70,11 @@ function loadNavFromSession(): PaneNavState {
         if (key === 'risk-assessment') {
             key = 'create-open';
             if (htab === 'main') htab = 'risk-assessment';
+        }
+        // CASIE moved from Main vertical nav into a horizontal tab.
+        if (key === 'casie') {
+            key = 'create-open';
+            if (htab === 'main') htab = 'casie';
         }
         return {
             activeKey: VALID_NAV_KEYS.has(key) ? key : 'create-open',
@@ -136,7 +140,7 @@ const savedNav = loadNavFromSession();
 const activeKey = ref(savedNav.activeKey);
 const activeHTab = ref(savedNav.activeHTab);
 
-const MISSION_EXEMPT_NAV_KEYS = new Set(['create-open', 'casie']);
+const MISSION_EXEMPT_NAV_KEYS = new Set(['create-open']);
 
 const noMissionModalOpen = ref(false);
 

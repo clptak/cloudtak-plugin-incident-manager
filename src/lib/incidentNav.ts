@@ -36,13 +36,17 @@ export const NAV_SECTIONS: NavSection[] = [
         ],
     },
     {
+        key: 'h-search-transition',
+        label: 'Search Transition',
+        items: [
+            { key: 'search-area', label: 'Search Area', helpKey: 'establishing-search-area' },
+        ],
+    },
+    {
         key: 'h-area',
         label: 'Area Search',
         helpKey: 'area-search',
-        items: [
-            { key: 'search-area', label: 'Search Area', helpKey: 'establishing-search-area' },
-            { key: 'casie', label: 'CASIE' },
-        ],
+        items: [],
     },
     {
         key: 'h-wrapup',
