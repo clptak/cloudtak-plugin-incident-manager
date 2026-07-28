@@ -140,7 +140,7 @@
                 All scenarios A–F have been sent for this mission. Use Edit above to revise one.
             </div>
 
-            <div class='mt-3'>
+            <div class='mt-3 d-flex flex-wrap gap-2'>
                 <button
                     class='btn btn-primary btn-sm'
                     :disabled='saving || posting || !saveCount || !activeMission || loading'
@@ -149,19 +149,41 @@
                     {{ saving ? 'Saving…' : 'Save' }}
                 </button>
                 <button
-                    class='btn btn-outline-secondary btn-sm ms-2'
+                    class='btn btn-outline-secondary btn-sm'
                     :disabled='posting || saving || !filledCount || !activeMission || loading'
                     @click='onSend'
                 >
                     {{ posting ? 'Sending…' : 'Send to DataSync' }}
                 </button>
                 <button
-                    class='btn btn-outline-secondary btn-sm ms-2'
+                    type='button'
+                    class='btn btn-outline-primary btn-sm'
+                    :disabled='exporting || !saveCount || loading'
+                    @click='downloadPdf'
+                >
+                    {{ exporting ? 'Generating PDF…' : 'Download PDF' }}
+                </button>
+                <button
+                    type='button'
+                    class='btn btn-outline-primary btn-sm'
+                    :disabled='uploading || !saveCount || !activeMission || loading'
+                    @click='onAddPdfToDataSync'
+                >
+                    {{ uploading ? 'Uploading…' : 'Add PDF to DataSync' }}
+                </button>
+                <button
+                    class='btn btn-outline-secondary btn-sm'
                     :disabled='saving || posting || loading'
                     @click='reset'
                 >
                     Clear
                 </button>
+            </div>
+            <div
+                v-if='!saveCount'
+                class='form-text text-muted'
+            >
+                Add at least one scenario description to enable Save / PDF.
             </div>
 
             <div
@@ -185,32 +207,15 @@
             </div>
 
             <div class='card mt-3'>
-                <div
-                    class='card-header py-2 d-flex align-items-center cursor-pointer user-select-none'
-                    role='button'
-                    tabindex='0'
-                    :aria-expanded='pdfExpanded'
-                    @click='pdfExpanded = !pdfExpanded'
-                    @keydown.enter.prevent='pdfExpanded = !pdfExpanded'
-                    @keydown.space.prevent='pdfExpanded = !pdfExpanded'
-                >
+                <div class='card-header py-2'>
                     <h4 class='card-title mb-0 fs-6'>
-                        GENERATE SCENARIOS RECORD SHEET
+                        Scenarios Record Sheet PDF
                     </h4>
-                    <IconChevronDown
-                        class='ms-auto transition-transform'
-                        :class='{ "rotate-180": pdfExpanded }'
-                        :size='18'
-                        stroke='1.5'
-                    />
                 </div>
-                <div
-                    v-show='pdfExpanded'
-                    class='card-body py-2'
-                >
+                <div class='card-body py-2'>
                     <p class='text-muted small mb-2'>
                         Prefills from ICS 201 / Initial Information when available.
-                        Edit Prepared By and date/time before generating.
+                        Edit header and Prepared By before downloading.
                         Rows are ordered by priority ascending (1→5).
                     </p>
                     <div class='row g-2 mb-2'>
@@ -288,7 +293,7 @@
                             :disabled='exporting || !saveCount'
                             @click='downloadPdf'
                         >
-                            {{ exporting ? 'Generating PDF…' : 'Download Scenarios Record Sheet' }}
+                            {{ exporting ? 'Generating PDF…' : 'Download Scenarios Record Sheet PDF' }}
                         </button>
                         <button
                             type='button'
@@ -307,7 +312,6 @@
 
 <script setup lang='ts'>
 import { reactive, ref, computed, onMounted, watch } from 'vue';
-import { IconChevronDown } from '@tabler/icons-vue';
 import Subscription from '../../../../../../src/base/subscription.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import { loadIcs201FromMission } from '../../../lib/ics201.ts';
@@ -430,7 +434,6 @@ const posting = ref(false);
 const saving = ref(false);
 const exporting = ref(false);
 const uploading = ref(false);
-const pdfExpanded = ref(false);
 const status = ref('');
 const statusError = ref(false);
 const contentHash = ref<string | undefined>();
@@ -804,13 +807,3 @@ async function addPdfToDataSync(): Promise<void> {
     }
 }
 </script>
-
-<style scoped>
-.rotate-180 {
-    transform: rotate(-180deg);
-}
-
-.transition-transform {
-    transition: transform 0.2s ease-out;
-}
-</style>
