@@ -98,7 +98,7 @@
                 >{{ level.label }}</span>
             </div>
 
-            <div class='mt-3'>
+            <div class='mt-3 d-flex flex-wrap gap-2'>
                 <button
                     class='btn btn-primary btn-sm'
                     :disabled='saving || posting || !valid || !activeMission || loading'
@@ -107,14 +107,30 @@
                     {{ saving ? 'Saving…' : 'Save' }}
                 </button>
                 <button
-                    class='btn btn-outline-secondary btn-sm ms-2'
+                    class='btn btn-outline-secondary btn-sm'
                     :disabled='posting || saving || !valid || !activeMission || loading'
                     @click='onSend'
                 >
                     {{ posting ? 'Sending…' : 'Send to DataSync' }}
                 </button>
                 <button
-                    class='btn btn-outline-secondary btn-sm ms-2'
+                    type='button'
+                    class='btn btn-outline-primary btn-sm'
+                    :disabled='exporting || !valid || loading'
+                    @click='downloadPdf'
+                >
+                    {{ exporting ? 'Generating PDF…' : 'Download PDF' }}
+                </button>
+                <button
+                    type='button'
+                    class='btn btn-outline-primary btn-sm'
+                    :disabled='uploading || !valid || !activeMission || loading'
+                    @click='onAddPdfToDataSync'
+                >
+                    {{ uploading ? 'Uploading…' : 'Add PDF to DataSync' }}
+                </button>
+                <button
+                    class='btn btn-outline-secondary btn-sm'
                     :disabled='saving || posting || loading'
                     @click='reset'
                 >
@@ -147,6 +163,106 @@
             >
                 {{ status }}
             </div>
+
+            <div class='card mt-3'>
+                <div class='card-header py-2'>
+                    <h4 class='card-title mb-0 fs-6'>
+                        Urgency Rating Chart PDF
+                    </h4>
+                </div>
+                <div class='card-body py-2'>
+                    <p class='text-muted small mb-2'>
+                        Prefills from ICS 201 / Initial Information when available.
+                        Edit header and Prepared By before downloading.
+                    </p>
+                    <div class='row g-2 mb-2'>
+                        <div class='col-md-6'>
+                            <label class='form-label small mb-1'>Incident Name</label>
+                            <input
+                                v-model='pdfHeader.incidentName'
+                                type='text'
+                                class='form-control form-control-sm'
+                                :readonly='incidentNameReadonly'
+                            >
+                        </div>
+                        <div class='col-md-6'>
+                            <label class='form-label small mb-1'>Incident Number</label>
+                            <input
+                                v-model='pdfHeader.incidentNumber'
+                                type='text'
+                                class='form-control form-control-sm'
+                                :readonly='incidentNumberReadonly'
+                            >
+                        </div>
+                        <div class='col-md-3'>
+                            <label class='form-label small mb-1'>Date</label>
+                            <input
+                                v-model='pdfHeader.date'
+                                type='text'
+                                class='form-control form-control-sm'
+                            >
+                        </div>
+                        <div class='col-md-3'>
+                            <label class='form-label small mb-1'>Time</label>
+                            <input
+                                v-model='pdfHeader.time'
+                                type='text'
+                                class='form-control form-control-sm'
+                            >
+                        </div>
+                        <div class='col-md-6'>
+                            <label class='form-label small mb-1'>Prepared by (Name)</label>
+                            <input
+                                v-model='pdfHeader.preparedByName'
+                                type='text'
+                                class='form-control form-control-sm'
+                            >
+                        </div>
+                        <div class='col-md-4'>
+                            <label class='form-label small mb-1'>Position / Title</label>
+                            <input
+                                v-model='pdfHeader.positionTitle'
+                                type='text'
+                                class='form-control form-control-sm'
+                            >
+                        </div>
+                        <div class='col-md-4'>
+                            <label class='form-label small mb-1'>Signature</label>
+                            <input
+                                v-model='pdfHeader.signature'
+                                type='text'
+                                class='form-control form-control-sm'
+                            >
+                        </div>
+                        <div class='col-md-4'>
+                            <label class='form-label small mb-1'>Date / Time</label>
+                            <input
+                                v-model='pdfHeader.preparedDateTime'
+                                type='text'
+                                class='form-control form-control-sm'
+                            >
+                        </div>
+                    </div>
+                    <div class='d-flex flex-wrap gap-2'>
+                        <button
+                            type='button'
+                            class='btn btn-outline-primary btn-sm'
+                            :disabled='exporting || !valid'
+                            @click='downloadPdf'
+                        >
+                            {{ exporting ? 'Generating PDF…' : 'Download Urgency Rating Chart PDF' }}
+                        </button>
+                        <button
+                            type='button'
+                            class='btn btn-outline-primary btn-sm'
+                            :disabled='uploading || !valid || !activeMission'
+                            @click='onAddPdfToDataSync'
+                        >
+                            {{ uploading ? 'Uploading…' : 'Add Urgency-Rating-Chart.pdf to DataSync' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </template>
@@ -156,12 +272,21 @@ import { reactive, ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { IconInfoCircle } from '@tabler/icons-vue';
 import Subscription from '../../../../../../src/base/subscription.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
+import { loadIcs201FromMission } from '../../../lib/ics201.ts';
+import { nowBriefingDate, nowBriefingTime } from '../../../lib/irBriefing.ts';
+import { downloadPdfBytes, uploadMissionFile } from '../../../lib/missionUpload.ts';
 import {
     buildUrgencyRating,
     defaultUrgencyFactors,
     urgencyLevelFromTotal,
     type UrgencyFactorKey,
 } from '../../../lib/urgencyRating.ts';
+import {
+    buildUrgencyRatingChartPdf,
+    defaultUrgencyRatingChartFilename,
+    URGENCY_RATING_CHART_MISSION_FILENAME,
+    type UrgencyRatingChartHeader,
+} from '../../../lib/urgencyRatingChartPdf.ts';
 import {
     loadUrgencyRatingFromMission,
     saveUrgencyRatingToMission,
@@ -180,6 +305,25 @@ interface Factor {
 }
 
 const { activeMission, requireActiveMission } = useIncident();
+
+function blankPdfHeader(): UrgencyRatingChartHeader {
+    return {
+        incidentName: '',
+        incidentNumber: '',
+        date: '',
+        time: '',
+        preparedByName: '',
+        positionTitle: '',
+        signature: '',
+        preparedDateTime: '',
+    };
+}
+
+const pdfHeader = reactive<UrgencyRatingChartHeader>(blankPdfHeader());
+const incidentNameReadonly = ref(false);
+const incidentNumberReadonly = ref(false);
+const exporting = ref(false);
+const uploading = ref(false);
 
 const factors = reactive<Factor[]>([
     {
@@ -310,9 +454,47 @@ function reset(): void {
     statusError.value = false;
 }
 
+async function prefillPdfHeader(): Promise<void> {
+    const date = nowBriefingDate();
+    const time = nowBriefingTime();
+    Object.assign(pdfHeader, blankPdfHeader());
+    incidentNameReadonly.value = false;
+    incidentNumberReadonly.value = false;
+
+    if (!activeMission.value) return;
+
+    try {
+        const loaded = await loadIcs201FromMission(
+            activeMission.value.guid,
+            activeMission.value.token,
+            activeMission.value.name,
+        );
+        const form = loaded.form;
+        pdfHeader.incidentName = form.incidentName.trim() || activeMission.value.name || '';
+        pdfHeader.incidentNumber = form.incidentNumber.trim();
+        pdfHeader.date = form.date.trim() || date;
+        pdfHeader.time = form.time.trim() || time;
+        pdfHeader.preparedByName = form.preparedByName.trim();
+        pdfHeader.positionTitle = form.positionTitle.trim();
+        pdfHeader.signature = form.signature.trim();
+        pdfHeader.preparedDateTime = form.preparedDateTime.trim() || `${pdfHeader.date} ${pdfHeader.time}`;
+        incidentNameReadonly.value = Boolean(pdfHeader.incidentName.trim());
+        incidentNumberReadonly.value = Boolean(pdfHeader.incidentNumber.trim());
+    } catch {
+        pdfHeader.incidentName = activeMission.value.name || '';
+        pdfHeader.date = date;
+        pdfHeader.time = time;
+        pdfHeader.preparedDateTime = `${date} ${time}`;
+        incidentNameReadonly.value = Boolean(pdfHeader.incidentName.trim());
+    }
+}
+
 async function recall(): Promise<void> {
     if (!activeMission.value) {
         contentHash.value = undefined;
+        Object.assign(pdfHeader, blankPdfHeader());
+        incidentNameReadonly.value = false;
+        incidentNumberReadonly.value = false;
         return;
     }
     loading.value = true;
@@ -325,6 +507,7 @@ async function recall(): Promise<void> {
             applyFactors(loaded.rating.factors);
             status.value = 'Loaded saved urgency from mission_schema.json.';
         }
+        await prefillPdfHeader();
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);
@@ -379,6 +562,61 @@ async function send(): Promise<void> {
         status.value = err instanceof Error ? err.message : String(err);
     } finally {
         posting.value = false;
+    }
+}
+
+async function generatePdfBytes(): Promise<Uint8Array> {
+    return buildUrgencyRatingChartPdf(currentFactors(), { ...pdfHeader });
+}
+
+async function downloadPdf(): Promise<void> {
+    if (!valid.value) return;
+    exporting.value = true;
+    status.value = '';
+    statusError.value = false;
+    try {
+        const bytes = await generatePdfBytes();
+        const filename = defaultUrgencyRatingChartFilename(
+            pdfHeader.incidentName || activeMission.value?.name || 'incident',
+        );
+        downloadPdfBytes(bytes, filename);
+        status.value = 'Urgency Rating Chart downloaded.';
+    } catch (err) {
+        statusError.value = true;
+        status.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        exporting.value = false;
+    }
+}
+
+async function onAddPdfToDataSync(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await addPdfToDataSync();
+}
+
+async function addPdfToDataSync(): Promise<void> {
+    if (!activeMission.value || !valid.value) return;
+    uploading.value = true;
+    status.value = '';
+    statusError.value = false;
+    try {
+        const bytes = await generatePdfBytes();
+        await uploadMissionFile(
+            activeMission.value.guid,
+            URGENCY_RATING_CHART_MISSION_FILENAME,
+            bytes,
+            { missionToken: activeMission.value.token },
+        );
+        const sub = await Subscription.load(activeMission.value.guid, {
+            token: activeMission.value.token ?? '',
+        });
+        await sub.fetch();
+        status.value = `Added ${URGENCY_RATING_CHART_MISSION_FILENAME} to ${activeMission.value.name}.`;
+    } catch (err) {
+        statusError.value = true;
+        status.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        uploading.value = false;
     }
 }
 
