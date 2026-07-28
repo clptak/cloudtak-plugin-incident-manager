@@ -3,7 +3,6 @@
  * (same path as CloudTAK draw/buffer). Raw sendCOT can silently no-op when the
  * Atlas websocket is closed and does not refresh the mission overlay cache.
  */
-import { Preferences } from '@capacitor/preferences';
 import COT, { OriginMode } from '../../../../src/base/cot.ts';
 import Subscription from '../../../../src/base/subscription.ts';
 import { useMapStore } from '../../../../src/stores/map.ts';
@@ -39,11 +38,6 @@ function plainRing(ring: [number, number][]): [number, number][] {
 
 function plainCenter(center: [number, number]): [number, number] {
     return [center[0], center[1]];
-}
-
-async function sessionToken(): Promise<string> {
-    const { value } = await Preferences.get({ key: 'token' });
-    return value || '';
 }
 
 async function ensureConnOpen(worker: ReturnType<typeof useMapStore>['worker']): Promise<void> {
