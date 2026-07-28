@@ -148,15 +148,7 @@
         "mission_summary": "",
         "urgency_rating": {},
         "casie": {},
-        "scenarios": [
-            {
-                "scenario_id": "",
-                "scenario_description": "",
-                "scenario_mobility": true,
-                "search_responsiveness": true,
-                "search_priority": 1
-            }
-        ],
+        "scenarios": [],
         "objectives": [],
         "strategies": [],
         "tactics": [],
