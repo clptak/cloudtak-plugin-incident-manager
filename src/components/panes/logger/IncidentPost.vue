@@ -483,7 +483,7 @@ async function loadRows(): Promise<void> {
     loading.value = true;
     try {
         const sub = await Subscription.load(activeMission.value.guid, {
-            token: activeMission.value.token ?? '',
+            missiontoken: activeMission.value.token ?? '',
         });
         const logs = await sub.log.list({ refresh: true });
 
@@ -649,7 +649,7 @@ async function save(): Promise<void> {
 
     try {
         const sub = await Subscription.load(activeMission.value.guid, {
-            token: activeMission.value.token ?? '',
+            missiontoken: activeMission.value.token ?? '',
         });
 
         for (const id of pendingDeleteIds.value) {
@@ -766,7 +766,7 @@ async function addPdfToDataSync(): Promise<void> {
             { missionToken: activeMission.value.token },
         );
         const sub = await Subscription.load(activeMission.value.guid, {
-            token: activeMission.value.token ?? '',
+            missiontoken: activeMission.value.token ?? '',
         });
         await sub.fetch();
         status.value = `Added ${ICS234_MISSION_FILENAME} to ${activeMission.value.name}.`;

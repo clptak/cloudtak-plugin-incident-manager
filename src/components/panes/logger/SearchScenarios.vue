@@ -512,7 +512,7 @@ async function loadSent(): Promise<void> {
     }
     try {
         const sub = await Subscription.load(activeMission.value.guid, {
-            token: activeMission.value.token ?? '',
+            missiontoken: activeMission.value.token ?? '',
         });
         const logs = await sub.log.list({ refresh: true });
 
@@ -712,7 +712,7 @@ async function send(): Promise<void> {
     let didWrite = false;
     try {
         const sub = await Subscription.load(activeMission.value.guid, {
-            token: activeMission.value.token ?? '',
+            missiontoken: activeMission.value.token ?? '',
         });
         for (const key of filled.value) {
             const d = drafts[key];
@@ -795,7 +795,7 @@ async function addPdfToDataSync(): Promise<void> {
             { missionToken: activeMission.value.token },
         );
         const sub = await Subscription.load(activeMission.value.guid, {
-            token: activeMission.value.token ?? '',
+            missiontoken: activeMission.value.token ?? '',
         });
         await sub.fetch();
         status.value = `Added ${SCENARIOS_RECORD_SHEET_MISSION_FILENAME} to ${activeMission.value.name}.`;

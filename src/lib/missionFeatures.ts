@@ -63,7 +63,6 @@ async function pushFeatureToMission(
     await ensureConnOpen(mapStore.worker);
 
     const sub = await Subscription.load(missionGuid, {
-        token: await sessionToken(),
         missiontoken: missionToken,
         subscribed: true,
     });
@@ -180,7 +179,6 @@ export async function updateMissionFeatureRemarks(opts: {
     remarks: string;
 }): Promise<'updated' | 'missing'> {
     const sub = await Subscription.load(opts.missionGuid, {
-        token: await sessionToken(),
         missiontoken: opts.missionToken,
         subscribed: true,
     });

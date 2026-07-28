@@ -634,7 +634,7 @@ async function loadMissionAssets(): Promise<void> {
     loadingFeatures.value = true;
     try {
         const sub = await Subscription.load(activeMission.value.guid, {
-            token: activeMission.value.token ?? '',
+            missiontoken: activeMission.value.token ?? '',
         });
         const feats = await sub.feature.list({ refresh: true });
         missionMarkers.value = feats
@@ -673,7 +673,7 @@ async function loadSent(): Promise<void> {
     loadingSent.value = true;
     try {
         const sub = await Subscription.load(activeMission.value.guid, {
-            token: activeMission.value.token ?? '',
+            missiontoken: activeMission.value.token ?? '',
         });
         const logs = await sub.log.list({ refresh: true });
 
@@ -729,7 +729,7 @@ async function send(): Promise<void> {
     let failed = 0;
     try {
         const sub = await Subscription.load(activeMission.value.guid, {
-            token: activeMission.value.token ?? '',
+            missiontoken: activeMission.value.token ?? '',
         });
         for (const draft of filledDrafts.value) {
             const f = draft.form;

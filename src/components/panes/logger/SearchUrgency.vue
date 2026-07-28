@@ -550,7 +550,7 @@ async function send(): Promise<void> {
         const breakdown = factors.map((f) => `${f.label}: ${f.value}`).join('; ');
         const content = `Search Urgency: ${level.value.label} (total ${total.value}/21). ${breakdown}`;
         const sub = await Subscription.load(activeMission.value.guid, {
-            token: activeMission.value.token ?? '',
+            missiontoken: activeMission.value.token ?? '',
         });
         await sub.log.create({
             content,
@@ -608,7 +608,7 @@ async function addPdfToDataSync(): Promise<void> {
             { missionToken: activeMission.value.token },
         );
         const sub = await Subscription.load(activeMission.value.guid, {
-            token: activeMission.value.token ?? '',
+            missiontoken: activeMission.value.token ?? '',
         });
         await sub.fetch();
         status.value = `Added ${URGENCY_RATING_CHART_MISSION_FILENAME} to ${activeMission.value.name}.`;

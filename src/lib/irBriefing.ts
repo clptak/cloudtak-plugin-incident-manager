@@ -182,7 +182,7 @@ export async function loadIrBriefingFromMission(
     const form = blankIrBriefingForm();
     const sources: IrBriefingSources = { ippLatLng: null };
 
-    const sub = await Subscription.load(missionGuid, { token: missionToken ?? '' });
+    const sub = await Subscription.load(missionGuid, { missiontoken: missionToken ?? '' });
     const logs = await sub.log.list({ refresh: true });
 
     const incident = latestIncidentInfoFromLogs(logs);

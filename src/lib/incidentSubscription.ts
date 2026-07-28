@@ -21,7 +21,6 @@ export async function loadIncidentSubscription(
     },
 ): Promise<Subscription> {
     const sub = await Subscription.load(mission.guid, {
-        token: await sessionToken(),
         missiontoken: missionAuthToken(mission),
         subscribed: true,
     });

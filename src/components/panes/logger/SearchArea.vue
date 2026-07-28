@@ -666,7 +666,7 @@ type LoadedSub = Awaited<ReturnType<typeof Subscription.load>>;
 
 async function loadSub(): Promise<LoadedSub> {
     return Subscription.load(activeMission.value!.guid, {
-        token: activeMission.value!.token ?? '',
+        missiontoken: activeMission.value!.token ?? '',
     });
 }
 

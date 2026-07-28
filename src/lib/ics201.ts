@@ -816,7 +816,7 @@ export async function loadIcs201FromMission(
         missionGuid,
     };
 
-    const sub = await Subscription.load(missionGuid, { token: missionToken ?? '' });
+    const sub = await Subscription.load(missionGuid, { missiontoken: missionToken ?? '' });
     const logs = await sub.log.list({ refresh: true });
 
     const incident = latestIncidentInfoFromLogs(logs);
@@ -1016,7 +1016,7 @@ export async function saveIcs201ToMission(
     missionToken?: string,
 ): Promise<string> {
     syncObjectivesSnapshot(form);
-    const sub = await Subscription.load(missionGuid, { token: missionToken ?? '' });
+    const sub = await Subscription.load(missionGuid, { missiontoken: missionToken ?? '' });
     const body = {
         dtg: new Date().toISOString(),
         content: serializeIcs201Form(form),

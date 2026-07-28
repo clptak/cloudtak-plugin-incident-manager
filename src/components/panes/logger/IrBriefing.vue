@@ -475,7 +475,7 @@ async function addPdfToDataSync(): Promise<void> {
             { missionToken: activeMission.value.token },
         );
         const sub = await Subscription.load(activeMission.value.guid, {
-            token: activeMission.value.token ?? '',
+            missiontoken: activeMission.value.token ?? '',
         });
         await sub.fetch();
         status.value = `Added ${SAR_BRIEFING_MISSION_FILENAME} to ${activeMission.value.name}.`;
