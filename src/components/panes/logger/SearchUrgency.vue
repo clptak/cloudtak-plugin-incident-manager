@@ -8,6 +8,8 @@
         <div class='card-body'>
             <p class='text-muted small mb-3'>
                 Score each factor 1 (most urgent) to 3 (least urgent).
+                Save stores the rating in <strong>mission_schema.json</strong>;
+                Send to DataSync posts a mission log entry.
             </p>
 
             <div class='table-responsive urgency-table-wrap'>
@@ -99,13 +101,21 @@
             <div class='mt-3'>
                 <button
                     class='btn btn-primary btn-sm'
-                    :disabled='posting || !valid'
+                    :disabled='saving || posting || !valid || !activeMission || loading'
+                    @click='onSave'
+                >
+                    {{ saving ? 'Saving…' : 'Save' }}
+                </button>
+                <button
+                    class='btn btn-outline-secondary btn-sm ms-2'
+                    :disabled='posting || saving || !valid || !activeMission || loading'
                     @click='onSend'
                 >
                     {{ posting ? 'Sending…' : 'Send to DataSync' }}
                 </button>
                 <button
                     class='btn btn-outline-secondary btn-sm ms-2'
+                    :disabled='saving || posting || loading'
                     @click='reset'
                 >
                     Clear
@@ -142,10 +152,20 @@
 </template>
 
 <script setup lang='ts'>
-import { reactive, ref, computed, onMounted, onUnmounted } from 'vue';
+import { reactive, ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { IconInfoCircle } from '@tabler/icons-vue';
 import Subscription from '../../../../../../src/base/subscription.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
+import {
+    buildUrgencyRating,
+    defaultUrgencyFactors,
+    urgencyLevelFromTotal,
+    type UrgencyFactorKey,
+} from '../../../lib/urgencyRating.ts';
+import {
+    loadUrgencyRatingFromMission,
+    saveUrgencyRatingToMission,
+} from '../../../lib/urgencyRatingPersistence.ts';
 
 interface HelpLine {
     text: string;
@@ -153,7 +173,7 @@ interface HelpLine {
 }
 
 interface Factor {
-    key: string;
+    key: UrgencyFactorKey;
     label: string;
     value: number;
     helpLines: HelpLine[];
@@ -253,30 +273,86 @@ function onDocumentClick(event: MouseEvent): void {
     }
 }
 
-onMounted(() => {
-    document.addEventListener('click', onDocumentClick);
-});
-
-onUnmounted(() => {
-    document.removeEventListener('click', onDocumentClick);
-});
-
 const total = computed(() => factors.reduce((s, f) => s + (Number(f.value) || 0), 0));
 const valid = computed(() => factors.every((f) => [1, 2, 3].includes(Number(f.value))));
 
 const level = computed(() => {
-    if (total.value <= 10) return { label: 'High', cls: 'bg-danger-lt text-danger' };
-    if (total.value <= 16) return { label: 'Moderate', cls: 'bg-yellow-lt text-yellow' };
-    return { label: 'Lower', cls: 'bg-green-lt text-green' };
+    const label = urgencyLevelFromTotal(total.value);
+    if (label === 'High') return { label, cls: 'bg-danger-lt text-danger' };
+    if (label === 'Moderate') return { label, cls: 'bg-yellow-lt text-yellow' };
+    return { label, cls: 'bg-green-lt text-green' };
 });
 
 const posting = ref(false);
+const saving = ref(false);
+const loading = ref(false);
 const status = ref('');
 const statusError = ref(false);
+const contentHash = ref<string | undefined>();
+
+function currentFactors(): Record<UrgencyFactorKey, number> {
+    const out = defaultUrgencyFactors();
+    for (const f of factors) {
+        out[f.key] = Number(f.value) || 1;
+    }
+    return out;
+}
+
+function applyFactors(scores: Record<UrgencyFactorKey, number>): void {
+    for (const f of factors) {
+        f.value = scores[f.key] ?? 1;
+    }
+}
 
 function reset(): void {
-    factors.forEach((f) => (f.value = 1));
+    applyFactors(defaultUrgencyFactors());
     status.value = '';
+    statusError.value = false;
+}
+
+async function recall(): Promise<void> {
+    if (!activeMission.value) {
+        contentHash.value = undefined;
+        return;
+    }
+    loading.value = true;
+    status.value = '';
+    statusError.value = false;
+    try {
+        const loaded = await loadUrgencyRatingFromMission(activeMission.value);
+        contentHash.value = loaded.contentHash;
+        if (loaded.rating) {
+            applyFactors(loaded.rating.factors);
+            status.value = 'Loaded saved urgency from mission_schema.json.';
+        }
+    } catch (err) {
+        statusError.value = true;
+        status.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        loading.value = false;
+    }
+}
+
+async function onSave(): Promise<void> {
+    if (!requireActiveMission()) return;
+    if (!activeMission.value || !valid.value) return;
+    saving.value = true;
+    status.value = '';
+    statusError.value = false;
+    try {
+        const rating = buildUrgencyRating(currentFactors());
+        contentHash.value = await saveUrgencyRatingToMission(
+            activeMission.value,
+            rating,
+            contentHash.value,
+        );
+        status.value = `Saved urgency rating (${rating.level}) to mission_schema.json on ${activeMission.value.name}.`;
+    } catch (err) {
+        statusError.value = true;
+        status.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        saving.value = false;
+    }
 }
 
 async function onSend(): Promise<void> {
@@ -305,6 +381,22 @@ async function send(): Promise<void> {
         posting.value = false;
     }
 }
+
+watch(
+    () => activeMission.value?.guid,
+    () => {
+        void recall();
+    },
+);
+
+onMounted(() => {
+    document.addEventListener('click', onDocumentClick);
+    void recall();
+});
+
+onUnmounted(() => {
+    document.removeEventListener('click', onDocumentClick);
+});
 </script>
 
 <style scoped>
