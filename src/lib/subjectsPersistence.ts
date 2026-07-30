@@ -52,8 +52,9 @@ const STRING_INFO_KEYS = [
 ] as const satisfies readonly (keyof SubjectInitialInformation)[];
 
 export function subjectFormToInitialInformation(f: SubjectForm): SubjectInitialInformation {
-    const { logId: _logId, ...rest } = f;
-    return { ...rest };
+    const rest = { ...f };
+    delete rest.logId;
+    return rest;
 }
 
 export function subjectFormFromInitialInformation(
