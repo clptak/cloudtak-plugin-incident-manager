@@ -5,8 +5,6 @@ import {
     blankObjectiveRows,
     ensureStrategy,
     ensureTactic,
-    formatStrategiesForPdf,
-    formatTacticsForPdf,
     hasPostKeyword,
     MAX_OBJECTIVES,
     parseObjectiveStatusFromKeywords,
@@ -45,6 +43,8 @@ export const ACTION_201_KEYWORD = '201';
 
 export const MAX_ACTION_ROWS = 22;
 export const MAX_RESOURCE_ROWS = 17;
+/** Soft cap on extra §8 Letter pages the user can add. */
+export const MAX_ACTION_CONTINUATION_PAGES = 10;
 
 export interface Ics201ActionRow {
     time: string;
@@ -86,6 +86,8 @@ export interface Ics201Form {
     currentObjectives: string[];
     plannedObjectives: Ics201PlannedObjective[];
     actions: Ics201ActionRow[];
+    /** Extra Letter pages for §8 Time/Actions overflow (no §7 box). */
+    actionContinuationPages: number;
     incidentCommanders: string;
     liaisonOfficer: string;
     safetyOfficer: string;
@@ -125,6 +127,17 @@ function blankResourceRow(): Ics201ResourceRow {
     };
 }
 
+export function normalizeActionContinuationPages(value: unknown): number {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 0) return 0;
+    return Math.min(Math.floor(n), MAX_ACTION_CONTINUATION_PAGES);
+}
+
+/** Total §8 Time/Actions rows across the primary page + continuation pages. */
+export function actionRowCapacity(continuationPages: number): number {
+    return MAX_ACTION_ROWS * (1 + normalizeActionContinuationPages(continuationPages));
+}
+
 export function blankIcs201Form(): Ics201Form {
     return {
         incidentName: '',
@@ -145,6 +158,7 @@ export function blankIcs201Form(): Ics201Form {
         currentObjectives: [],
         plannedObjectives: [],
         actions: Array.from({ length: MAX_ACTION_ROWS }, blankActionRow),
+        actionContinuationPages: 0,
         incidentCommanders: '',
         liaisonOfficer: '',
         safetyOfficer: '',
@@ -160,6 +174,18 @@ export function blankIcs201Form(): Ics201Form {
         organizationNotes: '',
         resources: Array.from({ length: MAX_RESOURCE_ROWS }, blankResourceRow),
     };
+}
+
+/** Grow or shrink the actions array to match continuation-page capacity. */
+export function ensureActionRowCapacity(form: Ics201Form): void {
+    const capacity = actionRowCapacity(form.actionContinuationPages);
+    if (form.actions.length < capacity) {
+        while (form.actions.length < capacity) {
+            form.actions.push(blankActionRow());
+        }
+    } else if (form.actions.length > capacity) {
+        form.actions.splice(capacity);
+    }
 }
 
 export function blankPlannedObjective(): Ics201PlannedObjective {
@@ -340,10 +366,13 @@ export function parseIcs201FormFromContent(content: string): Partial<Ics201Form>
     }
 }
 
-function padActions(rows: Ics201ActionRow[] | undefined): Ics201ActionRow[] {
-    const out = Array.from({ length: MAX_ACTION_ROWS }, blankActionRow);
+function padActions(
+    rows: Ics201ActionRow[] | undefined,
+    capacity = MAX_ACTION_ROWS,
+): Ics201ActionRow[] {
+    const out = Array.from({ length: capacity }, blankActionRow);
     if (!rows?.length) return out;
-    for (let i = 0; i < Math.min(rows.length, MAX_ACTION_ROWS); i++) {
+    for (let i = 0; i < Math.min(rows.length, capacity); i++) {
         out[i] = {
             time: String(rows[i]?.time ?? ''),
             actions: String(rows[i]?.actions ?? ''),
@@ -394,7 +423,15 @@ export function applyPartialIcs201Form(base: Ics201Form, partial: Partial<Ics201
         ...base,
         ...partial,
         ...objectivesNorm,
-        actions: padActions(partial.actions ?? base.actions),
+        actionContinuationPages: normalizeActionContinuationPages(
+            partial.actionContinuationPages ?? base.actionContinuationPages,
+        ),
+        actions: padActions(
+            partial.actions ?? base.actions,
+            actionRowCapacity(
+                partial.actionContinuationPages ?? base.actionContinuationPages,
+            ),
+        ),
         resources: padResources(partial.resources ?? base.resources),
         logId: partial.logId ?? base.logId,
     };
@@ -627,12 +664,14 @@ function sortLogsByTime(logs: MissionLogLike[]): MissionLogLike[] {
  * Actions for ICS 201 §8:
  * 1. Mission logs tagged exactly `201` (time = date/timestamp, actions = remarks/content)
  * 2. Logs tagged `planned` / `current`
- * 3. Risk Assessment strategies/tactics
+ * 3. Incident POST: one row per Objective / strategy / tactic line
  */
 export function actionsFromLogsAndPost(
     logs: MissionLogLike[],
     objectiveRows: ObjectiveRow[],
+    maxRows: number = MAX_ACTION_ROWS,
 ): Ics201ActionRow[] {
+    const capacity = Math.max(1, maxRows);
     const rows: Ics201ActionRow[] = [];
     const seen = new Set<string>();
 
@@ -643,14 +682,14 @@ export function actionsFromLogsAndPost(
         if (seen.has(key)) return false;
         seen.add(key);
         rows.push({ time: logActionTimeLabel(log), actions: text });
-        return rows.length >= MAX_ACTION_ROWS;
+        return rows.length >= capacity;
     };
 
     // Primary: keyword `201` → Time from log timestamp, Actions from remarks (content).
     for (const log of sortLogsByTime(logs)) {
         const kws = normalizeLogKeywords(log.keywords);
         if (!hasExactKeyword(kws, ACTION_201_KEYWORD)) continue;
-        if (pushLogRow(log, logRemarks(log))) return padActions(rows);
+        if (pushLogRow(log, logRemarks(log))) return padActions(rows, capacity);
     }
 
     for (const log of sortLogsByTime(logs)) {
@@ -664,24 +703,37 @@ export function actionsFromLogsAndPost(
         if (hasExactKeyword(kws, CURRENT_KEYWORD)) tags.push('Current');
         if (hasExactKeyword(kws, PLANNED_KEYWORD)) tags.push('Planned');
         const prefix = tags.length ? `[${tags.join('/')}] ` : '';
-        if (pushLogRow(log, `${prefix}${logRemarks(log)}`)) return padActions(rows);
+        if (pushLogRow(log, `${prefix}${logRemarks(log)}`)) return padActions(rows, capacity);
     }
 
     for (const row of objectiveRows) {
         if (!rowHasContent(row)) continue;
-        const strategies = formatStrategiesForPdf(row.strategies).trim();
-        const tactics = formatTacticsForPdf(row.strategies).trim();
-        const parts = [
-            row.objective.trim() && `Objective: ${row.objective.trim()}`,
-            strategies && `Strategies: ${strategies.replace(/\n/g, '; ')}`,
-            tactics && `Tactics: ${tactics.replace(/\n/g, '; ')}`,
-        ].filter(Boolean);
-        if (!parts.length) continue;
-        rows.push({ time: '', actions: collapseActionText(parts.join(' — ')) });
-        if (rows.length >= MAX_ACTION_ROWS) break;
+        if (rows.length >= capacity) break;
+
+        const obj = row.objective.trim();
+        if (obj) {
+            rows.push({ time: '', actions: `Objective: ${obj}` });
+            if (rows.length >= capacity) break;
+        }
+
+        for (let si = 0; si < row.strategies.length; si++) {
+            if (rows.length >= capacity) break;
+            const strategy = row.strategies[si];
+            const stratText = strategy.text.trim();
+            if (stratText) {
+                rows.push({ time: '', actions: `${si + 1}. ${stratText}` });
+                if (rows.length >= capacity) break;
+            }
+            for (let ti = 0; ti < strategy.tactics.length; ti++) {
+                if (rows.length >= capacity) break;
+                const tacText = strategy.tactics[ti].text.trim();
+                if (!tacText) continue;
+                rows.push({ time: '', actions: `${si + 1}.${ti + 1} ${tacText}` });
+            }
+        }
     }
 
-    return padActions(rows);
+    return padActions(rows, capacity);
 }
 
 function objectivesFromPost(objectiveRows: ObjectiveRow[]): {
@@ -935,12 +987,24 @@ export async function loadIcs201FromMission(
         }
         syncObjectivesSnapshot(form);
 
+        // Saved forms serialize blank action rows; don't let them wipe auto-fill.
+        if (!actionRowsHaveContent(form.actions)) {
+            form.actions = actionsFromLogsAndPost(
+                logs,
+                objectiveRows,
+                actionRowCapacity(form.actionContinuationPages),
+            );
+        } else {
+            ensureActionRowCapacity(form);
+        }
+
         // Saved forms serialize blank resource rows; don't let them wipe auto-fill.
         if (!resourceRowsHaveContent(form.resources)) {
             form.resources = autoResources;
         }
     }
 
+    ensureActionRowCapacity(form);
     return { form, sources };
 }
 
@@ -983,10 +1047,15 @@ export function mergeIcs201Sources(current: Ics201Form, loaded: Ics201Form): Ics
             ? current.plannedObjectives
             : loaded.plannedObjectives,
         objectives: keepObjectives ? current.objectives : loaded.objectives,
+        actionContinuationPages: Math.max(
+            normalizeActionContinuationPages(current.actionContinuationPages),
+            normalizeActionContinuationPages(loaded.actionContinuationPages),
+        ),
         actions: actionRowsHaveContent(current.actions) ? current.actions : loaded.actions,
         resources: resourceRowsHaveContent(current.resources) ? current.resources : loaded.resources,
         logId: current.logId ?? loaded.logId,
     };
+    ensureActionRowCapacity(merged);
     syncObjectivesSnapshot(merged);
     return merged;
 }

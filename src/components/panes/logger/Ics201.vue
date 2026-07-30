@@ -337,11 +337,38 @@
                         </tbody>
                     </table>
                 </div>
+                <div class='d-flex flex-wrap align-items-center gap-2 mt-2 mb-1'>
+                    <button
+                        type='button'
+                        class='btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1'
+                        :disabled='form.actionContinuationPages >= MAX_ACTION_CONTINUATION_PAGES'
+                        @click='addActionContinuationPage'
+                    >
+                        <IconPlus
+                            :size='16'
+                            stroke='1.5'
+                        />
+                        Add §8 continuation page
+                    </button>
+                    <button
+                        v-if='form.actionContinuationPages > 0'
+                        type='button'
+                        class='btn btn-sm btn-outline-secondary'
+                        @click='removeActionContinuationPage'
+                    >
+                        Remove continuation page
+                    </button>
+                    <span class='form-text mb-0'>
+                        {{ form.actionContinuationPages }} continuation page{{ form.actionContinuationPages === 1 ? '' : 's' }}
+                        · {{ actionCapacity }} action rows ({{ MAX_ACTION_ROWS }} per page)
+                    </span>
+                </div>
                 <div class='form-text mt-1'>
                     Prefills from mission logs tagged <code>201</code>
                     (time = log date/timestamp, actions = remarks with line breaks collapsed), then
-                    <code>planned</code> / <code>current</code>, then Risk Assessment strategies/tactics.
-                    On the PDF, long actions wrap onto the next §8 rows and shift later entries down.
+                    <code>planned</code> / <code>current</code>, then Incident POST as separate
+                    Objective / strategy (<code>1.</code>) / tactic (<code>1.1</code>) rows.
+                    Overflow spills onto §8 continuation pages (header + Time/Actions, no §7).
                 </div>
             </div>
         </div>
@@ -629,10 +656,15 @@ import { IconChevronDown, IconPlus, IconX } from '@tabler/icons-vue';
 import Subscription from '../../../../../../src/base/subscription.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import {
+    actionRowCapacity,
     blankIcs201Form,
     blankPlannedObjective,
+    ensureActionRowCapacity,
     loadIcs201FromMission,
+    MAX_ACTION_CONTINUATION_PAGES,
+    MAX_ACTION_ROWS,
     mergeIcs201Sources,
+    normalizeActionContinuationPages,
     saveIcs201ToMission,
     syncObjectivesSnapshot,
     type Ics201Form,
@@ -688,6 +720,20 @@ function removePlannedObjective(index: number): void {
 
 ensureObjectiveEditors();
 
+function addActionContinuationPage(): void {
+    if (form.actionContinuationPages >= MAX_ACTION_CONTINUATION_PAGES) return;
+    form.actionContinuationPages += 1;
+    ensureActionRowCapacity(form);
+}
+
+function removeActionContinuationPage(): void {
+    if (form.actionContinuationPages <= 0) return;
+    form.actionContinuationPages -= 1;
+    ensureActionRowCapacity(form);
+}
+
+const actionCapacity = computed(() => actionRowCapacity(form.actionContinuationPages));
+
 function lastFilledIndex(hasContent: (i: number) => boolean, length: number): number {
     for (let i = length - 1; i >= 0; i--) {
         if (hasContent(i)) return i;
@@ -697,10 +743,11 @@ function lastFilledIndex(hasContent: (i: number) => boolean, length: number): nu
 
 const visibleActions = computed(() => {
     const last = lastFilledIndex(
-        (i) => !!(form.actions[i].time.trim() || form.actions[i].actions.trim()),
+        (i) => !!(form.actions[i]?.time.trim() || form.actions[i]?.actions.trim()),
         form.actions.length,
     );
-    return form.actions.slice(0, Math.max(last + 2, 4));
+    const minVisible = Math.min(form.actions.length, Math.max(last + 2, 4));
+    return form.actions.slice(0, minVisible);
 });
 
 const visibleResources = computed(() => {
@@ -762,6 +809,7 @@ async function loadAll(preserveUserFields = false): Promise<void> {
             currentObjectives: [...form.currentObjectives],
             plannedObjectives: form.plannedObjectives.map((r) => ({ ...r })),
             actions: form.actions.map((r) => ({ ...r })),
+            actionContinuationPages: form.actionContinuationPages,
             incidentCommanders: form.incidentCommanders,
             liaisonOfficer: form.liaisonOfficer,
             safetyOfficer: form.safetyOfficer,
@@ -800,7 +848,11 @@ async function loadAll(preserveUserFields = false): Promise<void> {
             form.objectives = preserved.objectives;
             form.currentObjectives = preserved.currentObjectives;
             form.plannedObjectives = preserved.plannedObjectives;
+            form.actionContinuationPages = normalizeActionContinuationPages(
+                preserved.actionContinuationPages,
+            );
             form.actions = preserved.actions;
+            ensureActionRowCapacity(form);
             form.incidentCommanders = preserved.incidentCommanders;
             form.liaisonOfficer = preserved.liaisonOfficer;
             form.safetyOfficer = preserved.safetyOfficer;
@@ -817,6 +869,7 @@ async function loadAll(preserveUserFields = false): Promise<void> {
         }
 
         ensureObjectiveEditors();
+        ensureActionRowCapacity(form);
         syncObjectivesSnapshot(form);
 
         await loadWeatherIfNeeded(preserveUserFields);
@@ -875,6 +928,7 @@ async function saveToMission(): Promise<void> {
 
 async function generatePdfBytes(): Promise<Uint8Array> {
     syncObjectivesSnapshot(form);
+    ensureActionRowCapacity(form);
     return buildIcs201Pdf(
         {
             ...form,
