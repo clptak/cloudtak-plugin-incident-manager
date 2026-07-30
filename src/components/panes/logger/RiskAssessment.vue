@@ -1,13 +1,219 @@
 <template>
     <div>
+        <!-- Combined saved assessments -->
+        <div class='card mb-3'>
+            <div class='card-header py-2 small fw-semibold'>
+                Saved assessments
+            </div>
+            <div class='card-body p-0'>
+                <div
+                    v-if='loading'
+                    class='p-3 text-muted small'
+                >
+                    Loading…
+                </div>
+                <div
+                    v-else-if='!savedGroups.length'
+                    class='p-3 text-muted small'
+                >
+                    No assessments saved yet.
+                </div>
+                <div
+                    v-else
+                    class='table-responsive'
+                >
+                    <table class='table table-sm table-vcenter mb-0'>
+                        <thead>
+                            <tr>
+                                <th style='width: 110px;'>
+                                    Model
+                                </th>
+                                <th>Respondent</th>
+                                <th style='width: 70px;'>
+                                    Risk
+                                </th>
+                                <th>Level</th>
+                                <th class='d-none d-md-table-cell'>
+                                    Detail
+                                </th>
+                                <th style='width: 160px;' />
+                            </tr>
+                        </thead>
+                        <tbody
+                            v-for='group in savedGroups'
+                            :key='group.key'
+                        >
+                            <tr class='bg-body-secondary'>
+                                <td colspan='4'>
+                                    <div class='fw-semibold'>
+                                        {{ group.entry.tacticLabel || '(untitled tactic)' }}
+                                        <span
+                                            v-if='group.worstGar'
+                                            class='badge ms-2'
+                                            :class='bandBadgeClass(group.worstGar.band)'
+                                        >GAR worst: {{ group.worstGar.score }} — {{ group.worstGar.level }}</span>
+                                        <span
+                                            v-if='group.worstComp'
+                                            class='badge ms-2'
+                                            :class='bandBadgeClass(group.worstComp.band)'
+                                        >Comp worst: {{ group.worstComp.score }} — {{ group.worstComp.level }}</span>
+                                    </div>
+                                    <div
+                                        v-if='group.entry.description'
+                                        class='text-muted small'
+                                    >
+                                        {{ group.entry.description }}
+                                    </div>
+                                </td>
+                                <td class='d-none d-md-table-cell text-muted small'>
+                                    {{ group.respondentCount }}
+                                    respondent{{ group.respondentCount === 1 ? '' : 's' }}
+                                </td>
+                                <td class='text-end text-nowrap'>
+                                    <button
+                                        type='button'
+                                        class='btn btn-outline-primary btn-sm me-1'
+                                        :disabled='busy'
+                                        title='Add a GAR respondent for this tactic'
+                                        @click='onGarAddRespondent(group.key)'
+                                    >
+                                        + GAR
+                                    </button>
+                                    <button
+                                        type='button'
+                                        class='btn btn-outline-primary btn-sm me-1'
+                                        :disabled='busy'
+                                        title='Add a complacency respondent for this tactic'
+                                        @click='onCompAddRespondent(group.key)'
+                                    >
+                                        + Comp
+                                    </button>
+                                    <button
+                                        type='button'
+                                        class='btn btn-outline-danger btn-sm'
+                                        :disabled='busy'
+                                        title='Remove all assessments for this tactic'
+                                        @click='onDeleteAll(group.key)'
+                                    >
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr
+                                v-for='resp in group.entry.garRespondents'
+                                :key='`gar-${resp.id}`'
+                            >
+                                <td>
+                                    <span class='badge bg-secondary-lt text-secondary'>GAR</span>
+                                </td>
+                                <td>{{ resp.name || '(unnamed)' }}</td>
+                                <td class='fw-bold'>
+                                    {{ resp.score }}
+                                </td>
+                                <td>
+                                    <span
+                                        class='badge'
+                                        :class='bandBadgeClass(resp.band)'
+                                    >{{ resp.level }}</span>
+                                    <div class='text-muted small'>
+                                        {{ resp.recommendation }}
+                                    </div>
+                                </td>
+                                <td class='d-none d-md-table-cell text-muted small'>
+                                    {{ formatGarMitigations(resp) }}
+                                </td>
+                                <td class='text-end'>
+                                    <button
+                                        type='button'
+                                        class='btn btn-outline-secondary btn-sm me-1'
+                                        :disabled='busy'
+                                        @click='onGarEdit(group.key, resp.id)'
+                                    >
+                                        Edit
+                                    </button>
+                                    <button
+                                        type='button'
+                                        class='btn btn-outline-danger btn-sm'
+                                        :disabled='busy'
+                                        @click='onGarDeleteRespondent(group.key, resp.id)'
+                                    >
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr
+                                v-for='resp in group.entry.complacencyRespondents'
+                                :key='`comp-${resp.id}`'
+                            >
+                                <td>
+                                    <span class='badge bg-secondary-lt text-secondary'>Complacency</span>
+                                </td>
+                                <td>{{ resp.name || '(unnamed)' }}</td>
+                                <td class='fw-bold'>
+                                    {{ resp.score }}
+                                </td>
+                                <td>
+                                    <span
+                                        class='badge'
+                                        :class='bandBadgeClass(resp.band)'
+                                    >{{ resp.level }}</span>
+                                    <div class='text-muted small'>
+                                        {{ resp.recommendation }}
+                                    </div>
+                                </td>
+                                <td class='d-none d-md-table-cell text-muted small'>
+                                    {{ resp.repetition }} &times; {{ resp.confidence }} &times; {{ resp.experience }}
+                                </td>
+                                <td class='text-end'>
+                                    <button
+                                        type='button'
+                                        class='btn btn-outline-secondary btn-sm me-1'
+                                        :disabled='busy'
+                                        @click='onCompEdit(group.key, resp.id)'
+                                    >
+                                        Edit
+                                    </button>
+                                    <button
+                                        type='button'
+                                        class='btn btn-outline-danger btn-sm'
+                                        :disabled='busy'
+                                        @click='onCompDeleteRespondent(group.key, resp.id)'
+                                    >
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <!-- GAR Model -->
         <div class='card mb-3'>
-            <div class='card-header'>
+            <div
+                class='card-header d-flex align-items-center cursor-pointer user-select-none'
+                role='button'
+                tabindex='0'
+                :aria-expanded='garExpanded'
+                @click='garExpanded = !garExpanded'
+                @keydown.enter.prevent='garExpanded = !garExpanded'
+                @keydown.space.prevent='garExpanded = !garExpanded'
+            >
                 <h3 class='card-title mb-0'>
                     GAR Model
                 </h3>
+                <IconChevronDown
+                    class='ms-auto transition-transform'
+                    :class='{ "rotate-180": !garExpanded }'
+                    :size='20'
+                    stroke='1.5'
+                />
             </div>
-            <div class='card-body'>
+            <div
+                v-show='garExpanded'
+                class='card-body'
+            >
                 <p class='text-muted small mb-3'>
                     Operational Risk Management (GREEN-AMBER-RED). Rate each element
                     0 (no risk) through 10 (maximum risk). Any category rated ≥ 5 should
@@ -190,140 +396,31 @@
             </div>
         </div>
 
-        <div class='card mb-4'>
-            <div class='card-header py-2 small fw-semibold'>
-                GAR saved assessments
-            </div>
-            <div class='card-body p-0'>
-                <div
-                    v-if='loading'
-                    class='p-3 text-muted small'
-                >
-                    Loading…
-                </div>
-                <div
-                    v-else-if='!garSavedGroups.length'
-                    class='p-3 text-muted small'
-                >
-                    No GAR assessments saved yet.
-                </div>
-                <div
-                    v-else
-                    class='table-responsive'
-                >
-                    <table class='table table-sm table-vcenter mb-0'>
-                        <thead>
-                            <tr>
-                                <th>Respondent</th>
-                                <th style='width: 70px;'>
-                                    Risk
-                                </th>
-                                <th>Level</th>
-                                <th class='d-none d-md-table-cell'>
-                                    Mitigations
-                                </th>
-                                <th style='width: 120px;' />
-                            </tr>
-                        </thead>
-                        <tbody
-                            v-for='group in garSavedGroups'
-                            :key='group.key'
-                        >
-                            <tr class='bg-body-secondary'>
-                                <td colspan='3'>
-                                    <div class='fw-semibold'>
-                                        {{ group.entry.tacticLabel || '(untitled tactic)' }}
-                                        <span
-                                            v-if='group.worst'
-                                            class='badge ms-2'
-                                            :class='bandBadgeClass(group.worst.band)'
-                                        >Worst: {{ group.worst.score }} — {{ group.worst.level }}</span>
-                                    </div>
-                                    <div
-                                        v-if='group.entry.description'
-                                        class='text-muted small'
-                                    >
-                                        {{ group.entry.description }}
-                                    </div>
-                                </td>
-                                <td class='d-none d-md-table-cell text-muted small'>
-                                    {{ group.entry.garRespondents.length }}
-                                    respondent{{ group.entry.garRespondents.length === 1 ? '' : 's' }}
-                                </td>
-                                <td class='text-end'>
-                                    <button
-                                        type='button'
-                                        class='btn btn-outline-primary btn-sm me-1'
-                                        :disabled='busy'
-                                        title='Add a GAR respondent for this tactic'
-                                        @click='onGarAddRespondent(group.key)'
-                                    >
-                                        + Respondent
-                                    </button>
-                                    <button
-                                        type='button'
-                                        class='btn btn-outline-danger btn-sm'
-                                        :disabled='busy'
-                                        title='Remove all GAR assessments for this tactic'
-                                        @click='onGarDeleteAll(group.key)'
-                                    >
-                                        Delete
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr
-                                v-for='resp in group.entry.garRespondents'
-                                :key='resp.id'
-                            >
-                                <td>{{ resp.name || '(unnamed)' }}</td>
-                                <td class='fw-bold'>
-                                    {{ resp.score }}
-                                </td>
-                                <td>
-                                    <span
-                                        class='badge'
-                                        :class='bandBadgeClass(resp.band)'
-                                    >{{ resp.level }}</span>
-                                    <div class='text-muted small'>
-                                        {{ resp.recommendation }}
-                                    </div>
-                                </td>
-                                <td class='d-none d-md-table-cell text-muted small'>
-                                    {{ formatGarMitigations(resp) }}
-                                </td>
-                                <td class='text-end'>
-                                    <button
-                                        type='button'
-                                        class='btn btn-outline-secondary btn-sm me-1'
-                                        :disabled='busy'
-                                        @click='onGarEdit(group.key, resp.id)'
-                                    >
-                                        Edit
-                                    </button>
-                                    <button
-                                        type='button'
-                                        class='btn btn-outline-danger btn-sm'
-                                        :disabled='busy'
-                                        @click='onGarDeleteRespondent(group.key, resp.id)'
-                                    >
-                                        Delete
-                                    </button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
         <!-- Complacency Model -->
         <div class='card mb-3'>
-            <div class='card-header'>
+            <div
+                class='card-header d-flex align-items-center cursor-pointer user-select-none'
+                role='button'
+                tabindex='0'
+                :aria-expanded='compExpanded'
+                @click='compExpanded = !compExpanded'
+                @keydown.enter.prevent='compExpanded = !compExpanded'
+                @keydown.space.prevent='compExpanded = !compExpanded'
+            >
                 <h3 class='card-title mb-0'>
-                    Risk Assessment — Complacency Model
+                    Complacency Model
                 </h3>
+                <IconChevronDown
+                    class='ms-auto transition-transform'
+                    :class='{ "rotate-180": !compExpanded }'
+                    :size='20'
+                    stroke='1.5'
+                />
             </div>
-            <div class='card-body'>
+            <div
+                v-show='compExpanded'
+                class='card-body'
+            >
                 <p class='text-muted small mb-3'>
                     Risk = Repetition &times; Confidence &times; Experience
                     (Craig E. Geis, California Training Institute). Each respondent
@@ -519,132 +616,6 @@
             </div>
         </div>
 
-        <div class='card'>
-            <div class='card-header py-2 small fw-semibold'>
-                Complacency saved assessments
-            </div>
-            <div class='card-body p-0'>
-                <div
-                    v-if='loading'
-                    class='p-3 text-muted small'
-                >
-                    Loading…
-                </div>
-                <div
-                    v-else-if='!compSavedGroups.length'
-                    class='p-3 text-muted small'
-                >
-                    No complacency assessments saved yet.
-                </div>
-                <div
-                    v-else
-                    class='table-responsive'
-                >
-                    <table class='table table-sm table-vcenter mb-0'>
-                        <thead>
-                            <tr>
-                                <th>Respondent</th>
-                                <th style='width: 70px;'>
-                                    Risk
-                                </th>
-                                <th>Level</th>
-                                <th class='d-none d-md-table-cell'>
-                                    R &times; C &times; E
-                                </th>
-                                <th style='width: 120px;' />
-                            </tr>
-                        </thead>
-                        <tbody
-                            v-for='group in compSavedGroups'
-                            :key='group.key'
-                        >
-                            <tr class='bg-body-secondary'>
-                                <td colspan='3'>
-                                    <div class='fw-semibold'>
-                                        {{ group.entry.tacticLabel || '(untitled tactic)' }}
-                                        <span
-                                            v-if='group.worst'
-                                            class='badge ms-2'
-                                            :class='bandBadgeClass(group.worst.band)'
-                                        >Worst: {{ group.worst.score }} — {{ group.worst.level }}</span>
-                                    </div>
-                                    <div
-                                        v-if='group.entry.description'
-                                        class='text-muted small'
-                                    >
-                                        {{ group.entry.description }}
-                                    </div>
-                                </td>
-                                <td class='d-none d-md-table-cell text-muted small'>
-                                    {{ group.entry.complacencyRespondents.length }}
-                                    respondent{{ group.entry.complacencyRespondents.length === 1 ? '' : 's' }}
-                                </td>
-                                <td class='text-end'>
-                                    <button
-                                        type='button'
-                                        class='btn btn-outline-primary btn-sm me-1'
-                                        :disabled='busy'
-                                        title='Add a complacency respondent for this tactic'
-                                        @click='onCompAddRespondent(group.key)'
-                                    >
-                                        + Respondent
-                                    </button>
-                                    <button
-                                        type='button'
-                                        class='btn btn-outline-danger btn-sm'
-                                        :disabled='busy'
-                                        title='Remove all complacency assessments for this tactic'
-                                        @click='onCompDeleteAll(group.key)'
-                                    >
-                                        Delete
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr
-                                v-for='resp in group.entry.complacencyRespondents'
-                                :key='resp.id'
-                            >
-                                <td>{{ resp.name || '(unnamed)' }}</td>
-                                <td class='fw-bold'>
-                                    {{ resp.score }}
-                                </td>
-                                <td>
-                                    <span
-                                        class='badge'
-                                        :class='bandBadgeClass(resp.band)'
-                                    >{{ resp.level }}</span>
-                                    <div class='text-muted small'>
-                                        {{ resp.recommendation }}
-                                    </div>
-                                </td>
-                                <td class='d-none d-md-table-cell text-muted small'>
-                                    {{ resp.repetition }} &times; {{ resp.confidence }} &times; {{ resp.experience }}
-                                </td>
-                                <td class='text-end'>
-                                    <button
-                                        type='button'
-                                        class='btn btn-outline-secondary btn-sm me-1'
-                                        :disabled='busy'
-                                        @click='onCompEdit(group.key, resp.id)'
-                                    >
-                                        Edit
-                                    </button>
-                                    <button
-                                        type='button'
-                                        class='btn btn-outline-danger btn-sm'
-                                        :disabled='busy'
-                                        @click='onCompDeleteRespondent(group.key, resp.id)'
-                                    >
-                                        Delete
-                                    </button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
         <div
             v-if='showMitigationModal'
             class='modal modal-blur show d-block'
@@ -713,6 +684,7 @@
 </template>
 
 <script setup lang='ts'>
+import { IconChevronDown } from '@tabler/icons-vue';
 import { computed, reactive, ref, watch } from 'vue';
 import { useIncident } from '../../../composables/useIncident.ts';
 import { useWorkAssignments } from '../../../composables/useWorkAssignments.ts';
@@ -751,6 +723,9 @@ const assessments = ref<TacticRiskMap>({});
 const contentHash = ref<string | undefined>();
 const loading = ref(false);
 const saving = ref(false);
+
+const garExpanded = ref(false);
+const compExpanded = ref(false);
 
 const garStatusMessage = ref('');
 const garStatusError = ref(false);
@@ -840,14 +815,15 @@ const compCanSave = computed(() => {
     return !!comp.respondentName.trim();
 });
 
-const garSavedGroups = computed(() => Object.entries(assessments.value)
-    .filter(([, entry]) => entry.garRespondents.length > 0)
-    .map(([key, entry]) => ({ key, entry, worst: worstGarRespondent(entry) }))
-    .sort((a, b) => a.entry.tacticLabel.localeCompare(b.entry.tacticLabel)));
-
-const compSavedGroups = computed(() => Object.entries(assessments.value)
-    .filter(([, entry]) => entry.complacencyRespondents.length > 0)
-    .map(([key, entry]) => ({ key, entry, worst: worstComplacencyRespondent(entry) }))
+const savedGroups = computed(() => Object.entries(assessments.value)
+    .filter(([, entry]) => entryHasRespondents(entry))
+    .map(([key, entry]) => ({
+        key,
+        entry,
+        worstGar: worstGarRespondent(entry),
+        worstComp: worstComplacencyRespondent(entry),
+        respondentCount: entry.garRespondents.length + entry.complacencyRespondents.length,
+    }))
     .sort((a, b) => a.entry.tacticLabel.localeCompare(b.entry.tacticLabel)));
 
 function bandBadgeClass(band: RiskBand): string {
@@ -976,12 +952,14 @@ function onGarAddRespondent(key: string): void {
     if (!selectTacticInto(key, gar)) return;
     clearGarRespondentFields();
     garStatusMessage.value = '';
+    garExpanded.value = true;
 }
 
 function onCompAddRespondent(key: string): void {
     if (!selectTacticInto(key, comp)) return;
     clearCompRespondentFields();
     compStatusMessage.value = '';
+    compExpanded.value = true;
 }
 
 function onGarEdit(key: string, respondentId: string): void {
@@ -1003,6 +981,7 @@ function onGarEdit(key: string, respondentId: string): void {
     gar.mitigations = { ...resp.mitigations };
     gar.editingRespondentId = respondentId;
     garStatusMessage.value = '';
+    garExpanded.value = true;
 }
 
 function onCompEdit(key: string, respondentId: string): void {
@@ -1016,6 +995,7 @@ function onCompEdit(key: string, respondentId: string): void {
     comp.experience = resp.experience;
     comp.editingRespondentId = respondentId;
     compStatusMessage.value = '';
+    compExpanded.value = true;
 }
 
 async function persist(
@@ -1248,25 +1228,24 @@ async function onCompDeleteRespondent(key: string, respondentId: string): Promis
     );
 }
 
-async function onGarDeleteAll(key: string): Promise<void> {
+async function onDeleteAll(key: string): Promise<void> {
     if (!requireActiveMission()) return;
     const entry = assessments.value[key];
     if (!entry) return;
     await persist(
-        removeOrUpdateEntry(key, { garRespondents: [] }),
-        `Deleted all GAR assessments for "${entry.tacticLabel}".`,
+        removeOrUpdateEntry(key, { garRespondents: [], complacencyRespondents: [] }),
+        `Deleted all assessments for "${entry.tacticLabel}".`,
         'gar',
     );
 }
-
-async function onCompDeleteAll(key: string): Promise<void> {
-    if (!requireActiveMission()) return;
-    const entry = assessments.value[key];
-    if (!entry) return;
-    await persist(
-        removeOrUpdateEntry(key, { complacencyRespondents: [] }),
-        `Deleted all complacency assessments for "${entry.tacticLabel}".`,
-        'comp',
-    );
-}
 </script>
+
+<style scoped>
+.rotate-180 {
+    transform: rotate(180deg);
+}
+
+.transition-transform {
+    transition: transform 0.15s ease;
+}
+</style>
