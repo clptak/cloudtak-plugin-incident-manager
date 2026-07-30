@@ -14,6 +14,7 @@ export const DEMA_MISSION_RE = /^20\d\d-\d\d\d\d\d$/;
 
 const CFS_EVENT_ID_RE = /Event ID\s*\n\s*(A\d{8})\b/i;
 const CFS_CASE_NUMBERS_RE = /Case Numbers\s*\n\s*(S\d{7})\b/i;
+const CFS_CREATED_RE = /Created\s*\n\s*(\d{2}:\d{2}:\d{2})\s{2}(\d{2}\/\d{2}\/\d{2})/i;
 const CFS_DISPATCHED_RE = /Dispatched\s*\n\s*(\d{2}:\d{2}:\d{2})\s{2}(\d{2}\/\d{2}\/\d{2})/i;
 const CFS_ADDRESS_RE = /Address\s*\n\s*([^\n]+)/i;
 
@@ -40,6 +41,8 @@ export interface CadIdentifiers {
 export interface CfsHeaderFields {
     activityNumber: string | null;
     reportNumber: string | null;
+    /** datetime-local value from Created (YYYY-MM-DDTHH:MM) — Time Reported Missing */
+    callCreated: string | null;
     /** datetime-local value from Dispatched (YYYY-MM-DDTHH:MM) */
     assignmentDateTime: string | null;
     /** Decimal degrees from Address LL(...), if present */
@@ -121,12 +124,18 @@ export function dispatchedToDatetimeLocal(time: string, date: string): string | 
     return `${year}-${month}-${day}T${tm[1]}:${tm[2]}`;
 }
 
-/** Extract labeled Event ID, Case Numbers, Dispatched, and Address LL from CFS text. */
+/** Extract labeled Event ID, Case Numbers, Created, Dispatched, and Address LL from CFS text. */
 export function parseCfsHeaderFields(cadText: string): CfsHeaderFields {
     const eventMatch = cadText.match(CFS_EVENT_ID_RE);
     const caseMatch = cadText.match(CFS_CASE_NUMBERS_RE);
+    const createdMatch = cadText.match(CFS_CREATED_RE);
     const dispatchedMatch = cadText.match(CFS_DISPATCHED_RE);
     const addressMatch = cadText.match(CFS_ADDRESS_RE);
+
+    let callCreated: string | null = null;
+    if (createdMatch) {
+        callCreated = dispatchedToDatetimeLocal(createdMatch[1], createdMatch[2]);
+    }
 
     let assignmentDateTime: string | null = null;
     if (dispatchedMatch) {
@@ -144,6 +153,7 @@ export function parseCfsHeaderFields(cadText: string): CfsHeaderFields {
     return {
         activityNumber: eventMatch?.[1] ?? null,
         reportNumber: caseMatch?.[1] ?? null,
+        callCreated,
         assignmentDateTime,
         callLocation,
     };

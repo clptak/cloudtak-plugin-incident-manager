@@ -361,6 +361,7 @@ import { pushPointToMission } from '../../../lib/missionFeatures.ts';
 import { SUBJECT_KEYWORD, kwValue } from '../../../lib/subjectInfo.ts';
 import {
     applyCadIdsToSchema,
+    applyCfsTimestampsToSchema,
     applyIncidentFormToSchema,
     applyMissionContextToSchema,
     appendMpsRowsToSchema,
@@ -389,6 +390,10 @@ const rows = ref<MpsRow[]>([]);
 const selected = ref<boolean[]>([]);
 const parsedActivityNumber = ref<string | null>(null);
 const parsedReportNumber = ref<string | null>(null);
+const lastCfsTimestamps = ref<{
+    callCreated: string | null;
+    callDispatched: string | null;
+}>({ callCreated: null, callDispatched: null });
 const posting = ref(false);
 const showParsedModal = ref(false);
 const status = ref('');
@@ -595,6 +600,10 @@ async function syncSchemaFromForm(
     }
     applyIncidentFormToSchema(incidentForm, schema, { preserveEmptyAssignment: true });
     if (parsed) applyCadIdsToSchema(schema, parsed);
+    applyCfsTimestampsToSchema(schema, {
+        callCreated: lastCfsTimestamps.value.callCreated,
+        callDispatched: lastCfsTimestamps.value.callDispatched,
+    });
     if (parsedRows?.length) {
         replaceMpsRowsInSchema(schema, parsedRows, activeMission.value.name);
     }
@@ -620,6 +629,10 @@ async function parse(): Promise<void> {
     selected.value = res.rows.map(() => true);
     parsedActivityNumber.value = activityNumber;
     parsedReportNumber.value = reportNumber;
+    lastCfsTimestamps.value = {
+        callCreated: header.callCreated,
+        callDispatched: header.assignmentDateTime,
+    };
     applyParsedCadToForm(incidentForm, {
         activityNumber,
         reportNumber,

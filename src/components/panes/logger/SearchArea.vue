@@ -475,6 +475,7 @@ import { parseCoordinates } from '../../../lib/coords.ts';
 import { circleRing, milesToMeters, MILES_TO_METERS } from '../../../lib/rings.ts';
 import { pushPolygonToMission, pushPointToMission, deletePolygonFromMission } from '../../../lib/missionFeatures.ts';
 import type { RingStyle } from '../../../lib/missionFeatures.ts';
+import { loadMissionSchema } from '../../../lib/missionSchema.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import NavHelpButton from '../../NavHelpButton.vue';
 
@@ -653,11 +654,13 @@ function resumeToCurrentStep(): void {
 async function loadAreas(sub?: LoadedSub): Promise<void> {
     if (!activeMission.value) {
         sentAreas.value = [];
+        timeReportedMissing.value = '';
         return;
     }
     loadingAreas.value = true;
     try {
         const s = sub ?? await loadSub();
+        await loadTimeReportedMissing(s);
         const logs = await s.log.list({ refresh: true });
         const kw = (keywords: string[] | undefined, prefix: string): string => {
             const t = keywords?.find((k) => k.startsWith(prefix));
@@ -683,6 +686,19 @@ async function loadAreas(sub?: LoadedSub): Promise<void> {
         status.value = `Could not load search areas: ${err instanceof Error ? err.message : String(err)}`;
     } finally {
         loadingAreas.value = false;
+    }
+}
+
+/** Prefill Theoretical Time Reported Missing from CFS Created in mission_schema.json. */
+async function loadTimeReportedMissing(sub: LoadedSub): Promise<void> {
+    try {
+        const { schema } = await loadMissionSchema(sub);
+        const created = schema.cad_data?.call_timestamps?.call_created?.trim() ?? '';
+        if (created) {
+            timeReportedMissing.value = created;
+        }
+    } catch {
+        // Schema may be missing on new missions; leave the field as-is.
     }
 }
 

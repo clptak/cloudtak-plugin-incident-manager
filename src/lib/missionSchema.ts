@@ -308,6 +308,26 @@ export function applyCadIdsToSchema(schema: MissionSchema, parsed: CadIdentifier
     }
 }
 
+/** Persist CFS Created / Dispatched as datetime-local strings on call_timestamps. */
+export function applyCfsTimestampsToSchema(
+    schema: MissionSchema,
+    timestamps: { callCreated?: string | null; callDispatched?: string | null },
+): void {
+    if (!schema.cad_data.call_timestamps) {
+        schema.cad_data.call_timestamps = {
+            call_created: '',
+            call_dispatched: '',
+            call_cleared: '',
+        };
+    }
+    if (timestamps.callCreated) {
+        schema.cad_data.call_timestamps.call_created = timestamps.callCreated;
+    }
+    if (timestamps.callDispatched) {
+        schema.cad_data.call_timestamps.call_dispatched = timestamps.callDispatched;
+    }
+}
+
 function mpsRowToLogEntry(row: MpsRow, missionName: string): MissionLogEntry {
     return {
         source: row.source,
