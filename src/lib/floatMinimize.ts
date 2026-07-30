@@ -1,6 +1,7 @@
 import { markRaw } from 'vue';
 import type { PluginAPI } from '../../../../plugin.ts';
 import { useFloatStore } from '../../../../src/stores/float.ts';
+import { isPopoutOpen, focusPopout } from './popout.ts';
 
 export const PANE_UID = 'incident-manager';
 export const BOTTOM_BAR_KEY = 'incident-manager';
@@ -134,10 +135,16 @@ function clearBottomBarChip(): void {
 /**
  * Open the desktop float, or restore it if currently minimized.
  * No-op if the float is already visible.
+ * When the popout window is open, focus it instead — chips then act as
+ * "bring popout to front + navigate" (nav state is shared across windows).
  */
 export function openDesktopPane(): void {
     const pluginApi = requireApi();
     ensureBottomBarChip();
+    if (isPopoutOpen()) {
+        focusPopout();
+        return;
+    }
     if (minimized) {
         minimized = false;
         if (!pluginApi.float.has(PANE_UID)) {

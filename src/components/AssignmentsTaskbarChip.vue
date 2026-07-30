@@ -1,20 +1,15 @@
 <template>
-    <button
-        type='button'
-        class='btn btn-sm btn-outline-light d-flex align-items-center gap-2 text-nowrap'
+    <TaskbarChipButton
+        :icon='IconClipboardList'
+        label='Assignments'
         title='Open Assignments'
         @click='openAssignments'
-    >
-        <IconClipboardList
-            :size='16'
-            stroke='1.5'
-        />
-        <span>Assignments</span>
-    </button>
+    />
 </template>
 
 <script setup lang='ts'>
 import { IconClipboardList } from '@tabler/icons-vue';
+import TaskbarChipButton from './TaskbarChipButton.vue';
 import { openDesktopPane } from '../lib/floatMinimize.ts';
 import { useIncident } from '../composables/useIncident.ts';
 

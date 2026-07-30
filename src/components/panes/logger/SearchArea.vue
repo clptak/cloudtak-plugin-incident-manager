@@ -413,7 +413,16 @@
                                 :key='a.key'
                             >
                                 <td>{{ a.label }}</td>
-                                <td><code class='small'>{{ a.uuid }}</code></td>
+                                <td>
+                                    <button
+                                        type='button'
+                                        class='btn btn-link p-0 border-0 align-baseline'
+                                        title='Center the map on this feature'
+                                        @click='onFlyTo(a.uuid)'
+                                    >
+                                        <code class='small'>{{ a.uuid }}</code>
+                                    </button>
+                                </td>
                                 <td class='text-end'>
                                     <button
                                         type='button'
@@ -474,6 +483,7 @@ import { parseCoordinates } from '../../../lib/coords.ts';
 import { circleRing, milesToMeters, MILES_TO_METERS } from '../../../lib/rings.ts';
 import { pushPolygonToMission, pushPointToMission, deletePolygonFromMission } from '../../../lib/missionFeatures.ts';
 import type { RingStyle } from '../../../lib/missionFeatures.ts';
+import { flyToFeature } from '../../../lib/flyToFeature.ts';
 import { loadMissionSchema } from '../../../lib/missionSchema.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import NavHelpButton from '../../NavHelpButton.vue';
@@ -758,6 +768,15 @@ async function refreshFeatures(): Promise<void> {
     status.value = '';
     statusError.value = false;
     await loadFeatures();
+}
+
+/** Recenter the main map on a sent area's CoT feature (works from the popout too). */
+async function onFlyTo(uid: string): Promise<void> {
+    const found = await flyToFeature(uid);
+    if (!found) {
+        status.value = 'Feature is not on the map yet — try "Refresh map objects".';
+        statusError.value = true;
+    }
 }
 
 // ---- IPP -------------------------------------------------------------------

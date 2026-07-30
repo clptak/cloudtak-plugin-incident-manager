@@ -18,6 +18,7 @@
         </template>
 
         <template #actions>
+            <PopoutPaneAction />
             <MinimizePaneAction />
         </template>
 
@@ -31,6 +32,7 @@
 import { IconTarget } from '@tabler/icons-vue';
 import FloatingPane from '../../../../src/components/CloudTAK/util/FloatingPane.vue';
 import MinimizePaneAction from './MinimizePaneAction.vue';
+import PopoutPaneAction from './PopoutPaneAction.vue';
 import IncidentManagerPane from './IncidentManagerPane.vue';
 
 defineProps({

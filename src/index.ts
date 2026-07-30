@@ -9,6 +9,7 @@ import {
     cleanupFloatMinimize,
     openDesktopPane,
 } from './lib/floatMinimize.ts';
+import { bindPopout, closePopout } from './lib/popout.ts';
 
 const IncidentManagerFloatShell = defineAsyncComponent(
     () => import('./components/IncidentManagerFloatShell.vue')
@@ -40,6 +41,8 @@ export default class IncidentManagerPlugin implements PluginInstance {
 
     async enable(): Promise<void> {
         const api = this.api;
+
+        bindPopout(api);
 
         bindFloatMinimize({
             api,
@@ -87,6 +90,7 @@ export default class IncidentManagerPlugin implements PluginInstance {
 
     async disable(): Promise<void> {
         this.api.menu.remove('incident-manager');
+        closePopout();
         cleanupFloatMinimize();
         if (this.api.router.hasRoute(ROUTE_NAME)) {
             this.api.router.removeRoute(ROUTE_NAME);
