@@ -9,6 +9,7 @@ import { useMapStore } from '../../../../src/stores/map.ts';
 import { server } from '../../../../src/std.ts';
 import type { Feature } from '../../../../src/types.ts';
 import type Atlas from '../../../../src/workers/atlas.ts';
+import { withMissionFolderDest } from './folder.ts';
 
 export interface RingStyle {
     stroke?: string;
@@ -52,6 +53,7 @@ async function pushFeatureToMission(
     missionGuid: string,
     feat: Feature,
     missionToken?: string,
+    folderUid?: string,
 ): Promise<string> {
     const mapStore = useMapStore();
     await ensureConnOpen(mapStore.worker);
@@ -61,12 +63,22 @@ async function pushFeatureToMission(
         subscribed: true,
     });
 
-    const cot = await COT.load(toPlainFeature(feat), {
+    const plain = toPlainFeature(feat);
+    const cot = await COT.load(plain, {
         mode: OriginMode.MISSION,
         mode_id: missionGuid,
     }, { skipSave: true });
 
-    await sub.feature.update(mapStore.worker as unknown as Atlas, cot);
+    if (folderUid) {
+        // SubscriptionFeature.update overwrites dest to { 'mission-guid' } only,
+        // losing the folder. Send with an explicit dest.path (= layer UID) so
+        // TAK files the CoT into the folder on ingest, and only write locally.
+        await sub.feature.update(mapStore.worker as unknown as Atlas, cot, { skipNetwork: true });
+        await mapStore.worker.conn.sendCOT(withMissionFolderDest(plain, missionGuid, folderUid));
+    } else {
+        await sub.feature.update(mapStore.worker as unknown as Atlas, cot);
+    }
+
     return String(feat.id);
 }
 
@@ -86,6 +98,8 @@ export async function pushPolygonToMission(opts: {
     center: [number, number];
     style?: RingStyle;
     id?: string;
+    /** Mission layer (folder) UID to file the CoT under on ingest. */
+    folderUid?: string;
 }): Promise<string> {
     const now = new Date().toISOString();
     const id = opts.id ?? uuid();
@@ -120,7 +134,7 @@ export async function pushPolygonToMission(opts: {
         },
     } as unknown as Feature;
 
-    return pushFeatureToMission(opts.missionGuid, feat, opts.missionToken);
+    return pushFeatureToMission(opts.missionGuid, feat, opts.missionToken, opts.folderUid);
 }
 
 /**

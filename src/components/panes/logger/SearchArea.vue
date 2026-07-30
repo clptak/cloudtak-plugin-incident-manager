@@ -481,6 +481,7 @@ import { parseCoordinates } from '../../../lib/coords.ts';
 import { circleRing, milesToMeters, MILES_TO_METERS } from '../../../lib/rings.ts';
 import { pushPolygonToMission, pushPointToMission, deletePolygonFromMission } from '../../../lib/missionFeatures.ts';
 import type { RingStyle } from '../../../lib/missionFeatures.ts';
+import { ensureMissionFolder, attachFeaturesToFolder } from '../../../lib/folder.ts';
 import { flyToFeature } from '../../../lib/flyToFeature.ts';
 import FeatureCallsignCell from '../../FeatureCallsignCell.vue';
 import { areaSqMi, formatSqMi } from '../../../lib/geometryArea.ts';
@@ -886,7 +887,8 @@ async function upsertRing(
     miles: number,
     label: string,
     style: RingStyle,
-): Promise<void> {
+    folderUid?: string,
+): Promise<string> {
     const center = ippCenter.value;
     if (!center) throw new Error('No IPP center set.');
     const ring = circleRing(center[0], center[1], milesToMeters(miles));
@@ -900,9 +902,11 @@ async function upsertRing(
         center,
         style,
         id: existing?.uuid,
+        folderUid,
     });
 
     await writeAreaLog(sub, key, label, uuid);
+    return uuid;
 }
 
 async function onPushTheoretical(): Promise<void> {
@@ -934,40 +938,55 @@ async function onPushLpb(): Promise<void> {
     await pushLpb();
 }
 
+/** Mission folder name for the selected LPB category, e.g. "Search-Hiker" → "LPB Hiker". */
+function lpbFolderName(): string {
+    const cat = category.value;
+    const suffix = cat === OTHER_CATEGORY ? 'Other' : cat.slice(cat.indexOf('-') + 1).trim();
+    return `LPB ${suffix}`;
+}
+
 async function pushLpb(): Promise<void> {
     if (!ippCenter.value || !activeMission.value) return;
     pushing.value = true; status.value = ''; statusError.value = false;
     try {
         const sub = await loadSub();
-        let n = 0;
+        const folder = await ensureMissionFolder(sub, lpbFolderName());
+        const postedUids: string[] = [];
         if (category.value === OTHER_CATEGORY) {
             const source = otherSourceType.value.trim() || 'Other';
             for (let i = 0; i < otherRingMiles.value.length; i++) {
                 const miles = otherRingMiles.value[i];
-                await upsertRing(
+                postedUids.push(await upsertRing(
                     sub,
                     `lpb:other:${i}`,
                     miles,
                     `${source} ${miles.toFixed(1)}mi`,
                     LPB_RING_STYLE,
-                );
-                n++;
+                    folder.uid,
+                ));
             }
         } else {
             for (const q of quartiles) {
                 if (!q.selected) continue;
-                await upsertRing(
+                postedUids.push(await upsertRing(
                     sub,
                     `lpb:${q.key}`,
                     q.miles,
                     `${category.value} ${q.pct} (${q.miles.toFixed(1)}mi)`,
                     LPB_RING_STYLE,
-                );
-                n++;
+                    folder.uid,
+                ));
             }
         }
+        // Backup filing in case dest.path was ignored on ingest; best-effort only.
+        try {
+            await attachFeaturesToFolder(sub, folder.uid, postedUids);
+        } catch (attachErr) {
+            console.warn(attachErr);
+        }
         await loadAreas(sub);
-        status.value = `Saved ${n} LPB ring${n === 1 ? '' : 's'} to ${activeMission.value.name}.`;
+        const n = postedUids.length;
+        status.value = `Saved ${n} LPB ring${n === 1 ? '' : 's'} to ${activeMission.value.name} (${lpbFolderName()}).`;
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);
