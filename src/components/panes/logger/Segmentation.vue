@@ -163,6 +163,9 @@ import NavHelpButton from '../../NavHelpButton.vue';
 import FeatureCallsignCell from '../../FeatureCallsignCell.vue';
 import { flyToFeature } from '../../../lib/flyToFeature.ts';
 import { areaSqMi, formatSqMi } from '../../../lib/geometryArea.ts';
+import { ensureMissionFolder } from '../../../lib/folder.ts';
+
+const SEGMENTS_FOLDER = 'Segments';
 
 interface MissionFeatureRef {
     uid: string;
@@ -293,10 +296,11 @@ async function onAddSegments(): Promise<void> {
     status.value = '';
     statusError.value = false;
     try {
+        const addedUids = [...segmentUids.value];
         const next: SegmentMap = { ...segments.value };
         const now = new Date().toISOString();
         let n = 0;
-        for (const uid of segmentUids.value) {
+        for (const uid of addedUids) {
             const poly = missionPolygons.value.find((p) => p.uid === uid);
             next[uid] = {
                 callsign: poly?.callsign ?? uid,
@@ -307,6 +311,15 @@ async function onAddSegments(): Promise<void> {
         contentHash.value = await saveSegmentsToMission(activeMission.value, next, contentHash.value);
         segments.value = next;
         segmentUids.value = [];
+        // Polygons already exist on the mission — direct attach files them into
+        // the folder (same as Mission → Layers drag-drop / Subjective).
+        try {
+            const sub = await loadSub();
+            const folder = await ensureMissionFolder(sub, SEGMENTS_FOLDER);
+            await sub.layer.attachFeatures(folder.uid, addedUids);
+        } catch (attachErr) {
+            console.warn('Failed to file segments into Segments folder', attachErr);
+        }
         status.value = `Saved ${n} segment${n === 1 ? '' : 's'} to ${activeMission.value.name}.`;
     } catch (err) {
         statusError.value = true;
