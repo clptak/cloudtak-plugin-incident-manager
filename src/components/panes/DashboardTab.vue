@@ -427,6 +427,8 @@ import {
 import { resolveSubjects } from '../../lib/subjectsPersistence.ts';
 import { loadWorkAssignmentsFromMission } from '../../lib/workAssignmentPersistence.ts';
 import type { WorkAssignment } from '../../lib/workAssignments.ts';
+import { entryHasRespondents, type TacticRiskMap } from '../../lib/tacticRisk.ts';
+import { tacticAssessmentsFromSchema } from '../../lib/tacticRiskPersistence.ts';
 
 const { activeMission, requireActiveMission } = useIncident();
 
@@ -444,6 +446,7 @@ const initialInfo = ref<IncidentInfoForm | null>(null);
 const teams = ref<DashboardTeamRoster[]>([]);
 const resourceAssignments = ref<ResourceAssignment[]>([]);
 const workAssignments = ref<WorkAssignment[]>([]);
+const tacticAssessments = ref<TacticRiskMap>({});
 const teamsExpanded = ref(true);
 const resourceAssignmentsExpanded = ref(true);
 const workAssignmentsExpanded = ref(true);
@@ -511,7 +514,8 @@ const canExport = computed(
         || teams.value.length > 0
         || resourceAssignments.value.length > 0
         || workAssignments.value.length > 0
-        || displayRows.value.length > 0,
+        || displayRows.value.length > 0
+        || Object.values(tacticAssessments.value).some(entryHasRespondents),
 );
 
 function sortBy(): void {
@@ -640,6 +644,7 @@ async function exportPdf(): Promise<void> {
             teams.value,
             resourceAssignments.value,
             workAssignments.value,
+            tacticAssessments.value,
         );
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
@@ -668,6 +673,7 @@ async function refresh(): Promise<void> {
 
         initialInfo.value = resolveIncidentInfoForm(schema, logs);
         subjects.value = resolveSubjects(schema, logs);
+        tacticAssessments.value = tacticAssessmentsFromSchema(schema);
         teams.value = dashboardTeamsFromOrgChart(
             orgChartLoaded.tree,
             roster?.members ?? [],
@@ -708,6 +714,7 @@ watch(activeMission, (m) => {
         teams.value = [];
         resourceAssignments.value = [];
         workAssignments.value = [];
+        tacticAssessments.value = {};
     }
 }, { immediate: true });
 </script>
