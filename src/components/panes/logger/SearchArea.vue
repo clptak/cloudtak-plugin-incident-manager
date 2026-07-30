@@ -490,6 +490,7 @@ import { useIncident } from '../../../composables/useIncident.ts';
 import NavHelpButton from '../../NavHelpButton.vue';
 
 const SEARCH_AREA_KEYWORD = 'search-area';
+const SEARCH_AREA_FOLDER = 'Search Area';
 const IPP_KEY = 'ipp';
 const IPP_ICON = '83198b4872a8c34eb9c549da8a4de5a28f07821185b39a2277948f66c24ac17a/Wildfire/Fire Origin.png';
 const LPB_RING_STYLE: RingStyle = {
@@ -919,12 +920,19 @@ async function pushTheoretical(): Promise<void> {
     pushing.value = true; status.value = ''; statusError.value = false;
     try {
         const sub = await loadSub();
-        await upsertRing(sub, 'theoretical', theoreticalMiles.value, `Theoretical ${theoreticalMiles.value.toFixed(1)}mi`, {
+        const folder = await ensureMissionFolder(sub, SEARCH_AREA_FOLDER);
+        const uuid = await upsertRing(sub, 'theoretical', theoreticalMiles.value, `Theoretical ${theoreticalMiles.value.toFixed(1)}mi`, {
             stroke: '#ff9900',
             fillOpacity: 0.1,
-        });
+        }, folder.uid);
+        // Backup filing in case dest.path was ignored on ingest; best-effort only.
+        try {
+            await attachFeaturesToFolder(sub, folder.uid, [uuid]);
+        } catch (attachErr) {
+            console.warn(attachErr);
+        }
         await loadAreas(sub);
-        status.value = `Saved theoretical ring (${theoreticalMiles.value.toFixed(1)} mi) to ${activeMission.value.name}.`;
+        status.value = `Saved theoretical ring (${theoreticalMiles.value.toFixed(1)} mi) to ${activeMission.value.name} (${SEARCH_AREA_FOLDER}).`;
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);
@@ -1012,6 +1020,15 @@ async function addSubjective(): Promise<void> {
         const poly = missionPolygons.value.find((p) => p.uid === subjectiveUid.value);
         const label = `Subjective: ${poly?.callsign ?? subjectiveUid.value}`;
         await writeAreaLog(sub, 'subjective', label, subjectiveUid.value);
+        // The polygon already exists in the mission, so a direct attach files it
+        // into the folder immediately (same as Mission → Layers drag-drop).
+        try {
+            const folder = await ensureMissionFolder(sub, SEARCH_AREA_FOLDER);
+            await sub.layer.attachFeatures(folder.uid, [subjectiveUid.value]);
+        } catch (attachErr) {
+            // Log entry is authoritative; polygon may stay where it was.
+            console.warn('Failed to file subjective polygon into Search Area folder', attachErr);
+        }
         await loadAreas(sub);
         status.value = `Saved subjective search area to ${activeMission.value.name}.`;
     } catch (err) {
