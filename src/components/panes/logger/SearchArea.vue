@@ -405,7 +405,7 @@
                         class='table table-sm table-vcenter mb-0'
                     >
                         <thead>
-                            <tr><th>Area</th><th>CoT UID</th><th class='text-end' /></tr>
+                            <tr><th>Area</th><th>Map Object</th><th>Area (mi²)</th><th class='text-end' /></tr>
                         </thead>
                         <tbody>
                             <tr
@@ -414,15 +414,13 @@
                             >
                                 <td>{{ a.label }}</td>
                                 <td>
-                                    <button
-                                        type='button'
-                                        class='btn btn-link p-0 border-0 align-baseline'
-                                        title='Center the map on this feature'
-                                        @click='onFlyTo(a.uuid)'
-                                    >
-                                        <code class='small'>{{ a.uuid }}</code>
-                                    </button>
+                                    <FeatureCallsignCell
+                                        :uid='a.uuid'
+                                        :callsign='callsignForUid(a.uuid, a.label)'
+                                        @fly='onFlyTo(a.uuid)'
+                                    />
                                 </td>
+                                <td>{{ formatSqMi(areaForUid(a.uuid)) }}</td>
                                 <td class='text-end'>
                                     <button
                                         type='button'
@@ -484,6 +482,8 @@ import { circleRing, milesToMeters, MILES_TO_METERS } from '../../../lib/rings.t
 import { pushPolygonToMission, pushPointToMission, deletePolygonFromMission } from '../../../lib/missionFeatures.ts';
 import type { RingStyle } from '../../../lib/missionFeatures.ts';
 import { flyToFeature } from '../../../lib/flyToFeature.ts';
+import FeatureCallsignCell from '../../FeatureCallsignCell.vue';
+import { areaSqMi, formatSqMi } from '../../../lib/geometryArea.ts';
 import { loadMissionSchema } from '../../../lib/missionSchema.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import NavHelpButton from '../../NavHelpButton.vue';
@@ -503,6 +503,7 @@ interface MissionFeatureRef {
     uid: string;
     callsign: string;
     coords?: [number, number];
+    areaSqMi?: number;
 }
 
 /** A search area recalled from a DataSync log entry. */
@@ -738,6 +739,7 @@ async function loadFeatures(sub?: LoadedSub): Promise<void> {
             if (geom.type === 'Point' && Array.isArray(geom.coordinates)) {
                 ref.coords = [geom.coordinates[0], geom.coordinates[1]];
             }
+            ref.areaSqMi = areaSqMi(f.geometry);
             return ref;
         };
         missionMarkers.value = feats.filter((f: Feature) => (f.geometry as { type?: string })?.type === 'Point').map(toRef);
@@ -768,6 +770,18 @@ async function refreshFeatures(): Promise<void> {
     status.value = '';
     statusError.value = false;
     await loadFeatures();
+}
+
+/** Prefer the live feature callsign; fall back to the log label when not loaded. */
+function callsignForUid(uid: string, fallback: string): string {
+    const match = missionMarkers.value.find((m) => m.uid === uid)
+        ?? missionPolygons.value.find((p) => p.uid === uid);
+    return match?.callsign ?? fallback;
+}
+
+/** Polygon area in mi² for a sent area's feature; undefined for points (IPP) or unloaded features. */
+function areaForUid(uid: string): number | undefined {
+    return missionPolygons.value.find((p) => p.uid === uid)?.areaSqMi;
 }
 
 /** Recenter the main map on a sent area's CoT feature (works from the popout too). */

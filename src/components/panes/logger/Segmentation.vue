@@ -82,7 +82,7 @@
                         <thead>
                             <tr>
                                 <th>Segment</th>
-                                <th>CoT UID</th>
+                                <th>Area (mi²)</th>
                                 <th class='text-end' />
                             </tr>
                         </thead>
@@ -91,8 +91,14 @@
                                 v-for='row in segmentRows'
                                 :key='row.uid'
                             >
-                                <td>{{ row.callsign }}</td>
-                                <td><code class='small'>{{ row.uid }}</code></td>
+                                <td>
+                                    <FeatureCallsignCell
+                                        :uid='row.uid'
+                                        :callsign='row.callsign'
+                                        @fly='onFlyTo(row.uid)'
+                                    />
+                                </td>
+                                <td>{{ formatSqMi(areaForUid(row.uid)) }}</td>
                                 <td class='text-end'>
                                     <button
                                         type='button'
@@ -154,10 +160,14 @@ import {
     type SegmentMap,
 } from '../../../lib/segmentsPersistence.ts';
 import NavHelpButton from '../../NavHelpButton.vue';
+import FeatureCallsignCell from '../../FeatureCallsignCell.vue';
+import { flyToFeature } from '../../../lib/flyToFeature.ts';
+import { areaSqMi, formatSqMi } from '../../../lib/geometryArea.ts';
 
 interface MissionFeatureRef {
     uid: string;
     callsign: string;
+    areaSqMi?: number;
 }
 
 interface SegmentRow {
@@ -221,12 +231,30 @@ async function loadFeatures(): Promise<void> {
             })
             .map((f: Feature) => {
                 const props = (f.properties ?? {}) as { callsign?: string };
-                return { uid: String(f.id), callsign: (props.callsign as string).trim() };
+                return {
+                    uid: String(f.id),
+                    callsign: (props.callsign as string).trim(),
+                    areaSqMi: areaSqMi(f.geometry),
+                };
             });
     } catch {
         missionPolygons.value = [];
     } finally {
         loadingFeatures.value = false;
+    }
+}
+
+/** Polygon area in mi² for a segment's feature; undefined until features load. */
+function areaForUid(uid: string): number | undefined {
+    return missionPolygons.value.find((p) => p.uid === uid)?.areaSqMi;
+}
+
+/** Recenter the main map on a segment's CoT feature (works from the popout too). */
+async function onFlyTo(uid: string): Promise<void> {
+    const found = await flyToFeature(uid);
+    if (!found) {
+        status.value = 'Feature is not on the map yet — try "Refresh map objects".';
+        statusError.value = true;
     }
 }
 
