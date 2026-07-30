@@ -2,9 +2,9 @@
 
 import Subscription from '../../../../src/base/subscription.ts';
 import { formatCoordPair } from '../../../../src/base/utils/coordinateFormat.ts';
-import { latestIncidentInfoFromLogs } from './incidentInfo.ts';
 import { parseCoordinates } from './coords.ts';
 import { resolveMissionIppLocation } from './missionIpp.ts';
+import { incidentFormFromSchema, loadMissionSchema } from './missionSchema.ts';
 import {
     blankSubjectForm,
     effectiveSubjectAge,
@@ -185,11 +185,10 @@ export async function loadIrBriefingFromMission(
     const sub = await Subscription.load(missionGuid, { missiontoken: missionToken ?? '' });
     const logs = await sub.log.list({ refresh: true });
 
-    const incident = latestIncidentInfoFromLogs(logs);
-    if (incident) {
-        form.incidentCommander = incident.fields.icCoordinator.trim();
-        form.incidentName = incident.fields.incidentName.trim();
-    }
+    const { schema } = await loadMissionSchema(sub);
+    const incident = incidentFormFromSchema(schema);
+    form.incidentCommander = incident.icCoordinator.trim();
+    form.incidentName = incident.incidentName.trim();
     if (!form.incidentName && missionName) form.incidentName = missionName;
 
     form.operationalPeriod = operationalPeriodFromKeywords(sub.meta.keywords);

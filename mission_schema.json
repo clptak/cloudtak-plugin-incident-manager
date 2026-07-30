@@ -119,7 +119,7 @@
     "incident_response": {
         "incident_name": "",
         "incident_id": "",
-        "indicent_datetime": "",
+        "incident_datetime": "",
         "initial_objectives": [{
             "objective_id": "",
             "objective_description": ""

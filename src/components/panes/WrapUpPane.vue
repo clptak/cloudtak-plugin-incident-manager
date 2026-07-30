@@ -74,13 +74,12 @@
 
 <script setup lang='ts'>
 import { ref } from 'vue';
-import { latestIncidentInfoFromLogs, type MissionLogLike } from '../../lib/incidentInfo.ts';
 import { useIncident } from '../../composables/useIncident.ts';
 import { loadIncidentSubscription } from '../../lib/incidentSubscription.ts';
 import {
+    assignmentDataFromSchema,
     incidentFormFromSchema,
     loadMissionSchema,
-    resolveAssignmentData,
     type MissionSchema,
 } from '../../lib/missionSchema.ts';
 
@@ -102,13 +101,11 @@ function formatGenerationDate(epoch: number): string {
 
 function resolveReportMeta(
     schema: MissionSchema,
-    logs: MissionLogLike[],
 ): { reportNumber: string; icCoordinator: string } {
     const form = incidentFormFromSchema(schema);
-    const saved = latestIncidentInfoFromLogs(logs);
     return {
-        reportNumber: form.incidentId.trim() || saved?.fields.incidentId.trim() || '',
-        icCoordinator: form.icCoordinator.trim() || saved?.fields.icCoordinator.trim() || '',
+        reportNumber: form.incidentId.trim(),
+        icCoordinator: form.icCoordinator.trim(),
     };
 }
 
@@ -202,9 +199,9 @@ async function generate(): Promise<void> {
         const sub = await loadIncidentSubscription(activeMission.value);
         const { schema } = await loadMissionSchema(sub);
         const logs = await sub.log.list({ refresh: true });
-        const assignmentData = resolveAssignmentData(schema, logs);
+        const assignmentData = assignmentDataFromSchema(schema);
         const generatedAt = Date.now();
-        const { reportNumber, icCoordinator } = resolveReportMeta(schema, logs);
+        const { reportNumber, icCoordinator } = resolveReportMeta(schema);
         const sortedLogs = [...logs].sort((a, b) => {
             const ea = parseTime(a.dtg || a.created).epoch;
             const eb = parseTime(b.dtg || b.created).epoch;

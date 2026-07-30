@@ -12,7 +12,6 @@ import {
     type ObjectiveRow,
 } from './incidentPost.ts';
 import {
-    latestIncidentInfoFromLogs,
     normalizeLogKeywords,
     type MissionLogLike,
 } from './incidentInfo.ts';
@@ -28,7 +27,12 @@ import {
     type Ics201TreeOrganization,
 } from './orgChartExport.ts';
 import { loadIncidentSubscription } from './incidentSubscription.ts';
-import { loadMissionSchema } from './missionSchema.ts';
+import {
+    assignmentDataFromSchema,
+    incidentFormFromSchema,
+    loadMissionSchema,
+    type MissionSchema,
+} from './missionSchema.ts';
 import { orgChartFromSchemaValue } from './orgChartPersistence.ts';
 import { treeHasContent } from './hastyTeamTree.ts';
 import { loadResourceAssignmentsFromMission } from './resourceAssignmentPersistence.ts';
@@ -755,10 +759,9 @@ function objectivesFromPost(objectiveRows: ObjectiveRow[]): {
     return { currentObjectives, plannedObjectives };
 }
 
-function situationFromIrBriefingLogs(logs: MissionLogLike[]): string {
-    // IR Briefing is session-only; no dedicated log. Prefer initial-info assignment text.
-    const incident = latestIncidentInfoFromLogs(logs);
-    return incident?.fields.assignmentText.trim() ?? '';
+function situationFromMissionSchema(schema: MissionSchema): string {
+    // IR Briefing is session-only; no dedicated log. Prefer schema assignment text.
+    return assignmentDataFromSchema(schema).text;
 }
 
 function loadObjectiveRowsFromLogs(logs: MissionLogLike[]): ObjectiveRow[] {
@@ -871,15 +874,22 @@ export async function loadIcs201FromMission(
     const sub = await Subscription.load(missionGuid, { missiontoken: missionToken ?? '' });
     const logs = await sub.log.list({ refresh: true });
 
-    const incident = latestIncidentInfoFromLogs(logs);
-    if (incident) {
-        form.incidentName = incident.fields.incidentName.trim();
-        form.incidentNumber = incident.fields.incidentId.trim()
-            || incident.fields.eventId.trim();
-        form.preparedByName = incident.fields.icCoordinator.trim();
-        form.incidentCommanders = incident.fields.icCoordinator.trim();
+    const { schema } = await loadMissionSchema(sub);
+    const incident = incidentFormFromSchema(schema);
+    if (
+        incident.incidentName.trim()
+        || incident.incidentId.trim()
+        || incident.eventId.trim()
+        || incident.icCoordinator.trim()
+        || incident.assignmentText.trim()
+    ) {
+        form.incidentName = incident.incidentName.trim();
+        form.incidentNumber = incident.incidentId.trim()
+            || incident.eventId.trim();
+        form.preparedByName = incident.icCoordinator.trim();
+        form.incidentCommanders = incident.icCoordinator.trim();
         if (!form.situationSummary.trim()) {
-            form.situationSummary = incident.fields.assignmentText.trim();
+            form.situationSummary = incident.assignmentText.trim();
         }
     }
     if (!form.incidentName && missionName) form.incidentName = missionName;
@@ -920,7 +930,7 @@ export async function loadIcs201FromMission(
     const autoResources = form.resources;
 
     if (!form.situationSummary.trim()) {
-        form.situationSummary = situationFromIrBriefingLogs(logs);
+        form.situationSummary = situationFromMissionSchema(schema);
     }
 
     // §9 Current Organization: prefer the live Organization tab chart
@@ -955,13 +965,11 @@ export async function loadIcs201FromMission(
         Object.assign(form, applyPartialIcs201Form(form, saved.form));
         form.logId = saved.logId;
         // Re-apply auto sources that should always refresh from mission
-        if (incident) {
-            if (incident.fields.incidentName.trim()) {
-                form.incidentName = incident.fields.incidentName.trim();
-            }
-            const number = incident.fields.incidentId.trim() || incident.fields.eventId.trim();
-            if (number) form.incidentNumber = number;
+        if (incident.incidentName.trim()) {
+            form.incidentName = incident.incidentName.trim();
         }
+        const number = incident.incidentId.trim() || incident.eventId.trim();
+        if (number) form.incidentNumber = number;
         if (ippLatLng) {
             form.initialPlanningPoint = formatIppAsUtm(ippLatLng.lat, ippLatLng.lng);
         }

@@ -27,7 +27,7 @@ export function applyWorkAssignmentsToSchema(
         schema.incident_response = {
             incident_name: '',
             incident_id: '',
-            indicent_datetime: '',
+            incident_datetime: '',
         };
     }
     (schema.incident_response as Record<string, unknown>).work_assignments = assignments.map(

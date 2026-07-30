@@ -35,7 +35,7 @@ export function applyResourceAssignmentsToSchema(
         schema.incident_response = {
             incident_name: '',
             incident_id: '',
-            indicent_datetime: '',
+            incident_datetime: '',
         };
     }
     (schema.incident_response as Record<string, unknown>).resource_assignments = assignments.map(

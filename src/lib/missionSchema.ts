@@ -82,7 +82,7 @@ export interface MissionSchema {
     incident_response: {
         incident_name: string;
         incident_id: string;
-        indicent_datetime: string;
+        incident_datetime: string;
         [key: string]: unknown;
     };
     assignment: {
@@ -146,8 +146,16 @@ export function defaultMissionSchema(): MissionSchema {
     return JSON.parse(JSON.stringify(missionSchemaTemplate)) as MissionSchema;
 }
 
+/** Prefer corrected key; accept legacy typo from older mission files. */
+export function incidentDatetimeFromSchema(schema: MissionSchema): string {
+    const ir = schema.incident_response as Record<string, unknown>;
+    const modern = typeof ir.incident_datetime === 'string' ? ir.incident_datetime.trim() : '';
+    const legacy = typeof ir.indicent_datetime === 'string' ? ir.indicent_datetime.trim() : '';
+    return modern || legacy;
+}
+
 export function incidentFormFromSchema(schema: MissionSchema): IncidentInfoForm {
-    const conclusionIso = schema.incident_response.indicent_datetime || '';
+    const conclusionIso = incidentDatetimeFromSchema(schema);
     const assignment = schema.assignment ?? { text: '', datetime: '' };
     const assignmentIso = assignment.datetime || '';
     return {
@@ -156,7 +164,7 @@ export function incidentFormFromSchema(schema: MissionSchema): IncidentInfoForm 
         incidentId: schema.incident_id || schema.cad_data.report_number || schema.incident_response.incident_id || '',
         demaMission: schema.dema_mission_number || '',
         icCoordinator: schema.sar_coordinators || '',
-        incidentConclusionTime: conclusionIso ? isoToDatetimeLocal(conclusionIso) : nowDatetimeLocal(),
+        incidentConclusionTime: conclusionIso ? isoToDatetimeLocal(conclusionIso) : '',
         assignmentText: assignment.text || '',
         assignmentDateTime: assignmentIso ? isoToDatetimeLocal(assignmentIso) : nowDatetimeLocal(),
     };
@@ -180,7 +188,7 @@ export function resolveIncidentInfoForm(
         form.incidentId = fillIfEmpty(form.incidentId, f.incidentId);
         form.demaMission = fillIfEmpty(form.demaMission, f.demaMission);
         form.icCoordinator = fillIfEmpty(form.icCoordinator, f.icCoordinator);
-        if (!schema.incident_response.indicent_datetime) {
+        if (!incidentDatetimeFromSchema(schema)) {
             form.incidentConclusionTime = f.incidentConclusionTime;
         }
     }
@@ -267,7 +275,8 @@ export function applyIncidentFormToSchema(
     schema.cad_data.report_number = report;
     schema.incident_response.incident_name = form.incidentName.trim();
     schema.incident_response.incident_id = report;
-    schema.incident_response.indicent_datetime = conclusion;
+    schema.incident_response.incident_datetime = conclusion;
+    delete (schema.incident_response as Record<string, unknown>).indicent_datetime;
 
     if (!schema.assignment) {
         schema.assignment = { text: '', datetime: '' };

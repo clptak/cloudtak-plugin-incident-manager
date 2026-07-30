@@ -104,6 +104,11 @@
                     Active DataSync: <strong>{{ activeMission.name }}</strong>
                 </div>
 
+                <p class='text-muted small mt-2 mb-0'>
+                    Save stores fields in <strong>mission_schema.json</strong>;
+                    Send to DataSync posts a mission log entry.
+                </p>
+
                 <div
                     v-if='demaInvalid'
                     class='form-text text-warning mt-2'
@@ -111,13 +116,22 @@
                     Fix the state mission number format before saving.
                 </div>
 
-                <button
-                    class='btn btn-primary btn-sm mt-3'
-                    :disabled='savingIncident || demaInvalid'
-                    @click='onSaveIncidentInfo'
-                >
-                    {{ savingIncident ? 'Saving…' : 'Save to DataSync' }}
-                </button>
+                <div class='d-flex flex-wrap gap-2 mt-3'>
+                    <button
+                        class='btn btn-primary btn-sm'
+                        :disabled='savingIncident || sendingIncident || demaInvalid'
+                        @click='onSaveIncidentInfo'
+                    >
+                        {{ savingIncident ? 'Saving…' : 'Save' }}
+                    </button>
+                    <button
+                        class='btn btn-outline-secondary btn-sm'
+                        :disabled='sendingIncident || savingIncident || demaInvalid'
+                        @click='onSendIncidentInfo'
+                    >
+                        {{ sendingIncident ? 'Sending…' : 'Send to DataSync' }}
+                    </button>
+                </div>
 
                 <div
                     v-if='incidentStatus'
@@ -346,6 +360,7 @@ const missionSchema = ref<MissionSchema | null>(null);
 const schemaContentHash = ref<string | undefined>();
 const legacySchemaLogId = ref<string | undefined>();
 const savingIncident = ref(false);
+const sendingIncident = ref(false);
 const loadingIncident = ref(false);
 
 const cadText = ref('');
@@ -422,13 +437,24 @@ async function loadIncidentInfo(): Promise<void> {
         applyMissionContextToSchema(loaded.schema, activeMission.value.name);
 
         const saved = latestIncidentInfoFromLogs(logs);
-        if (schemaContentHash.value || legacySchemaLogId.value) {
-            Object.assign(incidentForm, incidentFormFromSchema(loaded.schema));
+        const fromSchema = incidentFormFromSchema(loaded.schema);
+        const schemaHasInfo = !!(
+            fromSchema.incidentName.trim()
+            || fromSchema.eventId.trim()
+            || fromSchema.incidentId.trim()
+            || fromSchema.demaMission.trim()
+            || fromSchema.icCoordinator.trim()
+            || fromSchema.incidentConclusionTime.trim()
+            || fromSchema.assignmentText.trim()
+        );
+        // Prefer mission_schema.json; fall back to initial-information log only when schema has no fields yet.
+        if (schemaContentHash.value || legacySchemaLogId.value || schemaHasInfo) {
+            Object.assign(incidentForm, fromSchema);
             mergeAssignmentIntoForm(
                 incidentForm,
                 loaded.schema,
-                saved?.keywords,
-                saved?.content,
+                schemaHasInfo ? undefined : saved?.keywords,
+                schemaHasInfo ? undefined : saved?.content,
             );
             incidentForm.logId = saved?.logId;
             if (!incidentForm.incidentName.trim()) applySubjectNameSuggestion(logs);
@@ -466,6 +492,11 @@ async function onSaveIncidentInfo(): Promise<void> {
     await saveIncidentInfo();
 }
 
+async function onSendIncidentInfo(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await sendIncidentInfoToDataSync();
+}
+
 async function saveIncidentInfo(): Promise<void> {
     if (!activeMission.value || demaInvalid.value) return;
     savingIncident.value = true;
@@ -474,6 +505,39 @@ async function saveIncidentInfo(): Promise<void> {
     try {
         const sub = await loadSub();
         const missionToken = subscriptionMissionToken(sub, activeMission.value);
+        let schema = missionSchema.value;
+        if (!schema) {
+            const loaded = await loadMissionSchema(sub);
+            schema = loaded.schema;
+            schemaContentHash.value = loaded.contentHash ?? schemaContentHash.value;
+            legacySchemaLogId.value = loaded.legacyLogId ?? legacySchemaLogId.value;
+        }
+        applyIncidentFormToSchema(incidentForm, schema);
+        applyMissionContextToSchema(schema, activeMission.value.name);
+        const savedSchema = await saveMissionSchema(sub, schema, {
+            contentHash: schemaContentHash.value,
+            legacyLogId: legacySchemaLogId.value,
+            missionToken,
+        });
+        schemaContentHash.value = savedSchema.contentHash;
+        legacySchemaLogId.value = undefined;
+        missionSchema.value = schema;
+        incidentStatus.value = `Saved incident information to mission_schema.json on ${activeMission.value.name}.`;
+    } catch (err) {
+        incidentStatusError.value = true;
+        incidentStatus.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        savingIncident.value = false;
+    }
+}
+
+async function sendIncidentInfoToDataSync(): Promise<void> {
+    if (!activeMission.value || demaInvalid.value) return;
+    sendingIncident.value = true;
+    incidentStatus.value = '';
+    incidentStatusError.value = false;
+    try {
+        const sub = await loadSub();
         const body = {
             dtg: new Date().toISOString(),
             content: buildIncidentInfoContent(incidentForm),
@@ -485,36 +549,12 @@ async function saveIncidentInfo(): Promise<void> {
             const created = await sub.log.create(body);
             incidentForm.logId = String(created.id);
         }
-
-        try {
-            let schema = missionSchema.value;
-            if (!schema) {
-                const loaded = await loadMissionSchema(sub);
-                schema = loaded.schema;
-                schemaContentHash.value = loaded.contentHash ?? schemaContentHash.value;
-                legacySchemaLogId.value = loaded.legacyLogId ?? legacySchemaLogId.value;
-            }
-            applyIncidentFormToSchema(incidentForm, schema);
-            applyMissionContextToSchema(schema, activeMission.value.name);
-            const savedSchema = await saveMissionSchema(sub, schema, {
-                contentHash: schemaContentHash.value,
-                legacyLogId: legacySchemaLogId.value,
-                missionToken,
-            });
-            schemaContentHash.value = savedSchema.contentHash;
-            legacySchemaLogId.value = undefined;
-            missionSchema.value = schema;
-            incidentStatus.value = `Saved incident information and mission_schema.json to ${activeMission.value.name}.`;
-        } catch (schemaErr) {
-            incidentStatusError.value = true;
-            const detail = schemaErr instanceof Error ? schemaErr.message : String(schemaErr);
-            incidentStatus.value = `Saved incident log to ${activeMission.value.name}, but mission_schema.json failed: ${detail}`;
-        }
+        incidentStatus.value = `Sent incident information log to ${activeMission.value.name}.`;
     } catch (err) {
         incidentStatusError.value = true;
         incidentStatus.value = err instanceof Error ? err.message : String(err);
     } finally {
-        savingIncident.value = false;
+        sendingIncident.value = false;
     }
 }
 

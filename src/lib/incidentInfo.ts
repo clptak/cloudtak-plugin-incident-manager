@@ -112,7 +112,7 @@ export function blankIncidentInfoForm(): IncidentInfoForm {
         incidentId: '',
         demaMission: '',
         icCoordinator: '',
-        incidentConclusionTime: nowDatetimeLocal(),
+        incidentConclusionTime: '',
         assignmentText: '',
         assignmentDateTime: nowDatetimeLocal(),
     };
@@ -128,7 +128,7 @@ export function fieldsFromLog(keywords?: unknown): IncidentInfoForm {
         incidentId: kwValue(normalized, 'incidentId:'),
         demaMission: kwValue(normalized, 'demaMission:'),
         icCoordinator: kwValue(normalized, 'icCoordinator:'),
-        incidentConclusionTime: conclusionIso ? isoToDatetimeLocal(conclusionIso) : nowDatetimeLocal(),
+        incidentConclusionTime: conclusionIso ? isoToDatetimeLocal(conclusionIso) : '',
         assignmentText: kwValue(normalized, 'assignmentText:'),
         assignmentDateTime: assignmentIso ? isoToDatetimeLocal(assignmentIso) : nowDatetimeLocal(),
     };
