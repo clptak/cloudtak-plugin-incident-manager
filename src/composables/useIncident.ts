@@ -36,6 +36,8 @@ const VALID_NAV_KEYS = new Set([
     'ics-201',
     'search-scenarios',
     'search-area',
+    'segmentation',
+    'initial-consensus',
     'incident-post',
     'generate-report-template',
 ]);

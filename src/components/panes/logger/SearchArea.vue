@@ -378,72 +378,6 @@
                 </div>
             </div>
 
-            <!-- 5 · Segments -->
-            <div class='card mb-3'>
-                <div
-                    class='card-header'
-                    :style='openable(4) ? "cursor:pointer" : "cursor:not-allowed"'
-                    :class='{ "opacity-50": !openable(4) }'
-                    @click='toggle("segments", 4)'
-                >
-                    <h3 class='card-title mb-0 d-flex align-items-center flex-grow-1'>
-                        <span class='me-2'>{{ expanded === 'segments' ? '▾' : '▸' }}</span>
-                        Segments
-                        <span
-                            v-if='stepDone.segments'
-                            class='badge bg-success ms-2'
-                        >added</span>
-                        <span
-                            v-else-if='!openable(4)'
-                            class='ms-2'
-                        >🔒</span>
-                        <span
-                            class='ms-auto d-inline-flex'
-                            @click.stop
-                        >
-                            <NavHelpButton help-key='segmenting-search-area' />
-                        </span>
-                    </h3>
-                </div>
-                <div
-                    v-show='expanded === "segments"'
-                    class='card-body'
-                >
-                    <label class='form-label'>Select segments from the active DataSync (multiple)</label>
-                    <div
-                        class='border rounded p-2'
-                        style='max-height: 240px; overflow:auto;'
-                    >
-                        <div
-                            v-if='!missionPolygons.length'
-                            class='text-muted small'
-                        >
-                            No polygons in the active DataSync.
-                        </div>
-                        <label
-                            v-for='p in missionPolygons'
-                            :key='p.uid'
-                            class='d-flex gap-2 align-items-center py-1'
-                            style='cursor:pointer'
-                        >
-                            <input
-                                v-model='segmentUids'
-                                type='checkbox'
-                                :value='p.uid'
-                                class='form-check-input'
-                            >
-                            <span>{{ p.callsign }}</span>
-                        </label>
-                    </div>
-                    <button
-                        class='btn btn-primary btn-sm mt-2'
-                        :disabled='!segmentUids.length || pushing'
-                        @click='onAddSegments'
-                    >
-                        Add {{ segmentUids.length }} segment{{ segmentUids.length === 1 ? '' : 's' }} to DataSync
-                    </button>
-                </div>
-            </div>
         </div>
 
         <!-- Recall: areas already on DataSync -->
@@ -563,7 +497,7 @@ interface MissionFeatureRef {
 
 /** A search area recalled from a DataSync log entry. */
 interface SentArea {
-    key: string;       // stable identity, e.g. 'theoretical', 'lpb:A', 'segment:<uuid>'
+    key: string;       // stable identity, e.g. 'theoretical', 'lpb:A'
     label: string;     // callsign / display text
     uuid: string;      // CoT uuid of the referenced feature (entryUid)
     logId: string;     // mission-log entry id
@@ -602,7 +536,6 @@ const loadingFeatures = ref(false);
 const settingIpp = ref(false);
 
 const subjectiveUid = ref('');
-const segmentUids = ref<string[]>([]);
 
 const categories = table.map((t) => t.category);
 const category = ref<string>(categories[0]);
@@ -672,7 +605,7 @@ async function loadSub(): Promise<LoadedSub> {
 
 // ---- Sequential accordion state -------------------------------------------
 
-const STEPS = ['ipp', 'theoretical', 'statistical', 'subjective', 'segments'] as const;
+const STEPS = ['ipp', 'theoretical', 'statistical', 'subjective'] as const;
 type StepKey = typeof STEPS[number];
 
 const expanded = ref<StepKey | ''>('ipp');
@@ -682,7 +615,6 @@ const stepDone = computed(() => ({
     theoretical: sentAreas.value.some((a) => a.key === 'theoretical'),
     statistical: sentAreas.value.some((a) => a.key.startsWith('lpb:')),
     subjective: sentAreas.value.some((a) => a.key === 'subjective'),
-    segments: sentAreas.value.some((a) => a.key.startsWith('segment:')),
 }));
 
 /** Index of the current (first not-yet-done) step; === STEPS.length when all done. */
@@ -736,7 +668,8 @@ async function loadAreas(sub?: LoadedSub): Promise<void> {
             if (!log.keywords?.includes(SEARCH_AREA_KEYWORD)) continue;
             const key = kw(log.keywords, 'area:');
             const uuid = kw(log.keywords, 'uid:');
-            if (!key || !uuid) continue;
+            // Segments moved to mission_schema.json; skip legacy segment logs here.
+            if (!key || !uuid || key.startsWith('segment:')) continue;
             const created = log.created || log.dtg || '';
             const prev = byKey.get(key);
             if (!prev || Date.parse(created) >= Date.parse(prev.created)) {
@@ -759,7 +692,6 @@ function rank(key: string): number {
     if (key === 'theoretical') return 1;
     if (key.startsWith('lpb:')) return 2;
     if (key === 'subjective') return 3;
-    if (key.startsWith('segment:')) return 4;
     return 9;
 }
 
@@ -996,7 +928,7 @@ async function pushLpb(): Promise<void> {
     }
 }
 
-// ---- Subjective & Segments (reference existing mission polygons) -----------
+// ---- Subjective (reference existing mission polygons) ---------------------
 
 const canAddSubjective = computed(() => !!subjectiveUid.value);
 
@@ -1023,33 +955,6 @@ async function addSubjective(): Promise<void> {
     }
 }
 
-async function onAddSegments(): Promise<void> {
-    if (!requireActiveMission()) return;
-    await addSegments();
-}
-
-async function addSegments(): Promise<void> {
-    if (!activeMission.value || !segmentUids.value.length) return;
-    pushing.value = true; status.value = ''; statusError.value = false;
-    try {
-        const sub = await loadSub();
-        let n = 0;
-        for (const uid of segmentUids.value) {
-            const poly = missionPolygons.value.find((p) => p.uid === uid);
-            await writeAreaLog(sub, `segment:${uid}`, `Segment: ${poly?.callsign ?? uid}`, uid);
-            n++;
-        }
-        segmentUids.value = [];
-        await loadAreas(sub);
-        status.value = `Saved ${n} segment${n === 1 ? '' : 's'} to ${activeMission.value.name}.`;
-    } catch (err) {
-        statusError.value = true;
-        status.value = err instanceof Error ? err.message : String(err);
-    } finally {
-        pushing.value = false;
-    }
-}
-
 // ---- Remove ----------------------------------------------------------------
 
 /** Remove a search area: delete its log entry and (for rings/markers we created) the feature. */
@@ -1060,8 +965,8 @@ async function removeArea(area: SentArea): Promise<void> {
         const sub = await loadSub();
         const log = sub.log as unknown as LogApi;
         await log.delete(area.logId);
-        // Best-effort: drop the feature from the mission map. Subjective/segments
-        // reference user-drawn polygons, so leave those in place.
+        // Best-effort: drop the feature from the mission map. Subjective
+        // references user-drawn polygons, so leave those in place.
         const ownsFeature = area.key === 'theoretical' || area.key.startsWith('lpb:') || area.key === IPP_KEY;
         if (ownsFeature) {
             try {

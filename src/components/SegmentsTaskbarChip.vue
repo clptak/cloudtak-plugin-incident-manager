@@ -2,7 +2,7 @@
     <button
         type='button'
         class='btn btn-sm btn-outline-light d-flex align-items-center gap-2 text-nowrap'
-        title='Open Search Area'
+        title='Open Segmentation'
         @click='openSegments'
     >
         <IconPolygon
@@ -22,6 +22,6 @@ const { selectKeyGuarded } = useIncident();
 
 function openSegments(): void {
     openDesktopPane();
-    selectKeyGuarded('search-area');
+    selectKeyGuarded('segmentation');
 }
 </script>

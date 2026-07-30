@@ -162,5 +162,6 @@
     "assignments_org_chart": {},
     "risk": {
         "tactic_assessments": {}
-    }
+    },
+    "segments": {}
 }

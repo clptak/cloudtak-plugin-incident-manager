@@ -40,6 +40,8 @@ export const NAV_SECTIONS: NavSection[] = [
         label: 'Search Transition',
         items: [
             { key: 'search-area', label: 'Search Area', helpKey: 'establishing-search-area' },
+            { key: 'segmentation', label: 'Segmentation', helpKey: 'segmenting-search-area' },
+            { key: 'initial-consensus', label: 'Initial Consensus' },
         ],
     },
     {

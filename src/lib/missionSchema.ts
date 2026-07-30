@@ -34,6 +34,13 @@ export interface MissionLogEntry {
     lon: string | number;
 }
 
+/** A search segment registered against a mission polygon CoT uid. */
+export interface SegmentRecord {
+    callsign: string;
+    created: string;
+    [key: string]: unknown;
+}
+
 export interface MissionSchema {
     event_id: string;
     incident_id: string;
@@ -86,6 +93,8 @@ export interface MissionSchema {
     assignments_org_chart?: Record<string, unknown>;
     /** Risk assessments keyed by assignment CoT uid (tactic_assessments map). */
     risk?: Record<string, unknown>;
+    /** Search segments keyed by CoT feature UUID. */
+    segments?: Record<string, SegmentRecord>;
     [key: string]: unknown;
 }
 

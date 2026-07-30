@@ -7,6 +7,17 @@
         <InitialInformation v-if='sub === "initial-information"' />
         <SubjectInformation v-else-if='sub === "subject-info"' />
         <SearchArea v-else-if='sub === "search-area"' />
+        <Segmentation v-else-if='sub === "segmentation"' />
+        <div
+            v-else-if='sub === "initial-consensus"'
+            class='card'
+        >
+            <div class='card-body'>
+                <p class='text-muted mb-0'>
+                    Coming Soon
+                </p>
+            </div>
+        </div>
         <SearchUrgency v-else-if='sub === "search-urgency"' />
         <IrBriefing v-else-if='sub === "ir-briefing"' />
         <Ics201 v-else-if='sub === "ics-201"' />
@@ -33,6 +44,7 @@ import { computed, defineAsyncComponent } from 'vue';
 const InitialInformation = defineAsyncComponent(() => import('./logger/InitialInformation.vue'));
 const SubjectInformation = defineAsyncComponent(() => import('./logger/SubjectInformation.vue'));
 const SearchArea = defineAsyncComponent(() => import('./logger/SearchArea.vue'));
+const Segmentation = defineAsyncComponent(() => import('./logger/Segmentation.vue'));
 const SearchUrgency = defineAsyncComponent(() => import('./logger/SearchUrgency.vue'));
 const IrBriefing = defineAsyncComponent(() => import('./logger/IrBriefing.vue'));
 const Ics201 = defineAsyncComponent(() => import('./logger/Ics201.vue'));
@@ -46,6 +58,8 @@ const labels: Record<string, string> = {
     'initial-information': 'Initial Information',
     'subject-info': 'Subject Information',
     'search-area': 'Search Area',
+    segmentation: 'Segmentation',
+    'initial-consensus': 'Initial Consensus',
     'search-urgency': 'Search Urgency',
     'ir-briefing': 'IR Briefing',
     'ics-201': 'ICS 201',
