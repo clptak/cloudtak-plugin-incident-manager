@@ -15,8 +15,9 @@
         </div>
         <div class='card-body'>
             <p class='text-muted small mb-3'>
-                Enter details for one or more missing subjects. Each subject is saved as a single
-                DataSync log entry (non-empty fields only) keyed by subject number.
+                Enter details for one or more missing subjects.
+                Send posts each filled subject as a DataSync log entry and upserts it into
+                <strong>mission_schema.json</strong> (<code>incident_response.subjects</code>).
             </p>
 
             <div
@@ -449,6 +450,12 @@ import {
     subjectNumberFromLog,
     type SubjectForm,
 } from '../../../lib/subjectInfo.ts';
+import {
+    resolveSubjects,
+    saveSubjectsToMission,
+} from '../../../lib/subjectsPersistence.ts';
+import { loadMissionSchema } from '../../../lib/missionSchema.ts';
+import { loadIncidentSubscription } from '../../../lib/incidentSubscription.ts';
 
 const { activeMission, requireActiveMission } = useIncident();
 
@@ -615,7 +622,7 @@ function rebuildDraftsFromSent(): void {
     }
 
     drafts.value = sentSubjects.value.map((s, i) =>
-        newDraft({ ...s.fields, subjectCaseID: s.number, logId: s.id }, i === 0),
+        newDraft({ ...s.fields, subjectCaseID: s.number, logId: s.id || undefined }, i === 0),
     );
 
     const used = new Set(drafts.value.map((d) => d.form.subjectCaseID));
@@ -671,20 +678,20 @@ async function loadSent(): Promise<void> {
         return;
     }
     loadingSent.value = true;
+    statusError.value = false;
     try {
-        const sub = await Subscription.load(activeMission.value.guid, {
-            missiontoken: activeMission.value.token ?? '',
-        });
+        const sub = await loadIncidentSubscription(activeMission.value);
         const logs = await sub.log.list({ refresh: true });
+        const loaded = await loadMissionSchema(sub);
 
-        const byNumber = new Map<string, SentSubject>();
+        const logByNumber = new Map<string, SentSubject>();
         for (const log of logs) {
             const number = subjectNumberFromLog(log.keywords);
             if (!number) continue;
             const created = log.created || log.dtg || '';
-            const prev = byNumber.get(number);
+            const prev = logByNumber.get(number);
             if (!prev || Date.parse(created) >= Date.parse(prev.created)) {
-                byNumber.set(number, {
+                logByNumber.set(number, {
                     number,
                     content: log.content || '',
                     created,
@@ -693,9 +700,24 @@ async function loadSent(): Promise<void> {
                 });
             }
         }
-        sentSubjects.value = [...byNumber.values()].sort(
-            (a, b) => Number.parseInt(a.number, 10) - Number.parseInt(b.number, 10),
-        );
+
+        const resolved = resolveSubjects(loaded.schema, logs);
+        if (resolved.length) {
+            sentSubjects.value = resolved.map((s) => {
+                const log = logByNumber.get(s.subjectCaseID);
+                return {
+                    number: s.subjectCaseID,
+                    content: log?.content || '',
+                    created: log?.created || '',
+                    id: log?.id || '',
+                    fields: { ...s, logId: log?.id },
+                };
+            });
+        } else {
+            sentSubjects.value = [...logByNumber.values()].sort(
+                (a, b) => Number.parseInt(a.number, 10) - Number.parseInt(b.number, 10),
+            );
+        }
         rebuildDraftsFromSent();
     } catch (err) {
         statusError.value = true;
@@ -727,10 +749,9 @@ async function send(): Promise<void> {
     let created = 0;
     let updated = 0;
     let failed = 0;
+    const succeeded: SubjectForm[] = [];
     try {
-        const sub = await Subscription.load(activeMission.value.guid, {
-            missiontoken: activeMission.value.token ?? '',
-        });
+        const sub = await loadIncidentSubscription(activeMission.value);
         for (const draft of filledDrafts.value) {
             const f = draft.form;
             const existing = sentSubjects.value.find((s) => s.number === f.subjectCaseID);
@@ -744,19 +765,40 @@ async function send(): Promise<void> {
                     await sub.log.update(f.logId || existing!.id, body);
                     updated++;
                 } else {
-                    await sub.log.create(body);
+                    const createdLog = await sub.log.create(body);
+                    f.logId = String(createdLog.id);
                     created++;
                 }
+                succeeded.push({ ...f });
             } catch {
                 failed++;
             }
         }
-        statusError.value = failed > 0;
+
+        let schemaOk = true;
+        let schemaDetail = '';
+        if (succeeded.length) {
+            try {
+                await saveSubjectsToMission(activeMission.value, succeeded);
+            } catch (schemaErr) {
+                schemaOk = false;
+                schemaDetail = schemaErr instanceof Error ? schemaErr.message : String(schemaErr);
+            }
+        }
+
+        statusError.value = failed > 0 || !schemaOk;
         const parts: string[] = [];
         if (created) parts.push(`${created} new`);
         if (updated) parts.push(`${updated} updated`);
-        status.value = `Saved ${parts.join(', ') || '0'} to ${activeMission.value.name}`
-            + (failed ? `, ${failed} failed.` : '.');
+        let msg = `Saved ${parts.join(', ') || '0'} to DataSync on ${activeMission.value.name}`;
+        if (succeeded.length && schemaOk) {
+            msg += ' and updated mission_schema.json';
+        }
+        msg += failed ? `, ${failed} failed.` : '.';
+        if (!schemaOk) {
+            msg += ` Schema update failed: ${schemaDetail}`;
+        }
+        status.value = msg;
         await loadSent();
     } catch (err) {
         statusError.value = true;

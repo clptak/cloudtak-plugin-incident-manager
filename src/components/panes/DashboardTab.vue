@@ -420,11 +420,11 @@ import { loadResourceAssignmentsFromMission } from '../../lib/resourceAssignment
 import type { ResourceAssignment } from '../../lib/resourceAssignments.ts';
 import {
     displaySubjectNumber,
-    parseSubjectsFromLogs,
     subjectDetailRows,
     SUBJECT_KEYWORD,
     type ParsedSubject,
 } from '../../lib/subjectInfo.ts';
+import { resolveSubjects } from '../../lib/subjectsPersistence.ts';
 import { loadWorkAssignmentsFromMission } from '../../lib/workAssignmentPersistence.ts';
 import type { WorkAssignment } from '../../lib/workAssignments.ts';
 
@@ -667,7 +667,7 @@ async function refresh(): Promise<void> {
         ]);
 
         initialInfo.value = resolveIncidentInfoForm(schema, logs);
-        subjects.value = parseSubjectsFromLogs(logs);
+        subjects.value = resolveSubjects(schema, logs);
         teams.value = dashboardTeamsFromOrgChart(
             orgChartLoaded.tree,
             roster?.members ?? [],

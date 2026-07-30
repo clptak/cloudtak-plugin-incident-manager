@@ -4,15 +4,15 @@ import Subscription from '../../../../src/base/subscription.ts';
 import { formatCoordPair } from '../../../../src/base/utils/coordinateFormat.ts';
 import { parseCoordinates } from './coords.ts';
 import { resolveMissionIppLocation } from './missionIpp.ts';
-import { incidentFormFromSchema, loadMissionSchema } from './missionSchema.ts';
+import { incidentFormFromSchema, loadMissionSchema, type MissionSchema } from './missionSchema.ts';
 import {
     blankSubjectForm,
     effectiveSubjectAge,
     fieldsFromLog,
-    parseSubjectsFromLogs,
     subjectNumberFromLog,
     type SubjectForm,
 } from './subjectInfo.ts';
+import { resolveSubjects } from './subjectsPersistence.ts';
 
 export const DEFAULT_SAFETY_MESSAGE = [
     'Stay warm.',
@@ -161,8 +161,11 @@ export async function resolveIppLatLng(
     return parseCoordinates(location);
 }
 
-function subjectsByNumber(logs: { keywords?: string[] }[]): Map<string, SubjectForm> {
-    const parsed = parseSubjectsFromLogs(logs);
+function subjectsByNumber(
+    schema: MissionSchema,
+    logs: { keywords?: string[] }[],
+): Map<string, SubjectForm> {
+    const parsed = resolveSubjects(schema, logs);
     const map = new Map<string, SubjectForm>();
     for (const s of parsed) map.set(s.subjectCaseID, s);
     return map;
@@ -199,7 +202,7 @@ export async function loadIrBriefingFromMission(
         form.initialPlanningPoint = formatIppAsUtm(ippLatLng.lat, ippLatLng.lng);
     }
 
-    const byNumber = subjectsByNumber(logs);
+    const byNumber = subjectsByNumber(schema, logs);
     BRIEFING_SUBJECT_NUMBERS.forEach((num, i) => {
         const subject = byNumber.get(num) ?? blankSubjectForm(num);
         form.subjects[i] = subjectToColumn(subject);
