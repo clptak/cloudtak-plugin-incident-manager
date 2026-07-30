@@ -1,7 +1,8 @@
 /**
- * Shared tactic risk assessments: GAR Model + Complacency Model respondents
+ * Shared tactic risk assessments: GAR + Complacency + SPE Model respondents
  * keyed by assignment CoT uid (or `tactic:<uuid>`).
- * See docs/GARModelWorksheet_v20230103.pdf and docs/risk-assessment_complancy-model.md.
+ * See docs/GARModelWorksheet_v20230103.pdf, docs/risk-assessment_complancy-model.md,
+ * and docs/risk-assessment_spe-model.md.
  */
 
 import {
@@ -10,8 +11,12 @@ import {
     type RiskBand,
     type RiskLevel,
 } from './complacencyRisk.ts';
+import {
+    normalizeSpeRespondent,
+    type SpeRiskRespondent,
+} from './speRisk.ts';
 
-export type { RiskBand, RiskLevel, ComplacencyRiskRespondent };
+export type { RiskBand, RiskLevel, ComplacencyRiskRespondent, SpeRiskRespondent };
 export {
     CONFIDENCE_OPTIONS,
     EXPERIENCE_OPTIONS,
@@ -19,7 +24,12 @@ export {
     riskLevelForScore,
     type FactorOption,
 } from './complacencyRisk.ts';
-
+export {
+    EXPOSURE_OPTIONS,
+    PROBABILITY_OPTIONS,
+    SEVERITY_OPTIONS,
+    speLevelForScore,
+} from './speRisk.ts';
 export type GarFactorKey =
     | 'supervision'
     | 'planning'
@@ -133,6 +143,7 @@ export interface TacticRiskEntry {
     description: string;
     complacencyRespondents: ComplacencyRiskRespondent[];
     garRespondents: GarRiskRespondent[];
+    speRespondents: SpeRiskRespondent[];
 }
 
 export type TacticRiskMap = Record<string, TacticRiskEntry>;
@@ -256,9 +267,16 @@ function normalizeGarList(raw: unknown): GarRiskRespondent[] {
         .filter((x): x is GarRiskRespondent => x != null);
 }
 
+function normalizeSpeList(raw: unknown): SpeRiskRespondent[] {
+    if (!Array.isArray(raw)) return [];
+    return raw
+        .map(normalizeSpeRespondent)
+        .filter((x): x is SpeRiskRespondent => x != null);
+}
+
 /**
- * Accepts shared shape (complacency_respondents / gar_respondents) and legacy
- * complacency-only entries (respondents or top-level factors).
+ * Accepts shared shape (complacency_respondents / gar_respondents / spe_respondents)
+ * and legacy complacency-only entries (respondents or top-level factors).
  */
 export function normalizeTacticRiskEntry(raw: unknown): TacticRiskEntry | null {
     if (!raw || typeof raw !== 'object') return null;
@@ -268,6 +286,7 @@ export function normalizeTacticRiskEntry(raw: unknown): TacticRiskEntry | null {
         r.complacency_respondents ?? r.complacencyRespondents,
     );
     const garRespondents = normalizeGarList(r.gar_respondents ?? r.garRespondents);
+    const speRespondents = normalizeSpeList(r.spe_respondents ?? r.speRespondents);
 
     if (!complacencyRespondents.length) {
         if (Array.isArray(r.respondents)) {
@@ -278,7 +297,9 @@ export function normalizeTacticRiskEntry(raw: unknown): TacticRiskEntry | null {
         }
     }
 
-    if (!complacencyRespondents.length && !garRespondents.length) return null;
+    if (!complacencyRespondents.length && !garRespondents.length && !speRespondents.length) {
+        return null;
+    }
 
     return {
         assignmentUid: String(r.assignmentUid ?? '').trim(),
@@ -287,6 +308,7 @@ export function normalizeTacticRiskEntry(raw: unknown): TacticRiskEntry | null {
         description: String(r.description ?? '').trim(),
         complacencyRespondents,
         garRespondents,
+        speRespondents,
     };
 }
 
@@ -320,6 +342,9 @@ export function mergeLegacyComplacencyAssessments(
                 garRespondents: out[key].garRespondents.length
                     ? out[key].garRespondents
                     : entry.garRespondents,
+                speRespondents: out[key].speRespondents.length
+                    ? out[key].speRespondents
+                    : entry.speRespondents,
             };
         } else {
             out[key] = entry;
@@ -337,6 +362,7 @@ export function tacticEntryToSchemaRecord(entry: TacticRiskEntry): Record<string
         description: entry.description,
         complacency_respondents: entry.complacencyRespondents,
         gar_respondents: entry.garRespondents,
+        spe_respondents: entry.speRespondents,
     };
 }
 
@@ -382,6 +408,25 @@ export function worstGarRespondent(entry: TacticRiskEntry): GarRiskRespondent | 
     return worst;
 }
 
+/** Higher band wins; within band, higher score is worse for SPE. */
+export function worstSpeRespondent(entry: TacticRiskEntry): SpeRiskRespondent | null {
+    let worst: SpeRiskRespondent | null = null;
+    for (const r of entry.speRespondents) {
+        if (!worst) {
+            worst = r;
+            continue;
+        }
+        const band = BAND_SEVERITY[r.band];
+        const worstBand = BAND_SEVERITY[worst.band];
+        if (band > worstBand || (band === worstBand && r.score > worst.score)) {
+            worst = r;
+        }
+    }
+    return worst;
+}
+
 export function entryHasRespondents(entry: TacticRiskEntry): boolean {
-    return entry.complacencyRespondents.length > 0 || entry.garRespondents.length > 0;
+    return entry.complacencyRespondents.length > 0
+        || entry.garRespondents.length > 0
+        || entry.speRespondents.length > 0;
 }

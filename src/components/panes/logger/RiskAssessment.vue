@@ -36,7 +36,7 @@
                                 <th class='d-none d-md-table-cell'>
                                     Detail
                                 </th>
-                                <th style='width: 160px;' />
+                                <th style='width: 220px;' />
                             </tr>
                         </thead>
                         <tbody
@@ -57,6 +57,11 @@
                                             class='badge ms-2'
                                             :class='bandBadgeClass(group.worstComp.band)'
                                         >Comp worst: {{ group.worstComp.score }} — {{ group.worstComp.level }}</span>
+                                        <span
+                                            v-if='group.worstSpe'
+                                            class='badge ms-2'
+                                            :class='bandBadgeClass(group.worstSpe.band)'
+                                        >SPE worst: {{ group.worstSpe.score }} — {{ group.worstSpe.level }}</span>
                                     </div>
                                     <div
                                         v-if='group.entry.description'
@@ -87,6 +92,15 @@
                                         @click='onCompAddRespondent(group.key)'
                                     >
                                         + Comp
+                                    </button>
+                                    <button
+                                        type='button'
+                                        class='btn btn-outline-primary btn-sm me-1'
+                                        :disabled='busy'
+                                        title='Add an SPE respondent for this tactic'
+                                        @click='onSpeAddRespondent(group.key)'
+                                    >
+                                        + SPE
                                     </button>
                                     <button
                                         type='button'
@@ -178,6 +192,48 @@
                                         class='btn btn-outline-danger btn-sm'
                                         :disabled='busy'
                                         @click='onCompDeleteRespondent(group.key, resp.id)'
+                                    >
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr
+                                v-for='resp in group.entry.speRespondents'
+                                :key='`spe-${resp.id}`'
+                            >
+                                <td>
+                                    <span class='badge bg-secondary-lt text-secondary'>SPE</span>
+                                </td>
+                                <td>{{ resp.name || '(unnamed)' }}</td>
+                                <td class='fw-bold'>
+                                    {{ resp.score }}
+                                </td>
+                                <td>
+                                    <span
+                                        class='badge'
+                                        :class='bandBadgeClass(resp.band)'
+                                    >{{ resp.level }}</span>
+                                    <div class='text-muted small'>
+                                        {{ resp.recommendation }}
+                                    </div>
+                                </td>
+                                <td class='d-none d-md-table-cell text-muted small'>
+                                    {{ resp.severity }} &times; {{ resp.probability }} &times; {{ resp.exposure }}
+                                </td>
+                                <td class='text-end'>
+                                    <button
+                                        type='button'
+                                        class='btn btn-outline-secondary btn-sm me-1'
+                                        :disabled='busy'
+                                        @click='onSpeEdit(group.key, resp.id)'
+                                    >
+                                        Edit
+                                    </button>
+                                    <button
+                                        type='button'
+                                        class='btn btn-outline-danger btn-sm'
+                                        :disabled='busy'
+                                        @click='onSpeDeleteRespondent(group.key, resp.id)'
                                     >
                                         Delete
                                     </button>
@@ -616,6 +672,225 @@
             </div>
         </div>
 
+        <!-- SPE Model -->
+        <div class='card mb-3'>
+            <div
+                class='card-header d-flex align-items-center cursor-pointer user-select-none'
+                role='button'
+                tabindex='0'
+                :aria-expanded='speExpanded'
+                @click='speExpanded = !speExpanded'
+                @keydown.enter.prevent='speExpanded = !speExpanded'
+                @keydown.space.prevent='speExpanded = !speExpanded'
+            >
+                <h3 class='card-title mb-0'>
+                    SPE Model
+                </h3>
+                <IconChevronDown
+                    class='ms-auto transition-transform'
+                    :class='{ "rotate-180": !speExpanded }'
+                    :size='20'
+                    stroke='1.5'
+                />
+            </div>
+            <div
+                v-show='speExpanded'
+                class='card-body'
+            >
+                <p class='text-muted small mb-3'>
+                    Risk = Severity &times; Probability &times; Exposure.
+                    Compare the result to the SPE Guidance Table (Table 18.1).
+                </p>
+
+                <div class='row g-2 mb-2'>
+                    <div class='col-md-6'>
+                        <label class='form-label small mb-1'>Tactic</label>
+                        <select
+                            v-model='spe.tacticChoice'
+                            class='form-select form-select-sm'
+                            :disabled='busy'
+                        >
+                            <option value=''>
+                                {{ assignmentOptions.length ? 'Select a tactic…' : 'No assignments yet — use New Tactic' }}
+                            </option>
+                            <option
+                                v-for='opt in assignmentOptions'
+                                :key='opt.id'
+                                :value='opt.id'
+                            >
+                                {{ opt.label }}
+                            </option>
+                            <option value='__new__'>
+                                New Tactic…
+                            </option>
+                        </select>
+                    </div>
+                    <div
+                        v-if='spe.tacticChoice === "__new__"'
+                        class='col-md-6'
+                    >
+                        <label class='form-label small mb-1'>New Tactic</label>
+                        <input
+                            v-model='spe.newTacticLabel'
+                            type='text'
+                            class='form-control form-control-sm'
+                            placeholder='e.g. Hasty search of likely routes from PLS'
+                            :disabled='busy'
+                        >
+                    </div>
+                </div>
+
+                <div class='mb-2'>
+                    <label class='form-label small mb-1'>Description</label>
+                    <textarea
+                        v-model='spe.description'
+                        class='form-control form-control-sm'
+                        rows='2'
+                        placeholder='Task being assessed, conditions, team notes…'
+                        :disabled='busy'
+                    />
+                </div>
+
+                <div class='mb-3'>
+                    <label class='form-label small mb-1'>Respondent</label>
+                    <input
+                        v-model='spe.respondentName'
+                        type='text'
+                        class='form-control form-control-sm'
+                        placeholder='Name or callsign of the person assessing'
+                        :disabled='busy'
+                    >
+                </div>
+
+                <div class='row g-2 mb-3'>
+                    <div class='col-md-4'>
+                        <label class='form-label small mb-1'>Severity</label>
+                        <select
+                            v-model.number='spe.severity'
+                            class='form-select form-select-sm'
+                            :disabled='busy'
+                        >
+                            <option :value='0'>
+                                Select…
+                            </option>
+                            <option
+                                v-for='opt in SEVERITY_OPTIONS'
+                                :key='opt.value'
+                                :value='opt.value'
+                            >
+                                {{ opt.value }} — {{ opt.label }}
+                            </option>
+                        </select>
+                    </div>
+                    <div class='col-md-4'>
+                        <label class='form-label small mb-1'>Probability</label>
+                        <select
+                            v-model.number='spe.probability'
+                            class='form-select form-select-sm'
+                            :disabled='busy'
+                        >
+                            <option :value='0'>
+                                Select…
+                            </option>
+                            <option
+                                v-for='opt in PROBABILITY_OPTIONS'
+                                :key='opt.value'
+                                :value='opt.value'
+                            >
+                                {{ opt.value }} — {{ opt.label }}
+                            </option>
+                        </select>
+                    </div>
+                    <div class='col-md-4'>
+                        <label class='form-label small mb-1'>Exposure</label>
+                        <select
+                            v-model.number='spe.exposure'
+                            class='form-select form-select-sm'
+                            :disabled='busy'
+                        >
+                            <option :value='0'>
+                                Select…
+                            </option>
+                            <option
+                                v-for='opt in EXPOSURE_OPTIONS'
+                                :key='opt.value'
+                                :value='opt.value'
+                            >
+                                {{ opt.value }} — {{ opt.label }}
+                            </option>
+                        </select>
+                    </div>
+                </div>
+
+                <div
+                    v-if='speResult'
+                    class='border rounded p-2 mb-3'
+                >
+                    <div class='d-flex align-items-center gap-2 mb-2'>
+                        <span class='fw-bold fs-3'>{{ speResult.score }}</span>
+                        <span
+                            class='badge'
+                            :class='bandBadgeClass(speResult.band)'
+                        >{{ speResult.label }}</span>
+                        <span class='small'>{{ speResult.recommendation }}</span>
+                    </div>
+                    <div
+                        class='progress'
+                        style='height: 8px;'
+                    >
+                        <div
+                            class='progress-bar'
+                            :class='bandBarClass(speResult.band)'
+                            :style='{ width: `${speResult.score}%` }'
+                        />
+                    </div>
+                    <div
+                        class='d-flex justify-content-between text-muted mt-1'
+                        style='font-size: 0.7rem;'
+                    >
+                        <span>1–19 Slight</span>
+                        <span>20–39 Possible</span>
+                        <span>40–59 Substantial</span>
+                        <span>60–79 High</span>
+                        <span>80–100 Very High</span>
+                    </div>
+                </div>
+                <div
+                    v-else
+                    class='text-muted small mb-3'
+                >
+                    Select Severity, Probability, and Exposure to compute the risk value.
+                </div>
+
+                <div class='d-flex align-items-center gap-2'>
+                    <button
+                        type='button'
+                        class='btn btn-primary btn-sm'
+                        :disabled='!speCanSave || busy'
+                        @click='onSpeSave'
+                    >
+                        {{ saving ? 'Saving…' : (spe.editingRespondentId ? 'Update assessment' : 'Save assessment') }}
+                    </button>
+                    <button
+                        type='button'
+                        class='btn btn-outline-secondary btn-sm'
+                        :disabled='busy'
+                        @click='resetSpeForm'
+                    >
+                        Clear
+                    </button>
+                </div>
+
+                <div
+                    v-if='speStatusMessage'
+                    class='fw-bold small mt-2'
+                    :class='speStatusError ? "text-danger" : "text-success"'
+                >
+                    {{ speStatusMessage }}
+                </div>
+            </div>
+        </div>
+
         <div
             v-if='showMitigationModal'
             class='modal modal-blur show d-block'
@@ -691,9 +966,12 @@ import { useWorkAssignments } from '../../../composables/useWorkAssignments.ts';
 import {
     CONFIDENCE_OPTIONS,
     EXPERIENCE_OPTIONS,
+    EXPOSURE_OPTIONS,
     GAR_FACTORS,
     GAR_SCORE_OPTIONS,
+    PROBABILITY_OPTIONS,
     REPETITION_OPTIONS,
+    SEVERITY_OPTIONS,
     entryHasRespondents,
     factorsNeedingMitigation,
     garFactorLabel,
@@ -701,13 +979,16 @@ import {
     garScoreFromFactors,
     newTacticKey,
     riskLevelForScore,
+    speLevelForScore,
     worstComplacencyRespondent,
     worstGarRespondent,
+    worstSpeRespondent,
     type ComplacencyRiskRespondent,
     type GarFactorKey,
     type GarMitigations,
     type GarRiskRespondent,
     type RiskBand,
+    type SpeRiskRespondent,
     type TacticRiskEntry,
     type TacticRiskMap,
 } from '../../../lib/tacticRisk.ts';
@@ -726,11 +1007,14 @@ const saving = ref(false);
 
 const garExpanded = ref(false);
 const compExpanded = ref(false);
+const speExpanded = ref(false);
 
 const garStatusMessage = ref('');
 const garStatusError = ref(false);
 const compStatusMessage = ref('');
 const compStatusError = ref(false);
+const speStatusMessage = ref('');
+const speStatusError = ref(false);
 
 const showMitigationModal = ref(false);
 const pendingMitigationKeys = ref<GarFactorKey[]>([]);
@@ -775,6 +1059,18 @@ const comp = reactive({
     editingRespondentId: '',
 });
 
+const spe = reactive({
+    tacticChoice: '',
+    newTacticLabel: '',
+    description: '',
+    respondentName: '',
+    severity: 0,
+    probability: 0,
+    exposure: 0,
+    editingKey: '',
+    editingRespondentId: '',
+});
+
 const busy = computed(() => loading.value || saving.value);
 
 const assignmentOptions = computed(() => assignments.value.map((a) => ({
@@ -815,6 +1111,19 @@ const compCanSave = computed(() => {
     return !!comp.respondentName.trim();
 });
 
+const speResult = computed(() => {
+    if (!spe.severity || !spe.probability || !spe.exposure) return null;
+    const score = spe.severity * spe.probability * spe.exposure;
+    const level = speLevelForScore(score);
+    return { score, ...level };
+});
+
+const speCanSave = computed(() => {
+    if (!speResult.value || !spe.tacticChoice) return false;
+    if (!labelForChoice(spe.tacticChoice, spe.newTacticLabel)) return false;
+    return !!spe.respondentName.trim();
+});
+
 const savedGroups = computed(() => Object.entries(assessments.value)
     .filter(([, entry]) => entryHasRespondents(entry))
     .map(([key, entry]) => ({
@@ -822,7 +1131,10 @@ const savedGroups = computed(() => Object.entries(assessments.value)
         entry,
         worstGar: worstGarRespondent(entry),
         worstComp: worstComplacencyRespondent(entry),
-        respondentCount: entry.garRespondents.length + entry.complacencyRespondents.length,
+        worstSpe: worstSpeRespondent(entry),
+        respondentCount: entry.garRespondents.length
+            + entry.complacencyRespondents.length
+            + entry.speRespondents.length,
     }))
     .sort((a, b) => a.entry.tacticLabel.localeCompare(b.entry.tacticLabel)));
 
@@ -880,6 +1192,23 @@ function clearCompRespondentFields(): void {
     comp.editingRespondentId = '';
 }
 
+function resetSpeForm(): void {
+    spe.tacticChoice = '';
+    spe.newTacticLabel = '';
+    spe.description = '';
+    clearSpeRespondentFields();
+    spe.editingKey = '';
+    speStatusMessage.value = '';
+}
+
+function clearSpeRespondentFields(): void {
+    spe.respondentName = '';
+    spe.severity = 0;
+    spe.probability = 0;
+    spe.exposure = 0;
+    spe.editingRespondentId = '';
+}
+
 function keyForForm(tacticChoice: string, editingKey: string): string | null {
     const assignment = assignmentForChoice(tacticChoice);
     if (assignment) return assignment.assignmentUid;
@@ -896,6 +1225,7 @@ async function load(): Promise<void> {
     loading.value = true;
     garStatusError.value = false;
     compStatusError.value = false;
+    speStatusError.value = false;
     try {
         await loadForMission(activeMission.value);
         const loaded = await loadTacticAssessmentsFromMission(activeMission.value);
@@ -929,9 +1259,18 @@ watch(() => comp.tacticChoice, (choice) => {
     if (existing) comp.description = existing.description;
 });
 
+watch(() => spe.tacticChoice, (choice) => {
+    spe.editingKey = '';
+    spe.editingRespondentId = '';
+    if (choice === '__new__' || !choice) return;
+    const assignment = assignmentForChoice(choice);
+    const existing = assignment ? assessments.value[assignment.assignmentUid] : undefined;
+    if (existing) spe.description = existing.description;
+});
+
 function selectTacticInto(
     key: string,
-    form: typeof gar | typeof comp,
+    form: typeof gar | typeof comp | typeof spe,
 ): boolean {
     const entry = assessments.value[key];
     if (!entry) return false;
@@ -960,6 +1299,13 @@ function onCompAddRespondent(key: string): void {
     clearCompRespondentFields();
     compStatusMessage.value = '';
     compExpanded.value = true;
+}
+
+function onSpeAddRespondent(key: string): void {
+    if (!selectTacticInto(key, spe)) return;
+    clearSpeRespondentFields();
+    speStatusMessage.value = '';
+    speExpanded.value = true;
 }
 
 function onGarEdit(key: string, respondentId: string): void {
@@ -998,19 +1344,36 @@ function onCompEdit(key: string, respondentId: string): void {
     compExpanded.value = true;
 }
 
+function onSpeEdit(key: string, respondentId: string): void {
+    const entry = assessments.value[key];
+    const resp = entry?.speRespondents.find((r) => r.id === respondentId);
+    if (!resp || !selectTacticInto(key, spe)) return;
+
+    spe.respondentName = resp.name;
+    spe.severity = resp.severity;
+    spe.probability = resp.probability;
+    spe.exposure = resp.exposure;
+    spe.editingRespondentId = respondentId;
+    speStatusMessage.value = '';
+    speExpanded.value = true;
+}
+
 async function persist(
     next: TacticRiskMap,
     successMessage: string,
-    which: 'gar' | 'comp',
+    which: 'gar' | 'comp' | 'spe',
 ): Promise<void> {
     if (!activeMission.value) return;
     saving.value = true;
     if (which === 'gar') {
         garStatusError.value = false;
         garStatusMessage.value = 'Saving…';
-    } else {
+    } else if (which === 'comp') {
         compStatusError.value = false;
         compStatusMessage.value = 'Saving…';
+    } else {
+        speStatusError.value = false;
+        speStatusMessage.value = 'Saving…';
     }
     try {
         contentHash.value = await saveTacticAssessmentsToMission(
@@ -1020,15 +1383,19 @@ async function persist(
         );
         assessments.value = next;
         if (which === 'gar') garStatusMessage.value = successMessage;
-        else compStatusMessage.value = successMessage;
+        else if (which === 'comp') compStatusMessage.value = successMessage;
+        else speStatusMessage.value = successMessage;
     } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (which === 'gar') {
             garStatusError.value = true;
             garStatusMessage.value = msg;
-        } else {
+        } else if (which === 'comp') {
             compStatusError.value = true;
             compStatusMessage.value = msg;
+        } else {
+            speStatusError.value = true;
+            speStatusMessage.value = msg;
         }
     } finally {
         saving.value = false;
@@ -1049,6 +1416,7 @@ function upsertEntryMeta(
         description: description.trim(),
         complacencyRespondents: existing?.complacencyRespondents ?? [],
         garRespondents: existing?.garRespondents ?? [],
+        speRespondents: existing?.speRespondents ?? [],
     };
 }
 
@@ -1186,6 +1554,57 @@ async function onCompSave(): Promise<void> {
     }
 }
 
+async function onSpeSave(): Promise<void> {
+    if (!requireActiveMission() || !speResult.value || !speCanSave.value) return;
+
+    const key = keyForForm(spe.tacticChoice, spe.editingKey) ?? newTacticKey();
+    const existing = assessments.value[key];
+    const entry = upsertEntryMeta(
+        spe.tacticChoice,
+        spe.newTacticLabel,
+        spe.description,
+        existing,
+    );
+    const name = spe.respondentName.trim();
+
+    const respondent: SpeRiskRespondent = {
+        id: spe.editingRespondentId || crypto.randomUUID(),
+        name,
+        severity: spe.severity,
+        probability: spe.probability,
+        exposure: spe.exposure,
+        score: speResult.value.score,
+        level: speResult.value.label,
+        recommendation: speResult.value.recommendation,
+        band: speResult.value.band,
+        assessedAt: new Date().toISOString(),
+    };
+
+    const respondents = [...entry.speRespondents];
+    const idx = respondents.findIndex((r) => (
+        spe.editingRespondentId
+            ? r.id === spe.editingRespondentId
+            : r.name.toLowerCase() === name.toLowerCase()
+    ));
+    if (idx >= 0) {
+        respondent.id = respondents[idx].id;
+        respondents[idx] = respondent;
+    } else {
+        respondents.push(respondent);
+    }
+    entry.speRespondents = respondents;
+
+    await persist(
+        { ...assessments.value, [key]: entry },
+        `Saved ${name}'s SPE assessment of "${entry.tacticLabel}" (${respondent.level}).`,
+        'spe',
+    );
+    if (!speStatusError.value) {
+        spe.editingKey = key.startsWith('tactic:') ? key : '';
+        clearSpeRespondentFields();
+    }
+}
+
 function removeOrUpdateEntry(
     key: string,
     patch: Partial<TacticRiskEntry>,
@@ -1228,12 +1647,29 @@ async function onCompDeleteRespondent(key: string, respondentId: string): Promis
     );
 }
 
+async function onSpeDeleteRespondent(key: string, respondentId: string): Promise<void> {
+    if (!requireActiveMission()) return;
+    const entry = assessments.value[key];
+    if (!entry) return;
+    const removed = entry.speRespondents.find((r) => r.id === respondentId);
+    const speRespondents = entry.speRespondents.filter((r) => r.id !== respondentId);
+    await persist(
+        removeOrUpdateEntry(key, { speRespondents }),
+        `Deleted ${removed?.name || 'respondent'}'s SPE assessment of "${entry.tacticLabel}".`,
+        'spe',
+    );
+}
+
 async function onDeleteAll(key: string): Promise<void> {
     if (!requireActiveMission()) return;
     const entry = assessments.value[key];
     if (!entry) return;
     await persist(
-        removeOrUpdateEntry(key, { garRespondents: [], complacencyRespondents: [] }),
+        removeOrUpdateEntry(key, {
+            garRespondents: [],
+            complacencyRespondents: [],
+            speRespondents: [],
+        }),
         `Deleted all assessments for "${entry.tacticLabel}".`,
         'gar',
     );
