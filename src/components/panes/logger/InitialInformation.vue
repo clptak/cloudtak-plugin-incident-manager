@@ -1,7 +1,72 @@
 <template>
     <div>
-        <!-- Incident Information -->
+        <!-- CFS / Call Notes -->
         <div class='card mb-3'>
+            <div
+                class='card-header d-flex align-items-center cursor-pointer user-select-none'
+                role='button'
+                tabindex='0'
+                :aria-expanded='cfsExpanded'
+                @click='cfsExpanded = !cfsExpanded'
+                @keydown.enter.prevent='cfsExpanded = !cfsExpanded'
+                @keydown.space.prevent='cfsExpanded = !cfsExpanded'
+            >
+                <h3 class='card-title mb-0'>
+                    CFS / Call Notes
+                </h3>
+                <IconChevronDown
+                    class='ms-auto transition-transform'
+                    :class='{ "rotate-180": !cfsExpanded }'
+                    :size='20'
+                    stroke='1.5'
+                />
+            </div>
+            <div
+                v-show='cfsExpanded'
+                class='card-body'
+            >
+                <label class='form-label mb-1'>Paste full CFS text (header + Remarks section)</label>
+                <textarea
+                    v-model='cadText'
+                    class='form-control'
+                    rows='10'
+                    placeholder='Paste the full MPS Call Notes here — include the Remarks section with timestamped log entries.'
+                />
+
+                <div class='mt-3'>
+                    <button
+                        class='btn btn-primary'
+                        @click='parse'
+                    >
+                        Parse &amp; Build
+                    </button>
+                </div>
+
+                <div
+                    v-if='!activeMission'
+                    class='form-text text-warning mt-2'
+                >
+                    No active mission. Select one in Create | Open first.
+                </div>
+                <div
+                    v-else
+                    class='form-text mt-2'
+                >
+                    Active DataSync: <strong>{{ activeMission.name }}</strong>
+                </div>
+
+                <div
+                    v-if='status'
+                    class='mt-2 fw-bold'
+                    :class='statusError ? "text-danger" : "text-success"'
+                >
+                    {{ status }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Incident Information -->
+        <div class='card'>
             <div class='card-header'>
                 <h3 class='card-title mb-0'>
                     Incident Information
@@ -143,54 +208,6 @@
             </div>
         </div>
 
-        <!-- CFS / Call Notes -->
-        <div class='card'>
-            <div class='card-header'>
-                <h3 class='card-title mb-0'>
-                    CFS / Call Notes
-                </h3>
-            </div>
-            <div class='card-body'>
-                <label class='form-label mb-1'>Paste full CFS text (header + Remarks section)</label>
-                <textarea
-                    v-model='cadText'
-                    class='form-control'
-                    rows='10'
-                    placeholder='Paste the full MPS Call Notes here — include the Remarks section with timestamped log entries.'
-                />
-
-                <div class='mt-3'>
-                    <button
-                        class='btn btn-primary'
-                        @click='parse'
-                    >
-                        Parse &amp; Build
-                    </button>
-                </div>
-
-                <div
-                    v-if='!activeMission'
-                    class='form-text text-warning mt-2'
-                >
-                    No active mission. Select one in Create | Open first.
-                </div>
-                <div
-                    v-else
-                    class='form-text mt-2'
-                >
-                    Active DataSync: <strong>{{ activeMission.name }}</strong>
-                </div>
-
-                <div
-                    v-if='status'
-                    class='mt-2 fw-bold'
-                    :class='statusError ? "text-danger" : "text-success"'
-                >
-                    {{ status }}
-                </div>
-            </div>
-        </div>
-
         <div
             v-if='showParsedModal'
             class='modal modal-blur show d-block'
@@ -322,6 +339,7 @@
 
 <script setup lang='ts'>
 import { ref, computed, reactive, watch, onMounted } from 'vue';
+import { IconChevronDown } from '@tabler/icons-vue';
 import { getMpsRows } from '../../../lib/mpsParser.ts';
 import type { MpsRow } from '../../../lib/mpsParser.ts';
 import {
@@ -331,6 +349,7 @@ import {
     buildIncidentInfoKeywords,
     isValidDemaMission,
     latestIncidentInfoFromLogs,
+    parseCfsHeaderFields,
     suggestIncidentName,
     type IncidentInfoForm,
 } from '../../../lib/incidentInfo.ts';
@@ -338,6 +357,7 @@ import {
     loadIncidentSubscription,
     subscriptionMissionToken,
 } from '../../../lib/incidentSubscription.ts';
+import { pushPointToMission } from '../../../lib/missionFeatures.ts';
 import { SUBJECT_KEYWORD, kwValue } from '../../../lib/subjectInfo.ts';
 import {
     applyCadIdsToSchema,
@@ -363,6 +383,7 @@ const savingIncident = ref(false);
 const sendingIncident = ref(false);
 const loadingIncident = ref(false);
 
+const cfsExpanded = ref(false);
 const cadText = ref('');
 const rows = ref<MpsRow[]>([]);
 const selected = ref<boolean[]>([]);
@@ -588,35 +609,78 @@ async function syncSchemaFromForm(
     missionSchema.value = schema;
 }
 
-function parse(): void {
+async function parse(): Promise<void> {
     status.value = '';
     statusError.value = false;
+    const header = parseCfsHeaderFields(cadText.value);
     const res = getMpsRows(cadText.value);
+    const activityNumber = header.activityNumber ?? res.activityNumber;
+    const reportNumber = header.reportNumber ?? res.reportNumber;
     rows.value = res.rows;
     selected.value = res.rows.map(() => true);
-    parsedActivityNumber.value = res.activityNumber;
-    parsedReportNumber.value = res.reportNumber;
+    parsedActivityNumber.value = activityNumber;
+    parsedReportNumber.value = reportNumber;
     applyParsedCadToForm(incidentForm, {
-        activityNumber: res.activityNumber,
-        reportNumber: res.reportNumber,
+        activityNumber,
+        reportNumber,
+        assignmentDateTime: header.assignmentDateTime,
     });
     showParsedModal.value = true;
-    void syncSchemaFromForm({
-        activityNumber: res.activityNumber,
-        reportNumber: res.reportNumber,
-    }, res.rows).then(() => {
+
+    const locationMsg = await maybeAddCallLocation(header, activityNumber);
+    if (statusError.value) return;
+
+    try {
+        await syncSchemaFromForm({
+            activityNumber,
+            reportNumber,
+        }, res.rows);
         if (!rows.value.length) {
             statusError.value = true;
-            status.value = res.activityNumber || res.reportNumber
+            status.value = activityNumber || reportNumber
                 ? 'Parsed activity/report numbers and updated mission schema; no timestamped Remarks entries found.'
                 : 'No timestamped Remarks entries found in the pasted text.';
         } else {
             status.value = 'Parsed call notes and updated mission schema.';
         }
-    }).catch((err) => {
+        if (locationMsg) {
+            status.value = `${status.value} ${locationMsg}`;
+        }
+    } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);
-    });
+    }
+}
+
+/** Prompt and push Address LL marker. Returns a short status suffix, or null. */
+async function maybeAddCallLocation(
+    header: ReturnType<typeof parseCfsHeaderFields>,
+    activityNumber: string | null,
+): Promise<string | null> {
+    if (!header.callLocation || !activeMission.value) return null;
+    const callsign = (activityNumber || incidentForm.eventId || 'CFS').trim();
+    const { lat, lng } = header.callLocation;
+    const latStr = lat.toFixed(6);
+    const lngStr = lng.toFixed(6);
+    const ok = window.confirm(
+        `Add call location ${callsign} at ${latStr}, ${lngStr} to the mission map?`,
+    );
+    if (!ok) return null;
+    try {
+        await pushPointToMission({
+            missionGuid: activeMission.value.guid,
+            missionToken: activeMission.value.missionToken ?? activeMission.value.token,
+            callsign,
+            point: [lng, lat],
+            type: '13064000001100000000',
+            icon: '2525E:13064000001100000000',
+        });
+        return `Added call location ${callsign} to the map.`;
+    } catch (err) {
+        statusError.value = true;
+        status.value = err instanceof Error ? err.message : String(err);
+        return null;
+    }
 }
 
 function toDtg(raw: string): string | undefined {
@@ -686,3 +750,17 @@ async function postLogs(): Promise<void> {
 onMounted(() => { void loadIncidentInfo(); });
 watch(() => activeMission.value?.guid, () => { void loadIncidentInfo(); });
 </script>
+
+<style scoped>
+.rotate-180 {
+    transform: rotate(-90deg);
+}
+
+.transition-transform {
+    transition: transform 0.2s ease-out;
+}
+
+.cursor-pointer {
+    cursor: pointer;
+}
+</style>
