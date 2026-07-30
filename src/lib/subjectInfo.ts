@@ -26,8 +26,10 @@ export interface SubjectForm {
     subjectHeight: string;
     subjectWeight: string;
     subjectHairColor: string;
-    subjectFacialHair: string;
-    subjectGlasses: string;
+    /** true = Yes, false = No, null = unset */
+    subjectFacialHair: boolean | null;
+    /** true = Yes, false = No, null = unset */
+    subjectGlasses: boolean | null;
     subjectDistinguishingMarks: string;
     subjectClothing: string;
     subjectFootwear: string;
@@ -99,6 +101,23 @@ function hasValue(value: string | undefined): value is string {
     return !!value?.trim();
 }
 
+/** Parse Yes/No boolean from keywords, schema, or legacy free text. */
+export function parseSubjectYesNo(value: unknown): boolean | null {
+    if (value === true || value === false) return value;
+    if (typeof value !== 'string') return null;
+    const v = value.trim().toLowerCase();
+    if (!v) return null;
+    if (v === 'true' || v === 'yes' || v === 'y' || v === '1') return true;
+    if (v === 'false' || v === 'no' || v === 'n' || v === '0') return false;
+    return null;
+}
+
+export function formatSubjectYesNo(value: boolean | null | undefined): string {
+    if (value === true) return 'Yes';
+    if (value === false) return 'No';
+    return '';
+}
+
 export function blankSubjectForm(subjectCaseID = '01'): SubjectForm {
     return {
         subjectCaseID,
@@ -111,8 +130,8 @@ export function blankSubjectForm(subjectCaseID = '01'): SubjectForm {
         subjectHeight: '',
         subjectWeight: '',
         subjectHairColor: '',
-        subjectFacialHair: '',
-        subjectGlasses: '',
+        subjectFacialHair: null,
+        subjectGlasses: null,
         subjectDistinguishingMarks: '',
         subjectClothing: '',
         subjectFootwear: '',
@@ -155,8 +174,8 @@ export function fieldsFromLog(keywords?: string[]): SubjectForm {
         subjectHeight: kwValue(keywords, 'height:'),
         subjectWeight: kwValue(keywords, 'weight:'),
         subjectHairColor: kwValue(keywords, 'hairColor:'),
-        subjectFacialHair: kwValue(keywords, 'facialHair:'),
-        subjectGlasses: kwValue(keywords, 'glasses:'),
+        subjectFacialHair: parseSubjectYesNo(kwValue(keywords, 'facialHair:')),
+        subjectGlasses: parseSubjectYesNo(kwValue(keywords, 'glasses:')),
         subjectDistinguishingMarks: kwValue(keywords, 'distinguishingMarks:'),
         subjectClothing: kwValue(keywords, 'clothing:'),
         subjectFootwear: kwValue(keywords, 'footwear:'),
@@ -185,8 +204,6 @@ export function hasFilledSubjectFields(f: SubjectForm): boolean {
         f.subjectHeight,
         f.subjectWeight,
         f.subjectHairColor,
-        f.subjectFacialHair,
-        f.subjectGlasses,
         f.subjectDistinguishingMarks,
         f.subjectClothing,
         f.subjectFootwear,
@@ -200,7 +217,9 @@ export function hasFilledSubjectFields(f: SubjectForm): boolean {
         f.subjectTimeWentMissing,
         f.subjectTimeReportedMissing,
         f.subjectReportedMissingBy,
-    ].some((v) => hasValue(v));
+    ].some((v) => hasValue(v))
+        || f.subjectFacialHair !== null
+        || f.subjectGlasses !== null;
 }
 
 function buildParts(f: SubjectForm): string[] {
@@ -217,8 +236,8 @@ function buildParts(f: SubjectForm): string[] {
     if (hasValue(f.subjectHeight)) parts.push(`Height: ${f.subjectHeight.trim()}`);
     if (hasValue(f.subjectWeight)) parts.push(`Weight: ${f.subjectWeight.trim()}`);
     if (hasValue(f.subjectHairColor)) parts.push(`Hair Color: ${f.subjectHairColor.trim()}`);
-    if (hasValue(f.subjectFacialHair)) parts.push(`Facial Hair: ${f.subjectFacialHair.trim()}`);
-    if (hasValue(f.subjectGlasses)) parts.push(`Glasses: ${f.subjectGlasses.trim()}`);
+    if (f.subjectFacialHair !== null) parts.push(`Facial Hair: ${formatSubjectYesNo(f.subjectFacialHair)}`);
+    if (f.subjectGlasses !== null) parts.push(`Glasses: ${formatSubjectYesNo(f.subjectGlasses)}`);
     if (hasValue(f.subjectDistinguishingMarks)) {
         parts.push(`Distinguishing Marks: ${f.subjectDistinguishingMarks.trim()}`);
     }
@@ -254,8 +273,8 @@ export function buildSubjectKeywords(f: SubjectForm): string[] {
     if (hasValue(f.subjectHeight)) kws.push(`height:${f.subjectHeight.trim()}`);
     if (hasValue(f.subjectWeight)) kws.push(`weight:${f.subjectWeight.trim()}`);
     if (hasValue(f.subjectHairColor)) kws.push(`hairColor:${f.subjectHairColor.trim()}`);
-    if (hasValue(f.subjectFacialHair)) kws.push(`facialHair:${f.subjectFacialHair.trim()}`);
-    if (hasValue(f.subjectGlasses)) kws.push(`glasses:${f.subjectGlasses.trim()}`);
+    if (f.subjectFacialHair !== null) kws.push(`facialHair:${f.subjectFacialHair}`);
+    if (f.subjectGlasses !== null) kws.push(`glasses:${f.subjectGlasses}`);
     if (hasValue(f.subjectDistinguishingMarks)) {
         kws.push(`distinguishingMarks:${f.subjectDistinguishingMarks.trim()}`);
     }
@@ -325,8 +344,12 @@ export function subjectDetailRows(s: SubjectForm): SubjectDetailRow[] {
     if (hasValue(s.subjectHeight)) rows.push({ label: 'Height', value: s.subjectHeight.trim() });
     if (hasValue(s.subjectWeight)) rows.push({ label: 'Weight', value: s.subjectWeight.trim() });
     if (hasValue(s.subjectHairColor)) rows.push({ label: 'Hair Color', value: s.subjectHairColor.trim() });
-    if (hasValue(s.subjectFacialHair)) rows.push({ label: 'Facial Hair', value: s.subjectFacialHair.trim() });
-    if (hasValue(s.subjectGlasses)) rows.push({ label: 'Glasses', value: s.subjectGlasses.trim() });
+    if (s.subjectFacialHair !== null) {
+        rows.push({ label: 'Facial Hair', value: formatSubjectYesNo(s.subjectFacialHair) });
+    }
+    if (s.subjectGlasses !== null) {
+        rows.push({ label: 'Glasses', value: formatSubjectYesNo(s.subjectGlasses) });
+    }
     if (hasValue(s.subjectDistinguishingMarks)) {
         rows.push({ label: 'Distinguishing Marks', value: s.subjectDistinguishingMarks.trim() });
     }

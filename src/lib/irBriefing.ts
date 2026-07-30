@@ -9,6 +9,7 @@ import {
     blankSubjectForm,
     effectiveSubjectAge,
     fieldsFromLog,
+    formatSubjectYesNo,
     subjectNumberFromLog,
     type SubjectForm,
 } from './subjectInfo.ts';
@@ -127,8 +128,8 @@ function subjectToColumn(f: SubjectForm): BriefingSubjectColumn {
         height: f.subjectHeight.trim(),
         weight: f.subjectWeight.trim(),
         hairColor: f.subjectHairColor.trim(),
-        facialHair: f.subjectFacialHair.trim(),
-        glasses: f.subjectGlasses.trim(),
+        facialHair: formatSubjectYesNo(f.subjectFacialHair),
+        glasses: formatSubjectYesNo(f.subjectGlasses),
         distinguishingMarks: f.subjectDistinguishingMarks.trim(),
         clothing: f.subjectClothing.trim(),
         footwear: f.subjectFootwear.trim(),

@@ -10,6 +10,7 @@ import {
 } from './missionSchema.ts';
 import {
     blankSubjectForm,
+    parseSubjectYesNo,
     parseSubjectsFromLogs,
     type ParsedSubject,
     type SubjectForm,
@@ -24,7 +25,7 @@ export interface SchemaSubjectRecord {
     lpq: Record<string, unknown>;
 }
 
-const INITIAL_INFO_KEYS: (keyof SubjectInitialInformation)[] = [
+const STRING_INFO_KEYS = [
     'subjectCaseID',
     'subjectName',
     'subjectDateOfBirth',
@@ -35,8 +36,6 @@ const INITIAL_INFO_KEYS: (keyof SubjectInitialInformation)[] = [
     'subjectHeight',
     'subjectWeight',
     'subjectHairColor',
-    'subjectFacialHair',
-    'subjectGlasses',
     'subjectDistinguishingMarks',
     'subjectClothing',
     'subjectFootwear',
@@ -50,14 +49,11 @@ const INITIAL_INFO_KEYS: (keyof SubjectInitialInformation)[] = [
     'subjectTimeWentMissing',
     'subjectTimeReportedMissing',
     'subjectReportedMissingBy',
-];
+] as const satisfies readonly (keyof SubjectInitialInformation)[];
 
 export function subjectFormToInitialInformation(f: SubjectForm): SubjectInitialInformation {
-    const out = blankSubjectForm(f.subjectCaseID) as SubjectInitialInformation;
-    for (const key of INITIAL_INFO_KEYS) {
-        out[key] = (f[key] ?? '') as SubjectInitialInformation[typeof key];
-    }
-    return out;
+    const { logId: _logId, ...rest } = f;
+    return { ...rest };
 }
 
 export function subjectFormFromInitialInformation(
@@ -65,12 +61,15 @@ export function subjectFormFromInitialInformation(
 ): SubjectForm {
     const form = blankSubjectForm();
     if (!info || typeof info !== 'object') return form;
-    for (const key of INITIAL_INFO_KEYS) {
-        const value = (info as Record<string, unknown>)[key];
+    const raw = info as Record<string, unknown>;
+    for (const key of STRING_INFO_KEYS) {
+        const value = raw[key];
         if (typeof value === 'string') {
             form[key] = value;
         }
     }
+    form.subjectFacialHair = parseSubjectYesNo(raw.subjectFacialHair);
+    form.subjectGlasses = parseSubjectYesNo(raw.subjectGlasses);
     if (!form.subjectCaseID) form.subjectCaseID = '01';
     return form;
 }

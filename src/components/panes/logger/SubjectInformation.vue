@@ -203,21 +203,39 @@
                         </div>
                         <div class='col-md-4'>
                             <label class='form-label'>Facial Hair</label>
-                            <input
-                                v-model='draft.form.subjectFacialHair'
-                                type='text'
-                                class='form-control'
-                                placeholder='Facial Hair'
+                            <select
+                                class='form-select'
+                                :value='yesNoSelectValue(draft.form.subjectFacialHair)'
+                                @change='draft.form.subjectFacialHair = parseYesNoSelect(($event.target as HTMLSelectElement).value)'
                             >
+                                <option value=''>
+                                    —
+                                </option>
+                                <option value='true'>
+                                    Yes
+                                </option>
+                                <option value='false'>
+                                    No
+                                </option>
+                            </select>
                         </div>
                         <div class='col-md-4'>
                             <label class='form-label'>Glasses</label>
-                            <input
-                                v-model='draft.form.subjectGlasses'
-                                type='text'
-                                class='form-control'
-                                placeholder='Glasses'
+                            <select
+                                class='form-select'
+                                :value='yesNoSelectValue(draft.form.subjectGlasses)'
+                                @change='draft.form.subjectGlasses = parseYesNoSelect(($event.target as HTMLSelectElement).value)'
                             >
+                                <option value=''>
+                                    —
+                                </option>
+                                <option value='true'>
+                                    Yes
+                                </option>
+                                <option value='false'>
+                                    No
+                                </option>
+                            </select>
                         </div>
                         <div class='col-md-4'>
                             <label class='form-label'>Other Distinguishing Marks</label>
@@ -447,6 +465,7 @@ import {
     effectiveSubjectAge,
     fieldsFromLog,
     hasFilledSubjectFields,
+    parseSubjectYesNo,
     subjectNumberFromLog,
     type SubjectForm,
 } from '../../../lib/subjectInfo.ts';
@@ -535,6 +554,16 @@ function hasValue(value: string | undefined): value is string {
 
 function hasFilledFields(f: SubjectForm): boolean {
     return hasFilledSubjectFields(f);
+}
+
+function yesNoSelectValue(value: boolean | null): string {
+    if (value === true) return 'true';
+    if (value === false) return 'false';
+    return '';
+}
+
+function parseYesNoSelect(value: string): boolean | null {
+    return parseSubjectYesNo(value);
 }
 
 const filledDrafts = computed(() => drafts.value.filter((d) => hasFilledFields(d.form)));
