@@ -380,8 +380,11 @@ import { useWorkAssignments } from '../../composables/useWorkAssignments.ts';
 import { nowDatetimeLocal } from '../../lib/incidentInfo.ts';
 import { listMissionCots, type MissionCotRef } from '../../lib/missionCots.ts';
 import { isValidAssignmentNumber } from '../../lib/workAssignments.ts';
+import { ensureMissionFolder } from '../../lib/folder.ts';
+import { loadIncidentSubscription } from '../../lib/incidentSubscription.ts';
 
 const SETUP_REMINDER_KEY = 'incident-manager:assignments-setup-reminder-dismissed';
+const ASSIGNMENT_FOLDER = 'Assignments';
 
 const { activeMission, selectKey, requireActiveMission } = useIncident();
 const {
@@ -512,20 +515,43 @@ async function refreshMissionCots(): Promise<void> {
     }
 }
 
+async function softEnsureAssignmentFolder(): Promise<void> {
+    if (!activeMission.value) return;
+    try {
+        const sub = await loadIncidentSubscription(activeMission.value);
+        await ensureMissionFolder(sub, ASSIGNMENT_FOLDER);
+    } catch (err) {
+        console.warn('Failed to ensure Assignments mission folder', err);
+    }
+}
+
+async function fileCotsIntoAssignmentFolder(uids: string[]): Promise<void> {
+    if (!activeMission.value || !uids.length) return;
+    try {
+        const sub = await loadIncidentSubscription(activeMission.value);
+        const folder = await ensureMissionFolder(sub, ASSIGNMENT_FOLDER);
+        await sub.layer.attachFeatures(folder.uid, [...new Set(uids)]);
+    } catch (err) {
+        console.warn('Failed to file CoTs into Assignments folder', err);
+    }
+}
+
 async function addRow(): Promise<void> {
     if (!activeMission.value || !canAdd.value) return;
 
+    const assignmentUid = form.value.assignmentUid.trim();
     await addAssignment(activeMission.value, {
         assignmentNumber: form.value.assignmentNumber,
         teamResourceAssignmentId: form.value.teamResourceAssignmentId.trim(),
         teamLabel: teamLabelForId(form.value.teamResourceAssignmentId),
-        assignmentUid: form.value.assignmentUid.trim(),
+        assignmentUid,
         assignmentCallsign: callsignForUid(form.value.assignmentUid),
         instructions: form.value.instructions.trim(),
         started: form.value.started.trim(),
         completed: form.value.completed.trim(),
     });
 
+    await fileCotsIntoAssignmentFolder([assignmentUid]);
     resetForm();
 }
 
@@ -576,6 +602,7 @@ async function onRowAssignmentChange(id: string, uid: string): Promise<void> {
         assignmentUid: uid,
         assignmentCallsign: callsignForUid(uid),
     });
+    await fileCotsIntoAssignmentFolder([uid]);
 }
 
 async function onSendStart(id: string): Promise<void> {
@@ -608,9 +635,17 @@ watch(resourceTeams, (teams) => {
 
 watch(() => activeMission.value?.guid, (guid) => {
     const mission = guid ? activeMission.value : null;
-    void loadForMission(mission);
-    void loadResourceTeams(mission);
-    void refreshMissionCots();
+    void (async () => {
+        await loadForMission(mission);
+        void loadResourceTeams(mission);
+        void refreshMissionCots();
+        if (!mission) return;
+        await softEnsureAssignmentFolder();
+        const uids = assignments.value
+            .map((a) => a.assignmentUid.trim())
+            .filter(Boolean);
+        await fileCotsIntoAssignmentFolder(uids);
+    })();
 }, { immediate: true });
 
 onMounted(() => {
