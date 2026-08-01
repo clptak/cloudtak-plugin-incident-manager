@@ -14,7 +14,7 @@
                         Initial Planning Point (IPP)
                         <span
                             v-if='stepDone.ipp'
-                            class='badge bg-success ms-2'
+                            class='badge bg-success text-white ms-2'
                         >set</span>
                         <span
                             v-else-if='!openable(0)'
@@ -116,7 +116,7 @@
                         Theoretical Search Area
                         <span
                             v-if='stepDone.theoretical'
-                            class='badge bg-success ms-2'
+                            class='badge bg-success text-white ms-2'
                         >added</span>
                         <span
                             v-else-if='!openable(1)'
@@ -185,7 +185,7 @@
                         Statistical Search Area (LPB)
                         <span
                             v-if='stepDone.statistical'
-                            class='badge bg-success ms-2'
+                            class='badge bg-success text-white ms-2'
                         >added</span>
                         <span
                             v-else-if='!openable(2)'
@@ -216,6 +216,13 @@
                             {{ c }}
                         </option>
                     </select>
+
+                    <span
+                        class='badge rounded-pill mb-2'
+                        :class='casesPillClass'
+                    >
+                        Cases: {{ selectedCases }}
+                    </span>
 
                     <div class='table-responsive'>
                         <table class='table table-sm table-vcenter mb-0'>
@@ -390,7 +397,7 @@
                         Subjective Search Area
                         <span
                             v-if='stepDone.subjective'
-                            class='badge bg-success ms-2'
+                            class='badge bg-success text-white ms-2'
                         >added</span>
                         <span
                             v-else-if='!openable(3)'
@@ -640,6 +647,7 @@ interface LogApi {
 
 interface AzlpbEntry {
     category: string;
+    cases: number;
     qAmi: number; qBmi: number; qCmi: number; qDmi: number;
 }
 
@@ -683,6 +691,17 @@ function refreshQuartiles(): void {
     }
 }
 watch(category, refreshQuartiles, { immediate: true });
+
+const selectedAzlpb = computed(() =>
+    table.find((t) => t.category === category.value),
+);
+const selectedCases = computed(() => selectedAzlpb.value?.cases ?? 0);
+const casesPillClass = computed(() => {
+    const n = selectedCases.value;
+    if (n < 10) return 'bg-danger text-white';
+    if (n < 50) return 'bg-warning text-white';
+    return 'bg-success text-white';
+});
 
 function openCustomSource(): void {
     showCustomSource.value = true;
