@@ -86,14 +86,41 @@
                 </table>
             </div>
 
-            <div class='d-flex align-items-center gap-2 mt-2'>
-                <progress
-                    :value='Math.max(7, Math.min(21, total))'
-                    max='21'
-                    style='flex:1;'
-                />
+            <div class='d-flex align-items-start gap-2 mt-2'>
+                <div class='urgency-scale flex-fill'>
+                    <div
+                        class='urgency-scale-track'
+                        role='progressbar'
+                        :aria-valuenow='clampedTotal'
+                        aria-valuemin='0'
+                        aria-valuemax='21'
+                        :aria-label='`Urgency total ${clampedTotal} of 21, ${level.label}`'
+                    >
+                        <div
+                            class='urgency-scale-fill'
+                            :style='{
+                                width: `${progressPercent}%`,
+                                backgroundColor: level.barColor,
+                            }'
+                        />
+                    </div>
+                    <div
+                        class='urgency-scale-ticks'
+                        aria-hidden='true'
+                    >
+                        <span
+                            v-for='mark in urgencyScaleMarks'
+                            :key='mark'
+                            class='urgency-scale-tick'
+                            :style='{ left: `${(mark / 21) * 100}%` }'
+                        >
+                            <span class='urgency-scale-tick-mark' />
+                            <span class='urgency-scale-tick-label'>{{ mark }}</span>
+                        </span>
+                    </div>
+                </div>
                 <span
-                    class='badge'
+                    class='badge mt-0'
                     :class='level.cls'
                 >{{ level.label }}</span>
             </div>
@@ -417,14 +444,22 @@ function onDocumentClick(event: MouseEvent): void {
     }
 }
 
+const urgencyScaleMarks = [0, 7, 14, 21] as const;
+
 const total = computed(() => factors.reduce((s, f) => s + (Number(f.value) || 0), 0));
 const valid = computed(() => factors.every((f) => [1, 2, 3].includes(Number(f.value))));
+const clampedTotal = computed(() => Math.max(0, Math.min(21, total.value)));
+const progressPercent = computed(() => (clampedTotal.value / 21) * 100);
 
 const level = computed(() => {
     const label = urgencyLevelFromTotal(total.value);
-    if (label === 'High') return { label, cls: 'bg-danger-lt text-danger' };
-    if (label === 'Moderate') return { label, cls: 'bg-yellow-lt text-yellow' };
-    return { label, cls: 'bg-green-lt text-green' };
+    if (label === 'High') {
+        return { label, cls: 'bg-danger-lt text-danger', barColor: 'var(--tblr-danger)' };
+    }
+    if (label === 'Moderate') {
+        return { label, cls: 'bg-yellow-lt text-yellow', barColor: 'var(--tblr-yellow)' };
+    }
+    return { label, cls: 'bg-green-lt text-green', barColor: 'var(--tblr-green)' };
 });
 
 const posting = ref(false);
@@ -636,5 +671,62 @@ onUnmounted(() => {
 <style scoped>
 .urgency-table-wrap {
     overflow: visible;
+}
+
+.urgency-scale {
+    min-width: 0;
+    padding-top: 0.15rem;
+}
+
+.urgency-scale-track {
+    height: 0.5rem;
+    border-radius: 0.25rem;
+    background: var(--tblr-border-color, rgba(0, 0, 0, 0.12));
+    overflow: hidden;
+}
+
+.urgency-scale-fill {
+    height: 100%;
+    border-radius: inherit;
+    transition: width 0.15s ease, background-color 0.15s ease;
+}
+
+.urgency-scale-ticks {
+    position: relative;
+    height: 1.35rem;
+    margin-top: 0.15rem;
+}
+
+.urgency-scale-tick {
+    position: absolute;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transform: translateX(-50%);
+}
+
+.urgency-scale-tick:first-child {
+    transform: translateX(0);
+    align-items: flex-start;
+}
+
+.urgency-scale-tick:last-child {
+    transform: translateX(-100%);
+    align-items: flex-end;
+}
+
+.urgency-scale-tick-mark {
+    display: block;
+    width: 1px;
+    height: 0.35rem;
+    background: var(--tblr-secondary, rgba(0, 0, 0, 0.35));
+}
+
+.urgency-scale-tick-label {
+    margin-top: 0.1rem;
+    font-size: 0.7rem;
+    line-height: 1;
+    color: var(--tblr-secondary, inherit);
 }
 </style>
