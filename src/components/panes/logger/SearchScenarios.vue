@@ -312,7 +312,7 @@
 
 <script setup lang='ts'>
 import { reactive, ref, computed, onMounted, watch } from 'vue';
-import Subscription from '../../../../../../src/base/subscription.ts';
+import { loadIncidentSubscription } from '../../../lib/incidentSubscription.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import { loadIcs201FromMission } from '../../../lib/ics201.ts';
 import { nowBriefingDate, nowBriefingTime } from '../../../lib/irBriefing.ts';
@@ -511,9 +511,7 @@ async function loadSent(): Promise<void> {
         return;
     }
     try {
-        const sub = await Subscription.load(activeMission.value.guid, {
-            missiontoken: activeMission.value.token ?? '',
-        });
+        const sub = await loadIncidentSubscription(activeMission.value);
         const logs = await sub.log.list({ refresh: true });
 
         // Keep the most recent entry per letter (defensive against legacy duplicates).
@@ -711,9 +709,7 @@ async function send(): Promise<void> {
     let created = 0; let updated = 0; let failed = 0;
     let didWrite = false;
     try {
-        const sub = await Subscription.load(activeMission.value.guid, {
-            missiontoken: activeMission.value.token ?? '',
-        });
+        const sub = await loadIncidentSubscription(activeMission.value);
         for (const key of filled.value) {
             const d = drafts[key];
             const body = {
@@ -794,9 +790,7 @@ async function addPdfToDataSync(): Promise<void> {
             bytes,
             { missionToken: activeMission.value.token },
         );
-        const sub = await Subscription.load(activeMission.value.guid, {
-            missiontoken: activeMission.value.token ?? '',
-        });
+        const sub = await loadIncidentSubscription(activeMission.value);
         await sub.fetch();
         status.value = `Added ${SCENARIOS_RECORD_SHEET_MISSION_FILENAME} to ${activeMission.value.name}.`;
     } catch (err) {

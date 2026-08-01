@@ -5,6 +5,7 @@ import theoreticalSearchAreaMd from '../../docs/establishing_search_area_1_theor
 import statisticalSearchAreaMd from '../../docs/establishing_search_area_2_statistical.md?raw';
 import subjectiveSearchAreaMd from '../../docs/establishing_search_area_3_subjective.md?raw';
 import segmentingSearchAreaMd from '../../docs/segmenting.md?raw';
+import initialConsensusMd from '../../docs/consensus_summary.md?raw';
 import resourceSummaryMd from '../../docs/resource_summary.md?raw';
 
 export type NavSectionHelpKey =
@@ -15,6 +16,7 @@ export type NavSectionHelpKey =
     | 'statistical-search-area'
     | 'subjective-search-area'
     | 'segmenting-search-area'
+    | 'initial-consensus'
     | 'resource-summary';
 
 export interface NavSectionHelpDoc {
@@ -50,6 +52,10 @@ export const NAV_SECTION_HELP: Record<NavSectionHelpKey, NavSectionHelpDoc> = {
     'segmenting-search-area': {
         markdown: segmentingSearchAreaMd,
         ariaLabel: 'About Segmenting the Search Area',
+    },
+    'initial-consensus': {
+        markdown: initialConsensusMd,
+        ariaLabel: 'About Initial Consensus',
     },
     'resource-summary': {
         markdown: resourceSummaryMd,

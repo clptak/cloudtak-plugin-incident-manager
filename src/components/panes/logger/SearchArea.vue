@@ -474,7 +474,6 @@
 
 <script setup lang='ts'>
 import { ref, computed, reactive, watch, onMounted } from 'vue';
-import Subscription from '../../../../../../src/base/subscription.ts';
 import type { Feature } from '../../../../../../src/types.ts';
 import azlpb from '../../../data/azlpb_table.json';
 import { parseCoordinates } from '../../../lib/coords.ts';
@@ -487,6 +486,7 @@ import FeatureCallsignCell from '../../FeatureCallsignCell.vue';
 import { areaSqMi, formatSqMi } from '../../../lib/geometryArea.ts';
 import { loadMissionSchema } from '../../../lib/missionSchema.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
+import { loadIncidentSubscription, missionAuthToken } from '../../../lib/incidentSubscription.ts';
 import NavHelpButton from '../../NavHelpButton.vue';
 
 const SEARCH_AREA_KEYWORD = 'search-area';
@@ -608,12 +608,10 @@ const statusError = ref(false);
 const sentAreas = ref<SentArea[]>([]);
 const loadingAreas = ref(false);
 
-type LoadedSub = Awaited<ReturnType<typeof Subscription.load>>;
+type LoadedSub = Awaited<ReturnType<typeof loadIncidentSubscription>>;
 
 async function loadSub(): Promise<LoadedSub> {
-    return Subscription.load(activeMission.value!.guid, {
-        missiontoken: activeMission.value!.token ?? '',
-    });
+    return loadIncidentSubscription(activeMission.value!);
 }
 
 // ---- Sequential accordion state -------------------------------------------
@@ -852,7 +850,7 @@ async function setIpp(): Promise<void> {
         } else {
             uuid = await pushPointToMission({
                 missionGuid: activeMission.value.guid,
-                missionToken: activeMission.value.token,
+                missionToken: missionAuthToken(activeMission.value),
                 callsign: label,
                 point: [ipp.value!.lng, ipp.value!.lat],
                 type: 'a-f-G',
@@ -897,7 +895,7 @@ async function upsertRing(
 
     const uuid = await pushPolygonToMission({
         missionGuid: activeMission.value!.guid,
-        missionToken: activeMission.value!.token,
+        missionToken: missionAuthToken(activeMission.value!),
         callsign: label,
         ring,
         center,
@@ -1057,7 +1055,7 @@ async function removeArea(area: SentArea): Promise<void> {
                 await deletePolygonFromMission({
                     missionGuid: activeMission.value.guid,
                     uid: area.uuid,
-                    missiontoken: activeMission.value.token || undefined,
+                    missiontoken: missionAuthToken(activeMission.value) || undefined,
                 });
             } catch { /* feature may already be gone; leave the log removal authoritative */ }
         }

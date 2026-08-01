@@ -302,7 +302,7 @@
 <script setup lang='ts'>
 import { ref, reactive, onMounted, watch } from 'vue';
 import { IconChevronDown } from '@tabler/icons-vue';
-import Subscription from '../../../../../../src/base/subscription.ts';
+import { loadIncidentSubscription } from '../../../lib/incidentSubscription.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import {
     blankIrBriefingForm,
@@ -474,9 +474,7 @@ async function addPdfToDataSync(): Promise<void> {
             bytes,
             { missionToken: activeMission.value.token },
         );
-        const sub = await Subscription.load(activeMission.value.guid, {
-            missiontoken: activeMission.value.token ?? '',
-        });
+        const sub = await loadIncidentSubscription(activeMission.value);
         await sub.fetch();
         status.value = `Added ${SAR_BRIEFING_MISSION_FILENAME} to ${activeMission.value.name}.`;
     } catch (err) {

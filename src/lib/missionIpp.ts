@@ -32,6 +32,7 @@ export async function resolveMissionIppLocation(
 ): Promise<string> {
     const sub = await Subscription.load(missionGuid, {
         missiontoken: missionToken ?? '',
+        reload: false,
     });
 
     const feats = await sub.feature.list({ refresh: true });

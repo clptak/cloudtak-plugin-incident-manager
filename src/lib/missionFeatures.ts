@@ -61,6 +61,7 @@ async function pushFeatureToMission(
     const sub = await Subscription.load(missionGuid, {
         missiontoken: missionToken,
         subscribed: true,
+        reload: false,
     });
 
     const plain = toPlainFeature(feat);
@@ -189,6 +190,7 @@ export async function updateMissionFeatureRemarks(opts: {
     const sub = await Subscription.load(opts.missionGuid, {
         missiontoken: opts.missionToken,
         subscribed: true,
+        reload: false,
     });
 
     const feats = await sub.feature.list({ refresh: true }) as Feature[];

@@ -451,7 +451,6 @@
 
 <script setup lang='ts'>
 import { ref, computed, onMounted, watch } from 'vue';
-import Subscription from '../../../../../../src/base/subscription.ts';
 import type { Feature } from '../../../../../../src/types.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import {
@@ -669,9 +668,7 @@ async function loadMissionAssets(): Promise<void> {
     }
     loadingFeatures.value = true;
     try {
-        const sub = await Subscription.load(activeMission.value.guid, {
-            missiontoken: activeMission.value.token ?? '',
-        });
+        const sub = await loadIncidentSubscription(activeMission.value);
         const feats = await sub.feature.list({ refresh: true });
         missionMarkers.value = feats
             .filter((f: Feature) => (f.geometry as { type?: string })?.type === 'Point')

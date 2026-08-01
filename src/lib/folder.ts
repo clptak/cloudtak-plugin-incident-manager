@@ -62,7 +62,14 @@ export async function ensureMissionFolder(
     sub: Subscription,
     name: string
 ): Promise<MissionLayer> {
-    let layers = await sub.layer.list({ refresh: true });
+    let layers: MissionLayer[];
+    try {
+        layers = await sub.layer.list({ refresh: true });
+    } catch {
+        // Layer refresh can fail with stale/unauthorized mission tokens;
+        // fall back to the local Dexie cache so folder reuse still works.
+        layers = await sub.layer.list();
+    }
     const existing = findLayerByName(layers, name);
     if (existing) return existing;
 

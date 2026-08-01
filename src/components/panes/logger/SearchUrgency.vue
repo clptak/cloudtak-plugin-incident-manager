@@ -270,7 +270,7 @@
 <script setup lang='ts'>
 import { reactive, ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { IconInfoCircle } from '@tabler/icons-vue';
-import Subscription from '../../../../../../src/base/subscription.ts';
+import { loadIncidentSubscription } from '../../../lib/incidentSubscription.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import { loadIcs201FromMission } from '../../../lib/ics201.ts';
 import { nowBriefingDate, nowBriefingTime } from '../../../lib/irBriefing.ts';
@@ -549,9 +549,7 @@ async function send(): Promise<void> {
     try {
         const breakdown = factors.map((f) => `${f.label}: ${f.value}`).join('; ');
         const content = `Search Urgency: ${level.value.label} (total ${total.value}/21). ${breakdown}`;
-        const sub = await Subscription.load(activeMission.value.guid, {
-            missiontoken: activeMission.value.token ?? '',
-        });
+        const sub = await loadIncidentSubscription(activeMission.value);
         await sub.log.create({
             content,
             keywords: ['search-urgency', `urgency:${level.value.label}`, `total:${total.value}`],
@@ -607,9 +605,7 @@ async function addPdfToDataSync(): Promise<void> {
             bytes,
             { missionToken: activeMission.value.token },
         );
-        const sub = await Subscription.load(activeMission.value.guid, {
-            missiontoken: activeMission.value.token ?? '',
-        });
+        const sub = await loadIncidentSubscription(activeMission.value);
         await sub.fetch();
         status.value = `Added ${URGENCY_RATING_CHART_MISSION_FILENAME} to ${activeMission.value.name}.`;
     } catch (err) {

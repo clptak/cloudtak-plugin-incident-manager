@@ -313,7 +313,7 @@
 <script setup lang='ts'>
 import { ref, computed, reactive, onMounted, watch } from 'vue';
 import { IconChevronDown } from '@tabler/icons-vue';
-import Subscription from '../../../../../../src/base/subscription.ts';
+import { loadIncidentSubscription } from '../../../lib/incidentSubscription.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import ObjectiveStrategies from './ObjectiveStrategies.vue';
 import {
@@ -482,9 +482,7 @@ async function loadRows(): Promise<void> {
     }
     loading.value = true;
     try {
-        const sub = await Subscription.load(activeMission.value.guid, {
-            missiontoken: activeMission.value.token ?? '',
-        });
+        const sub = await loadIncidentSubscription(activeMission.value);
         const logs = await sub.log.list({ refresh: true });
 
         const fresh = blankObjectiveRows();
@@ -587,7 +585,7 @@ function reset(): void {
 }
 
 async function upsertCell(
-    sub: Awaited<ReturnType<typeof Subscription.load>>,
+    sub: Awaited<ReturnType<typeof loadIncidentSubscription>>,
     text: string,
     keyword: string,
     contentLabel: string,
@@ -648,9 +646,7 @@ async function save(): Promise<void> {
     const counters = { created: 0, updated: 0, deleted: 0, failed: 0 };
 
     try {
-        const sub = await Subscription.load(activeMission.value.guid, {
-            missiontoken: activeMission.value.token ?? '',
-        });
+        const sub = await loadIncidentSubscription(activeMission.value);
 
         for (const id of pendingDeleteIds.value) {
             try {
@@ -765,9 +761,7 @@ async function addPdfToDataSync(): Promise<void> {
             bytes,
             { missionToken: activeMission.value.token },
         );
-        const sub = await Subscription.load(activeMission.value.guid, {
-            missiontoken: activeMission.value.token ?? '',
-        });
+        const sub = await loadIncidentSubscription(activeMission.value);
         await sub.fetch();
         status.value = `Added ${ICS234_MISSION_FILENAME} to ${activeMission.value.name}.`;
     } catch (err) {

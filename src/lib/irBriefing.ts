@@ -186,7 +186,7 @@ export async function loadIrBriefingFromMission(
     const form = blankIrBriefingForm();
     const sources: IrBriefingSources = { ippLatLng: null };
 
-    const sub = await Subscription.load(missionGuid, { missiontoken: missionToken ?? '' });
+    const sub = await Subscription.load(missionGuid, { missiontoken: missionToken ?? '', reload: false });
     const logs = await sub.log.list({ refresh: true });
 
     const { schema } = await loadMissionSchema(sub);

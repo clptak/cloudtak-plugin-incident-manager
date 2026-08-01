@@ -17,10 +17,11 @@
             v-else
             class='card'
         >
-            <div class='card-header d-flex align-items-center'>
+            <div class='card-header d-flex align-items-center gap-2'>
                 <h3 class='card-title mb-0 flex-grow-1'>
                     Initial Consensus
                 </h3>
+                <NavHelpButton help-key='initial-consensus' />
                 <button
                     type='button'
                     class='btn btn-primary btn-sm'
@@ -157,6 +158,7 @@
 
 <script setup lang='ts'>
 import { computed, onMounted, ref, watch } from 'vue';
+import NavHelpButton from '../../../NavHelpButton.vue';
 import ConsensusSetupModal from './ConsensusSetupModal.vue';
 import type { SetupResult } from './ConsensusSetupModal.vue';
 import ConsensusTable from './ConsensusTable.vue';
