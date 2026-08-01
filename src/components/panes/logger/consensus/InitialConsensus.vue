@@ -224,15 +224,12 @@ const sortedSegments = computed<SegmentRef[]>(() => {
         if (key === 'area') {
             return compareCallsign(a.callsign, b.callsign) * dir;
         }
-        let av = 0;
-        let bv = 0;
-        if (key === 'consensus') {
-            av = consensusForSegment(respondents, a.uid);
-            bv = consensusForSegment(respondents, b.uid);
-        } else {
-            av = respondents[key]?.values[a.uid] ?? 0;
-            bv = respondents[key]?.values[b.uid] ?? 0;
-        }
+        const av = key === 'consensus'
+            ? consensusForSegment(respondents, a.uid)
+            : (respondents[key]?.values[a.uid] ?? 0);
+        const bv = key === 'consensus'
+            ? consensusForSegment(respondents, b.uid)
+            : (respondents[key]?.values[b.uid] ?? 0);
         if (av === bv) return compareCallsign(a.callsign, b.callsign);
         return (av - bv) * dir;
     });
