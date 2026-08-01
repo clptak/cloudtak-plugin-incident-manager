@@ -187,7 +187,7 @@ async function openMission(mission: Mission, usePassword = false): Promise<void>
                 token: fetchedToken,
             });
         } else if (fetchedToken && overlay) {
-            await overlay.update({ token: fetchedToken });
+            overlay.token = fetchedToken;
         }
 
         // Persist the fresh token into the local subscription DB without a full
