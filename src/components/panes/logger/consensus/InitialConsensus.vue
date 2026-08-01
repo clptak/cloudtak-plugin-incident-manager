@@ -37,35 +37,61 @@
                     Loading…
                 </div>
                 <template v-else-if='consensus && consensus.accepted'>
-                    <table class='table table-sm table-vcenter mb-0'>
-                        <thead>
-                            <tr>
-                                <th>Area</th>
-                                <th class='text-end'>
-                                    Consensus POA
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td class='text-success'>
-                                    R.O.W.
-                                </td>
-                                <td class='text-end'>
-                                    {{ formatPoa(consensusRow(consensus.respondents)) }}
-                                </td>
-                            </tr>
-                            <tr
-                                v-for='seg in segments'
-                                :key='seg.uid'
-                            >
-                                <td>Seg. {{ seg.callsign }}</td>
-                                <td class='text-end'>
-                                    {{ formatPoa(consensusForSegment(consensus.respondents, seg.uid)) }}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div class='table-responsive'>
+                        <table class='table table-sm table-vcenter mb-0'>
+                            <thead>
+                                <tr>
+                                    <th>Area</th>
+                                    <th
+                                        v-for='(resp, idx) in consensus.respondents'
+                                        :key='idx'
+                                        class='text-end'
+                                    >
+                                        {{ resp.name }}
+                                    </th>
+                                    <th class='text-end'>
+                                        Consensus
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class='text-success'>
+                                        R.O.W.
+                                    </td>
+                                    <td
+                                        v-for='(resp, idx) in consensus.respondents'
+                                        :key='idx'
+                                        class='text-end text-primary'
+                                    >
+                                        {{ formatPoa(resp.row) }}
+                                    </td>
+                                    <td class='text-end text-success'>
+                                        {{ formatPoa(consensusRow(consensus.respondents)) }}
+                                    </td>
+                                </tr>
+                                <tr
+                                    v-for='seg in segments'
+                                    :key='seg.uid'
+                                >
+                                    <td>Seg. {{ seg.callsign }}</td>
+                                    <td
+                                        v-for='(resp, idx) in consensus.respondents'
+                                        :key='idx'
+                                        class='text-end text-primary'
+                                    >
+                                        <span
+                                            v-if='resp.method === "oconnor" && resp.letters[seg.uid]'
+                                            class='text-secondary me-1'
+                                        >({{ resp.letters[seg.uid] }})</span>{{ formatPoa(resp.values[seg.uid] ?? 0) }}
+                                    </td>
+                                    <td class='text-end text-success'>
+                                        {{ formatPoa(consensusForSegment(consensus.respondents, seg.uid)) }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </template>
                 <p
                     v-else
