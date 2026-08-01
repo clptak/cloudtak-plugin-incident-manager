@@ -41,16 +41,39 @@
                         <table class='table table-sm table-vcenter mb-0'>
                             <thead>
                                 <tr>
-                                    <th>Area</th>
+                                    <th>
+                                        <button
+                                            type='button'
+                                            class='btn btn-link p-0 border-0 align-baseline text-body'
+                                            title='Sort by area'
+                                            @click='toggleSort("area")'
+                                        >
+                                            Area{{ sortCaret('area') }}
+                                        </button>
+                                    </th>
                                     <th
                                         v-for='(resp, idx) in consensus.respondents'
                                         :key='idx'
                                         class='text-end'
                                     >
-                                        {{ resp.name }}
+                                        <button
+                                            type='button'
+                                            class='btn btn-link p-0 border-0 align-baseline text-body'
+                                            :title='`Sort by ${resp.name}`'
+                                            @click='toggleSort(idx)'
+                                        >
+                                            {{ resp.name }}{{ sortCaret(idx) }}
+                                        </button>
                                     </th>
                                     <th class='text-end'>
-                                        Consensus
+                                        <button
+                                            type='button'
+                                            class='btn btn-link p-0 border-0 align-baseline text-body'
+                                            title='Sort by consensus'
+                                            @click='toggleSort("consensus")'
+                                        >
+                                            Consensus{{ sortCaret('consensus') }}
+                                        </button>
                                     </th>
                                 </tr>
                             </thead>
@@ -71,7 +94,7 @@
                                     </td>
                                 </tr>
                                 <tr
-                                    v-for='seg in segments'
+                                    v-for='seg in sortedSegments'
                                     :key='seg.uid'
                                 >
                                     <td>
@@ -183,7 +206,52 @@ const setupFilename = ref('');
 const setupUseMyDocuments = ref(false);
 const setupRespondentCount = ref(3);
 
+type SortKey = 'area' | 'consensus' | number;
+type SortDir = 'asc' | 'desc';
+
+const sortKey = ref<SortKey>('area');
+const sortDir = ref<SortDir>('asc');
+
 const segmentUids = computed(() => segments.value.map((s) => s.uid));
+
+const sortedSegments = computed<SegmentRef[]>(() => {
+    const list = [...segments.value];
+    const dir = sortDir.value === 'asc' ? 1 : -1;
+    const key = sortKey.value;
+    const respondents = consensus.value?.respondents ?? [];
+
+    list.sort((a, b) => {
+        if (key === 'area') {
+            return compareCallsign(a.callsign, b.callsign) * dir;
+        }
+        let av = 0;
+        let bv = 0;
+        if (key === 'consensus') {
+            av = consensusForSegment(respondents, a.uid);
+            bv = consensusForSegment(respondents, b.uid);
+        } else {
+            av = respondents[key]?.values[a.uid] ?? 0;
+            bv = respondents[key]?.values[b.uid] ?? 0;
+        }
+        if (av === bv) return compareCallsign(a.callsign, b.callsign);
+        return (av - bv) * dir;
+    });
+    return list;
+});
+
+function toggleSort(key: SortKey): void {
+    if (sortKey.value === key) {
+        sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        sortKey.value = key;
+        sortDir.value = 'asc';
+    }
+}
+
+function sortCaret(key: SortKey): string {
+    if (sortKey.value !== key) return '';
+    return sortDir.value === 'asc' ? ' ▲' : ' ▼';
+}
 
 async function onFlyTo(uid: string): Promise<void> {
     status.value = '';
