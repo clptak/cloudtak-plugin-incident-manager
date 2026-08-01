@@ -8,6 +8,8 @@
  * 2. `attachFeatures` after the CoT is in the mission (races if called too soon)
  */
 import type Subscription from '../../../../src/base/subscription.ts';
+import { db } from '../../../../src/database.ts';
+import { server } from '../../../../src/std.ts';
 import type { Feature, MissionLayer } from '../../../../src/types.ts';
 
 export function sleep(ms: number): Promise<void> {
@@ -52,40 +54,105 @@ export function withMissionFolderDest(
     return wire;
 }
 
+function missionLayerHeaders(sub: Subscription): Record<string, string> {
+    const headers: Record<string, string> = {};
+    const token = sub.missiontoken || sub.layer.missiontoken;
+    if (token) headers.MissionAuthorization = token;
+    return headers;
+}
+
+/**
+ * Unwrap TAK / CloudTAK create payloads into a MissionLayer.
+ * Responses may be the layer, `{ data: layer }`, or a deeper TAKItem wrap.
+ */
+function unwrapMissionLayer(data: unknown): MissionLayer | undefined {
+    let cur: unknown = data;
+    for (let i = 0; i < 3; i++) {
+        if (!cur || typeof cur !== 'object') return undefined;
+        const obj = cur as Record<string, unknown>;
+        if (typeof obj.uid === 'string') return obj as unknown as MissionLayer;
+        if ('data' in obj) {
+            cur = obj.data;
+            continue;
+        }
+        return undefined;
+    }
+    return undefined;
+}
+
+async function persistLocalLayer(missionGuid: string, layer: MissionLayer): Promise<void> {
+    await db.subscription_layer.put({
+        uid: layer.uid,
+        mission: missionGuid,
+        layer,
+    });
+}
+
 /**
  * Ensure a root-level UID layer with the given name exists on the mission.
  * Reuses an existing layer with that name; creates one if missing.
- * Re-lists after create so we always return a fully hydrated layer uid
- * (create response is TAKItem-wrapped and not relied upon).
+ *
+ * Avoids `SubscriptionLayer.create()` because that always calls `refresh()`,
+ * which throws "Failed to fetch mission layers" when the mission token cannot
+ * list layers — even after a successful create POST.
  */
 export async function ensureMissionFolder(
     sub: Subscription,
     name: string
 ): Promise<MissionLayer> {
-    let layers: MissionLayer[];
-    try {
-        layers = await sub.layer.list({ refresh: true });
-    } catch {
-        // Layer refresh can fail with stale/unauthorized mission tokens;
-        // fall back to the local Dexie cache so folder reuse still works.
-        layers = await sub.layer.list();
-    }
-    const existing = findLayerByName(layers, name);
+    // Prefer local Dexie cache (Subscription.load uses reload:false).
+    let layers = await sub.layer.list();
+    let existing = findLayerByName(layers, name);
     if (existing) return existing;
 
-    await sub.layer.create({
-        name,
-        type: 'UID'
+    // Best-effort refresh; ignore auth/stale-token failures.
+    try {
+        layers = await sub.layer.list({ refresh: true });
+        existing = findLayerByName(layers, name);
+        if (existing) return existing;
+    } catch {
+        // continue — create via POST without a post-create refresh
+    }
+
+    const { data, error } = await server.POST('/api/marti/missions/{:name}/layer', {
+        params: {
+            path: { ':name': sub.guid },
+        },
+        headers: missionLayerHeaders(sub),
+        body: {
+            name,
+            type: 'UID',
+        },
     });
 
-    // create() already refreshes; list from local store
-    layers = await sub.layer.list();
-    const created = findLayerByName(layers, name);
-    if (!created) {
+    if (error || !data) {
         throw new Error(`Failed to create "${name}" mission folder`);
     }
 
-    return created;
+    let created = unwrapMissionLayer(data);
+
+    // If the create body was TAKItem-wrapped oddly, try one more local/server list.
+    if (!created?.uid) {
+        try {
+            layers = await sub.layer.list({ refresh: true });
+        } catch {
+            layers = await sub.layer.list();
+        }
+        created = findLayerByName(layers, name);
+    }
+
+    if (!created?.uid) {
+        throw new Error(`Failed to create "${name}" mission folder`);
+    }
+
+    const layer = {
+        ...created,
+        name: created.name || name,
+        type: created.type || 'UID',
+    } as MissionLayer;
+
+    await persistLocalLayer(sub.guid, layer);
+    return layer;
 }
 
 /**

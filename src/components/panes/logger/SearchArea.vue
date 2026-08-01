@@ -203,7 +203,7 @@
                     v-show='expanded === "statistical"'
                     class='card-body'
                 >
-                    <label class='form-label'>Subject LPB Category</label>
+                    <label class='form-label'>Arizona Subject LPB Category</label>
                     <select
                         v-model='category'
                         class='form-select form-select-sm mb-2'
@@ -215,68 +215,9 @@
                         >
                             {{ c }}
                         </option>
-                        <option value='Other'>
-                            Other
-                        </option>
                     </select>
 
-                    <template v-if='category === "Other"'>
-                        <label class='form-label'>Source and Type</label>
-                        <input
-                            v-model='otherSourceType'
-                            type='text'
-                            class='form-control form-control-sm mb-2'
-                            placeholder='e.g. Regional SAR stats — adult hiker'
-                        >
-                        <label class='form-label'>Ring Distances</label>
-                        <div class='input-group input-group-sm mb-2'>
-                            <input
-                                v-model='otherRingsInput'
-                                type='text'
-                                class='form-control'
-                                placeholder='e.g. 0.5, 1.2, 3.0'
-                            >
-                            <select
-                                v-model='otherRingsUnit'
-                                class='form-select'
-                                style='max-width: 6rem'
-                            >
-                                <option value='mi'>
-                                    mi
-                                </option>
-                                <option value='m'>
-                                    m
-                                </option>
-                            </select>
-                        </div>
-                        <div
-                            v-if='otherRingsInput && !otherRingMiles.length'
-                            class='form-text text-danger'
-                        >
-                            Enter one or more positive numbers, separated by commas or spaces.
-                        </div>
-                        <div
-                            v-else-if='otherRingMiles.length'
-                            class='form-text'
-                        >
-                            {{ otherRingMiles.length }} ring{{ otherRingMiles.length === 1 ? '' : 's' }}:
-                            <span
-                                v-for='(mi, i) in otherRingMiles'
-                                :key='i'
-                            >
-                                <span
-                                    v-if='i'
-                                    class='text-muted'
-                                > · </span>
-                                <span style='color:#ff0000'>●</span> {{ mi.toFixed(2) }} mi
-                            </span>
-                        </div>
-                    </template>
-
-                    <div
-                        v-else
-                        class='table-responsive'
-                    >
+                    <div class='table-responsive'>
                         <table class='table table-sm table-vcenter mb-0'>
                             <thead>
                                 <tr>
@@ -310,8 +251,129 @@
                         :disabled='!canPushLpb || pushing'
                         @click='onPushLpb'
                     >
-                        {{ pushing ? 'Sending…' : (category === 'Other' ? 'Add rings to DataSync' : 'Add selected rings to DataSync') }}
+                        {{ pushing ? 'Sending…' : 'Add selected rings to DataSync' }}
                     </button>
+
+                    <div class='mt-3 pt-3 border-top'>
+                        <button
+                            v-if='!showCustomSource'
+                            type='button'
+                            class='btn btn-outline-secondary btn-sm'
+                            @click='openCustomSource'
+                        >
+                            <IconPlus
+                                :size='16'
+                                class='me-1'
+                            />
+                            Add source
+                        </button>
+
+                        <div
+                            v-else
+                            class='border rounded p-3'
+                        >
+                            <div class='d-flex align-items-center justify-content-between mb-2'>
+                                <label class='form-label mb-0'>Custom LPB Source</label>
+                                <button
+                                    type='button'
+                                    class='btn btn-sm btn-link text-muted p-0'
+                                    title='Remove custom source'
+                                    @click='closeCustomSource'
+                                >
+                                    <IconX :size='18' />
+                                </button>
+                            </div>
+
+                            <label class='form-label'>Source</label>
+                            <input
+                                v-model='customSource'
+                                type='text'
+                                class='form-control form-control-sm mb-2'
+                                placeholder='e.g. Regional SAR stats'
+                            >
+
+                            <label class='form-label'>Category</label>
+                            <input
+                                v-model='customCategory'
+                                type='text'
+                                class='form-control form-control-sm mb-2'
+                                placeholder='e.g. Adult hiker'
+                            >
+
+                            <label class='form-label'>Ranges</label>
+                            <div
+                                v-for='(row, i) in customRanges'
+                                :key='i'
+                                class='input-group input-group-sm mb-2'
+                            >
+                                <input
+                                    v-model='row.label'
+                                    type='text'
+                                    class='form-control'
+                                    placeholder='Label (e.g. 25%)'
+                                    :aria-label='`Range ${i + 1} label`'
+                                >
+                                <input
+                                    v-model.number='row.distance'
+                                    type='number'
+                                    min='0'
+                                    step='any'
+                                    class='form-control'
+                                    placeholder='Distance'
+                                    style='max-width: 7rem'
+                                    :aria-label='`Range ${i + 1} distance`'
+                                >
+                                <select
+                                    v-model='row.unit'
+                                    class='form-select'
+                                    style='max-width: 5rem'
+                                    :aria-label='`Range ${i + 1} unit`'
+                                >
+                                    <option value='mi'>
+                                        mi
+                                    </option>
+                                    <option value='me'>
+                                        me
+                                    </option>
+                                </select>
+                                <button
+                                    type='button'
+                                    class='btn btn-outline-secondary'
+                                    :disabled='customRanges.length <= 1'
+                                    title='Remove range'
+                                    @click='removeCustomRange(i)'
+                                >
+                                    <IconX :size='16' />
+                                </button>
+                            </div>
+                            <button
+                                type='button'
+                                class='btn btn-outline-secondary btn-sm mb-2'
+                                :disabled='customRanges.length >= MAX_CUSTOM_RANGES'
+                                @click='addCustomRange'
+                            >
+                                <IconPlus
+                                    :size='16'
+                                    class='me-1'
+                                />
+                                Add range
+                            </button>
+                            <div
+                                v-if='customRanges.length >= MAX_CUSTOM_RANGES'
+                                class='form-text mb-2'
+                            >
+                                Maximum of {{ MAX_CUSTOM_RANGES }} ranges.
+                            </div>
+
+                            <button
+                                class='btn btn-primary btn-sm d-block'
+                                :disabled='!canPushCustomLpb || pushing'
+                                @click='onPushCustomLpb'
+                            >
+                                {{ pushing ? 'Sending…' : 'Add rings to DataSync' }}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -408,30 +470,56 @@
                             <tr><th>Area</th><th>Map Object</th><th>Area (mi²)</th><th class='text-end' /></tr>
                         </thead>
                         <tbody>
-                            <tr
-                                v-for='a in sentAreas'
-                                :key='a.key'
+                            <template
+                                v-for='row in recallRows'
+                                :key='row.rowKey'
                             >
-                                <td>{{ a.label }}</td>
-                                <td>
-                                    <FeatureCallsignCell
-                                        :uid='a.uuid'
-                                        :callsign='callsignForUid(a.uuid, a.label)'
-                                        @fly='onFlyTo(a.uuid)'
-                                    />
-                                </td>
-                                <td>{{ formatSqMi(areaForUid(a.uuid)) }}</td>
-                                <td class='text-end'>
-                                    <button
-                                        type='button'
-                                        class='btn btn-sm btn-link text-danger p-0'
-                                        :disabled='pushing'
-                                        @click='removeArea(a)'
+                                <tr
+                                    v-if='row.kind === "section"'
+                                    class='table-active'
+                                >
+                                    <td
+                                        colspan='4'
+                                        class='fw-bold small py-1'
                                     >
-                                        Remove
-                                    </button>
-                                </td>
-                            </tr>
+                                        {{ row.label }}
+                                    </td>
+                                </tr>
+                                <tr
+                                    v-else-if='row.kind === "folder"'
+                                    class='table-light'
+                                >
+                                    <td
+                                        colspan='4'
+                                        class='small text-muted py-1 ps-3'
+                                    >
+                                        {{ row.label }}
+                                    </td>
+                                </tr>
+                                <tr v-else>
+                                    <td :class='row.indent ? "ps-4" : ""'>
+                                        {{ row.area.label }}
+                                    </td>
+                                    <td>
+                                        <FeatureCallsignCell
+                                            :uid='row.area.uuid'
+                                            :callsign='callsignForUid(row.area.uuid, row.area.label)'
+                                            @fly='onFlyTo(row.area.uuid)'
+                                        />
+                                    </td>
+                                    <td>{{ formatSqMi(areaForUid(row.area.uuid)) }}</td>
+                                    <td class='text-end'>
+                                        <button
+                                            type='button'
+                                            class='btn btn-sm btn-link text-danger p-0'
+                                            :disabled='pushing'
+                                            @click='removeArea(row.area)'
+                                        >
+                                            Remove
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
                         </tbody>
                     </table>
                 </div>
@@ -474,6 +562,7 @@
 
 <script setup lang='ts'>
 import { ref, computed, reactive, watch, onMounted } from 'vue';
+import { IconPlus, IconX } from '@tabler/icons-vue';
 import type { Feature } from '../../../../../../src/types.ts';
 import azlpb from '../../../data/azlpb_table.json';
 import { parseCoordinates } from '../../../lib/coords.ts';
@@ -499,7 +588,20 @@ const LPB_RING_STYLE: RingStyle = {
     strokeWidth: 2,
     strokeStyle: 'dotted',
 };
-const OTHER_CATEGORY = 'Other';
+const AZ_LPB_SOURCE = 'AZ';
+const MAX_CUSTOM_RANGES = 4;
+
+type LpbDistanceUnit = 'mi' | 'me';
+
+interface CustomLpbRange {
+    label: string;
+    distance: number | null;
+    unit: LpbDistanceUnit;
+}
+
+function emptyCustomRange(): CustomLpbRange {
+    return { label: '', distance: null, unit: 'mi' };
+}
 
 interface MissionFeatureRef {
     uid: string;
@@ -510,12 +612,18 @@ interface MissionFeatureRef {
 
 /** A search area recalled from a DataSync log entry. */
 interface SentArea {
-    key: string;       // stable identity, e.g. 'theoretical', 'lpb:A'
+    key: string;       // stable identity, e.g. 'theoretical', 'lpb:m5k2x:A'
     label: string;     // callsign / display text
     uuid: string;      // CoT uuid of the referenced feature (entryUid)
     logId: string;     // mission-log entry id
     created: string;
+    folder?: string;   // LPB mission folder name from keywords folder:…
 }
+
+type RecallRow =
+    | { kind: 'section'; rowKey: string; label: string }
+    | { kind: 'folder'; rowKey: string; label: string }
+    | { kind: 'area'; rowKey: string; area: SentArea; indent?: boolean };
 
 /** The mission-log wrapper, widened to carry the patched `entryUid` field. */
 interface LogWriteBody {
@@ -552,9 +660,11 @@ const subjectiveUid = ref('');
 
 const categories = table.map((t) => t.category);
 const category = ref<string>(categories[0]);
-const otherSourceType = ref('');
-const otherRingsInput = ref('');
-const otherRingsUnit = ref<'mi' | 'm'>('mi');
+
+const showCustomSource = ref(false);
+const customSource = ref('');
+const customCategory = ref('');
+const customRanges = ref<CustomLpbRange[]>([emptyCustomRange()]);
 
 const QUARTILE_COLORS = { A: '#ff0000', B: '#ff0000', C: '#ff0000', D: '#ff0000' };
 
@@ -566,7 +676,6 @@ const quartiles = reactive([
 ]);
 
 function refreshQuartiles(): void {
-    if (category.value === OTHER_CATEGORY) return;
     const entry = table.find((t) => t.category === category.value);
     if (!entry) return;
     for (const q of quartiles) {
@@ -575,18 +684,43 @@ function refreshQuartiles(): void {
 }
 watch(category, refreshQuartiles, { immediate: true });
 
-function parseRingDistances(input: string): number[] {
-    return input
-        .split(/[,\s]+/)
-        .map((s) => parseFloat(s.trim()))
-        .filter((n) => Number.isFinite(n) && n > 0);
+function openCustomSource(): void {
+    showCustomSource.value = true;
+    if (!customRanges.value.length) customRanges.value = [emptyCustomRange()];
 }
 
-const otherRingMiles = computed(() => {
-    const values = parseRingDistances(otherRingsInput.value);
-    if (otherRingsUnit.value === 'mi') return values;
-    return values.map((m) => m / MILES_TO_METERS);
-});
+function closeCustomSource(): void {
+    showCustomSource.value = false;
+    customSource.value = '';
+    customCategory.value = '';
+    customRanges.value = [emptyCustomRange()];
+}
+
+function addCustomRange(): void {
+    if (customRanges.value.length >= MAX_CUSTOM_RANGES) return;
+    customRanges.value.push(emptyCustomRange());
+}
+
+function removeCustomRange(index: number): void {
+    if (customRanges.value.length <= 1) return;
+    customRanges.value.splice(index, 1);
+}
+
+function distanceToMiles(distance: number, unit: LpbDistanceUnit): number {
+    return unit === 'mi' ? distance : distance / MILES_TO_METERS;
+}
+
+/** Valid custom ranges ready to push (label + positive distance). */
+const validCustomRanges = computed(() =>
+    customRanges.value
+        .map((row) => {
+            const label = row.label.trim();
+            const dist = typeof row.distance === 'number' ? row.distance : NaN;
+            if (!label || !Number.isFinite(dist) || dist <= 0) return null;
+            return { label, miles: distanceToMiles(dist, row.unit) };
+        })
+        .filter((r): r is { label: string; miles: number } => r !== null),
+);
 
 // Theoretical
 const timeMissing = ref('');
@@ -681,12 +815,20 @@ async function loadAreas(sub?: LoadedSub): Promise<void> {
             if (!log.keywords?.includes(SEARCH_AREA_KEYWORD)) continue;
             const key = kw(log.keywords, 'area:');
             const uuid = kw(log.keywords, 'uid:');
+            const folder = kw(log.keywords, 'folder:') || undefined;
             // Segments moved to mission_schema.json; skip legacy segment logs here.
             if (!key || !uuid || key.startsWith('segment:')) continue;
             const created = log.created || log.dtg || '';
             const prev = byKey.get(key);
             if (!prev || Date.parse(created) >= Date.parse(prev.created)) {
-                byKey.set(key, { key, label: log.content || key, uuid, logId: String(log.id), created });
+                byKey.set(key, {
+                    key,
+                    label: log.content || key,
+                    uuid,
+                    logId: String(log.id),
+                    created,
+                    folder,
+                });
             }
         }
         sentAreas.value = [...byKey.values()].sort((a, b) => rank(a.key) - rank(b.key) || a.key.localeCompare(b.key));
@@ -720,6 +862,52 @@ function rank(key: string): number {
     if (key === 'subjective') return 3;
     return 9;
 }
+
+/** Grouped recall table: IPP/Theoretical, Statistical (by folder), Subjective. */
+const recallRows = computed((): RecallRow[] => {
+    const areas = sentAreas.value;
+    const rows: RecallRow[] = [];
+
+    const ipp = areas.find((a) => a.key === IPP_KEY);
+    if (ipp) rows.push({ kind: 'area', rowKey: ipp.key, area: ipp });
+
+    const theoretical = areas.find((a) => a.key === 'theoretical');
+    if (theoretical) rows.push({ kind: 'area', rowKey: theoretical.key, area: theoretical });
+
+    const lpbAreas = areas
+        .filter((a) => a.key.startsWith('lpb:'))
+        .sort((a, b) => (a.folder || 'Unfiled').localeCompare(b.folder || 'Unfiled')
+            || a.key.localeCompare(b.key));
+
+    if (lpbAreas.length) {
+        rows.push({ kind: 'section', rowKey: 'section:statistical', label: 'Statistical' });
+        const byFolder = new Map<string, SentArea[]>();
+        for (const a of lpbAreas) {
+            const name = a.folder || 'Unfiled';
+            const list = byFolder.get(name) ?? [];
+            list.push(a);
+            byFolder.set(name, list);
+        }
+        for (const [folderName, rings] of byFolder) {
+            rows.push({ kind: 'folder', rowKey: `folder:${folderName}`, label: folderName });
+            for (const a of rings) {
+                rows.push({ kind: 'area', rowKey: a.key, area: a, indent: true });
+            }
+        }
+    }
+
+    const subjective = areas.find((a) => a.key === 'subjective');
+    if (subjective) rows.push({ kind: 'area', rowKey: subjective.key, area: subjective });
+
+    // Any unexpected keys (keep visible)
+    const known = new Set(rows.filter((r): r is Extract<RecallRow, { kind: 'area' }> => r.kind === 'area').map((r) => r.area.key));
+    for (const a of areas) {
+        if (known.has(a.key)) continue;
+        rows.push({ kind: 'area', rowKey: a.key, area: a });
+    }
+
+    return rows;
+});
 
 /** Load point markers and polygons from the active DataSync mission. */
 async function loadFeatures(sub?: LoadedSub): Promise<void> {
@@ -818,13 +1006,21 @@ const ippCenter = computed<[number, number] | null>(() => {
 });
 
 /** Upsert a log entry that references an existing CoT feature (no feature created). */
-async function writeAreaLog(sub: LoadedSub, key: string, content: string, uuid: string): Promise<void> {
+async function writeAreaLog(
+    sub: LoadedSub,
+    key: string,
+    content: string,
+    uuid: string,
+    opts?: { folder?: string },
+): Promise<void> {
     const existing = sentAreas.value.find((a) => a.key === key);
     const log = sub.log as unknown as LogApi;
+    const keywords = [SEARCH_AREA_KEYWORD, `area:${key}`, `uid:${uuid}`];
+    if (opts?.folder) keywords.push(`folder:${opts.folder}`);
     const body: LogWriteBody = {
         dtg: new Date().toISOString(),
         content,
-        keywords: [SEARCH_AREA_KEYWORD, `area:${key}`, `uid:${uuid}`],
+        keywords,
         entryUid: uuid,
     };
     if (existing?.logId) await log.update(existing.logId, body);
@@ -874,8 +1070,12 @@ async function setIpp(): Promise<void> {
 
 const canPushLpb = computed(() => {
     if (!ippCenter.value) return false;
-    if (category.value === OTHER_CATEGORY) return otherRingMiles.value.length > 0;
     return quartiles.some((q) => q.selected);
+});
+const canPushCustomLpb = computed(() => {
+    if (!ippCenter.value) return false;
+    if (!customSource.value.trim() || !customCategory.value.trim()) return false;
+    return validCustomRanges.value.length > 0;
 });
 const canPushTheoretical = computed(() => !!ippCenter.value && theoreticalMiles.value > 0);
 
@@ -908,6 +1108,33 @@ async function upsertRing(
     return uuid;
 }
 
+/** Always insert a new LPB ring CoT (never reuse prior uuid/key). */
+async function insertLpbRing(
+    sub: LoadedSub,
+    key: string,
+    miles: number,
+    label: string,
+    folderName: string,
+    folderUid?: string,
+): Promise<string> {
+    const center = ippCenter.value;
+    if (!center) throw new Error('No IPP center set.');
+    const ring = circleRing(center[0], center[1], milesToMeters(miles));
+
+    const uuid = await pushPolygonToMission({
+        missionGuid: activeMission.value!.guid,
+        missionToken: missionAuthToken(activeMission.value!),
+        callsign: label,
+        ring,
+        center,
+        style: LPB_RING_STYLE,
+        folderUid,
+    });
+
+    await writeAreaLog(sub, key, label, uuid, { folder: folderName });
+    return uuid;
+}
+
 async function onPushTheoretical(): Promise<void> {
     if (!requireActiveMission()) return;
     await pushTheoretical();
@@ -918,19 +1145,27 @@ async function pushTheoretical(): Promise<void> {
     pushing.value = true; status.value = ''; statusError.value = false;
     try {
         const sub = await loadSub();
-        const folder = await ensureMissionFolder(sub, SEARCH_AREA_FOLDER);
+        let folderUid: string | undefined;
+        try {
+            const folder = await ensureMissionFolder(sub, SEARCH_AREA_FOLDER);
+            folderUid = folder.uid;
+        } catch (folderErr) {
+            console.warn(folderErr);
+        }
         const uuid = await upsertRing(sub, 'theoretical', theoreticalMiles.value, `Theoretical ${theoreticalMiles.value.toFixed(1)}mi`, {
             stroke: '#ff9900',
             fillOpacity: 0.1,
-        }, folder.uid);
+        }, folderUid);
         // Backup filing in case dest.path was ignored on ingest; best-effort only.
-        try {
-            await attachFeaturesToFolder(sub, folder.uid, [uuid]);
-        } catch (attachErr) {
-            console.warn(attachErr);
+        if (folderUid) {
+            try {
+                await attachFeaturesToFolder(sub, folderUid, [uuid]);
+            } catch (attachErr) {
+                console.warn(attachErr);
+            }
         }
         await loadAreas(sub);
-        status.value = `Saved theoretical ring (${theoreticalMiles.value.toFixed(1)} mi) to ${activeMission.value.name} (${SEARCH_AREA_FOLDER}).`;
+        status.value = `Saved theoretical ring (${theoreticalMiles.value.toFixed(1)} mi) to ${activeMission.value.name}${folderUid ? ` (${SEARCH_AREA_FOLDER})` : ''}.`;
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);
@@ -944,11 +1179,45 @@ async function onPushLpb(): Promise<void> {
     await pushLpb();
 }
 
-/** Mission folder name for the selected LPB category, e.g. "Search-Hiker" → "LPB Hiker". */
-function lpbFolderName(): string {
-    const cat = category.value;
-    const suffix = cat === OTHER_CATEGORY ? 'Other' : cat.slice(cat.indexOf('-') + 1).trim();
-    return `LPB ${suffix}`;
+async function onPushCustomLpb(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await pushCustomLpb();
+}
+
+/** Mission folder name: "LPB {category} - {source}". */
+function lpbFolderName(categoryName: string, source: string): string {
+    return `LPB ${categoryName} - ${source}`;
+}
+
+/** Ring callsign: "{label} {category} {source}". */
+function lpbRingCallsign(label: string, categoryName: string, source: string): string {
+    return `${label} ${categoryName} ${source}`;
+}
+
+/** Names already used by LPB folders (layers + recalled log keywords). */
+async function takenLpbFolderNames(sub: LoadedSub): Promise<Set<string>> {
+    const taken = new Set<string>();
+    for (const a of sentAreas.value) {
+        if (a.folder) taken.add(a.folder);
+    }
+    try {
+        const layers = await sub.layer.list();
+        for (const layer of layers) {
+            if (layer.name) taken.add(layer.name);
+        }
+    } catch {
+        // Local layer cache may be empty; log-derived names still apply.
+    }
+    return taken;
+}
+
+/** Next free folder name: base, base (2), base (3), … */
+async function uniqueLpbFolderName(sub: LoadedSub, base: string): Promise<string> {
+    const taken = await takenLpbFolderNames(sub);
+    if (!taken.has(base)) return base;
+    let n = 2;
+    while (taken.has(`${base} (${n})`)) n += 1;
+    return `${base} (${n})`;
 }
 
 async function pushLpb(): Promise<void> {
@@ -956,43 +1225,87 @@ async function pushLpb(): Promise<void> {
     pushing.value = true; status.value = ''; statusError.value = false;
     try {
         const sub = await loadSub();
-        const folder = await ensureMissionFolder(sub, lpbFolderName());
-        const postedUids: string[] = [];
-        if (category.value === OTHER_CATEGORY) {
-            const source = otherSourceType.value.trim() || 'Other';
-            for (let i = 0; i < otherRingMiles.value.length; i++) {
-                const miles = otherRingMiles.value[i];
-                postedUids.push(await upsertRing(
-                    sub,
-                    `lpb:other:${i}`,
-                    miles,
-                    `${source} ${miles.toFixed(1)}mi`,
-                    LPB_RING_STYLE,
-                    folder.uid,
-                ));
-            }
-        } else {
-            for (const q of quartiles) {
-                if (!q.selected) continue;
-                postedUids.push(await upsertRing(
-                    sub,
-                    `lpb:${q.key}`,
-                    q.miles,
-                    `${category.value} ${q.pct} (${q.miles.toFixed(1)}mi)`,
-                    LPB_RING_STYLE,
-                    folder.uid,
-                ));
-            }
-        }
-        // Backup filing in case dest.path was ignored on ingest; best-effort only.
+        const cat = category.value;
+        const pushId = Date.now().toString(36);
+        const folderName = await uniqueLpbFolderName(sub, lpbFolderName(cat, AZ_LPB_SOURCE));
+        let folderUid: string | undefined;
         try {
-            await attachFeaturesToFolder(sub, folder.uid, postedUids);
-        } catch (attachErr) {
-            console.warn(attachErr);
+            const folder = await ensureMissionFolder(sub, folderName);
+            folderUid = folder.uid;
+        } catch (folderErr) {
+            console.warn(folderErr);
+        }
+        const postedUids: string[] = [];
+        for (const q of quartiles) {
+            if (!q.selected) continue;
+            postedUids.push(await insertLpbRing(
+                sub,
+                `lpb:${pushId}:${q.key}`,
+                q.miles,
+                lpbRingCallsign(q.pct, cat, AZ_LPB_SOURCE),
+                folderName,
+                folderUid,
+            ));
+        }
+        if (folderUid) {
+            try {
+                await attachFeaturesToFolder(sub, folderUid, postedUids);
+            } catch (attachErr) {
+                console.warn(attachErr);
+            }
         }
         await loadAreas(sub);
         const n = postedUids.length;
-        status.value = `Saved ${n} LPB ring${n === 1 ? '' : 's'} to ${activeMission.value.name} (${lpbFolderName()}).`;
+        status.value = `Saved ${n} LPB ring${n === 1 ? '' : 's'} to ${activeMission.value.name}${folderUid ? ` (${folderName})` : ''}.`;
+    } catch (err) {
+        statusError.value = true;
+        status.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        pushing.value = false;
+    }
+}
+
+async function pushCustomLpb(): Promise<void> {
+    if (!ippCenter.value || !activeMission.value) return;
+    const source = customSource.value.trim();
+    const cat = customCategory.value.trim();
+    const ranges = validCustomRanges.value;
+    if (!source || !cat || !ranges.length) return;
+
+    pushing.value = true; status.value = ''; statusError.value = false;
+    try {
+        const sub = await loadSub();
+        const pushId = Date.now().toString(36);
+        const folderName = await uniqueLpbFolderName(sub, lpbFolderName(cat, source));
+        let folderUid: string | undefined;
+        try {
+            const folder = await ensureMissionFolder(sub, folderName);
+            folderUid = folder.uid;
+        } catch (folderErr) {
+            console.warn(folderErr);
+        }
+        const postedUids: string[] = [];
+        for (let i = 0; i < ranges.length; i++) {
+            const row = ranges[i];
+            postedUids.push(await insertLpbRing(
+                sub,
+                `lpb:${pushId}:${i}`,
+                row.miles,
+                lpbRingCallsign(row.label, cat, source),
+                folderName,
+                folderUid,
+            ));
+        }
+        if (folderUid) {
+            try {
+                await attachFeaturesToFolder(sub, folderUid, postedUids);
+            } catch (attachErr) {
+                console.warn(attachErr);
+            }
+        }
+        await loadAreas(sub);
+        const n = postedUids.length;
+        status.value = `Saved ${n} LPB ring${n === 1 ? '' : 's'} to ${activeMission.value.name}${folderUid ? ` (${folderName})` : ''}.`;
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);
