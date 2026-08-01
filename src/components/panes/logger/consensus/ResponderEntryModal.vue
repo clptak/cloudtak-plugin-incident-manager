@@ -54,7 +54,14 @@
                                         :key='seg.uid'
                                     >
                                         <th class='text-end'>
-                                            Seg. {{ seg.callsign }}
+                                            <button
+                                                type='button'
+                                                class='btn btn-link p-0 border-0 align-baseline text-end'
+                                                title='Center the map on this segment'
+                                                @click='onFlyTo(seg.uid)'
+                                            >
+                                                Seg. {{ seg.callsign }}
+                                            </button>
                                         </th>
                                         <td>
                                             <select
@@ -137,6 +144,12 @@
                         </div>
                     </div>
                     <div
+                        v-if='flyError'
+                        class='text-danger small mt-2'
+                    >
+                        {{ flyError }}
+                    </div>
+                    <div
                         v-if='error'
                         class='text-danger small mt-2'
                     >
@@ -175,6 +188,7 @@ import {
     type ConsensusRespondent,
     type OconnorLetter,
 } from '../../../../lib/consensus.ts';
+import { flyToFeature } from '../../../../lib/flyToFeature.ts';
 
 export interface SegmentRef {
     uid: string;
@@ -206,10 +220,19 @@ for (const seg of props.segments) {
 }
 
 const error = ref('');
+const flyError = ref('');
 
 const mattsonTotal = computed(() =>
     props.segments.reduce((sum, seg) => sum + (Number(values[seg.uid]) || 0), (Number(row.value) || 0)),
 );
+
+async function onFlyTo(uid: string): Promise<void> {
+    flyError.value = '';
+    const found = await flyToFeature(uid);
+    if (!found) {
+        flyError.value = 'Feature is not on the map yet — try Refresh map objects in Segmentation.';
+    }
+}
 
 function onAccept(): void {
     const uids = props.segments.map((s) => s.uid);

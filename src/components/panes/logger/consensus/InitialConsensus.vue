@@ -74,7 +74,16 @@
                                     v-for='seg in segments'
                                     :key='seg.uid'
                                 >
-                                    <td>Seg. {{ seg.callsign }}</td>
+                                    <td>
+                                        <button
+                                            type='button'
+                                            class='btn btn-link p-0 border-0 align-baseline text-start'
+                                            title='Center the map on this segment'
+                                            @click='onFlyTo(seg.uid)'
+                                        >
+                                            Seg. {{ seg.callsign }}
+                                        </button>
+                                    </td>
                                     <td
                                         v-for='(resp, idx) in consensus.respondents'
                                         :key='idx'
@@ -144,6 +153,7 @@ import {
     type ConsensusRespondent,
     type InitialConsensusState,
 } from '../../../../lib/consensus.ts';
+import { flyToFeature } from '../../../../lib/flyToFeature.ts';
 
 /** ICS segment labels are numeric; sort them numerically for display. */
 function compareCallsign(a: string, b: string): number {
@@ -174,6 +184,16 @@ const setupUseMyDocuments = ref(false);
 const setupRespondentCount = ref(3);
 
 const segmentUids = computed(() => segments.value.map((s) => s.uid));
+
+async function onFlyTo(uid: string): Promise<void> {
+    status.value = '';
+    statusError.value = false;
+    const found = await flyToFeature(uid);
+    if (!found) {
+        statusError.value = true;
+        status.value = 'Feature is not on the map yet — try Refresh map objects in Segmentation.';
+    }
+}
 
 async function loadAll(): Promise<void> {
     if (!activeMission.value) {
