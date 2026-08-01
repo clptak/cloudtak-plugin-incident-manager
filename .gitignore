@@ -23,6 +23,7 @@ docs/*.md
 !docs/establishing_search_area_3_subjective.md
 !docs/segmenting.md
 !docs/resource_summary.md
+!docs/consensus_summary.md
 docs/*.txt
 node sar-publications-scraper.js
 docs/attribution_example.html
