@@ -145,11 +145,11 @@ async function fetchMissions(): Promise<void> {
 async function openMission(mission: Mission, usePassword = false): Promise<void> {
     error.value = '';
 
-    const alreadyLoaded = !!OverlayManager.loadedByMode('mission', mission.guid);
+    const overlay = OverlayManager.loadedByMode('mission', mission.guid);
+    const alreadyLoaded = !!overlay;
 
-    // Password-protected missions that aren't loaded yet need a mission
-    // token first - reveal the inline password input on first click.
-    if (mission.passwordProtected && !alreadyLoaded && !usePassword) {
+    // Password-protected missions that aren't unlocked yet need a mission token.
+    if (mission.passwordProtected && !usePassword) {
         missionPasswords.value[mission.guid] = missionPasswords.value[mission.guid] ?? '';
         return;
     }
@@ -157,12 +157,18 @@ async function openMission(mission: Mission, usePassword = false): Promise<void>
     openingGuid.value = mission.guid;
     try {
         let fetchedToken: string | undefined;
-        if (mission.passwordProtected && !alreadyLoaded && usePassword) {
-            passwordErrors.value[mission.guid] = undefined;
-            try {
-                const getMission = await fetchMission(mission, missionPasswords.value[mission.guid]);
-                fetchedToken = getMission.token || undefined;
-            } catch (err) {
+        passwordErrors.value[mission.guid] = undefined;
+
+        // Always fetch a fresh server token on open. Local/overlay tokens can be
+        // stale (wrong mission) and still look "present", which breaks layer APIs.
+        try {
+            const password = mission.passwordProtected
+                ? missionPasswords.value[mission.guid]
+                : undefined;
+            const getMission = await fetchMission(mission, password);
+            fetchedToken = getMission.token || undefined;
+        } catch (err) {
+            if (mission.passwordProtected) {
                 passwordErrors.value[mission.guid] = err instanceof Error && err.message.includes('Illegal attempt to access mission')
                     ? 'Invalid Password'
                     : err instanceof Error ? err.message : String(err);
@@ -180,14 +186,30 @@ async function openMission(mission: Mission, usePassword = false): Promise<void>
                 mode_id: mission.guid,
                 token: fetchedToken,
             });
+        } else if (fetchedToken && overlay) {
+            await overlay.update({ token: fetchedToken });
         }
+
+        // Persist the fresh token into the local subscription DB without a full
+        // layer refresh (reload:true was failing open for stale tokens).
+        if (fetchedToken) {
+            await Subscription.load(mission.guid, {
+                missiontoken: fetchedToken,
+                subscribed: true,
+                reload: false,
+            });
+        }
+
         const sub = await mapStore.loadMission(mission.guid);
         if (sub) await mapStore.makeActiveMission(sub);
+
+        const finalToken = fetchedToken || sub?.missiontoken || undefined;
 
         setActiveMission({
             guid: mission.guid,
             name: mission.name,
-            missionToken: sub?.missiontoken || fetchedToken || undefined,
+            missionToken: finalToken,
+            token: finalToken,
         });
 
         delete missionPasswords.value[mission.guid];

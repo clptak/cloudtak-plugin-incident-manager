@@ -1,0 +1,187 @@
+/**
+ * CASIE Initial Consensus math and validation.
+ *
+ * Methods:
+ * - Mattson: each respondent distributes exactly 100 points across R.O.W. + segments.
+ * - O'Connor: R.O.W. is a percentage; each segment gets a letter A–I (A = very
+ *   likely … I = very unlikely). Letters map to weights A=9 … I=1 and the
+ *   remaining (100 − R.O.W.) percent is split proportionally to the weights.
+ * - Proportional: each value (incl. R.O.W.) is an independent 0–100 rating.
+ *
+ * The consensus column is the arithmetic mean across respondents per row.
+ */
+
+export type ConsensusMethod = 'mattson' | 'oconnor' | 'proportional';
+
+export const OCONNOR_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'] as const;
+export type OconnorLetter = (typeof OCONNOR_LETTERS)[number];
+
+/** A=9 down to I=1. */
+export const OCONNOR_WEIGHTS: Record<OconnorLetter, number> = {
+    A: 9, B: 8, C: 7, D: 6, E: 5, F: 4, G: 3, H: 2, I: 1,
+};
+
+export const MAX_RESPONDENTS = 10;
+
+export interface ConsensusRespondent {
+    /** Display name; defaults to "Responder N". */
+    name: string;
+    method: ConsensusMethod;
+    /** Rest of the World percentage (0–100). */
+    row: number;
+    /** O'Connor letter per segment UID (only meaningful when method is oconnor). */
+    letters: Record<string, OconnorLetter>;
+    /** POA value per segment UID (derived from letters for O'Connor). */
+    values: Record<string, number>;
+}
+
+export interface InitialConsensusState {
+    /** Mirrors incident_response.incident_name at last save. */
+    incident_name: string;
+    /** WinC.A.S.I.E. III export placeholder fields. */
+    filename: string;
+    use_my_documents: boolean;
+    respondents: ConsensusRespondent[];
+    accepted: boolean;
+    updated: string;
+}
+
+export function methodLabel(method: ConsensusMethod): string {
+    if (method === 'mattson') return 'Mattson';
+    if (method === 'oconnor') return "O'Connor";
+    return 'Proportional';
+}
+
+export function defaultRespondent(index: number, segmentUids: string[]): ConsensusRespondent {
+    const values: Record<string, number> = {};
+    for (const uid of segmentUids) values[uid] = 0;
+    return {
+        name: `Responder ${index + 1}`,
+        method: 'mattson',
+        row: 100,
+        letters: {},
+        values,
+    };
+}
+
+export function defaultConsensusState(
+    incidentName: string,
+    segmentUids: string[],
+    respondentCount: number,
+): InitialConsensusState {
+    const respondents: ConsensusRespondent[] = [];
+    for (let i = 0; i < respondentCount; i++) {
+        respondents.push(defaultRespondent(i, segmentUids));
+    }
+    return {
+        incident_name: incidentName,
+        filename: incidentName,
+        use_my_documents: false,
+        respondents,
+        accepted: false,
+        updated: new Date().toISOString(),
+    };
+}
+
+/** Grow/shrink the respondent list, preserving existing entries. */
+export function resizeRespondents(
+    respondents: ConsensusRespondent[],
+    count: number,
+    segmentUids: string[],
+): ConsensusRespondent[] {
+    const next = respondents.slice(0, count);
+    while (next.length < count) {
+        next.push(defaultRespondent(next.length, segmentUids));
+    }
+    return next;
+}
+
+/** Ensure every segment UID has a value entry; drop values for removed segments. */
+export function alignRespondentToSegments(
+    resp: ConsensusRespondent,
+    segmentUids: string[],
+): void {
+    const values: Record<string, number> = {};
+    const letters: Record<string, OconnorLetter> = {};
+    for (const uid of segmentUids) {
+        values[uid] = typeof resp.values[uid] === 'number' ? resp.values[uid] : 0;
+        if (resp.letters[uid]) letters[uid] = resp.letters[uid];
+    }
+    resp.values = values;
+    resp.letters = letters;
+}
+
+/** Derive O'Connor segment POAs from R.O.W. + letters. */
+export function oconnorValues(
+    row: number,
+    letters: Record<string, OconnorLetter>,
+    segmentUids: string[],
+): Record<string, number> {
+    const out: Record<string, number> = {};
+    let totalWeight = 0;
+    for (const uid of segmentUids) {
+        const letter = letters[uid];
+        totalWeight += letter ? OCONNOR_WEIGHTS[letter] : 0;
+    }
+    const remaining = 100 - row;
+    for (const uid of segmentUids) {
+        const letter = letters[uid];
+        out[uid] = letter && totalWeight > 0
+            ? (remaining * OCONNOR_WEIGHTS[letter]) / totalWeight
+            : 0;
+    }
+    return out;
+}
+
+function mean(values: number[]): number {
+    if (!values.length) return 0;
+    return values.reduce((sum, v) => sum + v, 0) / values.length;
+}
+
+export function consensusRow(respondents: ConsensusRespondent[]): number {
+    return mean(respondents.map((r) => r.row));
+}
+
+export function consensusForSegment(
+    respondents: ConsensusRespondent[],
+    uid: string,
+): number {
+    return mean(respondents.map((r) => r.values[uid] ?? 0));
+}
+
+export function formatPoa(value: number): string {
+    return value.toFixed(2);
+}
+
+const SUM_TOLERANCE = 0.005;
+
+/** Returns an error message when the respondent's entry is invalid, else null. */
+export function validateRespondentEntry(
+    resp: ConsensusRespondent,
+    segmentUids: string[],
+): string | null {
+    if (!Number.isFinite(resp.row) || resp.row < 0 || resp.row > 100) {
+        return 'R.O.W. must be a number between 0 and 100.';
+    }
+    if (resp.method === 'oconnor') {
+        for (const uid of segmentUids) {
+            if (!resp.letters[uid]) {
+                return 'Every segment requires a letter (A–I).';
+            }
+        }
+        return null;
+    }
+    for (const uid of segmentUids) {
+        const v = resp.values[uid];
+        if (!Number.isFinite(v) || v < 0 || v > 100) {
+            return 'Every segment requires a number between 0 and 100.';
+        }
+    }
+    if (resp.method === 'mattson') {
+        const total = resp.row + segmentUids.reduce((sum, uid) => sum + (resp.values[uid] ?? 0), 0);
+        if (Math.abs(total - 100) > SUM_TOLERANCE) {
+            return `All 100 points must be used: R.O.W. + segments currently total ${total.toFixed(2)}.`;
+        }
+    }
+    return null;
+}

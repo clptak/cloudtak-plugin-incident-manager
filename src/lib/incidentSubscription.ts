@@ -18,11 +18,15 @@ export async function loadIncidentSubscription(
     mission: ActiveMission,
     opts?: {
         onMissionToken?: (missionToken: string) => void;
+        reload?: boolean;
     },
 ): Promise<Subscription> {
     const sub = await Subscription.load(mission.guid, {
         missiontoken: missionAuthToken(mission),
         subscribed: true,
+        // Default false: full refresh pulls mission layers and throws
+        // "Failed to fetch mission layers" when the stored token is stale.
+        reload: opts?.reload ?? false,
     });
     if (sub.missiontoken && sub.missiontoken !== missionAuthToken(mission)) {
         opts?.onMissionToken?.(sub.missiontoken);

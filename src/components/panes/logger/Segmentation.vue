@@ -164,6 +164,7 @@ import FeatureCallsignCell from '../../FeatureCallsignCell.vue';
 import { flyToFeature } from '../../../lib/flyToFeature.ts';
 import { areaSqMi, formatSqMi } from '../../../lib/geometryArea.ts';
 import { ensureMissionFolder } from '../../../lib/folder.ts';
+import { missionAuthToken } from '../../../lib/incidentSubscription.ts';
 
 const SEGMENTS_FOLDER = 'Segments';
 
@@ -212,7 +213,10 @@ const availablePolygons = computed(() =>
 
 async function loadSub(): Promise<Awaited<ReturnType<typeof Subscription.load>>> {
     return Subscription.load(activeMission.value!.guid, {
-        missiontoken: activeMission.value!.token ?? '',
+        missiontoken: missionAuthToken(activeMission.value!),
+        // Avoid Subscription.refresh → layer.refresh during picker load;
+        // feature.list({ refresh: true }) refreshes CoTs only.
+        reload: false,
     });
 }
 
