@@ -23,6 +23,15 @@
                 </h3>
                 <NavHelpButton help-key='initial-consensus' />
                 <button
+                    v-if='consensus && consensus.accepted'
+                    type='button'
+                    class='btn btn-outline-primary btn-sm'
+                    :disabled='!segments.length'
+                    @click='onGenerateWc3'
+                >
+                    Generate WC3 Files
+                </button>
+                <button
                     type='button'
                     class='btn btn-primary btn-sm'
                     @click='openSetup'
@@ -179,6 +188,7 @@ import {
     type InitialConsensusState,
 } from '../../../../lib/consensus.ts';
 import { flyToFeature } from '../../../../lib/flyToFeature.ts';
+import { downloadWc3Zip } from '../../../../lib/wc3Export.ts';
 
 /** ICS segment labels are numeric; sort them numerically for display. */
 function compareCallsign(a: string, b: string): number {
@@ -399,6 +409,22 @@ async function onTableAccept(): Promise<void> {
 function onTableCancel(): void {
     view.value = 'card';
     void loadAll();
+}
+
+function onGenerateWc3(): void {
+    if (!consensus.value?.accepted || !segments.value.length) return;
+    status.value = '';
+    statusError.value = false;
+    try {
+        const ordered = [...segments.value].sort((a, b) =>
+            compareCallsign(a.callsign, b.callsign),
+        );
+        const zipName = downloadWc3Zip(consensus.value, ordered);
+        status.value = `Downloaded ${zipName}.`;
+    } catch (err) {
+        statusError.value = true;
+        status.value = `Could not generate WC3 files: ${err instanceof Error ? err.message : String(err)}`;
+    }
 }
 
 watch(activeMission, () => {
