@@ -419,7 +419,7 @@ function drawCommsRow(
     form: IrBriefingForm,
     top: number,
 ): number {
-    let y = drawSectionTitle(page, bold, 'Communications', top);
+    const y = drawSectionTitle(page, bold, 'Communications', top);
     const gap = 10;
     const colW = (CONTENT_W - gap * 2) / 3;
     drawLabelValuePair(page, font, bold, 'Repeated', form.adamRepeatedChannel, MARGIN_X, y, colW);

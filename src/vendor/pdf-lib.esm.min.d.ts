@@ -19,7 +19,7 @@ export interface PDFPage {
     getSize(): { width: number; height: number };
     drawText(
         text: string,
-        options: { x: number; y: number; size: number; font: PDFFont },
+        options: { x: number; y: number; size: number; font: PDFFont; color?: RGB },
     ): void;
     drawRectangle(options: {
         x: number;
@@ -27,6 +27,7 @@ export interface PDFPage {
         width: number;
         height: number;
         color?: RGB;
+        borderColor?: RGB;
         borderWidth?: number;
     }): void;
     drawPage(
