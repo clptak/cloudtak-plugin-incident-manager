@@ -293,6 +293,22 @@
                     >
                         {{ uploading ? 'Uploading…' : 'Add SAR-Briefing.pdf to DataSync' }}
                     </button>
+                    <button
+                        type='button'
+                        class='btn btn-outline-secondary btn-sm'
+                        :disabled='exportingNew'
+                        @click='downloadPdfNew'
+                    >
+                        {{ exportingNew ? 'Generating PDF…' : 'Download SAR Briefing PDF (New)' }}
+                    </button>
+                    <button
+                        type='button'
+                        class='btn btn-outline-secondary btn-sm'
+                        :disabled='uploadingNew'
+                        @click='onAddPdfNewToDataSync'
+                    >
+                        {{ uploadingNew ? 'Uploading…' : 'Add SAR-Briefing-New.pdf to DataSync' }}
+                    </button>
                 </div>
             </div>
         </div>
@@ -316,6 +332,11 @@ import {
     defaultSarBriefingFilename,
     SAR_BRIEFING_MISSION_FILENAME,
 } from '../../../lib/sarBriefingPdf.ts';
+import {
+    buildSarBriefingModernPdf,
+    defaultSarBriefingModernFilename,
+    SAR_BRIEFING_MODERN_MISSION_FILENAME,
+} from '../../../lib/sarBriefingModernPdf.ts';
 import { downloadPdfBytes, uploadMissionFile } from '../../../lib/missionUpload.ts';
 
 const { activeMission, requireActiveMission } = useIncident();
@@ -325,6 +346,8 @@ const loading = ref(false);
 const refreshing = ref(false);
 const exporting = ref(false);
 const uploading = ref(false);
+const exportingNew = ref(false);
+const uploadingNew = ref(false);
 const pdfExpanded = ref(true);
 const status = ref('');
 const statusError = ref(false);
@@ -433,8 +456,16 @@ async function refreshSources(): Promise<void> {
     }
 }
 
+function formSnapshot(): IrBriefingForm {
+    return { ...form, subjects: [...form.subjects] as IrBriefingForm['subjects'] };
+}
+
 async function generatePdfBytes(): Promise<Uint8Array> {
-    return buildSarBriefingPdf({ ...form, subjects: [...form.subjects] as IrBriefingForm['subjects'] });
+    return buildSarBriefingPdf(formSnapshot());
+}
+
+async function generateModernPdfBytes(): Promise<Uint8Array> {
+    return buildSarBriefingModernPdf(formSnapshot());
 }
 
 async function downloadPdf(): Promise<void> {
@@ -456,9 +487,33 @@ async function downloadPdf(): Promise<void> {
     }
 }
 
+async function downloadPdfNew(): Promise<void> {
+    exportingNew.value = true;
+    status.value = '';
+    statusError.value = false;
+    try {
+        const bytes = await generateModernPdfBytes();
+        const filename = defaultSarBriefingModernFilename(
+            form.incidentName || activeMission.value?.name || 'incident',
+        );
+        downloadPdfBytes(bytes, filename);
+        status.value = 'Modern PDF downloaded.';
+    } catch (err) {
+        statusError.value = true;
+        status.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        exportingNew.value = false;
+    }
+}
+
 async function onAddPdfToDataSync(): Promise<void> {
     if (!requireActiveMission()) return;
     await addPdfToDataSync();
+}
+
+async function onAddPdfNewToDataSync(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await addPdfNewToDataSync();
 }
 
 async function addPdfToDataSync(): Promise<void> {
@@ -482,6 +537,30 @@ async function addPdfToDataSync(): Promise<void> {
         status.value = err instanceof Error ? err.message : String(err);
     } finally {
         uploading.value = false;
+    }
+}
+
+async function addPdfNewToDataSync(): Promise<void> {
+    if (!activeMission.value) return;
+    uploadingNew.value = true;
+    status.value = '';
+    statusError.value = false;
+    try {
+        const bytes = await generateModernPdfBytes();
+        await uploadMissionFile(
+            activeMission.value.guid,
+            SAR_BRIEFING_MODERN_MISSION_FILENAME,
+            bytes,
+            { missionToken: activeMission.value.token },
+        );
+        const sub = await loadIncidentSubscription(activeMission.value);
+        await sub.fetch();
+        status.value = `Added ${SAR_BRIEFING_MODERN_MISSION_FILENAME} to ${activeMission.value.name}.`;
+    } catch (err) {
+        statusError.value = true;
+        status.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        uploadingNew.value = false;
     }
 }
 
