@@ -23,12 +23,10 @@
                 </div>
                 <div class='modal-body'>
                     <div class='mb-3'>
-                        <label class='form-label'>Name</label>
-                        <input
+                        <TablerInput
                             v-model='name'
-                            type='text'
-                            class='form-control'
-                        >
+                            label='Name'
+                        />
                     </div>
                     <label
                         v-for='opt in methodOptions'
@@ -44,12 +42,13 @@
                         >
                         <span class='form-check-label'>{{ opt.label }}</span>
                     </label>
-                    <div
+                    <TablerInlineAlert
                         v-if='error'
-                        class='text-danger small mt-2'
-                    >
-                        {{ error }}
-                    </div>
+                        class='mt-2'
+                        severity='danger'
+                        title='Error'
+                        :description='error'
+                    />
                 </div>
                 <div class='modal-footer'>
                     <button
@@ -75,6 +74,7 @@
 
 <script setup lang='ts'>
 import { ref } from 'vue';
+import { TablerInlineAlert, TablerInput } from '@tak-ps/vue-tabler';
 import type { ConsensusMethod } from '../../../../lib/consensus.ts';
 
 const props = defineProps<{

@@ -15,66 +15,51 @@
         <div
             v-for='i in visibleCount'
             :key='i'
-            class='card mb-2'
+            class='cloudtak-accent border rounded-3 text-white p-2 mb-2'
         >
-            <div class='card-header py-1 d-flex align-items-center'>
-                <strong>Objective {{ i }}</strong>
+            <div class='d-flex align-items-center mb-2'>
+                <p class='text-uppercase text-white-50 small mb-0'>
+                    Objective {{ i }}
+                </p>
                 <span
                     v-if='rowIsLegacy(i - 1)'
                     class='badge bg-secondary ms-2'
                     title='Originally saved under the old risk-assessment keyword'
                 >legacy</span>
             </div>
-            <div class='card-body py-2'>
-                <div class='mb-2'>
-                    <label class='form-label small mb-1'>
-                        4 · Objective <span class='text-muted'>(Desired Outcome)</span>
-                    </label>
-                    <textarea
-                        v-model='rows[i - 1].objective'
-                        class='form-control form-control-sm'
-                        rows='3'
-                        placeholder='Desired Outcome'
-                    />
-                </div>
-                <div class='row g-2 mb-2 align-items-end'>
-                    <div class='col-auto'>
-                        <label class='form-label small mb-1'>
-                            Current / Planned
-                        </label>
-                        <select
-                            v-model='rows[i - 1].status'
-                            class='form-select form-select-sm'
-                            @change='onObjectiveStatusChange(i - 1)'
-                        >
-                            <option
-                                v-for='opt in objectiveStatusOptions'
-                                :key='opt.value'
-                                :value='opt.value'
-                            >
-                                {{ opt.label }}
-                            </option>
-                        </select>
-                    </div>
-                    <div
-                        v-if='rows[i - 1].status === "planned"'
-                        class='col-auto'
-                    >
-                        <label class='form-label small mb-1'>
-                            Planned date
-                        </label>
-                        <input
-                            v-model='rows[i - 1].plannedDate'
-                            type='date'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
-                </div>
-                <ObjectiveStrategies
-                    v-model='rows[i - 1].strategies'
-                    @delete-id='queueDelete'
+
+            <div class='mb-2'>
+                <TablerInput
+                    v-model='rows[i - 1].objective'
+                    label='4 · Objective (Desired Outcome)'
+                    :rows='3'
+                    placeholder='Desired Outcome'
                 />
             </div>
+            <div class='row g-2 mb-2 align-items-end'>
+                <div class='col-auto'>
+                    <TablerEnum
+                        :model-value='statusLabelFor(rows[i - 1].status)'
+                        label='Current / Planned'
+                        :options='objectiveStatusLabels'
+                        @update:model-value='onStatusLabelChange(i - 1, $event)'
+                    />
+                </div>
+                <div
+                    v-if='rows[i - 1].status === "planned"'
+                    class='col-auto'
+                >
+                    <TablerInput
+                        v-model='rows[i - 1].plannedDate'
+                        label='Planned date'
+                        type='date'
+                    />
+                </div>
+            </div>
+            <ObjectiveStrategies
+                v-model='rows[i - 1].strategies'
+                @delete-id='queueDelete'
+            />
         </div>
 
         <button
@@ -108,211 +93,224 @@
             </button>
         </div>
 
-        <div
+        <TablerInlineAlert
             v-if='!activeMission'
-            class='form-text text-warning mt-2'
-        >
-            No active mission. Select one in Create | Open first.
-        </div>
+            class='mt-2'
+            severity='warning'
+            title='No active mission'
+            description='Select one in Create | Open first.'
+        />
         <div
             v-else
             class='form-text mt-2'
         >
             Active DataSync: <strong>{{ activeMission.name }}</strong>
         </div>
-        <div
+        <TablerInlineAlert
             v-if='status'
-            class='fw-bold mt-1'
-            :class='statusError ? "text-danger" : "text-success"'
+            class='mt-2'
+            :severity='statusError ? "danger" : "success"'
+            :title='statusError ? "Error" : "Success"'
+            :description='status'
+        />
+
+        <div
+            v-if='!pdfExpanded'
+            class='cloudtak-accent border rounded-3 text-white mt-3 mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+            role='button'
+            tabindex='0'
+            :aria-expanded='false'
+            @click='pdfExpanded = true'
+            @keydown.enter.prevent='pdfExpanded = true'
+            @keydown.space.prevent='pdfExpanded = true'
         >
-            {{ status }}
+            <p class='text-uppercase text-white-50 small mb-0'>
+                Generate ICS-234-CG Form
+            </p>
+            <IconChevronDown
+                class='ms-auto transition-transform text-white-50 rotate-180'
+                :size='20'
+                stroke='1.5'
+            />
         </div>
-
-        <div class='card mt-3 mb-3'>
-            <div
-                class='card-header py-2 d-flex align-items-center cursor-pointer user-select-none'
-                role='button'
-                tabindex='0'
-                :aria-expanded='pdfExpanded'
-                @click='pdfExpanded = !pdfExpanded'
-                @keydown.enter.prevent='pdfExpanded = !pdfExpanded'
-                @keydown.space.prevent='pdfExpanded = !pdfExpanded'
-            >
-                <h4 class='card-title mb-0 fs-6'>
-                    GENERATE ICS-234-CG Form
-                </h4>
-                <IconChevronDown
-                    class='ms-auto transition-transform'
-                    :class='{ "rotate-180": pdfExpanded }'
-                    :size='18'
-                    stroke='1.5'
-                />
-            </div>
-            <div
-                v-show='pdfExpanded'
-                class='card-body py-2'
-            >
-                <div class='row g-2'>
-                    <div class='col-md-6'>
-                        <label class='form-label small mb-1'>1 · Incident Name</label>
-                        <input
-                            v-model='pdfHeader.incidentName'
-                            type='text'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
-                    <div class='col-md-6'>
-                        <label class='form-label small mb-1'>2 · Incident Location</label>
-                        <input
-                            v-model='pdfHeader.incidentLocation'
-                            type='text'
-                            class='form-control form-control-sm'
-                            placeholder='From DataSync IPP'
-                        >
-                        <div class='form-text text-muted'>
-                            Prefilled from the mission IPP on DataSync when available.
-                        </div>
-                    </div>
-                    <div class='col-md-6'>
-                        <label class='form-label small mb-1'>3 · Operational Period — From</label>
-                        <input
-                            v-model='pdfHeader.operationalPeriodFrom'
-                            type='datetime-local'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
-                    <div class='col-md-6'>
-                        <label class='form-label small mb-1'>3 · Operational Period — To</label>
-                        <input
-                            v-model='pdfHeader.operationalPeriodTo'
-                            type='datetime-local'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
-                    <div class='col-md-3'>
-                        <label class='form-label small mb-1'>7 · Prepared by — Name</label>
-                        <input
-                            v-model='pdfHeader.preparedByName'
-                            type='text'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
-                    <div class='col-md-3'>
-                        <label class='form-label small mb-1'>Position / Title</label>
-                        <input
-                            v-model='pdfHeader.preparedByTitle'
-                            type='text'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
-                    <div class='col-md-3'>
-                        <label class='form-label small mb-1'>Signature</label>
-                        <input
-                            v-model='pdfHeader.preparedBySignature'
-                            type='text'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
-                    <div class='col-md-3'>
-                        <label class='form-label small mb-1'>Date / Time</label>
-                        <input
-                            v-model='pdfHeader.preparedByDateTime'
-                            type='datetime-local'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
+        <TablerBorder
+            v-else
+            class='cloudtak-accent text-white mt-3 mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <div
+                    class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='true'
+                    @click='pdfExpanded = false'
+                    @keydown.enter.prevent='pdfExpanded = false'
+                    @keydown.space.prevent='pdfExpanded = false'
+                >
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Generate ICS-234-CG Form
+                    </p>
+                    <IconChevronDown
+                        class='ms-auto transition-transform text-white-50'
+                        :size='20'
+                        stroke='1.5'
+                    />
                 </div>
+            </template>
 
-                <div class='mt-3 d-flex flex-wrap gap-2'>
-                    <button
-                        type='button'
-                        class='btn btn-outline-primary btn-sm'
-                        :disabled='exporting || !filledRowCount'
-                        @click='downloadPdf'
-                    >
-                        {{ exporting ? 'Generating PDF…' : 'Download ICS 234 PDF' }}
-                    </button>
-                    <button
-                        type='button'
-                        class='btn btn-outline-primary btn-sm'
-                        :disabled='uploading || !filledRowCount'
-                        @click='onAddPdfToDataSync'
-                    >
-                        {{ uploading ? 'Uploading…' : 'Add ICS-234.PDF to DataSync' }}
-                    </button>
+            <div class='row g-2'>
+                <div class='col-md-6'>
+                    <TablerInput
+                        v-model='pdfHeader.incidentName'
+                        label='1 · Incident Name'
+                    />
+                </div>
+                <div class='col-md-6'>
+                    <TablerInput
+                        v-model='pdfHeader.incidentLocation'
+                        label='2 · Incident Location'
+                        placeholder='From DataSync IPP'
+                        description='Prefilled from the mission IPP on DataSync when available.'
+                    />
+                </div>
+                <div class='col-md-6'>
+                    <TablerInput
+                        v-model='pdfHeader.operationalPeriodFrom'
+                        label='3 · Operational Period — From'
+                        type='datetime-local'
+                    />
+                </div>
+                <div class='col-md-6'>
+                    <TablerInput
+                        v-model='pdfHeader.operationalPeriodTo'
+                        label='3 · Operational Period — To'
+                        type='datetime-local'
+                    />
+                </div>
+                <div class='col-md-3'>
+                    <TablerInput
+                        v-model='pdfHeader.preparedByName'
+                        label='7 · Prepared by — Name'
+                    />
+                </div>
+                <div class='col-md-3'>
+                    <TablerInput
+                        v-model='pdfHeader.preparedByTitle'
+                        label='Position / Title'
+                    />
+                </div>
+                <div class='col-md-3'>
+                    <TablerInput
+                        v-model='pdfHeader.preparedBySignature'
+                        label='Signature'
+                    />
+                </div>
+                <div class='col-md-3'>
+                    <TablerInput
+                        v-model='pdfHeader.preparedByDateTime'
+                        label='Date / Time'
+                        type='datetime-local'
+                    />
                 </div>
             </div>
-        </div>
+
+            <div class='mt-3 d-flex flex-wrap gap-2'>
+                <button
+                    type='button'
+                    class='btn btn-outline-primary btn-sm'
+                    :disabled='exporting || !filledRowCount'
+                    @click='downloadPdf'
+                >
+                    {{ exporting ? 'Generating PDF…' : 'Download ICS 234 PDF' }}
+                </button>
+                <button
+                    type='button'
+                    class='btn btn-outline-primary btn-sm'
+                    :disabled='uploading || !filledRowCount'
+                    @click='onAddPdfToDataSync'
+                >
+                    {{ uploading ? 'Uploading…' : 'Add ICS-234.PDF to DataSync' }}
+                </button>
+            </div>
+        </TablerBorder>
 
         <!-- Running list: ICS 234-CG matrix reconstructed from DataSync -->
-        <div class='card mt-4'>
-            <div class='card-header py-2 d-flex align-items-center'>
-                <h3 class='card-title mb-0'>
+        <TablerBorder
+            class='cloudtak-accent text-white'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0'>
                     Work Analysis Matrix — on DataSync ({{ savedRows.length }})
-                </h3>
+                </p>
+            </template>
+
+            <div
+                v-if='loading'
+                class='text-white-50 small'
+            >
+                Loading…
             </div>
-            <div class='card-body py-2'>
-                <div
-                    v-if='loading'
-                    class='text-muted small'
-                >
-                    Loading…
-                </div>
-                <div
-                    v-else-if='!savedRows.length'
-                    class='text-muted small'
-                >
-                    No entries on DataSync yet. Fill an objective above and save.
-                </div>
-                <div
-                    v-else
-                    class='table-responsive'
-                >
-                    <table class='table table-sm table-vcenter table-bordered mb-0'>
-                        <thead>
-                            <tr>
-                                <th style='width:3rem;'>
-                                    #
-                                </th>
-                                <th>4 · Objective (Desired Outcome)</th>
-                                <th>5 · Strategies (How)</th>
-                                <th>6 · Tactics / Work Assignments (Who / What / Where / When)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr
-                                v-for='r in savedRows'
-                                :key='r.row'
-                            >
-                                <td>
-                                    {{ r.row }}
-                                    <span
-                                        v-if='r.legacy'
-                                        class='badge bg-secondary'
-                                        title='Originally saved under the old risk-assessment keyword'
-                                    >L</span>
-                                </td>
-                                <td style='white-space:pre-wrap;'>
-                                    {{ r.objective }}
-                                </td>
-                                <td style='white-space:pre-wrap;'>
-                                    {{ formatStrategiesForDisplay(r.strategies) }}
-                                </td>
-                                <td style='white-space:pre-wrap;'>
-                                    {{ formatTacticsForDisplay(r.strategies) }}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+            <div
+                v-else-if='!savedRows.length'
+                class='text-white-50 small'
+            >
+                No entries on DataSync yet. Fill an objective above and save.
             </div>
-        </div>
+            <div
+                v-else
+                class='table-responsive'
+            >
+                <table class='table table-sm table-vcenter table-bordered mb-0'>
+                    <thead>
+                        <tr>
+                            <th style='width:3rem;'>
+                                #
+                            </th>
+                            <th>4 · Objective (Desired Outcome)</th>
+                            <th>5 · Strategies (How)</th>
+                            <th>6 · Tactics / Work Assignments (Who / What / Where / When)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr
+                            v-for='r in savedRows'
+                            :key='r.row'
+                        >
+                            <td>
+                                {{ r.row }}
+                                <span
+                                    v-if='r.legacy'
+                                    class='badge bg-secondary'
+                                    title='Originally saved under the old risk-assessment keyword'
+                                >L</span>
+                            </td>
+                            <td style='white-space:pre-wrap;'>
+                                {{ r.objective }}
+                            </td>
+                            <td style='white-space:pre-wrap;'>
+                                {{ formatStrategiesForDisplay(r.strategies) }}
+                            </td>
+                            <td style='white-space:pre-wrap;'>
+                                {{ formatTacticsForDisplay(r.strategies) }}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </TablerBorder>
     </div>
 </template>
 
 <script setup lang='ts'>
 import { ref, computed, reactive, onMounted, watch } from 'vue';
 import { IconChevronDown } from '@tabler/icons-vue';
+import { TablerBorder, TablerInput, TablerEnum, TablerInlineAlert } from '@tak-ps/vue-tabler';
 import { loadIncidentSubscription } from '../../../lib/incidentSubscription.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import ObjectiveStrategies from './ObjectiveStrategies.vue';
@@ -354,11 +352,18 @@ const rows = ref<ObjectiveRow[]>(blankObjectiveRows());
 const visibleCount = ref(1);
 const savedRows = ref<SavedObjectiveRow[]>([]);
 const pendingDeleteIds = ref<string[]>([]);
-const objectiveStatusOptions = OBJECTIVE_STATUSES;
+const objectiveStatusLabels = OBJECTIVE_STATUSES.map((opt) => opt.label);
 
-function onObjectiveStatusChange(index: number): void {
+function statusLabelFor(status: ObjectiveRow['status']): string {
+    return OBJECTIVE_STATUSES.find((opt) => opt.value === status)?.label ?? 'Current';
+}
+
+function onStatusLabelChange(index: number, label: string): void {
     const row = rows.value[index];
     if (!row) return;
+    const opt = OBJECTIVE_STATUSES.find((entry) => entry.label === label);
+    if (!opt) return;
+    row.status = opt.value;
     if (row.status !== 'planned') row.plannedDate = '';
 }
 

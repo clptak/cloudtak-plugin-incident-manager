@@ -12,214 +12,202 @@
             Loading mission data…
         </div>
 
-        <div class='card mb-3'>
-            <div class='card-header py-2'>
-                <h4 class='card-title mb-0 fs-6'>
+        <TablerBorder
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0'>
                     Briefing Header
-                </h4>
-            </div>
-            <div class='card-body py-2'>
-                <div class='row g-2'>
-                    <div class='col-md-3'>
-                        <label class='form-label small mb-1'>Date</label>
-                        <input
-                            v-model='form.briefingDate'
-                            type='text'
-                            class='form-control form-control-sm'
-                            placeholder='MM/DD/YY'
-                        >
-                    </div>
-                    <div class='col-md-3'>
-                        <label class='form-label small mb-1'>Time</label>
-                        <input
-                            v-model='form.briefingTime'
-                            type='text'
-                            class='form-control form-control-sm'
-                            placeholder='HH:MM'
-                        >
-                    </div>
-                    <div class='col-md-6'>
-                        <label class='form-label small mb-1'>Incident Commander</label>
-                        <input
-                            v-model='form.incidentCommander'
-                            type='text'
-                            class='form-control form-control-sm'
-                            readonly
-                        >
-                    </div>
-                    <div class='col-12'>
-                        <label class='form-label small mb-1'>Initial Planning Point (UTM/Map Datum)</label>
-                        <input
-                            v-model='form.initialPlanningPoint'
-                            type='text'
-                            class='form-control form-control-sm'
-                            readonly
-                        >
-                    </div>
+                </p>
+            </template>
+
+            <div class='row g-2'>
+                <div class='col-md-3'>
+                    <TablerInput
+                        v-model='form.briefingDate'
+                        label='Date'
+                        placeholder='MM/DD/YY'
+                    />
+                </div>
+                <div class='col-md-3'>
+                    <TablerInput
+                        v-model='form.briefingTime'
+                        label='Time'
+                        placeholder='HH:MM'
+                    />
+                </div>
+                <div class='col-md-6'>
+                    <TablerInput
+                        v-model='form.incidentCommander'
+                        label='Incident Commander'
+                        :disabled='true'
+                    />
+                </div>
+                <div class='col-12'>
+                    <TablerInput
+                        v-model='form.initialPlanningPoint'
+                        label='Initial Planning Point (UTM/Map Datum)'
+                        :disabled='true'
+                    />
                 </div>
             </div>
-        </div>
+        </TablerBorder>
 
-        <div class='card mb-3'>
-            <div class='card-header py-2'>
-                <h4 class='card-title mb-0 fs-6'>
+        <TablerBorder
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0'>
                     Search Subject(s) Information
-                </h4>
-            </div>
-            <div class='card-body py-2'>
-                <div class='table-responsive'>
-                    <table class='table table-sm table-bordered mb-0 small'>
-                        <thead>
-                            <tr>
-                                <th style='width:8rem;'>
-                                    Field
-                                </th>
-                                <th>Subject 1</th>
-                                <th>Subject 2</th>
-                                <th>Subject 3</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr
-                                v-for='row in subjectRows'
-                                :key='row.key'
+                </p>
+            </template>
+
+            <div class='table-responsive'>
+                <table class='table table-sm table-bordered mb-0 small'>
+                    <thead>
+                        <tr>
+                            <th style='width:8rem;'>
+                                Field
+                            </th>
+                            <th>Subject 1</th>
+                            <th>Subject 2</th>
+                            <th>Subject 3</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr
+                            v-for='row in subjectRows'
+                            :key='row.key'
+                        >
+                            <td class='text-muted'>
+                                {{ row.label }}
+                            </td>
+                            <td
+                                v-for='(subject, i) in form.subjects'
+                                :key='`${row.key}-${i}`'
                             >
-                                <td class='text-muted'>
-                                    {{ row.label }}
-                                </td>
-                                <td
-                                    v-for='(subject, i) in form.subjects'
-                                    :key='`${row.key}-${i}`'
-                                >
-                                    {{ subject[row.key] || '—' }}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <div class='form-text mt-1'>
-                    Edit subject details in Subject Information, then click Refresh from mission.
-                </div>
+                                {{ subject[row.key] || '—' }}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
-        </div>
+            <div class='form-text mt-1'>
+                Edit subject details in Subject Information, then click Refresh from mission.
+            </div>
+        </TablerBorder>
 
-        <div class='card mb-3'>
-            <div class='card-header py-2'>
-                <h4 class='card-title mb-0 fs-6'>
+        <TablerBorder
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0'>
                     Briefing Content
-                </h4>
-            </div>
-            <div class='card-body py-2'>
-                <div class='mb-2'>
-                    <label class='form-label small mb-1'>Situation Summary</label>
-                    <textarea
-                        v-model='form.situationSummary'
-                        class='form-control form-control-sm'
-                        rows='3'
-                    />
-                </div>
-                <div class='mb-2'>
-                    <label class='form-label small mb-1'>Actions Taken So Far / Resources on Scene</label>
-                    <textarea
-                        v-model='form.actionsTaken'
-                        class='form-control form-control-sm'
-                        rows='3'
-                    />
-                </div>
-                <div class='row g-2 mb-2'>
-                    <div class='col-md-4'>
-                        <label class='form-label small mb-1'>Repeated Channel</label>
-                        <input
-                            v-model='form.adamRepeatedChannel'
-                            type='text'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
-                    <div class='col-md-4'>
-                        <label class='form-label small mb-1'>Car to Car Channel</label>
-                        <input
-                            v-model='form.carToCarChannel'
-                            type='text'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
-                    <div class='col-md-4'>
-                        <label class='form-label small mb-1'>Alternate Channel</label>
-                        <input
-                            v-model='form.alternateChannel'
-                            type='text'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
-                </div>
-                <div class='mb-2'>
-                    <label class='form-label small mb-1'>Weather Summary</label>
-                    <textarea
-                        v-model='form.weatherSummary'
-                        class='form-control form-control-sm'
-                        rows='4'
-                    />
-                    <div class='form-text'>
-                        Prefilled from CloudTAK weather when IPP coordinates are available.
-                    </div>
-                </div>
-                <div class='mb-0'>
-                    <label class='form-label small mb-1'>Safety Message</label>
-                    <textarea
-                        v-model='form.safetyMessage'
-                        class='form-control form-control-sm'
-                        rows='4'
-                    />
-                </div>
-            </div>
-        </div>
+                </p>
+            </template>
 
-        <div class='card mb-3'>
-            <div class='card-header py-2'>
-                <h4 class='card-title mb-0 fs-6'>
-                    Page 2 Header (Unit Log)
-                </h4>
+            <div class='mb-2'>
+                <TablerInput
+                    v-model='form.situationSummary'
+                    label='Situation Summary'
+                    :rows='3'
+                />
             </div>
-            <div class='card-body py-2'>
-                <div class='row g-2'>
-                    <div class='col-md-6'>
-                        <label class='form-label small mb-1'>Incident Name</label>
-                        <input
-                            v-model='form.incidentName'
-                            type='text'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
-                    <div class='col-md-6'>
-                        <label class='form-label small mb-1'>Operational Period</label>
-                        <input
-                            v-model='form.operationalPeriod'
-                            type='text'
-                            class='form-control form-control-sm'
-                            placeholder='e.g. OP-00'
-                        >
-                    </div>
-                    <div class='col-md-6'>
-                        <label class='form-label small mb-1'>Date Prepared</label>
-                        <input
-                            :value='form.briefingDate'
-                            type='text'
-                            class='form-control form-control-sm'
-                            readonly
-                        >
-                    </div>
-                    <div class='col-md-6'>
-                        <label class='form-label small mb-1'>Time Prepared</label>
-                        <input
-                            :value='form.briefingTime'
-                            type='text'
-                            class='form-control form-control-sm'
-                            readonly
-                        >
-                    </div>
+            <div class='mb-2'>
+                <TablerInput
+                    v-model='form.actionsTaken'
+                    label='Actions Taken So Far / Resources on Scene'
+                    :rows='3'
+                />
+            </div>
+            <div class='row g-2 mb-2'>
+                <div class='col-md-4'>
+                    <TablerInput
+                        v-model='form.adamRepeatedChannel'
+                        label='Repeated Channel'
+                    />
+                </div>
+                <div class='col-md-4'>
+                    <TablerInput
+                        v-model='form.carToCarChannel'
+                        label='Car to Car Channel'
+                    />
+                </div>
+                <div class='col-md-4'>
+                    <TablerInput
+                        v-model='form.alternateChannel'
+                        label='Alternate Channel'
+                    />
                 </div>
             </div>
-        </div>
+            <div class='mb-2'>
+                <TablerInput
+                    v-model='form.weatherSummary'
+                    label='Weather Summary'
+                    :rows='4'
+                    description='Prefilled from CloudTAK weather when IPP coordinates are available.'
+                />
+            </div>
+            <div class='mb-0'>
+                <TablerInput
+                    v-model='form.safetyMessage'
+                    label='Safety Message'
+                    :rows='4'
+                />
+            </div>
+        </TablerBorder>
+
+        <TablerBorder
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0'>
+                    Page 2 Header (Unit Log)
+                </p>
+            </template>
+
+            <div class='row g-2'>
+                <div class='col-md-6'>
+                    <TablerInput
+                        v-model='form.incidentName'
+                        label='Incident Name'
+                    />
+                </div>
+                <div class='col-md-6'>
+                    <TablerInput
+                        v-model='form.operationalPeriod'
+                        label='Operational Period'
+                        placeholder='e.g. OP-00'
+                    />
+                </div>
+                <div class='col-md-6'>
+                    <TablerInput
+                        :model-value='form.briefingDate'
+                        label='Date Prepared'
+                        :disabled='true'
+                    />
+                </div>
+                <div class='col-md-6'>
+                    <TablerInput
+                        :model-value='form.briefingTime'
+                        label='Time Prepared'
+                        :disabled='true'
+                    />
+                </div>
+            </div>
+        </TablerBorder>
 
         <div class='d-flex flex-wrap align-items-center gap-2 mb-3'>
             <button
@@ -232,92 +220,116 @@
             </button>
         </div>
 
-        <div
+        <TablerInlineAlert
             v-if='!activeMission'
-            class='form-text text-warning'
-        >
-            No active mission. Select one in Create | Open first.
-        </div>
+            class='mb-2'
+            severity='warning'
+            title='No active mission'
+            description='Select one in Create | Open first.'
+        />
         <div
             v-else
             class='form-text'
         >
             Active DataSync: <strong>{{ activeMission.name }}</strong>
         </div>
-        <div
+        <TablerInlineAlert
             v-if='status'
-            class='fw-bold mt-1'
-            :class='statusError ? "text-danger" : "text-success"'
-        >
-            {{ status }}
-        </div>
+            class='mt-2'
+            :severity='statusError ? "danger" : "success"'
+            :title='statusError ? "Error" : "Success"'
+            :description='status'
+        />
 
-        <div class='card mt-3'>
-            <div
-                class='card-header py-2 d-flex align-items-center cursor-pointer user-select-none'
-                role='button'
-                tabindex='0'
-                :aria-expanded='pdfExpanded'
-                @click='pdfExpanded = !pdfExpanded'
-                @keydown.enter.prevent='pdfExpanded = !pdfExpanded'
-                @keydown.space.prevent='pdfExpanded = !pdfExpanded'
-            >
-                <h4 class='card-title mb-0 fs-6'>
-                    GENERATE SAR BRIEFING PDF
-                </h4>
-                <IconChevronDown
-                    class='ms-auto transition-transform'
-                    :class='{ "rotate-180": pdfExpanded }'
-                    :size='18'
-                    stroke='1.5'
-                />
-            </div>
-            <div
-                v-show='pdfExpanded'
-                class='card-body py-2'
-            >
-                <div class='d-flex flex-wrap gap-2'>
-                    <button
-                        type='button'
-                        class='btn btn-outline-primary btn-sm'
-                        :disabled='exporting'
-                        @click='downloadPdf'
-                    >
-                        {{ exporting ? 'Generating PDF…' : 'Download SAR Briefing PDF' }}
-                    </button>
-                    <button
-                        type='button'
-                        class='btn btn-outline-primary btn-sm'
-                        :disabled='uploading'
-                        @click='onAddPdfToDataSync'
-                    >
-                        {{ uploading ? 'Uploading…' : 'Add SAR-Briefing.pdf to DataSync' }}
-                    </button>
-                    <button
-                        type='button'
-                        class='btn btn-outline-secondary btn-sm'
-                        :disabled='exportingNew'
-                        @click='downloadPdfNew'
-                    >
-                        {{ exportingNew ? 'Generating PDF…' : 'Download SAR Briefing PDF (New)' }}
-                    </button>
-                    <button
-                        type='button'
-                        class='btn btn-outline-secondary btn-sm'
-                        :disabled='uploadingNew'
-                        @click='onAddPdfNewToDataSync'
-                    >
-                        {{ uploadingNew ? 'Uploading…' : 'Add SAR-Briefing-New.pdf to DataSync' }}
-                    </button>
-                </div>
-            </div>
+        <div
+            v-if='!pdfExpanded'
+            class='cloudtak-accent border rounded-3 text-white mt-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+            role='button'
+            tabindex='0'
+            :aria-expanded='false'
+            @click='pdfExpanded = true'
+            @keydown.enter.prevent='pdfExpanded = true'
+            @keydown.space.prevent='pdfExpanded = true'
+        >
+            <p class='text-uppercase text-white-50 small mb-0'>
+                Generate SAR Briefing PDF
+            </p>
+            <IconChevronDown
+                class='ms-auto transition-transform text-white-50 rotate-180'
+                :size='20'
+                stroke='1.5'
+            />
         </div>
+        <TablerBorder
+            v-else
+            class='cloudtak-accent text-white mt-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <div
+                    class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='true'
+                    @click='pdfExpanded = false'
+                    @keydown.enter.prevent='pdfExpanded = false'
+                    @keydown.space.prevent='pdfExpanded = false'
+                >
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Generate SAR Briefing PDF
+                    </p>
+                    <IconChevronDown
+                        class='ms-auto transition-transform text-white-50'
+                        :size='20'
+                        stroke='1.5'
+                    />
+                </div>
+            </template>
+
+            <div class='d-flex flex-wrap gap-2'>
+                <button
+                    type='button'
+                    class='btn btn-outline-primary btn-sm'
+                    :disabled='exporting'
+                    @click='downloadPdf'
+                >
+                    {{ exporting ? 'Generating PDF…' : 'Download SAR Briefing PDF' }}
+                </button>
+                <button
+                    type='button'
+                    class='btn btn-outline-primary btn-sm'
+                    :disabled='uploading'
+                    @click='onAddPdfToDataSync'
+                >
+                    {{ uploading ? 'Uploading…' : 'Add SAR-Briefing.pdf to DataSync' }}
+                </button>
+                <button
+                    type='button'
+                    class='btn btn-outline-secondary btn-sm'
+                    :disabled='exportingNew'
+                    @click='downloadPdfNew'
+                >
+                    {{ exportingNew ? 'Generating PDF…' : 'Download SAR Briefing PDF (New)' }}
+                </button>
+                <button
+                    type='button'
+                    class='btn btn-outline-secondary btn-sm'
+                    :disabled='uploadingNew'
+                    @click='onAddPdfNewToDataSync'
+                >
+                    {{ uploadingNew ? 'Uploading…' : 'Add SAR-Briefing-New.pdf to DataSync' }}
+                </button>
+            </div>
+        </TablerBorder>
     </div>
 </template>
 
 <script setup lang='ts'>
 import { ref, reactive, onMounted, watch } from 'vue';
 import { IconChevronDown } from '@tabler/icons-vue';
+import { TablerBorder, TablerInput, TablerInlineAlert } from '@tak-ps/vue-tabler';
 import { loadIncidentSubscription } from '../../../lib/incidentSubscription.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import {

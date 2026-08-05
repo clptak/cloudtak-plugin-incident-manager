@@ -13,33 +13,41 @@
             @cancel='onTableCancel'
         />
 
-        <div
+        <TablerBorder
             v-else
-            class='card'
+            class='cloudtak-accent text-white'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
         >
-            <div class='card-header d-flex align-items-center gap-2'>
-                <h3 class='card-title mb-0 flex-grow-1'>
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0'>
                     Initial Consensus
-                </h3>
-                <NavHelpButton help-key='initial-consensus' />
-                <button
-                    v-if='consensus && consensus.accepted'
-                    type='button'
-                    class='btn btn-outline-primary btn-sm'
-                    :disabled='!segments.length'
-                    @click='onGenerateWc3'
-                >
-                    Generate WC3 Files
-                </button>
-                <button
-                    type='button'
-                    class='btn btn-primary btn-sm'
-                    @click='openSetup'
-                >
-                    {{ consensus && consensus.accepted ? 'Edit Consensus' : 'Create Consensus' }}
-                </button>
-            </div>
-            <div class='card-body'>
+                </p>
+            </template>
+            <template #header>
+                <div class='d-flex align-items-center gap-2'>
+                    <NavHelpButton help-key='initial-consensus' />
+                    <button
+                        v-if='consensus && consensus.accepted'
+                        type='button'
+                        class='btn btn-outline-primary btn-sm'
+                        :disabled='!segments.length'
+                        @click='onGenerateWc3'
+                    >
+                        Generate WC3 Files
+                    </button>
+                    <button
+                        type='button'
+                        class='btn btn-primary btn-sm'
+                        @click='openSetup'
+                    >
+                        {{ consensus && consensus.accepted ? 'Edit Consensus' : 'Create Consensus' }}
+                    </button>
+                </div>
+            </template>
+
+            <div>
                 <div
                     v-if='loading'
                     class='text-muted small'
@@ -141,15 +149,15 @@
                 >
                     No consensus yet. Click "Create Consensus" to begin.
                 </p>
-                <div
+                <TablerInlineAlert
                     v-if='status && view !== "table"'
-                    class='fw-bold mt-2'
-                    :class='statusError ? "text-danger" : "text-success"'
-                >
-                    {{ status }}
-                </div>
+                    class='mt-2'
+                    :severity='statusError ? "danger" : "success"'
+                    :title='statusError ? "Error" : "Status"'
+                    :description='status'
+                />
             </div>
-        </div>
+        </TablerBorder>
 
         <ConsensusSetupModal
             v-if='showSetup'
@@ -167,6 +175,7 @@
 
 <script setup lang='ts'>
 import { computed, onMounted, ref, watch } from 'vue';
+import { TablerBorder, TablerInlineAlert } from '@tak-ps/vue-tabler';
 import NavHelpButton from '../../../NavHelpButton.vue';
 import ConsensusSetupModal from './ConsensusSetupModal.vue';
 import type { SetupResult } from './ConsensusSetupModal.vue';

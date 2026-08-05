@@ -1,575 +1,735 @@
 <template>
-    <div class='row g-3'>
-        <div class='col-lg-8'>
-            <!-- 1 · IPP -->
-            <div class='card mb-3'>
+    <div>
+        <!-- 1 · IPP -->
+        <div
+            v-if='expanded !== "ipp"'
+            class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center user-select-none'
+            :class='openable(0) ? "cursor-pointer" : "opacity-50"'
+            :style='openable(0) ? "cursor:pointer" : "cursor:not-allowed"'
+            role='button'
+            tabindex='0'
+            :aria-expanded='false'
+            @click='toggle("ipp", 0)'
+            @keydown.enter.prevent='toggle("ipp", 0)'
+            @keydown.space.prevent='toggle("ipp", 0)'
+        >
+            <p class='text-uppercase text-white-50 small mb-0'>
+                Initial Planning Point (IPP)
+            </p>
+            <span
+                v-if='stepDone.ipp'
+                class='badge bg-success text-white ms-2'
+            >set</span>
+            <IconLock
+                v-else-if='!openable(0)'
+                :size='16'
+                stroke='1.5'
+                class='ms-2 text-white-50'
+            />
+            <IconChevronDown
+                class='ms-auto transition-transform text-white-50 rotate-180'
+                :size='20'
+                stroke='1.5'
+            />
+        </div>
+        <TablerBorder
+            v-else
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
                 <div
-                    class='card-header'
-                    :style='openable(0) ? "cursor:pointer" : "cursor:not-allowed"'
-                    :class='{ "opacity-50": !openable(0) }'
+                    class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='true'
                     @click='toggle("ipp", 0)'
+                    @keydown.enter.prevent='toggle("ipp", 0)'
+                    @keydown.space.prevent='toggle("ipp", 0)'
                 >
-                    <h3 class='card-title mb-0 d-flex align-items-center'>
-                        <span class='me-2'>{{ expanded === 'ipp' ? '▾' : '▸' }}</span>
+                    <p class='text-uppercase text-white-50 small mb-0'>
                         Initial Planning Point (IPP)
-                        <span
-                            v-if='stepDone.ipp'
-                            class='badge bg-success text-white ms-2'
-                        >set</span>
-                        <span
-                            v-else-if='!openable(0)'
-                            class='ms-2'
-                        >🔒</span>
-                    </h3>
-                </div>
-                <div
-                    v-show='expanded === "ipp"'
-                    class='card-body'
-                >
-                    <label class='form-label'>IPP Coordinates</label>
-                    <div class='input-group'>
-                        <input
-                            v-model='ippInput'
-                            type='text'
-                            class='form-control'
-                            :disabled='!!selectedObjectUid'
-                            placeholder='40.0150, -105.2705 or 40 00 54 -105 16 14'
-                        >
-                        <button
-                            class='btn btn-primary'
-                            :disabled='!canSetIpp || settingIpp'
-                            @click='onSetIpp'
-                        >
-                            {{ settingIpp ? 'Setting…' : 'Set IPP' }}
-                        </button>
-                    </div>
-                    <div class='form-text'>
-                        <span
-                            v-if='selectedObjectUid'
-                            class='text-muted'
-                        >Using selected DataSync object.</span>
-                        <span
-                            v-else-if='ipp'
-                            class='text-success'
-                        >→ {{ ipp.lat.toFixed(5) }}, {{ ipp.lng.toFixed(5) }}</span>
-                        <span
-                            v-else-if='ippInput'
-                            class='text-danger'
-                        >→ unrecognized format</span>
-                        <span v-else>Supports decimal degrees, DMS, DM, and MPS.</span>
-                    </div>
-
-                    <label class='form-label mt-2'>OR Choose DataSync Object</label>
-                    <select
-                        v-model='selectedObjectUid'
-                        class='form-select form-select-sm'
-                    >
-                        <option value=''>
-                            — none (use coordinates above) —
-                        </option>
-                        <option
-                            v-for='m in missionMarkers'
-                            :key='m.uid'
-                            :value='m.uid'
-                        >
-                            {{ m.callsign }}
-                        </option>
-                    </select>
-                    <div
-                        v-if='loadingFeatures'
-                        class='form-text'
-                    >
-                        Loading mission objects…
-                    </div>
-                    <div
-                        v-else-if='!missionMarkers.length'
-                        class='form-text text-muted'
-                    >
-                        No point markers in the active DataSync.
-                    </div>
-
-                    <label class='form-label mt-2'>IPP Type</label>
-                    <select
-                        v-model='ippType'
-                        class='form-select form-select-sm'
-                    >
-                        <option value='LKP'>
-                            LKP — Last Known Position
-                        </option>
-                        <option value='PLS'>
-                            PLS — Point Last Seen
-                        </option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- 2 · Theoretical -->
-            <div class='card mb-3'>
-                <div
-                    class='card-header'
-                    :style='openable(1) ? "cursor:pointer" : "cursor:not-allowed"'
-                    :class='{ "opacity-50": !openable(1) }'
-                    @click='toggle("theoretical", 1)'
-                >
-                    <h3 class='card-title mb-0 d-flex align-items-center flex-grow-1'>
-                        <span class='me-2'>{{ expanded === 'theoretical' ? '▾' : '▸' }}</span>
-                        Theoretical Search Area
-                        <span
-                            v-if='stepDone.theoretical'
-                            class='badge bg-success text-white ms-2'
-                        >added</span>
-                        <span
-                            v-else-if='!openable(1)'
-                            class='ms-2'
-                        >🔒</span>
-                        <span
-                            class='ms-auto d-inline-flex'
-                            @click.stop
-                        >
-                            <NavHelpButton help-key='theoretical-search-area' />
-                        </span>
-                    </h3>
-                </div>
-                <div
-                    v-show='expanded === "theoretical"'
-                    class='card-body'
-                >
-                    <label class='form-label'>Time Missing</label>
-                    <input
-                        v-model='timeMissing'
-                        type='datetime-local'
-                        class='form-control mb-2'
-                    >
-                    <label class='form-label'>Time Reported Missing</label>
-                    <input
-                        v-model='timeReportedMissing'
-                        type='datetime-local'
-                        class='form-control mb-2'
-                    >
-                    <label class='form-label'>Travel Speed (mph)</label>
-                    <input
-                        v-model.number='travelSpeed'
-                        type='number'
-                        min='0'
-                        step='0.1'
-                        class='form-control'
-                        placeholder='e.g. 2.5'
-                    >
-                    <div
-                        v-if='theoreticalMiles'
-                        class='form-text'
-                    >
-                        Radius: <strong>{{ theoreticalMiles.toFixed(2) }} mi</strong>
-                        ({{ elapsedHours.toFixed(1) }} h elapsed × {{ travelSpeed }} mph)
-                    </div>
-                    <button
-                        class='btn btn-orange text-white btn-sm mt-2'
-                        :disabled='!canPushTheoretical || pushing'
-                        @click='onPushTheoretical'
-                    >
-                        Add to DataSync
-                    </button>
-                </div>
-            </div>
-
-            <!-- 3 · Statistical / LPB -->
-            <div class='card mb-3'>
-                <div
-                    class='card-header'
-                    :style='openable(2) ? "cursor:pointer" : "cursor:not-allowed"'
-                    :class='{ "opacity-50": !openable(2) }'
-                    @click='toggle("statistical", 2)'
-                >
-                    <h3 class='card-title mb-0 d-flex align-items-center flex-grow-1'>
-                        <span class='me-2'>{{ expanded === 'statistical' ? '▾' : '▸' }}</span>
-                        Statistical Search Area (LPB)
-                        <span
-                            v-if='stepDone.statistical'
-                            class='badge bg-success text-white ms-2'
-                        >added</span>
-                        <span
-                            v-else-if='!openable(2)'
-                            class='ms-2'
-                        >🔒</span>
-                        <span
-                            class='ms-auto d-inline-flex'
-                            @click.stop
-                        >
-                            <NavHelpButton help-key='statistical-search-area' />
-                        </span>
-                    </h3>
-                </div>
-                <div
-                    v-show='expanded === "statistical"'
-                    class='card-body'
-                >
-                    <label class='form-label'>Arizona Subject LPB Category</label>
-                    <select
-                        v-model='category'
-                        class='form-select form-select-sm mb-2'
-                    >
-                        <option
-                            v-for='c in categories'
-                            :key='c'
-                            :value='c'
-                        >
-                            {{ c }}
-                        </option>
-                    </select>
-
+                    </p>
                     <span
-                        class='badge rounded-pill mb-2'
-                        :class='casesPillClass'
+                        v-if='stepDone.ipp'
+                        class='badge bg-success text-white ms-2'
+                    >set</span>
+                    <IconChevronDown
+                        class='ms-auto transition-transform text-white-50'
+                        :size='20'
+                        stroke='1.5'
+                    />
+                </div>
+            </template>
+
+            <div>
+                <TablerInput
+                    v-model='ippInput'
+                    label='IPP Coordinates'
+                    :disabled='!!selectedObjectUid'
+                    placeholder='40.0150, -105.2705 or 40 00 54 -105 16 14'
+                />
+                <div class='form-text'>
+                    <span
+                        v-if='selectedObjectUid'
+                        class='text-muted'
+                    >Using selected DataSync object.</span>
+                    <span
+                        v-else-if='ipp'
+                        class='text-success'
+                    >→ {{ ipp.lat.toFixed(5) }}, {{ ipp.lng.toFixed(5) }}</span>
+                    <span
+                        v-else-if='ippInput'
+                        class='text-danger'
+                    >→ unrecognized format</span>
+                    <span v-else>Supports decimal degrees, DMS, DM, and MPS.</span>
+                </div>
+
+                <p class='text-uppercase text-white-50 small mb-1 mt-3'>
+                    OR Choose DataSync Object
+                </p>
+                <select
+                    v-model='selectedObjectUid'
+                    class='form-select form-select-sm'
+                >
+                    <option value=''>
+                        — none (use coordinates above) —
+                    </option>
+                    <option
+                        v-for='m in missionMarkers'
+                        :key='m.uid'
+                        :value='m.uid'
                     >
-                        Cases: {{ selectedCases }}
+                        {{ m.callsign }}
+                    </option>
+                </select>
+                <div
+                    v-if='loadingFeatures'
+                    class='form-text'
+                >
+                    Loading mission objects…
+                </div>
+                <div
+                    v-else-if='!missionMarkers.length'
+                    class='form-text text-muted'
+                >
+                    No point markers in the active DataSync.
+                </div>
+
+                <div class='mt-3'>
+                    <TablerEnum
+                        v-model='ippTypeLabel'
+                        label='IPP Type'
+                        :options='IPP_TYPE_OPTIONS'
+                    />
+                </div>
+
+                <button
+                    class='btn btn-primary mt-3'
+                    :disabled='!canSetIpp || settingIpp'
+                    @click='onSetIpp'
+                >
+                    {{ settingIpp ? 'Setting…' : 'Set IPP' }}
+                </button>
+            </div>
+        </TablerBorder>
+
+        <!-- 2 · Theoretical -->
+        <div
+            v-if='expanded !== "theoretical"'
+            class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center user-select-none'
+            :class='openable(1) ? "cursor-pointer" : "opacity-50"'
+            :style='openable(1) ? "cursor:pointer" : "cursor:not-allowed"'
+            role='button'
+            tabindex='0'
+            :aria-expanded='false'
+            @click='toggle("theoretical", 1)'
+            @keydown.enter.prevent='toggle("theoretical", 1)'
+            @keydown.space.prevent='toggle("theoretical", 1)'
+        >
+            <p class='text-uppercase text-white-50 small mb-0'>
+                Theoretical Search Area
+            </p>
+            <span
+                v-if='stepDone.theoretical'
+                class='badge bg-success text-white ms-2'
+            >added</span>
+            <IconLock
+                v-else-if='!openable(1)'
+                :size='16'
+                stroke='1.5'
+                class='ms-2 text-white-50'
+            />
+            <span
+                class='ms-auto d-inline-flex me-2'
+                @click.stop
+            >
+                <NavHelpButton help-key='theoretical-search-area' />
+            </span>
+            <IconChevronDown
+                class='transition-transform text-white-50 rotate-180'
+                :size='20'
+                stroke='1.5'
+            />
+        </div>
+        <TablerBorder
+            v-else
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <div
+                    class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='true'
+                    @click='toggle("theoretical", 1)'
+                    @keydown.enter.prevent='toggle("theoretical", 1)'
+                    @keydown.space.prevent='toggle("theoretical", 1)'
+                >
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Theoretical Search Area
+                    </p>
+                    <span
+                        v-if='stepDone.theoretical'
+                        class='badge bg-success text-white ms-2'
+                    >added</span>
+                    <span
+                        class='ms-auto d-inline-flex me-2'
+                        @click.stop
+                    >
+                        <NavHelpButton help-key='theoretical-search-area' />
                     </span>
+                    <IconChevronDown
+                        class='transition-transform text-white-50'
+                        :size='20'
+                        stroke='1.5'
+                    />
+                </div>
+            </template>
 
-                    <div class='table-responsive'>
-                        <table class='table table-sm table-vcenter mb-0'>
-                            <thead>
-                                <tr>
-                                    <th>Ring</th><th>Percentile</th><th>Distance</th><th>Send</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr
-                                    v-for='q in quartiles'
-                                    :key='q.key'
-                                >
-                                    <td>
-                                        <span :style='`color:${q.color}`'>●</span> {{ q.key }}
-                                    </td>
-                                    <td>{{ q.pct }}</td>
-                                    <td>{{ q.miles.toFixed(2) }} mi</td>
-                                    <td>
-                                        <input
-                                            v-model='q.selected'
-                                            type='checkbox'
-                                            class='form-check-input'
-                                        >
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+            <div>
+                <TablerInput
+                    v-model='timeMissing'
+                    label='Time Missing'
+                    type='datetime-local'
+                />
+                <TablerInput
+                    v-model='timeReportedMissing'
+                    label='Time Reported Missing'
+                    type='datetime-local'
+                />
+                <TablerInput
+                    v-model.number='travelSpeed'
+                    label='Travel Speed (mph)'
+                    type='number'
+                    placeholder='e.g. 2.5'
+                />
+                <div
+                    v-if='theoreticalMiles'
+                    class='form-text'
+                >
+                    Radius: <strong>{{ theoreticalMiles.toFixed(2) }} mi</strong>
+                    ({{ elapsedHours.toFixed(1) }} h elapsed × {{ travelSpeed }} mph)
+                </div>
+                <button
+                    class='btn btn-primary btn-sm mt-2'
+                    :disabled='!canPushTheoretical || pushing'
+                    @click='onPushTheoretical'
+                >
+                    Add to DataSync
+                </button>
+            </div>
+        </TablerBorder>
 
-                    <button
-                        class='btn btn-primary btn-sm mt-3'
-                        :disabled='!canPushLpb || pushing'
-                        @click='onPushLpb'
+        <!-- 3 · Statistical / LPB -->
+        <div
+            v-if='expanded !== "statistical"'
+            class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center user-select-none'
+            :class='openable(2) ? "cursor-pointer" : "opacity-50"'
+            :style='openable(2) ? "cursor:pointer" : "cursor:not-allowed"'
+            role='button'
+            tabindex='0'
+            :aria-expanded='false'
+            @click='toggle("statistical", 2)'
+            @keydown.enter.prevent='toggle("statistical", 2)'
+            @keydown.space.prevent='toggle("statistical", 2)'
+        >
+            <p class='text-uppercase text-white-50 small mb-0'>
+                Statistical Search Area (LPB)
+            </p>
+            <span
+                v-if='stepDone.statistical'
+                class='badge bg-success text-white ms-2'
+            >added</span>
+            <IconLock
+                v-else-if='!openable(2)'
+                :size='16'
+                stroke='1.5'
+                class='ms-2 text-white-50'
+            />
+            <span
+                class='ms-auto d-inline-flex me-2'
+                @click.stop
+            >
+                <NavHelpButton help-key='statistical-search-area' />
+            </span>
+            <IconChevronDown
+                class='transition-transform text-white-50 rotate-180'
+                :size='20'
+                stroke='1.5'
+            />
+        </div>
+        <TablerBorder
+            v-else
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <div
+                    class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='true'
+                    @click='toggle("statistical", 2)'
+                    @keydown.enter.prevent='toggle("statistical", 2)'
+                    @keydown.space.prevent='toggle("statistical", 2)'
+                >
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Statistical Search Area (LPB)
+                    </p>
+                    <span
+                        v-if='stepDone.statistical'
+                        class='badge bg-success text-white ms-2'
+                    >added</span>
+                    <span
+                        class='ms-auto d-inline-flex me-2'
+                        @click.stop
                     >
-                        {{ pushing ? 'Sending…' : 'Add selected rings to DataSync' }}
+                        <NavHelpButton help-key='statistical-search-area' />
+                    </span>
+                    <IconChevronDown
+                        class='transition-transform text-white-50'
+                        :size='20'
+                        stroke='1.5'
+                    />
+                </div>
+            </template>
+
+            <div>
+                <TablerEnum
+                    v-model='category'
+                    label='Arizona Subject LPB Category'
+                    :options='categories'
+                />
+
+                <span
+                    class='badge rounded-pill mb-2 mt-2'
+                    :class='casesPillClass'
+                >
+                    Cases: {{ selectedCases }}
+                </span>
+
+                <div class='table-responsive'>
+                    <table class='table table-sm table-vcenter mb-0'>
+                        <thead>
+                            <tr>
+                                <th>Ring</th><th>Percentile</th><th>Distance</th><th>Send</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for='q in quartiles'
+                                :key='q.key'
+                            >
+                                <td>
+                                    <span :style='`color:${q.color}`'>●</span> {{ q.key }}
+                                </td>
+                                <td>{{ q.pct }}</td>
+                                <td>{{ q.miles.toFixed(2) }} mi</td>
+                                <td>
+                                    <input
+                                        v-model='q.selected'
+                                        type='checkbox'
+                                        class='form-check-input'
+                                    >
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <button
+                    class='btn btn-primary btn-sm mt-3'
+                    :disabled='!canPushLpb || pushing'
+                    @click='onPushLpb'
+                >
+                    {{ pushing ? 'Sending…' : 'Add selected rings to DataSync' }}
+                </button>
+
+                <div class='mt-3 pt-3 border-top'>
+                    <button
+                        v-if='!showCustomSource'
+                        type='button'
+                        class='btn btn-outline-secondary btn-sm'
+                        @click='openCustomSource'
+                    >
+                        <IconPlus
+                            :size='16'
+                            class='me-1'
+                        />
+                        Add source
                     </button>
 
-                    <div class='mt-3 pt-3 border-top'>
+                    <div
+                        v-else
+                        class='cloudtak-accent border rounded-3 p-3'
+                    >
+                        <div class='d-flex align-items-center justify-content-between mb-2'>
+                            <p class='text-uppercase text-white-50 small mb-0'>
+                                Custom LPB Source
+                            </p>
+                            <button
+                                type='button'
+                                class='btn btn-sm btn-link text-muted p-0'
+                                title='Remove custom source'
+                                @click='closeCustomSource'
+                            >
+                                <IconX :size='18' />
+                            </button>
+                        </div>
+
+                        <TablerInput
+                            v-model='customSource'
+                            label='Source'
+                            placeholder='e.g. Regional SAR stats'
+                        />
+
+                        <TablerInput
+                            v-model='customCategory'
+                            label='Category'
+                            placeholder='e.g. Adult hiker'
+                        />
+
+                        <p class='text-uppercase text-white-50 small mb-1 mt-2'>
+                            Ranges
+                        </p>
+                        <div
+                            v-for='(row, i) in customRanges'
+                            :key='i'
+                            class='input-group input-group-sm mb-2'
+                        >
+                            <input
+                                v-model='row.label'
+                                type='text'
+                                class='form-control'
+                                placeholder='Label (e.g. 25%)'
+                                :aria-label='`Range ${i + 1} label`'
+                            >
+                            <input
+                                v-model.number='row.distance'
+                                type='number'
+                                min='0'
+                                step='any'
+                                class='form-control'
+                                placeholder='Distance'
+                                style='max-width: 7rem'
+                                :aria-label='`Range ${i + 1} distance`'
+                            >
+                            <select
+                                v-model='row.unit'
+                                class='form-select'
+                                style='max-width: 5rem'
+                                :aria-label='`Range ${i + 1} unit`'
+                            >
+                                <option value='mi'>
+                                    mi
+                                </option>
+                                <option value='me'>
+                                    me
+                                </option>
+                            </select>
+                            <button
+                                type='button'
+                                class='btn btn-outline-secondary'
+                                :disabled='customRanges.length <= 1'
+                                title='Remove range'
+                                @click='removeCustomRange(i)'
+                            >
+                                <IconX :size='16' />
+                            </button>
+                        </div>
                         <button
-                            v-if='!showCustomSource'
                             type='button'
-                            class='btn btn-outline-secondary btn-sm'
-                            @click='openCustomSource'
+                            class='btn btn-outline-secondary btn-sm mb-2'
+                            :disabled='customRanges.length >= MAX_CUSTOM_RANGES'
+                            @click='addCustomRange'
                         >
                             <IconPlus
                                 :size='16'
                                 class='me-1'
                             />
-                            Add source
+                            Add range
                         </button>
-
                         <div
-                            v-else
-                            class='border rounded p-3'
+                            v-if='customRanges.length >= MAX_CUSTOM_RANGES'
+                            class='form-text mb-2'
                         >
-                            <div class='d-flex align-items-center justify-content-between mb-2'>
-                                <label class='form-label mb-0'>Custom LPB Source</label>
-                                <button
-                                    type='button'
-                                    class='btn btn-sm btn-link text-muted p-0'
-                                    title='Remove custom source'
-                                    @click='closeCustomSource'
-                                >
-                                    <IconX :size='18' />
-                                </button>
-                            </div>
-
-                            <label class='form-label'>Source</label>
-                            <input
-                                v-model='customSource'
-                                type='text'
-                                class='form-control form-control-sm mb-2'
-                                placeholder='e.g. Regional SAR stats'
-                            >
-
-                            <label class='form-label'>Category</label>
-                            <input
-                                v-model='customCategory'
-                                type='text'
-                                class='form-control form-control-sm mb-2'
-                                placeholder='e.g. Adult hiker'
-                            >
-
-                            <label class='form-label'>Ranges</label>
-                            <div
-                                v-for='(row, i) in customRanges'
-                                :key='i'
-                                class='input-group input-group-sm mb-2'
-                            >
-                                <input
-                                    v-model='row.label'
-                                    type='text'
-                                    class='form-control'
-                                    placeholder='Label (e.g. 25%)'
-                                    :aria-label='`Range ${i + 1} label`'
-                                >
-                                <input
-                                    v-model.number='row.distance'
-                                    type='number'
-                                    min='0'
-                                    step='any'
-                                    class='form-control'
-                                    placeholder='Distance'
-                                    style='max-width: 7rem'
-                                    :aria-label='`Range ${i + 1} distance`'
-                                >
-                                <select
-                                    v-model='row.unit'
-                                    class='form-select'
-                                    style='max-width: 5rem'
-                                    :aria-label='`Range ${i + 1} unit`'
-                                >
-                                    <option value='mi'>
-                                        mi
-                                    </option>
-                                    <option value='me'>
-                                        me
-                                    </option>
-                                </select>
-                                <button
-                                    type='button'
-                                    class='btn btn-outline-secondary'
-                                    :disabled='customRanges.length <= 1'
-                                    title='Remove range'
-                                    @click='removeCustomRange(i)'
-                                >
-                                    <IconX :size='16' />
-                                </button>
-                            </div>
-                            <button
-                                type='button'
-                                class='btn btn-outline-secondary btn-sm mb-2'
-                                :disabled='customRanges.length >= MAX_CUSTOM_RANGES'
-                                @click='addCustomRange'
-                            >
-                                <IconPlus
-                                    :size='16'
-                                    class='me-1'
-                                />
-                                Add range
-                            </button>
-                            <div
-                                v-if='customRanges.length >= MAX_CUSTOM_RANGES'
-                                class='form-text mb-2'
-                            >
-                                Maximum of {{ MAX_CUSTOM_RANGES }} ranges.
-                            </div>
-
-                            <button
-                                class='btn btn-primary btn-sm d-block'
-                                :disabled='!canPushCustomLpb || pushing'
-                                @click='onPushCustomLpb'
-                            >
-                                {{ pushing ? 'Sending…' : 'Add rings to DataSync' }}
-                            </button>
+                            Maximum of {{ MAX_CUSTOM_RANGES }} ranges.
                         </div>
+
+                        <button
+                            class='btn btn-primary btn-sm d-block'
+                            :disabled='!canPushCustomLpb || pushing'
+                            @click='onPushCustomLpb'
+                        >
+                            {{ pushing ? 'Sending…' : 'Add rings to DataSync' }}
+                        </button>
                     </div>
                 </div>
             </div>
+        </TablerBorder>
 
-            <!-- 4 · Subjective -->
-            <div class='card mb-3'>
+        <!-- 4 · Subjective -->
+        <div
+            v-if='expanded !== "subjective"'
+            class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center user-select-none'
+            :class='openable(3) ? "cursor-pointer" : "opacity-50"'
+            :style='openable(3) ? "cursor:pointer" : "cursor:not-allowed"'
+            role='button'
+            tabindex='0'
+            :aria-expanded='false'
+            @click='toggle("subjective", 3)'
+            @keydown.enter.prevent='toggle("subjective", 3)'
+            @keydown.space.prevent='toggle("subjective", 3)'
+        >
+            <p class='text-uppercase text-white-50 small mb-0'>
+                Subjective Search Area
+            </p>
+            <span
+                v-if='stepDone.subjective'
+                class='badge bg-success text-white ms-2'
+            >added</span>
+            <IconLock
+                v-else-if='!openable(3)'
+                :size='16'
+                stroke='1.5'
+                class='ms-2 text-white-50'
+            />
+            <span
+                class='ms-auto d-inline-flex me-2'
+                @click.stop
+            >
+                <NavHelpButton help-key='subjective-search-area' />
+            </span>
+            <IconChevronDown
+                class='transition-transform text-white-50 rotate-180'
+                :size='20'
+                stroke='1.5'
+            />
+        </div>
+        <TablerBorder
+            v-else
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
                 <div
-                    class='card-header'
-                    :style='openable(3) ? "cursor:pointer" : "cursor:not-allowed"'
-                    :class='{ "opacity-50": !openable(3) }'
+                    class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='true'
                     @click='toggle("subjective", 3)'
+                    @keydown.enter.prevent='toggle("subjective", 3)'
+                    @keydown.space.prevent='toggle("subjective", 3)'
                 >
-                    <h3 class='card-title mb-0 d-flex align-items-center flex-grow-1'>
-                        <span class='me-2'>{{ expanded === 'subjective' ? '▾' : '▸' }}</span>
+                    <p class='text-uppercase text-white-50 small mb-0'>
                         Subjective Search Area
-                        <span
-                            v-if='stepDone.subjective'
-                            class='badge bg-success text-white ms-2'
-                        >added</span>
-                        <span
-                            v-else-if='!openable(3)'
-                            class='ms-2'
-                        >🔒</span>
-                        <span
-                            class='ms-auto d-inline-flex'
-                            @click.stop
-                        >
-                            <NavHelpButton help-key='subjective-search-area' />
-                        </span>
-                    </h3>
+                    </p>
+                    <span
+                        v-if='stepDone.subjective'
+                        class='badge bg-success text-white ms-2'
+                    >added</span>
+                    <span
+                        class='ms-auto d-inline-flex me-2'
+                        @click.stop
+                    >
+                        <NavHelpButton help-key='subjective-search-area' />
+                    </span>
+                    <IconChevronDown
+                        class='transition-transform text-white-50'
+                        :size='20'
+                        stroke='1.5'
+                    />
                 </div>
+            </template>
+
+            <div>
+                <p class='text-uppercase text-white-50 small mb-1'>
+                    Choose a polygon from the active DataSync
+                </p>
+                <select
+                    v-model='subjectiveUid'
+                    class='form-select form-select-sm'
+                >
+                    <option value=''>
+                        — select a polygon —
+                    </option>
+                    <option
+                        v-for='p in missionPolygons'
+                        :key='p.uid'
+                        :value='p.uid'
+                    >
+                        {{ p.callsign }}
+                    </option>
+                </select>
                 <div
-                    v-show='expanded === "subjective"'
-                    class='card-body'
+                    v-if='!missionPolygons.length'
+                    class='form-text text-muted'
                 >
-                    <label class='form-label'>Choose a polygon from the active DataSync</label>
-                    <select
-                        v-model='subjectiveUid'
-                        class='form-select form-select-sm'
-                    >
-                        <option value=''>
-                            — select a polygon —
-                        </option>
-                        <option
-                            v-for='p in missionPolygons'
-                            :key='p.uid'
-                            :value='p.uid'
-                        >
-                            {{ p.callsign }}
-                        </option>
-                    </select>
-                    <div
-                        v-if='!missionPolygons.length'
-                        class='form-text text-muted'
-                    >
-                        No polygons in the active DataSync.
-                    </div>
-                    <button
-                        class='btn btn-primary btn-sm mt-2'
-                        :disabled='!canAddSubjective || pushing'
-                        @click='onAddSubjective'
-                    >
-                        Add to DataSync
-                    </button>
+                    No polygons in the active DataSync.
                 </div>
-            </div>
-        </div>
-
-        <!-- Recall: areas already on DataSync -->
-        <div class='col-12'>
-            <div class='card'>
-                <div class='card-header py-2'>
-                    <h3 class='card-title mb-0'>
-                        Search Areas on DataSync ({{ sentAreas.length }})
-                    </h3>
-                </div>
-                <div class='card-body py-2'>
-                    <div
-                        v-if='loadingAreas'
-                        class='text-muted small'
-                    >
-                        Loading…
-                    </div>
-                    <div
-                        v-else-if='!sentAreas.length'
-                        class='text-muted small'
-                    >
-                        No search areas sent yet. Set the IPP to begin.
-                    </div>
-                    <table
-                        v-else
-                        class='table table-sm table-vcenter mb-0'
-                    >
-                        <thead>
-                            <tr><th>Area</th><th>Map Object</th><th>Area (mi²)</th><th class='text-end' /></tr>
-                        </thead>
-                        <tbody>
-                            <template
-                                v-for='row in recallRows'
-                                :key='row.rowKey'
-                            >
-                                <tr
-                                    v-if='row.kind === "section"'
-                                    class='table-active'
-                                >
-                                    <td
-                                        colspan='4'
-                                        class='fw-bold small py-1'
-                                    >
-                                        {{ row.label }}
-                                    </td>
-                                </tr>
-                                <tr
-                                    v-else-if='row.kind === "folder"'
-                                    class='table-light'
-                                >
-                                    <td
-                                        colspan='4'
-                                        class='small text-muted py-1 ps-3'
-                                    >
-                                        {{ row.label }}
-                                    </td>
-                                </tr>
-                                <tr v-else>
-                                    <td :class='row.indent ? "ps-4" : ""'>
-                                        {{ row.area.label }}
-                                    </td>
-                                    <td>
-                                        <FeatureCallsignCell
-                                            :uid='row.area.uuid'
-                                            :callsign='callsignForUid(row.area.uuid, row.area.label)'
-                                            @fly='onFlyTo(row.area.uuid)'
-                                        />
-                                    </td>
-                                    <td>{{ formatSqMi(areaForUid(row.area.uuid)) }}</td>
-                                    <td class='text-end'>
-                                        <button
-                                            type='button'
-                                            class='btn btn-sm btn-link text-danger p-0'
-                                            :disabled='pushing'
-                                            @click='removeArea(row.area)'
-                                        >
-                                            Remove
-                                        </button>
-                                    </td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- shared status -->
-        <div class='col-12'>
-            <div
-                v-if='!activeMission'
-                class='form-text text-warning'
-            >
-                No active mission. Select one in Create | Open first.
-            </div>
-            <div
-                v-else
-                class='form-text d-flex flex-wrap align-items-center gap-2'
-            >
-                <span>Active DataSync: <strong>{{ activeMission.name }}</strong></span>
                 <button
-                    type='button'
-                    class='btn btn-outline-primary btn-sm'
-                    :disabled='loadingFeatures'
-                    title='Reload markers and polygons from the active DataSync mission'
-                    @click='onRefreshFeatures'
+                    class='btn btn-primary btn-sm mt-2'
+                    :disabled='!canAddSubjective || pushing'
+                    @click='onAddSubjective'
                 >
-                    {{ loadingFeatures ? 'Loading…' : 'Refresh map objects' }}
+                    Add to DataSync
                 </button>
             </div>
+        </TablerBorder>
+
+        <!-- Recall: areas already on DataSync -->
+        <TablerBorder
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0'>
+                    Search Areas on DataSync ({{ sentAreas.length }})
+                </p>
+            </template>
+
             <div
-                v-if='status'
-                class='fw-bold mt-1'
-                :class='statusError ? "text-danger" : "text-success"'
+                v-if='loadingAreas'
+                class='text-muted small'
             >
-                {{ status }}
+                Loading…
             </div>
+            <div
+                v-else-if='!sentAreas.length'
+                class='text-muted small'
+            >
+                No search areas sent yet. Set the IPP to begin.
+            </div>
+            <table
+                v-else
+                class='table table-sm table-vcenter mb-0'
+            >
+                <thead>
+                    <tr><th>Area</th><th>Map Object</th><th>Area (mi²)</th><th class='text-end' /></tr>
+                </thead>
+                <tbody>
+                    <template
+                        v-for='row in recallRows'
+                        :key='row.rowKey'
+                    >
+                        <tr
+                            v-if='row.kind === "section"'
+                            class='table-active'
+                        >
+                            <td
+                                colspan='4'
+                                class='fw-bold small py-1'
+                            >
+                                {{ row.label }}
+                            </td>
+                        </tr>
+                        <tr
+                            v-else-if='row.kind === "folder"'
+                            class='table-light'
+                        >
+                            <td
+                                colspan='4'
+                                class='small text-muted py-1 ps-3'
+                            >
+                                {{ row.label }}
+                            </td>
+                        </tr>
+                        <tr v-else>
+                            <td :class='row.indent ? "ps-4" : ""'>
+                                {{ row.area.label }}
+                            </td>
+                            <td>
+                                <FeatureCallsignCell
+                                    :uid='row.area.uuid'
+                                    :callsign='callsignForUid(row.area.uuid, row.area.label)'
+                                    @fly='onFlyTo(row.area.uuid)'
+                                />
+                            </td>
+                            <td>{{ formatSqMi(areaForUid(row.area.uuid)) }}</td>
+                            <td class='text-end'>
+                                <button
+                                    type='button'
+                                    class='btn btn-sm btn-link text-danger p-0'
+                                    :disabled='pushing'
+                                    @click='removeArea(row.area)'
+                                >
+                                    Remove
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </TablerBorder>
+
+        <!-- shared status -->
+        <TablerInlineAlert
+            v-if='!activeMission'
+            class='mb-2'
+            severity='warning'
+            title='No Active Mission'
+            description='Select one in Create | Open first.'
+        />
+        <div
+            v-else
+            class='form-text d-flex flex-wrap align-items-center gap-2 mb-2'
+        >
+            <span>Active DataSync: <strong>{{ activeMission.name }}</strong></span>
+            <button
+                type='button'
+                class='btn btn-outline-primary btn-sm'
+                :disabled='loadingFeatures'
+                title='Reload markers and polygons from the active DataSync mission'
+                @click='onRefreshFeatures'
+            >
+                {{ loadingFeatures ? 'Loading…' : 'Refresh map objects' }}
+            </button>
         </div>
+        <TablerInlineAlert
+            v-if='status'
+            :severity='statusError ? "danger" : "success"'
+            :title='statusError ? "Error" : "Success"'
+            :description='status'
+        />
     </div>
 </template>
 
 <script setup lang='ts'>
 import { ref, computed, reactive, watch, onMounted } from 'vue';
-import { IconPlus, IconX } from '@tabler/icons-vue';
+import { IconPlus, IconX, IconChevronDown, IconLock } from '@tabler/icons-vue';
+import { TablerBorder, TablerInput, TablerEnum, TablerInlineAlert } from '@tak-ps/vue-tabler';
 import type { Feature } from '../../../../../../src/types.ts';
 import azlpb from '../../../data/azlpb_table.json';
 import { parseCoordinates } from '../../../lib/coords.ts';
@@ -597,6 +757,7 @@ const LPB_RING_STYLE: RingStyle = {
 };
 const AZ_LPB_SOURCE = 'AZ';
 const MAX_CUSTOM_RANGES = 4;
+const IPP_TYPE_OPTIONS = ['LKP — Last Known Position', 'PLS — Point Last Seen'];
 
 type LpbDistanceUnit = 'mi' | 'me';
 
@@ -658,6 +819,14 @@ const ippInput = ref('');
 const ipp = computed(() => parseCoordinates(ippInput.value));
 
 const ippType = ref<'LKP' | 'PLS'>('LKP');
+const ippTypeLabel = computed({
+    get(): string {
+        return ippType.value === 'PLS' ? IPP_TYPE_OPTIONS[1] : IPP_TYPE_OPTIONS[0];
+    },
+    set(label: string): void {
+        ippType.value = label === IPP_TYPE_OPTIONS[1] ? 'PLS' : 'LKP';
+    },
+});
 const selectedObjectUid = ref('');
 const missionMarkers = ref<MissionFeatureRef[]>([]);
 const missionPolygons = ref<MissionFeatureRef[]>([]);
@@ -1401,3 +1570,13 @@ async function removeArea(area: SentArea): Promise<void> {
     }
 }
 </script>
+
+<style scoped>
+.rotate-180 {
+    transform: rotate(-90deg);
+}
+
+.transition-transform {
+    transition: transform 0.2s ease-out;
+}
+</style>

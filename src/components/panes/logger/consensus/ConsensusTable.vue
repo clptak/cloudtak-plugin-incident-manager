@@ -1,12 +1,20 @@
 <template>
-    <div class='card'>
-        <div class='card-header d-flex align-items-center'>
-            <h3 class='card-title mb-0 flex-grow-1'>
+    <TablerBorder
+        class='cloudtak-accent text-white'
+        :fill-height='false'
+        :shadow='false'
+        gap='sm'
+    >
+        <template #label>
+            <p class='text-uppercase text-white-50 small mb-0'>
                 Consensus
-            </h3>
+            </p>
+        </template>
+        <template #header>
             <span class='text-danger fw-bold small'>Click on the column header to edit the column</span>
-        </div>
-        <div class='card-body'>
+        </template>
+
+        <div>
             <div class='table-responsive'>
                 <table class='table table-sm table-bordered table-vcenter mb-0 consensus-table'>
                     <thead>
@@ -94,48 +102,49 @@
                 </table>
             </div>
 
-            <div
+            <TablerInlineAlert
                 v-if='status'
-                class='fw-bold mt-2'
-                :class='statusError ? "text-danger" : "text-success"'
-            >
-                {{ status }}
+                class='mt-2'
+                :severity='statusError ? "danger" : "success"'
+                :title='statusError ? "Error" : "Status"'
+                :description='status'
+            />
+
+            <div class='d-flex gap-2 mt-3'>
+                <button
+                    type='button'
+                    class='btn btn-primary'
+                    :disabled='saving'
+                    @click='emit("accept")'
+                >
+                    {{ saving ? 'Saving…' : 'Accept' }}
+                </button>
+                <button
+                    type='button'
+                    class='btn btn-secondary'
+                    :disabled='saving'
+                    @click='emit("back")'
+                >
+                    Back
+                </button>
+                <button
+                    type='button'
+                    class='btn btn-secondary'
+                    :disabled='saving'
+                    @click='emit("cancel")'
+                >
+                    Cancel
+                </button>
+                <button
+                    type='button'
+                    class='btn btn-outline-secondary'
+                    title='Help is not available yet'
+                >
+                    Help
+                </button>
             </div>
         </div>
-        <div class='card-footer d-flex gap-2'>
-            <button
-                type='button'
-                class='btn btn-primary'
-                :disabled='saving'
-                @click='emit("accept")'
-            >
-                {{ saving ? 'Saving…' : 'Accept' }}
-            </button>
-            <button
-                type='button'
-                class='btn btn-secondary'
-                :disabled='saving'
-                @click='emit("back")'
-            >
-                Back
-            </button>
-            <button
-                type='button'
-                class='btn btn-secondary'
-                :disabled='saving'
-                @click='emit("cancel")'
-            >
-                Cancel
-            </button>
-            <button
-                type='button'
-                class='btn btn-outline-secondary'
-                title='Help is not available yet'
-            >
-                Help
-            </button>
-        </div>
-    </div>
+    </TablerBorder>
 
     <ResponderMethodModal
         v-if='methodIndex !== null'
@@ -156,6 +165,7 @@
 
 <script setup lang='ts'>
 import { ref } from 'vue';
+import { TablerBorder, TablerInlineAlert } from '@tak-ps/vue-tabler';
 import ResponderMethodModal from './ResponderMethodModal.vue';
 import ResponderEntryModal from './ResponderEntryModal.vue';
 import type { SegmentRef } from './ResponderEntryModal.vue';

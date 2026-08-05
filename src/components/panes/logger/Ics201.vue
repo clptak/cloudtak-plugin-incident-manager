@@ -13,200 +13,254 @@
             Loading mission data…
         </div>
 
-        <div class='card mb-3'>
-            <div class='card-header py-2'>
-                <h4 class='card-title mb-0 fs-6'>
+        <TablerBorder
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0'>
                     Header
-                </h4>
-            </div>
-            <div class='card-body py-2'>
-                <div class='row g-2'>
-                    <div class='col-md-6'>
-                        <label class='form-label small mb-1'>Incident Name</label>
-                        <input
-                            v-model='form.incidentName'
-                            type='text'
-                            class='form-control form-control-sm'
-                            readonly
-                        >
-                    </div>
-                    <div class='col-md-6'>
-                        <label class='form-label small mb-1'>Incident Number</label>
-                        <input
-                            v-model='form.incidentNumber'
-                            type='text'
-                            class='form-control form-control-sm'
-                            readonly
-                        >
-                    </div>
-                    <div class='col-md-3'>
-                        <label class='form-label small mb-1'>Date</label>
-                        <input
-                            v-model='form.date'
-                            type='text'
-                            class='form-control form-control-sm'
-                            placeholder='MM/DD/YY'
-                        >
-                    </div>
-                    <div class='col-md-3'>
-                        <label class='form-label small mb-1'>Time</label>
-                        <input
-                            v-model='form.time'
-                            type='text'
-                            class='form-control form-control-sm'
-                            placeholder='HH:MM'
-                        >
-                    </div>
-                    <div class='col-md-6'>
-                        <label class='form-label small mb-1'>Initial Planning Point</label>
-                        <input
-                            v-model='form.initialPlanningPoint'
-                            type='text'
-                            class='form-control form-control-sm'
-                            readonly
-                        >
-                    </div>
-                </div>
-            </div>
-        </div>
+                </p>
+            </template>
 
-        <div class='card mb-3'>
-            <div class='card-header py-2'>
-                <h4 class='card-title mb-0 fs-6'>
-                    Map / Sketch (TAK Mission, IPP, Weather, Comms)
-                </h4>
-            </div>
-            <div class='card-body py-2'>
-                <div class='mb-2'>
-                    <label class='form-label small mb-1'>Weather Summary</label>
-                    <textarea
-                        v-model='form.weatherSummary'
-                        class='form-control form-control-sm'
-                        rows='4'
+            <div class='row g-2'>
+                <div class='col-md-6'>
+                    <TablerInput
+                        v-model='form.incidentName'
+                        label='Incident Name'
+                        :disabled='true'
                     />
                 </div>
-                <div class='row g-2'>
-                    <div class='col-md-4'>
-                        <label class='form-label small mb-1'>Repeated Channel</label>
-                        <input
-                            v-model='form.adamRepeatedChannel'
-                            type='text'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
-                    <div class='col-md-4'>
-                        <label class='form-label small mb-1'>Car to Car Channel</label>
-                        <input
-                            v-model='form.carToCarChannel'
-                            type='text'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
-                    <div class='col-md-4'>
-                        <label class='form-label small mb-1'>Alternate Channel</label>
-                        <input
-                            v-model='form.alternateChannel'
-                            type='text'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
+                <div class='col-md-6'>
+                    <TablerInput
+                        v-model='form.incidentNumber'
+                        label='Incident Number'
+                        :disabled='true'
+                    />
                 </div>
-                <div class='form-text mt-1'>
-                    Written into Map/Sketch with TAK MISSION name/guid and IPP.
+                <div class='col-md-3'>
+                    <TablerInput
+                        v-model='form.date'
+                        label='Date'
+                        placeholder='MM/DD/YY'
+                    />
+                </div>
+                <div class='col-md-3'>
+                    <TablerInput
+                        v-model='form.time'
+                        label='Time'
+                        placeholder='HH:MM'
+                    />
+                </div>
+                <div class='col-md-6'>
+                    <TablerInput
+                        v-model='form.initialPlanningPoint'
+                        label='Initial Planning Point'
+                        :disabled='true'
+                    />
                 </div>
             </div>
-        </div>
+        </TablerBorder>
 
-        <div class='card mb-3'>
-            <div class='card-header py-2'>
-                <h4 class='card-title mb-0 fs-6'>
-                    Situation Summary &amp; Safety
-                </h4>
-            </div>
-            <div class='card-body py-2'>
-                <textarea
-                    v-model='form.situationSummary'
-                    class='form-control form-control-sm'
-                    rows='4'
+        <TablerBorder
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0'>
+                    Map / Sketch (TAK Mission, IPP, Weather, Comms)
+                </p>
+            </template>
+
+            <div class='mb-2'>
+                <TablerInput
+                    v-model='form.weatherSummary'
+                    label='Weather Summary'
+                    :rows='4'
                 />
             </div>
-        </div>
-
-        <div class='card mb-3'>
-            <div class='card-header py-2'>
-                <h4 class='card-title mb-0 fs-6'>
-                    Prepared By
-                </h4>
-            </div>
-            <div class='card-body py-2'>
-                <div class='row g-2'>
-                    <div class='col-md-3'>
-                        <label class='form-label small mb-1'>Name</label>
-                        <input
-                            v-model='form.preparedByName'
-                            type='text'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
-                    <div class='col-md-3'>
-                        <label class='form-label small mb-1'>Position / Title</label>
-                        <input
-                            v-model='form.positionTitle'
-                            type='text'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
-                    <div class='col-md-3'>
-                        <label class='form-label small mb-1'>Signature</label>
-                        <input
-                            v-model='form.signature'
-                            type='text'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
-                    <div class='col-md-3'>
-                        <label class='form-label small mb-1'>Date/Time</label>
-                        <input
-                            v-model='form.preparedDateTime'
-                            type='text'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
+            <div class='row g-2'>
+                <div class='col-md-4'>
+                    <TablerInput
+                        v-model='form.adamRepeatedChannel'
+                        label='Repeated Channel'
+                    />
+                </div>
+                <div class='col-md-4'>
+                    <TablerInput
+                        v-model='form.carToCarChannel'
+                        label='Car to Car Channel'
+                    />
+                </div>
+                <div class='col-md-4'>
+                    <TablerInput
+                        v-model='form.alternateChannel'
+                        label='Alternate Channel'
+                    />
                 </div>
             </div>
-        </div>
-
-        <div class='card mb-3'>
-            <div class='card-header py-2'>
-                <h4 class='card-title mb-0 fs-6'>
-                    Current and Planned Objectives
-                </h4>
+            <div class='form-text mt-1'>
+                Written into Map/Sketch with TAK MISSION name/guid and IPP.
             </div>
-            <div class='card-body py-2'>
-                <div class='mb-3'>
-                    <label class='form-label small mb-1'>
-                        Current Objectives
-                    </label>
-                    <div
-                        v-for='(text, i) in form.currentObjectives'
-                        :key='`current-obj-${i}`'
-                        class='input-group input-group-sm mb-2'
+        </TablerBorder>
+
+        <TablerBorder
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0'>
+                    Situation Summary &amp; Safety
+                </p>
+            </template>
+
+            <TablerInput
+                v-model='form.situationSummary'
+                :rows='4'
+            />
+        </TablerBorder>
+
+        <TablerBorder
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0'>
+                    Prepared By
+                </p>
+            </template>
+
+            <div class='row g-2'>
+                <div class='col-md-3'>
+                    <TablerInput
+                        v-model='form.preparedByName'
+                        label='Name'
+                    />
+                </div>
+                <div class='col-md-3'>
+                    <TablerInput
+                        v-model='form.positionTitle'
+                        label='Position / Title'
+                    />
+                </div>
+                <div class='col-md-3'>
+                    <TablerInput
+                        v-model='form.signature'
+                        label='Signature'
+                    />
+                </div>
+                <div class='col-md-3'>
+                    <TablerInput
+                        v-model='form.preparedDateTime'
+                        label='Date/Time'
+                    />
+                </div>
+            </div>
+        </TablerBorder>
+
+        <TablerBorder
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0'>
+                    Current and Planned Objectives
+                </p>
+            </template>
+
+            <div class='mb-3'>
+                <p class='text-uppercase text-white-50 small mb-1'>
+                    Current Objectives
+                </p>
+                <div
+                    v-for='(text, i) in form.currentObjectives'
+                    :key='`current-obj-${i}`'
+                    class='d-flex align-items-start gap-2 mb-2'
+                >
+                    <span
+                        class='text-white-50 small pt-2'
+                        style='min-width: 1.5rem;'
                     >
-                        <span class='input-group-text text-muted'>
+                        {{ i + 1 }}
+                    </span>
+                    <div class='flex-grow-1'>
+                        <TablerInput
+                            v-model='form.currentObjectives[i]'
+                            :placeholder='`Current objective ${i + 1}`'
+                        />
+                    </div>
+                    <button
+                        v-if='form.currentObjectives.length > 1'
+                        type='button'
+                        class='btn btn-outline-danger btn-sm mt-1'
+                        :aria-label='`Remove current objective ${i + 1}`'
+                        @click='removeCurrentObjective(i)'
+                    >
+                        <IconX
+                            :size='16'
+                            stroke='1.5'
+                        />
+                    </button>
+                </div>
+                <button
+                    type='button'
+                    class='btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1'
+                    @click='addCurrentObjective'
+                >
+                    <IconPlus
+                        :size='16'
+                        stroke='1.5'
+                    />
+                    Add current objective
+                </button>
+            </div>
+
+            <div>
+                <p class='text-uppercase text-white-50 small mb-1'>
+                    Planned Objectives
+                </p>
+                <div
+                    v-for='(row, i) in form.plannedObjectives'
+                    :key='`planned-obj-${i}`'
+                    class='row g-2 mb-2 align-items-start'
+                >
+                    <div class='col d-flex align-items-start gap-2'>
+                        <span
+                            class='text-white-50 small pt-2'
+                            style='min-width: 1.5rem;'
+                        >
                             {{ i + 1 }}
                         </span>
-                        <input
-                            v-model='form.currentObjectives[i]'
-                            type='text'
-                            class='form-control form-control-sm'
-                            :placeholder='`Current objective ${i + 1}`'
-                        >
+                        <div class='flex-grow-1'>
+                            <TablerInput
+                                v-model='row.text'
+                                :placeholder='`Planned objective ${i + 1}`'
+                            />
+                        </div>
+                    </div>
+                    <div class='col-auto'>
+                        <TablerInput
+                            v-model='row.date'
+                            type='date'
+                        />
+                    </div>
+                    <div class='col-auto'>
                         <button
-                            v-if='form.currentObjectives.length > 1'
+                            v-if='form.plannedObjectives.length > 1'
                             type='button'
-                            class='btn btn-outline-danger btn-sm'
-                            :aria-label='`Remove current objective ${i + 1}`'
-                            @click='removeCurrentObjective(i)'
+                            class='btn btn-outline-danger btn-sm mt-1'
+                            :aria-label='`Remove planned objective ${i + 1}`'
+                            @click='removePlannedObjective(i)'
                         >
                             <IconX
                                 :size='16'
@@ -214,355 +268,268 @@
                             />
                         </button>
                     </div>
-                    <button
-                        type='button'
-                        class='btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1'
-                        @click='addCurrentObjective'
-                    >
-                        <IconPlus
-                            :size='16'
-                            stroke='1.5'
-                        />
-                        Add current objective
-                    </button>
                 </div>
-
-                <div>
-                    <label class='form-label small mb-1'>
-                        Planned Objectives
-                    </label>
-                    <div
-                        v-for='(row, i) in form.plannedObjectives'
-                        :key='`planned-obj-${i}`'
-                        class='row g-2 mb-2 align-items-center'
-                    >
-                        <div class='col'>
-                            <div class='input-group input-group-sm'>
-                                <span class='input-group-text text-muted'>
-                                    {{ i + 1 }}
-                                </span>
-                                <input
-                                    v-model='row.text'
-                                    type='text'
-                                    class='form-control form-control-sm'
-                                    :placeholder='`Planned objective ${i + 1}`'
-                                >
-                            </div>
-                        </div>
-                        <div class='col-auto'>
-                            <input
-                                v-model='row.date'
-                                type='date'
-                                class='form-control form-control-sm'
-                                aria-label='Planned date'
-                            >
-                        </div>
-                        <div class='col-auto'>
-                            <button
-                                v-if='form.plannedObjectives.length > 1'
-                                type='button'
-                                class='btn btn-outline-danger btn-sm'
-                                :aria-label='`Remove planned objective ${i + 1}`'
-                                @click='removePlannedObjective(i)'
-                            >
-                                <IconX
-                                    :size='16'
-                                    stroke='1.5'
-                                />
-                            </button>
-                        </div>
-                    </div>
-                    <button
-                        type='button'
-                        class='btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1'
-                        @click='addPlannedObjective'
-                    >
-                        <IconPlus
-                            :size='16'
-                            stroke='1.5'
-                        />
-                        Add planned objective
-                    </button>
-                </div>
-                <div class='form-text mt-2'>
-                    Prefills from Incident POST objectives tagged Current / Planned.
-                    PDF groups planned rows by date (e.g. “Planned Objectives for 7/5/12:”).
-                </div>
+                <button
+                    type='button'
+                    class='btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1'
+                    @click='addPlannedObjective'
+                >
+                    <IconPlus
+                        :size='16'
+                        stroke='1.5'
+                    />
+                    Add planned objective
+                </button>
             </div>
-        </div>
+            <div class='form-text mt-2'>
+                Prefills from Incident POST objectives tagged Current / Planned.
+                PDF groups planned rows by date (e.g. “Planned Objectives for 7/5/12:”).
+            </div>
+        </TablerBorder>
 
-        <div class='card mb-3'>
-            <div class='card-header py-2'>
-                <h4 class='card-title mb-0 fs-6'>
+        <TablerBorder
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0'>
                     Current / Planned Actions
-                </h4>
-            </div>
-            <div class='card-body py-2'>
-                <div class='table-responsive'>
-                    <table class='table table-sm table-bordered mb-0 small'>
-                        <thead>
-                            <tr>
-                                <th style='width:5rem;'>
-                                    #
-                                </th>
-                                <th style='width:6rem;'>
-                                    Time
-                                </th>
-                                <th>Actions / Strategies / Tactics</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr
-                                v-for='(row, i) in visibleActions'
-                                :key='`action-${i}`'
-                            >
-                                <td class='text-muted'>
-                                    {{ i + 1 }}
-                                </td>
-                                <td>
-                                    <input
-                                        v-model='row.time'
-                                        type='text'
-                                        class='form-control form-control-sm'
-                                    >
-                                </td>
-                                <td>
-                                    <textarea
-                                        v-model='row.actions'
-                                        class='form-control form-control-sm'
-                                        rows='2'
-                                    />
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <div class='d-flex flex-wrap align-items-center gap-2 mt-2 mb-1'>
-                    <button
-                        type='button'
-                        class='btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1'
-                        :disabled='form.actionContinuationPages >= MAX_ACTION_CONTINUATION_PAGES'
-                        @click='addActionContinuationPage'
-                    >
-                        <IconPlus
-                            :size='16'
-                            stroke='1.5'
-                        />
-                        Add §8 continuation page
-                    </button>
-                    <button
-                        v-if='form.actionContinuationPages > 0'
-                        type='button'
-                        class='btn btn-sm btn-outline-secondary'
-                        @click='removeActionContinuationPage'
-                    >
-                        Remove continuation page
-                    </button>
-                    <span class='form-text mb-0'>
-                        {{ form.actionContinuationPages }} continuation page{{ form.actionContinuationPages === 1 ? '' : 's' }}
-                        · {{ actionCapacity }} action rows ({{ MAX_ACTION_ROWS }} per page)
-                    </span>
-                </div>
-                <div class='form-text mt-1'>
-                    Prefills from mission logs tagged <code>201</code>
-                    (time = log date/timestamp, actions = remarks with line breaks collapsed), then
-                    <code>planned</code> / <code>current</code>, then Incident POST as separate
-                    Objective / strategy (<code>1.</code>) / tactic (<code>1.1</code>) rows.
-                    Overflow spills onto §8 continuation pages (header + Time/Actions, no §7).
-                </div>
-            </div>
-        </div>
+                </p>
+            </template>
 
-        <div class='card mb-3'>
-            <div class='card-header py-2'>
-                <h4 class='card-title mb-0 fs-6'>
+            <div class='table-responsive'>
+                <table class='table table-sm table-bordered mb-0 small'>
+                    <thead>
+                        <tr>
+                            <th style='width:5rem;'>
+                                #
+                            </th>
+                            <th style='width:6rem;'>
+                                Time
+                            </th>
+                            <th>Actions / Strategies / Tactics</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr
+                            v-for='(row, i) in visibleActions'
+                            :key='`action-${i}`'
+                        >
+                            <td class='text-muted'>
+                                {{ i + 1 }}
+                            </td>
+                            <td>
+                                <TablerInput v-model='row.time' />
+                            </td>
+                            <td>
+                                <TablerInput
+                                    v-model='row.actions'
+                                    :rows='2'
+                                />
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class='d-flex flex-wrap align-items-center gap-2 mt-2 mb-1'>
+                <button
+                    type='button'
+                    class='btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1'
+                    :disabled='form.actionContinuationPages >= MAX_ACTION_CONTINUATION_PAGES'
+                    @click='addActionContinuationPage'
+                >
+                    <IconPlus
+                        :size='16'
+                        stroke='1.5'
+                    />
+                    Add §8 continuation page
+                </button>
+                <button
+                    v-if='form.actionContinuationPages > 0'
+                    type='button'
+                    class='btn btn-sm btn-outline-secondary'
+                    @click='removeActionContinuationPage'
+                >
+                    Remove continuation page
+                </button>
+                <span class='form-text mb-0'>
+                    {{ form.actionContinuationPages }} continuation page{{ form.actionContinuationPages === 1 ? '' : 's' }}
+                    · {{ actionCapacity }} action rows ({{ MAX_ACTION_ROWS }} per page)
+                </span>
+            </div>
+            <div class='form-text mt-1'>
+                Prefills from mission logs tagged <code>201</code>
+                (time = log date/timestamp, actions = remarks with line breaks collapsed), then
+                <code>planned</code> / <code>current</code>, then Incident POST as separate
+                Objective / strategy (<code>1.</code>) / tactic (<code>1.1</code>) rows.
+                Overflow spills onto §8 continuation pages (header + Time/Actions, no §7).
+            </div>
+        </TablerBorder>
+
+        <TablerBorder
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0'>
                     Current Organization
-                </h4>
-            </div>
-            <div class='card-body py-2'>
-                <div class='row g-2'>
-                    <div class='col-md-6'>
-                        <label class='form-label small mb-1'>Incident Commander(s)</label>
-                        <textarea
-                            v-model='form.incidentCommanders'
-                            class='form-control form-control-sm'
-                            rows='2'
-                        />
-                    </div>
-                    <div class='col-md-6'>
-                        <label class='form-label small mb-1'>Liaison Officer</label>
-                        <input
-                            v-model='form.liaisonOfficer'
-                            type='text'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
-                    <div class='col-md-6'>
-                        <label class='form-label small mb-1'>Safety Officer</label>
-                        <input
-                            v-model='form.safetyOfficer'
-                            type='text'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
-                    <div class='col-md-6'>
-                        <label class='form-label small mb-1'>Public Information Officer</label>
-                        <input
-                            v-model='form.publicInformationOfficer'
-                            type='text'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
-                    <div class='col-md-6'>
-                        <label class='form-label small mb-1'>Planning Section Chief</label>
-                        <input
-                            v-model='form.planningSectionChief'
-                            type='text'
-                            class='form-control form-control-sm'
-                        >
-                        <textarea
-                            v-model='form.planningSectionUnits'
-                            class='form-control form-control-sm mt-1'
-                            rows='3'
-                            placeholder='Planning Section teams/personnel (one per line)'
-                        />
-                    </div>
-                    <div class='col-md-6'>
-                        <label class='form-label small mb-1'>Operations Section Chief</label>
-                        <input
-                            v-model='form.operationsSectionChief'
-                            type='text'
-                            class='form-control form-control-sm'
-                        >
-                        <textarea
-                            v-model='form.operationsSectionUnits'
-                            class='form-control form-control-sm mt-1'
-                            rows='3'
-                            placeholder='Operations Section teams/personnel (one per line)'
-                        />
-                    </div>
-                    <div class='col-md-6'>
-                        <label class='form-label small mb-1'>Finance/Admin Section Chief</label>
-                        <input
-                            v-model='form.financeSectionChief'
-                            type='text'
-                            class='form-control form-control-sm'
-                        >
-                        <textarea
-                            v-model='form.financeSectionUnits'
-                            class='form-control form-control-sm mt-1'
-                            rows='3'
-                            placeholder='Finance/Admin Section teams/personnel (one per line)'
-                        />
-                    </div>
-                    <div class='col-md-6'>
-                        <label class='form-label small mb-1'>Logistics Section Chief</label>
-                        <input
-                            v-model='form.logisticsSectionChief'
-                            type='text'
-                            class='form-control form-control-sm'
-                        >
-                        <textarea
-                            v-model='form.logisticsSectionUnits'
-                            class='form-control form-control-sm mt-1'
-                            rows='3'
-                            placeholder='Logistics Section teams/personnel (one per line)'
-                        />
-                    </div>
-                    <div class='col-12'>
-                        <label class='form-label small mb-1'>Organization Notes</label>
-                        <textarea
-                            v-model='form.organizationNotes'
-                            class='form-control form-control-sm'
-                            rows='2'
-                        />
-                    </div>
-                </div>
-                <div class='form-text mt-1'>
-                    Prefills from the Organization tab chart: positions fill the officer/chief
-                    boxes and each section&apos;s teams appear under its Section Chief on the PDF.
-                    Anything not under a Section Chief goes to Organization Notes.
-                </div>
-            </div>
-        </div>
+                </p>
+            </template>
 
-        <div class='card mb-3'>
-            <div class='card-header py-2'>
-                <h4 class='card-title mb-0 fs-6'>
+            <div class='row g-2'>
+                <div class='col-md-6'>
+                    <TablerInput
+                        v-model='form.incidentCommanders'
+                        label='Incident Commander(s)'
+                        :rows='2'
+                    />
+                </div>
+                <div class='col-md-6'>
+                    <TablerInput
+                        v-model='form.liaisonOfficer'
+                        label='Liaison Officer'
+                    />
+                </div>
+                <div class='col-md-6'>
+                    <TablerInput
+                        v-model='form.safetyOfficer'
+                        label='Safety Officer'
+                    />
+                </div>
+                <div class='col-md-6'>
+                    <TablerInput
+                        v-model='form.publicInformationOfficer'
+                        label='Public Information Officer'
+                    />
+                </div>
+                <div class='col-md-6'>
+                    <TablerInput
+                        v-model='form.planningSectionChief'
+                        label='Planning Section Chief'
+                    />
+                    <TablerInput
+                        v-model='form.planningSectionUnits'
+                        class='mt-1'
+                        :rows='3'
+                        placeholder='Planning Section teams/personnel (one per line)'
+                    />
+                </div>
+                <div class='col-md-6'>
+                    <TablerInput
+                        v-model='form.operationsSectionChief'
+                        label='Operations Section Chief'
+                    />
+                    <TablerInput
+                        v-model='form.operationsSectionUnits'
+                        class='mt-1'
+                        :rows='3'
+                        placeholder='Operations Section teams/personnel (one per line)'
+                    />
+                </div>
+                <div class='col-md-6'>
+                    <TablerInput
+                        v-model='form.financeSectionChief'
+                        label='Finance/Admin Section Chief'
+                    />
+                    <TablerInput
+                        v-model='form.financeSectionUnits'
+                        class='mt-1'
+                        :rows='3'
+                        placeholder='Finance/Admin Section teams/personnel (one per line)'
+                    />
+                </div>
+                <div class='col-md-6'>
+                    <TablerInput
+                        v-model='form.logisticsSectionChief'
+                        label='Logistics Section Chief'
+                    />
+                    <TablerInput
+                        v-model='form.logisticsSectionUnits'
+                        class='mt-1'
+                        :rows='3'
+                        placeholder='Logistics Section teams/personnel (one per line)'
+                    />
+                </div>
+                <div class='col-12'>
+                    <TablerInput
+                        v-model='form.organizationNotes'
+                        label='Organization Notes'
+                        :rows='2'
+                    />
+                </div>
+            </div>
+            <div class='form-text mt-1'>
+                Prefills from the Organization tab chart: positions fill the officer/chief
+                boxes and each section&apos;s teams appear under its Section Chief on the PDF.
+                Anything not under a Section Chief goes to Organization Notes.
+            </div>
+        </TablerBorder>
+
+        <TablerBorder
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0'>
                     Resource Summary
-                </h4>
+                </p>
+            </template>
+
+            <div class='table-responsive'>
+                <table class='table table-sm table-bordered mb-0 small'>
+                    <thead>
+                        <tr>
+                            <th>Resource</th>
+                            <th>Identifier</th>
+                            <th>Ordered</th>
+                            <th>ETA</th>
+                            <th>Arrived</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr
+                            v-for='(row, i) in visibleResources'
+                            :key='`resource-${i}`'
+                        >
+                            <td>
+                                <TablerInput v-model='row.resource' />
+                            </td>
+                            <td>
+                                <TablerInput v-model='row.identifier' />
+                            </td>
+                            <td>
+                                <TablerInput v-model='row.dateTimeOrdered' />
+                            </td>
+                            <td>
+                                <TablerInput v-model='row.eta' />
+                            </td>
+                            <td class='text-center align-middle'>
+                                <input
+                                    v-model='row.arrived'
+                                    type='checkbox'
+                                    class='form-check-input'
+                                >
+                            </td>
+                            <td>
+                                <TablerInput v-model='row.notes' />
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
-            <div class='card-body py-2'>
-                <div class='table-responsive'>
-                    <table class='table table-sm table-bordered mb-0 small'>
-                        <thead>
-                            <tr>
-                                <th>Resource</th>
-                                <th>Identifier</th>
-                                <th>Ordered</th>
-                                <th>ETA</th>
-                                <th>Arrived</th>
-                                <th>Notes</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr
-                                v-for='(row, i) in visibleResources'
-                                :key='`resource-${i}`'
-                            >
-                                <td>
-                                    <input
-                                        v-model='row.resource'
-                                        type='text'
-                                        class='form-control form-control-sm'
-                                    >
-                                </td>
-                                <td>
-                                    <input
-                                        v-model='row.identifier'
-                                        type='text'
-                                        class='form-control form-control-sm'
-                                    >
-                                </td>
-                                <td>
-                                    <input
-                                        v-model='row.dateTimeOrdered'
-                                        type='text'
-                                        class='form-control form-control-sm'
-                                    >
-                                </td>
-                                <td>
-                                    <input
-                                        v-model='row.eta'
-                                        type='text'
-                                        class='form-control form-control-sm'
-                                    >
-                                </td>
-                                <td class='text-center align-middle'>
-                                    <input
-                                        v-model='row.arrived'
-                                        type='checkbox'
-                                        class='form-check-input'
-                                    >
-                                </td>
-                                <td>
-                                    <input
-                                        v-model='row.notes'
-                                        type='text'
-                                        class='form-control form-control-sm'
-                                    >
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <div class='form-text mt-1'>
-                    Prefills from Mission Resource assignments (Resources screen)
-                    and mission logs tagged <code>RESOURCES</code>
-                    (one resource per log: Agency, Resource Identifier, Date / Time Ordered, ETA, Arrived, Notes).
-                </div>
+            <div class='form-text mt-1'>
+                Prefills from Mission Resource assignments (Resources screen)
+                and mission logs tagged <code>RESOURCES</code>
+                (one resource per log: Agency, Resource Identifier, Date / Time Ordered, ETA, Arrived, Notes).
             </div>
-        </div>
+        </TablerBorder>
 
         <div class='d-flex flex-wrap align-items-center gap-2 mb-3'>
             <button
@@ -583,76 +550,100 @@
             </button>
         </div>
 
-        <div
+        <TablerInlineAlert
             v-if='!activeMission'
-            class='form-text text-warning'
-        >
-            No active mission. Select one in Create | Open first.
-        </div>
+            class='mb-2'
+            severity='warning'
+            title='No active mission'
+            description='Select one in Create | Open first.'
+        />
         <div
             v-else
             class='form-text'
         >
             Active DataSync: <strong>{{ activeMission.name }}</strong>
         </div>
-        <div
+        <TablerInlineAlert
             v-if='status'
-            class='fw-bold mt-1'
-            :class='statusError ? "text-danger" : "text-success"'
-        >
-            {{ status }}
-        </div>
+            class='mt-2'
+            :severity='statusError ? "danger" : "success"'
+            :title='statusError ? "Error" : "Success"'
+            :description='status'
+        />
 
-        <div class='card mt-3'>
-            <div
-                class='card-header py-2 d-flex align-items-center cursor-pointer user-select-none'
-                role='button'
-                tabindex='0'
-                :aria-expanded='pdfExpanded'
-                @click='pdfExpanded = !pdfExpanded'
-                @keydown.enter.prevent='pdfExpanded = !pdfExpanded'
-                @keydown.space.prevent='pdfExpanded = !pdfExpanded'
-            >
-                <h4 class='card-title mb-0 fs-6'>
-                    GENERATE ICS 201 PDF
-                </h4>
-                <IconChevronDown
-                    class='ms-auto transition-transform'
-                    :class='{ "rotate-180": pdfExpanded }'
-                    :size='18'
-                    stroke='1.5'
-                />
-            </div>
-            <div
-                v-show='pdfExpanded'
-                class='card-body py-2'
-            >
-                <div class='d-flex flex-wrap gap-2'>
-                    <button
-                        type='button'
-                        class='btn btn-outline-primary btn-sm'
-                        :disabled='exporting'
-                        @click='downloadPdf'
-                    >
-                        {{ exporting ? 'Generating PDF…' : 'Download ICS 201 PDF' }}
-                    </button>
-                    <button
-                        type='button'
-                        class='btn btn-outline-primary btn-sm'
-                        :disabled='uploading'
-                        @click='onAddPdfToDataSync'
-                    >
-                        {{ uploading ? 'Uploading…' : 'Add ICS-201.pdf to DataSync' }}
-                    </button>
-                </div>
-            </div>
+        <div
+            v-if='!pdfExpanded'
+            class='cloudtak-accent border rounded-3 text-white mt-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+            role='button'
+            tabindex='0'
+            :aria-expanded='false'
+            @click='pdfExpanded = true'
+            @keydown.enter.prevent='pdfExpanded = true'
+            @keydown.space.prevent='pdfExpanded = true'
+        >
+            <p class='text-uppercase text-white-50 small mb-0'>
+                Generate ICS 201 PDF
+            </p>
+            <IconChevronDown
+                class='ms-auto transition-transform text-white-50 rotate-180'
+                :size='20'
+                stroke='1.5'
+            />
         </div>
+        <TablerBorder
+            v-else
+            class='cloudtak-accent text-white mt-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <div
+                    class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='true'
+                    @click='pdfExpanded = false'
+                    @keydown.enter.prevent='pdfExpanded = false'
+                    @keydown.space.prevent='pdfExpanded = false'
+                >
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Generate ICS 201 PDF
+                    </p>
+                    <IconChevronDown
+                        class='ms-auto transition-transform text-white-50'
+                        :size='20'
+                        stroke='1.5'
+                    />
+                </div>
+            </template>
+
+            <div class='d-flex flex-wrap gap-2'>
+                <button
+                    type='button'
+                    class='btn btn-outline-primary btn-sm'
+                    :disabled='exporting'
+                    @click='downloadPdf'
+                >
+                    {{ exporting ? 'Generating PDF…' : 'Download ICS 201 PDF' }}
+                </button>
+                <button
+                    type='button'
+                    class='btn btn-outline-primary btn-sm'
+                    :disabled='uploading'
+                    @click='onAddPdfToDataSync'
+                >
+                    {{ uploading ? 'Uploading…' : 'Add ICS-201.pdf to DataSync' }}
+                </button>
+            </div>
+        </TablerBorder>
     </div>
 </template>
 
 <script setup lang='ts'>
 import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { IconChevronDown, IconPlus, IconX } from '@tabler/icons-vue';
+import { TablerBorder, TablerInput, TablerInlineAlert } from '@tak-ps/vue-tabler';
 import { loadIncidentSubscription } from '../../../lib/incidentSubscription.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import {

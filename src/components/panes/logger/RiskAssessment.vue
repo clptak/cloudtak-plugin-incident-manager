@@ -1,346 +1,358 @@
 <template>
     <div>
         <!-- Combined saved assessments -->
-        <div class='card mb-3'>
-            <div class='card-header py-2 small fw-semibold'>
-                Saved assessments
+        <TablerBorder
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0'>
+                    Saved Assessments
+                </p>
+            </template>
+
+            <div
+                v-if='loading'
+                class='text-muted small'
+            >
+                Loading…
             </div>
-            <div class='card-body p-0'>
-                <div
-                    v-if='loading'
-                    class='p-3 text-muted small'
-                >
-                    Loading…
-                </div>
-                <div
-                    v-else-if='!savedGroups.length'
-                    class='p-3 text-muted small'
-                >
-                    No assessments saved yet.
-                </div>
-                <div
-                    v-else
-                    class='table-responsive'
-                >
-                    <table class='table table-sm table-vcenter mb-0'>
-                        <thead>
-                            <tr>
-                                <th style='width: 110px;'>
-                                    Model
-                                </th>
-                                <th>Respondent</th>
-                                <th style='width: 70px;'>
-                                    Risk
-                                </th>
-                                <th>Level</th>
-                                <th class='d-none d-md-table-cell'>
-                                    Detail
-                                </th>
-                                <th style='width: 220px;' />
-                            </tr>
-                        </thead>
-                        <tbody
-                            v-for='group in savedGroups'
-                            :key='group.key'
+            <div
+                v-else-if='!savedGroups.length'
+                class='text-muted small'
+            >
+                No assessments saved yet.
+            </div>
+            <div
+                v-else
+                class='table-responsive'
+            >
+                <table class='table table-sm table-vcenter mb-0'>
+                    <thead>
+                        <tr>
+                            <th style='width: 110px;'>
+                                Model
+                            </th>
+                            <th>Respondent</th>
+                            <th style='width: 70px;'>
+                                Risk
+                            </th>
+                            <th>Level</th>
+                            <th class='d-none d-md-table-cell'>
+                                Detail
+                            </th>
+                            <th style='width: 220px;' />
+                        </tr>
+                    </thead>
+                    <tbody
+                        v-for='group in savedGroups'
+                        :key='group.key'
+                    >
+                        <tr class='bg-body-secondary'>
+                            <td colspan='4'>
+                                <div class='fw-semibold'>
+                                    {{ group.entry.tacticLabel || '(untitled tactic)' }}
+                                    <span
+                                        v-if='group.worstGar'
+                                        class='badge ms-2'
+                                        :class='bandBadgeClass(group.worstGar.band)'
+                                    >GAR worst: {{ group.worstGar.score }} — {{ group.worstGar.level }}</span>
+                                    <span
+                                        v-if='group.worstComp'
+                                        class='badge ms-2'
+                                        :class='bandBadgeClass(group.worstComp.band)'
+                                    >Comp worst: {{ group.worstComp.score }} — {{ group.worstComp.level }}</span>
+                                    <span
+                                        v-if='group.worstSpe'
+                                        class='badge ms-2'
+                                        :class='bandBadgeClass(group.worstSpe.band)'
+                                    >SPE worst: {{ group.worstSpe.score }} — {{ group.worstSpe.level }}</span>
+                                </div>
+                                <div
+                                    v-if='group.entry.description'
+                                    class='text-muted small'
+                                >
+                                    {{ group.entry.description }}
+                                </div>
+                            </td>
+                            <td class='d-none d-md-table-cell text-muted small'>
+                                {{ group.respondentCount }}
+                                respondent{{ group.respondentCount === 1 ? '' : 's' }}
+                            </td>
+                            <td class='text-end text-nowrap'>
+                                <button
+                                    type='button'
+                                    class='btn btn-outline-primary btn-sm me-1'
+                                    :disabled='busy'
+                                    title='Add a GAR respondent for this tactic'
+                                    @click='onGarAddRespondent(group.key)'
+                                >
+                                    + GAR
+                                </button>
+                                <button
+                                    type='button'
+                                    class='btn btn-outline-primary btn-sm me-1'
+                                    :disabled='busy'
+                                    title='Add a complacency respondent for this tactic'
+                                    @click='onCompAddRespondent(group.key)'
+                                >
+                                    + Comp
+                                </button>
+                                <button
+                                    type='button'
+                                    class='btn btn-outline-primary btn-sm me-1'
+                                    :disabled='busy'
+                                    title='Add an SPE respondent for this tactic'
+                                    @click='onSpeAddRespondent(group.key)'
+                                >
+                                    + SPE
+                                </button>
+                                <button
+                                    type='button'
+                                    class='btn btn-outline-danger btn-sm'
+                                    :disabled='busy'
+                                    title='Remove all assessments for this tactic'
+                                    @click='onDeleteAll(group.key)'
+                                >
+                                    Delete
+                                </button>
+                            </td>
+                        </tr>
+                        <tr
+                            v-for='resp in group.entry.garRespondents'
+                            :key='`gar-${resp.id}`'
                         >
-                            <tr class='bg-body-secondary'>
-                                <td colspan='4'>
-                                    <div class='fw-semibold'>
-                                        {{ group.entry.tacticLabel || '(untitled tactic)' }}
-                                        <span
-                                            v-if='group.worstGar'
-                                            class='badge ms-2'
-                                            :class='bandBadgeClass(group.worstGar.band)'
-                                        >GAR worst: {{ group.worstGar.score }} — {{ group.worstGar.level }}</span>
-                                        <span
-                                            v-if='group.worstComp'
-                                            class='badge ms-2'
-                                            :class='bandBadgeClass(group.worstComp.band)'
-                                        >Comp worst: {{ group.worstComp.score }} — {{ group.worstComp.level }}</span>
-                                        <span
-                                            v-if='group.worstSpe'
-                                            class='badge ms-2'
-                                            :class='bandBadgeClass(group.worstSpe.band)'
-                                        >SPE worst: {{ group.worstSpe.score }} — {{ group.worstSpe.level }}</span>
-                                    </div>
-                                    <div
-                                        v-if='group.entry.description'
-                                        class='text-muted small'
-                                    >
-                                        {{ group.entry.description }}
-                                    </div>
-                                </td>
-                                <td class='d-none d-md-table-cell text-muted small'>
-                                    {{ group.respondentCount }}
-                                    respondent{{ group.respondentCount === 1 ? '' : 's' }}
-                                </td>
-                                <td class='text-end text-nowrap'>
-                                    <button
-                                        type='button'
-                                        class='btn btn-outline-primary btn-sm me-1'
-                                        :disabled='busy'
-                                        title='Add a GAR respondent for this tactic'
-                                        @click='onGarAddRespondent(group.key)'
-                                    >
-                                        + GAR
-                                    </button>
-                                    <button
-                                        type='button'
-                                        class='btn btn-outline-primary btn-sm me-1'
-                                        :disabled='busy'
-                                        title='Add a complacency respondent for this tactic'
-                                        @click='onCompAddRespondent(group.key)'
-                                    >
-                                        + Comp
-                                    </button>
-                                    <button
-                                        type='button'
-                                        class='btn btn-outline-primary btn-sm me-1'
-                                        :disabled='busy'
-                                        title='Add an SPE respondent for this tactic'
-                                        @click='onSpeAddRespondent(group.key)'
-                                    >
-                                        + SPE
-                                    </button>
-                                    <button
-                                        type='button'
-                                        class='btn btn-outline-danger btn-sm'
-                                        :disabled='busy'
-                                        title='Remove all assessments for this tactic'
-                                        @click='onDeleteAll(group.key)'
-                                    >
-                                        Delete
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr
-                                v-for='resp in group.entry.garRespondents'
-                                :key='`gar-${resp.id}`'
-                            >
-                                <td>
-                                    <span class='badge bg-secondary-lt text-secondary'>GAR</span>
-                                </td>
-                                <td>{{ resp.name || '(unnamed)' }}</td>
-                                <td class='fw-bold'>
-                                    {{ resp.score }}
-                                </td>
-                                <td>
-                                    <span
-                                        class='badge'
-                                        :class='bandBadgeClass(resp.band)'
-                                    >{{ resp.level }}</span>
-                                    <div class='text-muted small'>
-                                        {{ resp.recommendation }}
-                                    </div>
-                                </td>
-                                <td class='d-none d-md-table-cell text-muted small'>
-                                    {{ formatGarMitigations(resp) }}
-                                </td>
-                                <td class='text-end'>
-                                    <button
-                                        type='button'
-                                        class='btn btn-outline-secondary btn-sm me-1'
-                                        :disabled='busy'
-                                        @click='onGarEdit(group.key, resp.id)'
-                                    >
-                                        Edit
-                                    </button>
-                                    <button
-                                        type='button'
-                                        class='btn btn-outline-danger btn-sm'
-                                        :disabled='busy'
-                                        @click='onGarDeleteRespondent(group.key, resp.id)'
-                                    >
-                                        Delete
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr
-                                v-for='resp in group.entry.complacencyRespondents'
-                                :key='`comp-${resp.id}`'
-                            >
-                                <td>
-                                    <span class='badge bg-secondary-lt text-secondary'>Complacency</span>
-                                </td>
-                                <td>{{ resp.name || '(unnamed)' }}</td>
-                                <td class='fw-bold'>
-                                    {{ resp.score }}
-                                </td>
-                                <td>
-                                    <span
-                                        class='badge'
-                                        :class='bandBadgeClass(resp.band)'
-                                    >{{ resp.level }}</span>
-                                    <div class='text-muted small'>
-                                        {{ resp.recommendation }}
-                                    </div>
-                                </td>
-                                <td class='d-none d-md-table-cell text-muted small'>
-                                    {{ resp.repetition }} &times; {{ resp.confidence }} &times; {{ resp.experience }}
-                                </td>
-                                <td class='text-end'>
-                                    <button
-                                        type='button'
-                                        class='btn btn-outline-secondary btn-sm me-1'
-                                        :disabled='busy'
-                                        @click='onCompEdit(group.key, resp.id)'
-                                    >
-                                        Edit
-                                    </button>
-                                    <button
-                                        type='button'
-                                        class='btn btn-outline-danger btn-sm'
-                                        :disabled='busy'
-                                        @click='onCompDeleteRespondent(group.key, resp.id)'
-                                    >
-                                        Delete
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr
-                                v-for='resp in group.entry.speRespondents'
-                                :key='`spe-${resp.id}`'
-                            >
-                                <td>
-                                    <span class='badge bg-secondary-lt text-secondary'>SPE</span>
-                                </td>
-                                <td>{{ resp.name || '(unnamed)' }}</td>
-                                <td class='fw-bold'>
-                                    {{ resp.score }}
-                                </td>
-                                <td>
-                                    <span
-                                        class='badge'
-                                        :class='bandBadgeClass(resp.band)'
-                                    >{{ resp.level }}</span>
-                                    <div class='text-muted small'>
-                                        {{ resp.recommendation }}
-                                    </div>
-                                </td>
-                                <td class='d-none d-md-table-cell text-muted small'>
-                                    {{ resp.severity }} &times; {{ resp.probability }} &times; {{ resp.exposure }}
-                                </td>
-                                <td class='text-end'>
-                                    <button
-                                        type='button'
-                                        class='btn btn-outline-secondary btn-sm me-1'
-                                        :disabled='busy'
-                                        @click='onSpeEdit(group.key, resp.id)'
-                                    >
-                                        Edit
-                                    </button>
-                                    <button
-                                        type='button'
-                                        class='btn btn-outline-danger btn-sm'
-                                        :disabled='busy'
-                                        @click='onSpeDeleteRespondent(group.key, resp.id)'
-                                    >
-                                        Delete
-                                    </button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                            <td>
+                                <span class='badge bg-secondary-lt text-secondary'>GAR</span>
+                            </td>
+                            <td>{{ resp.name || '(unnamed)' }}</td>
+                            <td class='fw-bold'>
+                                {{ resp.score }}
+                            </td>
+                            <td>
+                                <span
+                                    class='badge'
+                                    :class='bandBadgeClass(resp.band)'
+                                >{{ resp.level }}</span>
+                                <div class='text-muted small'>
+                                    {{ resp.recommendation }}
+                                </div>
+                            </td>
+                            <td class='d-none d-md-table-cell text-muted small'>
+                                {{ formatGarMitigations(resp) }}
+                            </td>
+                            <td class='text-end'>
+                                <button
+                                    type='button'
+                                    class='btn btn-outline-secondary btn-sm me-1'
+                                    :disabled='busy'
+                                    @click='onGarEdit(group.key, resp.id)'
+                                >
+                                    Edit
+                                </button>
+                                <button
+                                    type='button'
+                                    class='btn btn-outline-danger btn-sm'
+                                    :disabled='busy'
+                                    @click='onGarDeleteRespondent(group.key, resp.id)'
+                                >
+                                    Delete
+                                </button>
+                            </td>
+                        </tr>
+                        <tr
+                            v-for='resp in group.entry.complacencyRespondents'
+                            :key='`comp-${resp.id}`'
+                        >
+                            <td>
+                                <span class='badge bg-secondary-lt text-secondary'>Complacency</span>
+                            </td>
+                            <td>{{ resp.name || '(unnamed)' }}</td>
+                            <td class='fw-bold'>
+                                {{ resp.score }}
+                            </td>
+                            <td>
+                                <span
+                                    class='badge'
+                                    :class='bandBadgeClass(resp.band)'
+                                >{{ resp.level }}</span>
+                                <div class='text-muted small'>
+                                    {{ resp.recommendation }}
+                                </div>
+                            </td>
+                            <td class='d-none d-md-table-cell text-muted small'>
+                                {{ resp.repetition }} &times; {{ resp.confidence }} &times; {{ resp.experience }}
+                            </td>
+                            <td class='text-end'>
+                                <button
+                                    type='button'
+                                    class='btn btn-outline-secondary btn-sm me-1'
+                                    :disabled='busy'
+                                    @click='onCompEdit(group.key, resp.id)'
+                                >
+                                    Edit
+                                </button>
+                                <button
+                                    type='button'
+                                    class='btn btn-outline-danger btn-sm'
+                                    :disabled='busy'
+                                    @click='onCompDeleteRespondent(group.key, resp.id)'
+                                >
+                                    Delete
+                                </button>
+                            </td>
+                        </tr>
+                        <tr
+                            v-for='resp in group.entry.speRespondents'
+                            :key='`spe-${resp.id}`'
+                        >
+                            <td>
+                                <span class='badge bg-secondary-lt text-secondary'>SPE</span>
+                            </td>
+                            <td>{{ resp.name || '(unnamed)' }}</td>
+                            <td class='fw-bold'>
+                                {{ resp.score }}
+                            </td>
+                            <td>
+                                <span
+                                    class='badge'
+                                    :class='bandBadgeClass(resp.band)'
+                                >{{ resp.level }}</span>
+                                <div class='text-muted small'>
+                                    {{ resp.recommendation }}
+                                </div>
+                            </td>
+                            <td class='d-none d-md-table-cell text-muted small'>
+                                {{ resp.severity }} &times; {{ resp.probability }} &times; {{ resp.exposure }}
+                            </td>
+                            <td class='text-end'>
+                                <button
+                                    type='button'
+                                    class='btn btn-outline-secondary btn-sm me-1'
+                                    :disabled='busy'
+                                    @click='onSpeEdit(group.key, resp.id)'
+                                >
+                                    Edit
+                                </button>
+                                <button
+                                    type='button'
+                                    class='btn btn-outline-danger btn-sm'
+                                    :disabled='busy'
+                                    @click='onSpeDeleteRespondent(group.key, resp.id)'
+                                >
+                                    Delete
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
-        </div>
+        </TablerBorder>
 
         <!-- GAR Model -->
-        <div class='card mb-3'>
-            <div
-                class='card-header d-flex align-items-center cursor-pointer user-select-none'
-                role='button'
-                tabindex='0'
-                :aria-expanded='garExpanded'
-                @click='garExpanded = !garExpanded'
-                @keydown.enter.prevent='garExpanded = !garExpanded'
-                @keydown.space.prevent='garExpanded = !garExpanded'
-            >
-                <h3 class='card-title mb-0'>
-                    GAR Model
-                </h3>
-                <IconChevronDown
-                    class='ms-auto transition-transform'
-                    :class='{ "rotate-180": !garExpanded }'
-                    :size='20'
-                    stroke='1.5'
-                />
-            </div>
-            <div
-                v-show='garExpanded'
-                class='card-body'
-            >
+        <div
+            v-if='!garExpanded'
+            class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+            role='button'
+            tabindex='0'
+            :aria-expanded='false'
+            @click='garExpanded = true'
+            @keydown.enter.prevent='garExpanded = true'
+            @keydown.space.prevent='garExpanded = true'
+        >
+            <p class='text-uppercase text-white-50 small mb-0'>
+                GAR Model
+            </p>
+            <IconChevronDown
+                class='ms-auto transition-transform text-white-50 rotate-180'
+                :size='20'
+                stroke='1.5'
+            />
+        </div>
+        <TablerBorder
+            v-else
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <div
+                    class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='true'
+                    @click='garExpanded = false'
+                    @keydown.enter.prevent='garExpanded = false'
+                    @keydown.space.prevent='garExpanded = false'
+                >
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        GAR Model
+                    </p>
+                    <IconChevronDown
+                        class='ms-auto transition-transform text-white-50'
+                        :size='20'
+                        stroke='1.5'
+                    />
+                </div>
+            </template>
+
+            <div>
                 <p class='text-muted small mb-3'>
                     Operational Risk Management (GREEN-AMBER-RED). Rate each element
                     0 (no risk) through 10 (maximum risk). Any category rated ≥ 5 should
                     receive specific mitigation.
                 </p>
 
-                <div
+                <TablerInlineAlert
                     v-if='!activeMission'
-                    class='alert alert-info small mb-3'
-                >
-                    Select a mission in <strong>Create | Open</strong> before saving assessments.
-                </div>
+                    class='mb-3'
+                    severity='info'
+                    title='No Active Mission'
+                    description='Select a mission in Create | Open before saving assessments.'
+                />
 
                 <div class='row g-2 mb-2'>
                     <div class='col-md-6'>
-                        <label class='form-label small mb-1'>Tactic</label>
-                        <select
-                            v-model='gar.tacticChoice'
-                            class='form-select form-select-sm'
+                        <TablerEnum
+                            v-model='garTacticLabel'
+                            label='Tactic'
+                            :options='tacticOptions'
                             :disabled='busy'
-                        >
-                            <option value=''>
-                                {{ assignmentOptions.length ? 'Select a tactic…' : 'No assignments yet — use New Tactic' }}
-                            </option>
-                            <option
-                                v-for='opt in assignmentOptions'
-                                :key='opt.id'
-                                :value='opt.id'
-                            >
-                                {{ opt.label }}
-                            </option>
-                            <option value='__new__'>
-                                New Tactic…
-                            </option>
-                        </select>
+                        />
                     </div>
                     <div
                         v-if='gar.tacticChoice === "__new__"'
                         class='col-md-6'
                     >
-                        <label class='form-label small mb-1'>New Tactic</label>
-                        <input
+                        <TablerInput
                             v-model='gar.newTacticLabel'
-                            type='text'
-                            class='form-control form-control-sm'
+                            label='New Tactic'
                             placeholder='e.g. Hasty search of likely routes from PLS'
                             :disabled='busy'
-                        >
+                        />
                     </div>
                 </div>
 
                 <div class='mb-2'>
-                    <label class='form-label small mb-1'>Description</label>
-                    <textarea
+                    <TablerInput
                         v-model='gar.description'
-                        class='form-control form-control-sm'
-                        rows='2'
+                        label='Description'
+                        :rows='2'
                         placeholder='Task being assessed, conditions, team notes…'
                         :disabled='busy'
                     />
                 </div>
 
                 <div class='mb-3'>
-                    <label class='form-label small mb-1'>Respondent</label>
-                    <input
+                    <TablerInput
                         v-model='gar.respondentName'
-                        type='text'
-                        class='form-control form-control-sm'
+                        label='Respondent'
                         placeholder='Name or callsign of the person assessing'
                         :disabled='busy'
-                    >
+                    />
                 </div>
 
                 <div
@@ -359,32 +371,24 @@
                             </div>
                         </div>
                         <div class='col-md-4'>
-                            <select
-                                v-model.number='gar.factors[factor.key]'
-                                class='form-select form-select-sm'
+                            <TablerEnum
+                                :model-value='String(gar.factors[factor.key])'
+                                :options='garScoreOptionStrings'
                                 :disabled='busy'
-                            >
-                                <option
-                                    v-for='n in GAR_SCORE_OPTIONS'
-                                    :key='n'
-                                    :value='n'
-                                >
-                                    {{ n }}
-                                </option>
-                            </select>
+                                @update:model-value='(v: string) => onGarFactorChange(factor.key, v)'
+                            />
                         </div>
                     </div>
                     <div
                         v-if='gar.factors[factor.key] >= 5'
                         class='mt-1'
                     >
-                        <label class='form-label small mb-1 text-warning'>
+                        <p class='text-warning small mb-1'>
                             Mitigation for {{ factor.label }} (recommended)
-                        </label>
-                        <textarea
+                        </p>
+                        <TablerInput
                             v-model='gar.mitigations[factor.key]'
-                            class='form-control form-control-sm'
-                            rows='2'
+                            :rows='2'
                             placeholder='Specific mitigation for this category…'
                             :disabled='busy'
                         />
@@ -442,41 +446,65 @@
                     </button>
                 </div>
 
-                <div
+                <TablerInlineAlert
                     v-if='garStatusMessage'
-                    class='fw-bold small mt-2'
-                    :class='garStatusError ? "text-danger" : "text-success"'
-                >
-                    {{ garStatusMessage }}
-                </div>
-            </div>
-        </div>
-
-        <!-- Complacency Model -->
-        <div class='card mb-3'>
-            <div
-                class='card-header d-flex align-items-center cursor-pointer user-select-none'
-                role='button'
-                tabindex='0'
-                :aria-expanded='compExpanded'
-                @click='compExpanded = !compExpanded'
-                @keydown.enter.prevent='compExpanded = !compExpanded'
-                @keydown.space.prevent='compExpanded = !compExpanded'
-            >
-                <h3 class='card-title mb-0'>
-                    Complacency Model
-                </h3>
-                <IconChevronDown
-                    class='ms-auto transition-transform'
-                    :class='{ "rotate-180": !compExpanded }'
-                    :size='20'
-                    stroke='1.5'
+                    class='mt-2'
+                    :severity='garStatusError ? "danger" : "success"'
+                    :title='garStatusError ? "Error" : "Status"'
+                    :description='garStatusMessage'
                 />
             </div>
-            <div
-                v-show='compExpanded'
-                class='card-body'
-            >
+        </TablerBorder>
+
+        <!-- Complacency Model -->
+        <div
+            v-if='!compExpanded'
+            class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+            role='button'
+            tabindex='0'
+            :aria-expanded='false'
+            @click='compExpanded = true'
+            @keydown.enter.prevent='compExpanded = true'
+            @keydown.space.prevent='compExpanded = true'
+        >
+            <p class='text-uppercase text-white-50 small mb-0'>
+                Complacency Model
+            </p>
+            <IconChevronDown
+                class='ms-auto transition-transform text-white-50 rotate-180'
+                :size='20'
+                stroke='1.5'
+            />
+        </div>
+        <TablerBorder
+            v-else
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <div
+                    class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='true'
+                    @click='compExpanded = false'
+                    @keydown.enter.prevent='compExpanded = false'
+                    @keydown.space.prevent='compExpanded = false'
+                >
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Complacency Model
+                    </p>
+                    <IconChevronDown
+                        class='ms-auto transition-transform text-white-50'
+                        :size='20'
+                        stroke='1.5'
+                    />
+                </div>
+            </template>
+
+            <div>
                 <p class='text-muted small mb-3'>
                     Risk = Repetition &times; Confidence &times; Experience
                     (Craig E. Geis, California Training Institute). Each respondent
@@ -485,121 +513,69 @@
 
                 <div class='row g-2 mb-2'>
                     <div class='col-md-6'>
-                        <label class='form-label small mb-1'>Tactic</label>
-                        <select
-                            v-model='comp.tacticChoice'
-                            class='form-select form-select-sm'
+                        <TablerEnum
+                            v-model='compTacticLabel'
+                            label='Tactic'
+                            :options='tacticOptions'
                             :disabled='busy'
-                        >
-                            <option value=''>
-                                {{ assignmentOptions.length ? 'Select a tactic…' : 'No assignments yet — use New Tactic' }}
-                            </option>
-                            <option
-                                v-for='opt in assignmentOptions'
-                                :key='opt.id'
-                                :value='opt.id'
-                            >
-                                {{ opt.label }}
-                            </option>
-                            <option value='__new__'>
-                                New Tactic…
-                            </option>
-                        </select>
+                        />
                     </div>
                     <div
                         v-if='comp.tacticChoice === "__new__"'
                         class='col-md-6'
                     >
-                        <label class='form-label small mb-1'>New Tactic</label>
-                        <input
+                        <TablerInput
                             v-model='comp.newTacticLabel'
-                            type='text'
-                            class='form-control form-control-sm'
+                            label='New Tactic'
                             placeholder='e.g. Hasty search of likely routes from PLS'
                             :disabled='busy'
-                        >
+                        />
                     </div>
                 </div>
 
                 <div class='mb-2'>
-                    <label class='form-label small mb-1'>Description</label>
-                    <textarea
+                    <TablerInput
                         v-model='comp.description'
-                        class='form-control form-control-sm'
-                        rows='2'
+                        label='Description'
+                        :rows='2'
                         placeholder='Task being assessed, conditions, team notes…'
                         :disabled='busy'
                     />
                 </div>
 
                 <div class='mb-3'>
-                    <label class='form-label small mb-1'>Respondent</label>
-                    <input
+                    <TablerInput
                         v-model='comp.respondentName'
-                        type='text'
-                        class='form-control form-control-sm'
+                        label='Respondent'
                         placeholder='Name or callsign of the person assessing'
                         :disabled='busy'
-                    >
+                    />
                 </div>
 
                 <div class='row g-2 mb-3'>
                     <div class='col-md-4'>
-                        <label class='form-label small mb-1'>Repetition</label>
-                        <select
-                            v-model.number='comp.repetition'
-                            class='form-select form-select-sm'
+                        <TablerEnum
+                            v-model='compRepetitionLabel'
+                            label='Repetition'
+                            :options='repetitionOptionLabels'
                             :disabled='busy'
-                        >
-                            <option :value='0'>
-                                Select…
-                            </option>
-                            <option
-                                v-for='opt in REPETITION_OPTIONS'
-                                :key='opt.value'
-                                :value='opt.value'
-                            >
-                                {{ opt.value }} — {{ opt.label }}
-                            </option>
-                        </select>
+                        />
                     </div>
                     <div class='col-md-4'>
-                        <label class='form-label small mb-1'>Confidence</label>
-                        <select
-                            v-model.number='comp.confidence'
-                            class='form-select form-select-sm'
+                        <TablerEnum
+                            v-model='compConfidenceLabel'
+                            label='Confidence'
+                            :options='confidenceOptionLabels'
                             :disabled='busy'
-                        >
-                            <option :value='0'>
-                                Select…
-                            </option>
-                            <option
-                                v-for='opt in CONFIDENCE_OPTIONS'
-                                :key='opt.value'
-                                :value='opt.value'
-                            >
-                                {{ opt.value }} — {{ opt.label }}
-                            </option>
-                        </select>
+                        />
                     </div>
                     <div class='col-md-4'>
-                        <label class='form-label small mb-1'>Experience</label>
-                        <select
-                            v-model.number='comp.experience'
-                            class='form-select form-select-sm'
+                        <TablerEnum
+                            v-model='compExperienceLabel'
+                            label='Experience'
+                            :options='experienceOptionLabels'
                             :disabled='busy'
-                        >
-                            <option :value='0'>
-                                Select…
-                            </option>
-                            <option
-                                v-for='opt in EXPERIENCE_OPTIONS'
-                                :key='opt.value'
-                                :value='opt.value'
-                            >
-                                {{ opt.value }} — {{ opt.label }}
-                            </option>
-                        </select>
+                        />
                     </div>
                 </div>
 
@@ -662,41 +638,65 @@
                     </button>
                 </div>
 
-                <div
+                <TablerInlineAlert
                     v-if='compStatusMessage'
-                    class='fw-bold small mt-2'
-                    :class='compStatusError ? "text-danger" : "text-success"'
-                >
-                    {{ compStatusMessage }}
-                </div>
-            </div>
-        </div>
-
-        <!-- SPE Model -->
-        <div class='card mb-3'>
-            <div
-                class='card-header d-flex align-items-center cursor-pointer user-select-none'
-                role='button'
-                tabindex='0'
-                :aria-expanded='speExpanded'
-                @click='speExpanded = !speExpanded'
-                @keydown.enter.prevent='speExpanded = !speExpanded'
-                @keydown.space.prevent='speExpanded = !speExpanded'
-            >
-                <h3 class='card-title mb-0'>
-                    SPE Model
-                </h3>
-                <IconChevronDown
-                    class='ms-auto transition-transform'
-                    :class='{ "rotate-180": !speExpanded }'
-                    :size='20'
-                    stroke='1.5'
+                    class='mt-2'
+                    :severity='compStatusError ? "danger" : "success"'
+                    :title='compStatusError ? "Error" : "Status"'
+                    :description='compStatusMessage'
                 />
             </div>
-            <div
-                v-show='speExpanded'
-                class='card-body'
-            >
+        </TablerBorder>
+
+        <!-- SPE Model -->
+        <div
+            v-if='!speExpanded'
+            class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+            role='button'
+            tabindex='0'
+            :aria-expanded='false'
+            @click='speExpanded = true'
+            @keydown.enter.prevent='speExpanded = true'
+            @keydown.space.prevent='speExpanded = true'
+        >
+            <p class='text-uppercase text-white-50 small mb-0'>
+                SPE Model
+            </p>
+            <IconChevronDown
+                class='ms-auto transition-transform text-white-50 rotate-180'
+                :size='20'
+                stroke='1.5'
+            />
+        </div>
+        <TablerBorder
+            v-else
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <div
+                    class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='true'
+                    @click='speExpanded = false'
+                    @keydown.enter.prevent='speExpanded = false'
+                    @keydown.space.prevent='speExpanded = false'
+                >
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        SPE Model
+                    </p>
+                    <IconChevronDown
+                        class='ms-auto transition-transform text-white-50'
+                        :size='20'
+                        stroke='1.5'
+                    />
+                </div>
+            </template>
+
+            <div>
                 <p class='text-muted small mb-3'>
                     Risk = Severity &times; Probability &times; Exposure.
                     Compare the result to the SPE Guidance Table (Table 18.1).
@@ -704,121 +704,69 @@
 
                 <div class='row g-2 mb-2'>
                     <div class='col-md-6'>
-                        <label class='form-label small mb-1'>Tactic</label>
-                        <select
-                            v-model='spe.tacticChoice'
-                            class='form-select form-select-sm'
+                        <TablerEnum
+                            v-model='speTacticLabel'
+                            label='Tactic'
+                            :options='tacticOptions'
                             :disabled='busy'
-                        >
-                            <option value=''>
-                                {{ assignmentOptions.length ? 'Select a tactic…' : 'No assignments yet — use New Tactic' }}
-                            </option>
-                            <option
-                                v-for='opt in assignmentOptions'
-                                :key='opt.id'
-                                :value='opt.id'
-                            >
-                                {{ opt.label }}
-                            </option>
-                            <option value='__new__'>
-                                New Tactic…
-                            </option>
-                        </select>
+                        />
                     </div>
                     <div
                         v-if='spe.tacticChoice === "__new__"'
                         class='col-md-6'
                     >
-                        <label class='form-label small mb-1'>New Tactic</label>
-                        <input
+                        <TablerInput
                             v-model='spe.newTacticLabel'
-                            type='text'
-                            class='form-control form-control-sm'
+                            label='New Tactic'
                             placeholder='e.g. Hasty search of likely routes from PLS'
                             :disabled='busy'
-                        >
+                        />
                     </div>
                 </div>
 
                 <div class='mb-2'>
-                    <label class='form-label small mb-1'>Description</label>
-                    <textarea
+                    <TablerInput
                         v-model='spe.description'
-                        class='form-control form-control-sm'
-                        rows='2'
+                        label='Description'
+                        :rows='2'
                         placeholder='Task being assessed, conditions, team notes…'
                         :disabled='busy'
                     />
                 </div>
 
                 <div class='mb-3'>
-                    <label class='form-label small mb-1'>Respondent</label>
-                    <input
+                    <TablerInput
                         v-model='spe.respondentName'
-                        type='text'
-                        class='form-control form-control-sm'
+                        label='Respondent'
                         placeholder='Name or callsign of the person assessing'
                         :disabled='busy'
-                    >
+                    />
                 </div>
 
                 <div class='row g-2 mb-3'>
                     <div class='col-md-4'>
-                        <label class='form-label small mb-1'>Severity</label>
-                        <select
-                            v-model.number='spe.severity'
-                            class='form-select form-select-sm'
+                        <TablerEnum
+                            v-model='speSeverityLabel'
+                            label='Severity'
+                            :options='severityOptionLabels'
                             :disabled='busy'
-                        >
-                            <option :value='0'>
-                                Select…
-                            </option>
-                            <option
-                                v-for='opt in SEVERITY_OPTIONS'
-                                :key='opt.value'
-                                :value='opt.value'
-                            >
-                                {{ opt.value }} — {{ opt.label }}
-                            </option>
-                        </select>
+                        />
                     </div>
                     <div class='col-md-4'>
-                        <label class='form-label small mb-1'>Probability</label>
-                        <select
-                            v-model.number='spe.probability'
-                            class='form-select form-select-sm'
+                        <TablerEnum
+                            v-model='speProbabilityLabel'
+                            label='Probability'
+                            :options='probabilityOptionLabels'
                             :disabled='busy'
-                        >
-                            <option :value='0'>
-                                Select…
-                            </option>
-                            <option
-                                v-for='opt in PROBABILITY_OPTIONS'
-                                :key='opt.value'
-                                :value='opt.value'
-                            >
-                                {{ opt.value }} — {{ opt.label }}
-                            </option>
-                        </select>
+                        />
                     </div>
                     <div class='col-md-4'>
-                        <label class='form-label small mb-1'>Exposure</label>
-                        <select
-                            v-model.number='spe.exposure'
-                            class='form-select form-select-sm'
+                        <TablerEnum
+                            v-model='speExposureLabel'
+                            label='Exposure'
+                            :options='exposureOptionLabels'
                             :disabled='busy'
-                        >
-                            <option :value='0'>
-                                Select…
-                            </option>
-                            <option
-                                v-for='opt in EXPOSURE_OPTIONS'
-                                :key='opt.value'
-                                :value='opt.value'
-                            >
-                                {{ opt.value }} — {{ opt.label }}
-                            </option>
-                        </select>
+                        />
                     </div>
                 </div>
 
@@ -881,15 +829,15 @@
                     </button>
                 </div>
 
-                <div
+                <TablerInlineAlert
                     v-if='speStatusMessage'
-                    class='fw-bold small mt-2'
-                    :class='speStatusError ? "text-danger" : "text-success"'
-                >
-                    {{ speStatusMessage }}
-                </div>
+                    class='mt-2'
+                    :severity='speStatusError ? "danger" : "success"'
+                    :title='speStatusError ? "Error" : "Status"'
+                    :description='speStatusMessage'
+                />
             </div>
-        </div>
+        </TablerBorder>
 
         <div
             v-if='showMitigationModal'
@@ -961,6 +909,12 @@
 <script setup lang='ts'>
 import { IconChevronDown } from '@tabler/icons-vue';
 import { computed, reactive, ref, watch } from 'vue';
+import {
+    TablerBorder,
+    TablerEnum,
+    TablerInlineAlert,
+    TablerInput,
+} from '@tak-ps/vue-tabler';
 import { useIncident } from '../../../composables/useIncident.ts';
 import { useWorkAssignments } from '../../../composables/useWorkAssignments.ts';
 import {
@@ -984,6 +938,7 @@ import {
     worstGarRespondent,
     worstSpeRespondent,
     type ComplacencyRiskRespondent,
+    type FactorOption,
     type GarFactorKey,
     type GarMitigations,
     type GarRiskRespondent,
@@ -1086,6 +1041,96 @@ function labelForChoice(choice: string, newLabel: string): string {
     if (choice === '__new__') return newLabel.trim();
     return assignmentOptions.value.find((o) => o.id === choice)?.label ?? '';
 }
+
+// ── TablerEnum presentation helpers ──
+// These map the existing string/number model fields to the string[] label
+// options TablerEnum requires, without altering the underlying scoring data.
+const NEW_TACTIC_LABEL = 'New Tactic…';
+
+function tacticPlaceholderLabel(): string {
+    return assignmentOptions.value.length ? 'Select a tactic…' : 'No assignments yet — use New Tactic';
+}
+
+const tacticOptions = computed(() => [
+    tacticPlaceholderLabel(),
+    ...assignmentOptions.value.map((o) => o.label),
+    NEW_TACTIC_LABEL,
+]);
+
+function tacticChoiceToLabel(choice: string): string {
+    if (choice === '__new__') return NEW_TACTIC_LABEL;
+    if (!choice) return tacticPlaceholderLabel();
+    return assignmentOptions.value.find((o) => o.id === choice)?.label ?? tacticPlaceholderLabel();
+}
+
+function tacticLabelToChoice(label: string): string {
+    if (label === NEW_TACTIC_LABEL) return '__new__';
+    return assignmentOptions.value.find((o) => o.label === label)?.id ?? '';
+}
+
+const garTacticLabel = computed({
+    get: () => tacticChoiceToLabel(gar.tacticChoice),
+    set: (label: string) => { gar.tacticChoice = tacticLabelToChoice(label); },
+});
+const compTacticLabel = computed({
+    get: () => tacticChoiceToLabel(comp.tacticChoice),
+    set: (label: string) => { comp.tacticChoice = tacticLabelToChoice(label); },
+});
+const speTacticLabel = computed({
+    get: () => tacticChoiceToLabel(spe.tacticChoice),
+    set: (label: string) => { spe.tacticChoice = tacticLabelToChoice(label); },
+});
+
+const garScoreOptionStrings = GAR_SCORE_OPTIONS.map(String);
+
+function onGarFactorChange(key: GarFactorKey, label: string): void {
+    gar.factors[key] = Number(label) || 0;
+}
+
+function factorOptionLabels(options: FactorOption[]): string[] {
+    return ['Select…', ...options.map((o) => `${o.value} — ${o.label}`)];
+}
+
+function factorValueToLabel(value: number, options: FactorOption[]): string {
+    const opt = options.find((o) => o.value === value);
+    return opt ? `${opt.value} — ${opt.label}` : 'Select…';
+}
+
+function factorLabelToValue(label: string, options: FactorOption[]): number {
+    return options.find((o) => `${o.value} — ${o.label}` === label)?.value ?? 0;
+}
+
+const repetitionOptionLabels = factorOptionLabels(REPETITION_OPTIONS);
+const confidenceOptionLabels = factorOptionLabels(CONFIDENCE_OPTIONS);
+const experienceOptionLabels = factorOptionLabels(EXPERIENCE_OPTIONS);
+const severityOptionLabels = factorOptionLabels(SEVERITY_OPTIONS);
+const probabilityOptionLabels = factorOptionLabels(PROBABILITY_OPTIONS);
+const exposureOptionLabels = factorOptionLabels(EXPOSURE_OPTIONS);
+
+const compRepetitionLabel = computed({
+    get: () => factorValueToLabel(comp.repetition, REPETITION_OPTIONS),
+    set: (label: string) => { comp.repetition = factorLabelToValue(label, REPETITION_OPTIONS); },
+});
+const compConfidenceLabel = computed({
+    get: () => factorValueToLabel(comp.confidence, CONFIDENCE_OPTIONS),
+    set: (label: string) => { comp.confidence = factorLabelToValue(label, CONFIDENCE_OPTIONS); },
+});
+const compExperienceLabel = computed({
+    get: () => factorValueToLabel(comp.experience, EXPERIENCE_OPTIONS),
+    set: (label: string) => { comp.experience = factorLabelToValue(label, EXPERIENCE_OPTIONS); },
+});
+const speSeverityLabel = computed({
+    get: () => factorValueToLabel(spe.severity, SEVERITY_OPTIONS),
+    set: (label: string) => { spe.severity = factorLabelToValue(label, SEVERITY_OPTIONS); },
+});
+const speProbabilityLabel = computed({
+    get: () => factorValueToLabel(spe.probability, PROBABILITY_OPTIONS),
+    set: (label: string) => { spe.probability = factorLabelToValue(label, PROBABILITY_OPTIONS); },
+});
+const speExposureLabel = computed({
+    get: () => factorValueToLabel(spe.exposure, EXPOSURE_OPTIONS),
+    set: (label: string) => { spe.exposure = factorLabelToValue(label, EXPOSURE_OPTIONS); },
+});
 
 const garResult = computed(() => {
     const score = garScoreFromFactors(gar.factors);
@@ -1678,10 +1723,10 @@ async function onDeleteAll(key: string): Promise<void> {
 
 <style scoped>
 .rotate-180 {
-    transform: rotate(180deg);
+    transform: rotate(-90deg);
 }
 
 .transition-transform {
-    transition: transform 0.15s ease;
+    transition: transform 0.2s ease-out;
 }
 </style>

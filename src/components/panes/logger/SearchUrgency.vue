@@ -1,11 +1,17 @@
 <template>
-    <div class='card'>
-        <div class='card-header'>
-            <h3 class='card-title mb-0'>
+    <TablerBorder
+        class='cloudtak-accent text-white'
+        :fill-height='false'
+        :shadow='false'
+        gap='sm'
+    >
+        <template #label>
+            <p class='text-uppercase text-white-50 small mb-0'>
                 Search Urgency Rating
-            </h3>
-        </div>
-        <div class='card-body'>
+            </p>
+        </template>
+
+        <div>
             <p class='text-muted small mb-3'>
                 Score each factor 1 (most urgent) to 3 (least urgent).
                 Save stores the rating in <strong>mission_schema.json</strong>;
@@ -171,103 +177,130 @@
             >
                 Each rating must be 1, 2, or 3.
             </div>
-            <div
+            <TablerInlineAlert
                 v-if='!activeMission'
-                class='form-text text-warning'
-            >
-                No active mission. Select one in Create | Open first.
-            </div>
+                class='mt-2'
+                severity='warning'
+                title='No Active Mission'
+                description='Select one in Create | Open first.'
+            />
             <div
                 v-else
                 class='form-text'
             >
                 Active DataSync: <strong>{{ activeMission.name }}</strong>
             </div>
-            <div
+            <TablerInlineAlert
                 v-if='status'
-                class='fw-bold mt-1'
-                :class='statusError ? "text-danger" : "text-success"'
-            >
-                {{ status }}
-            </div>
+                class='mt-2'
+                :severity='statusError ? "danger" : "success"'
+                :title='statusError ? "Error" : "Success"'
+                :description='status'
+            />
 
-            <div class='card mt-3'>
-                <div class='card-header py-2'>
-                    <h4 class='card-title mb-0 fs-6'>
-                        Urgency Rating Chart PDF
-                    </h4>
-                </div>
-                <div class='card-body py-2'>
+            <!-- Urgency Rating Chart PDF -->
+            <div
+                v-if='!pdfExpanded'
+                class='cloudtak-accent border rounded-3 text-white mt-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+                role='button'
+                tabindex='0'
+                :aria-expanded='false'
+                @click='pdfExpanded = true'
+                @keydown.enter.prevent='pdfExpanded = true'
+                @keydown.space.prevent='pdfExpanded = true'
+            >
+                <p class='text-uppercase text-white-50 small mb-0'>
+                    Urgency Rating Chart PDF
+                </p>
+                <IconChevronDown
+                    class='ms-auto transition-transform text-white-50 rotate-180'
+                    :size='20'
+                    stroke='1.5'
+                />
+            </div>
+            <TablerBorder
+                v-else
+                class='cloudtak-accent text-white mt-3'
+                :fill-height='false'
+                :shadow='false'
+                gap='sm'
+            >
+                <template #label>
+                    <div
+                        class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                        role='button'
+                        tabindex='0'
+                        :aria-expanded='true'
+                        @click='pdfExpanded = false'
+                        @keydown.enter.prevent='pdfExpanded = false'
+                        @keydown.space.prevent='pdfExpanded = false'
+                    >
+                        <p class='text-uppercase text-white-50 small mb-0'>
+                            Urgency Rating Chart PDF
+                        </p>
+                        <IconChevronDown
+                            class='ms-auto transition-transform text-white-50'
+                            :size='20'
+                            stroke='1.5'
+                        />
+                    </div>
+                </template>
+
+                <div>
                     <p class='text-muted small mb-2'>
                         Prefills from ICS 201 / Initial Information when available.
                         Edit header and Prepared By before downloading.
                     </p>
                     <div class='row g-2 mb-2'>
                         <div class='col-md-6'>
-                            <label class='form-label small mb-1'>Incident Name</label>
-                            <input
+                            <TablerInput
                                 v-model='pdfHeader.incidentName'
-                                type='text'
-                                class='form-control form-control-sm'
-                                :readonly='incidentNameReadonly'
-                            >
+                                label='Incident Name'
+                                :disabled='incidentNameReadonly'
+                            />
                         </div>
                         <div class='col-md-6'>
-                            <label class='form-label small mb-1'>Incident Number</label>
-                            <input
+                            <TablerInput
                                 v-model='pdfHeader.incidentNumber'
-                                type='text'
-                                class='form-control form-control-sm'
-                                :readonly='incidentNumberReadonly'
-                            >
+                                label='Incident Number'
+                                :disabled='incidentNumberReadonly'
+                            />
                         </div>
                         <div class='col-md-3'>
-                            <label class='form-label small mb-1'>Date</label>
-                            <input
+                            <TablerInput
                                 v-model='pdfHeader.date'
-                                type='text'
-                                class='form-control form-control-sm'
-                            >
+                                label='Date'
+                            />
                         </div>
                         <div class='col-md-3'>
-                            <label class='form-label small mb-1'>Time</label>
-                            <input
+                            <TablerInput
                                 v-model='pdfHeader.time'
-                                type='text'
-                                class='form-control form-control-sm'
-                            >
+                                label='Time'
+                            />
                         </div>
                         <div class='col-md-6'>
-                            <label class='form-label small mb-1'>Prepared by (Name)</label>
-                            <input
+                            <TablerInput
                                 v-model='pdfHeader.preparedByName'
-                                type='text'
-                                class='form-control form-control-sm'
-                            >
+                                label='Prepared by (Name)'
+                            />
                         </div>
                         <div class='col-md-4'>
-                            <label class='form-label small mb-1'>Position / Title</label>
-                            <input
+                            <TablerInput
                                 v-model='pdfHeader.positionTitle'
-                                type='text'
-                                class='form-control form-control-sm'
-                            >
+                                label='Position / Title'
+                            />
                         </div>
                         <div class='col-md-4'>
-                            <label class='form-label small mb-1'>Signature</label>
-                            <input
+                            <TablerInput
                                 v-model='pdfHeader.signature'
-                                type='text'
-                                class='form-control form-control-sm'
-                            >
+                                label='Signature'
+                            />
                         </div>
                         <div class='col-md-4'>
-                            <label class='form-label small mb-1'>Date / Time</label>
-                            <input
+                            <TablerInput
                                 v-model='pdfHeader.preparedDateTime'
-                                type='text'
-                                class='form-control form-control-sm'
-                            >
+                                label='Date / Time'
+                            />
                         </div>
                     </div>
                     <div class='d-flex flex-wrap gap-2'>
@@ -289,14 +322,15 @@
                         </button>
                     </div>
                 </div>
-            </div>
+            </TablerBorder>
         </div>
-    </div>
+    </TablerBorder>
 </template>
 
 <script setup lang='ts'>
 import { reactive, ref, computed, watch, onMounted, onUnmounted } from 'vue';
-import { IconInfoCircle } from '@tabler/icons-vue';
+import { IconInfoCircle, IconChevronDown } from '@tabler/icons-vue';
+import { TablerBorder, TablerInput, TablerInlineAlert } from '@tak-ps/vue-tabler';
 import { loadIncidentSubscription } from '../../../lib/incidentSubscription.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import { loadIcs201FromMission } from '../../../lib/ics201.ts';
@@ -351,6 +385,7 @@ const incidentNameReadonly = ref(false);
 const incidentNumberReadonly = ref(false);
 const exporting = ref(false);
 const uploading = ref(false);
+const pdfExpanded = ref(true);
 
 const factors = reactive<Factor[]>([
     {
@@ -669,6 +704,14 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.rotate-180 {
+    transform: rotate(-90deg);
+}
+
+.transition-transform {
+    transition: transform 0.2s ease-out;
+}
+
 .urgency-table-wrap {
     overflow: visible;
 }

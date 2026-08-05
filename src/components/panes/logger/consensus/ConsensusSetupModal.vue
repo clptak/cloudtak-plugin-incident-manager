@@ -23,12 +23,10 @@
                 </div>
                 <div class='modal-body'>
                     <div class='mb-3'>
-                        <label class='form-label'>Incident Name</label>
-                        <input
+                        <TablerInput
                             v-model='incidentName'
-                            type='text'
-                            class='form-control'
-                        >
+                            label='Incident Name'
+                        />
                     </div>
                     <div class='mb-3 d-flex align-items-center gap-2'>
                         <!-- Placeholder for future WinC.A.S.I.E. III local-file export. -->
@@ -42,58 +40,38 @@
                         <span class='text-muted small text-truncate'>Saved to the active DataSync mission</span>
                     </div>
                     <div class='mb-3'>
-                        <label class='form-check'>
-                            <input
-                                v-model='useMyDocuments'
-                                type='checkbox'
-                                class='form-check-input'
-                            >
-                            <span class='form-check-label'>Use My Documents Folder</span>
-                        </label>
+                        <TablerToggle
+                            v-model='useMyDocuments'
+                            label='Use My Documents Folder'
+                        />
                     </div>
                     <div class='mb-3'>
-                        <label class='form-label'>Filename (no extension)</label>
-                        <input
+                        <TablerInput
                             v-model='filename'
-                            type='text'
-                            class='form-control'
-                        >
+                            label='Filename (no extension)'
+                        />
                     </div>
-                    <div class='mb-3 row align-items-center'>
-                        <label class='col-8 col-form-label'>Number of segments, (excluding R.O.W.)</label>
-                        <div class='col-4'>
-                            <input
-                                :value='segmentCount'
-                                type='text'
-                                class='form-control'
-                                readonly
-                                title='Count of segments registered in Segmentation'
-                            >
-                        </div>
+                    <div class='mb-3'>
+                        <TablerInput
+                            :model-value='segmentCount'
+                            label='Number of Segments, (excluding R.O.W.)'
+                            :disabled='true'
+                            title='Count of segments registered in Segmentation'
+                        />
                     </div>
-                    <div class='mb-2 row align-items-center'>
-                        <label class='col-8 col-form-label'>Number of respondents</label>
-                        <div class='col-4'>
-                            <select
-                                v-model.number='respondentCount'
-                                class='form-select'
-                            >
-                                <option
-                                    v-for='n in maxRespondents'
-                                    :key='n'
-                                    :value='n'
-                                >
-                                    {{ n }}
-                                </option>
-                            </select>
-                        </div>
+                    <div class='mb-2'>
+                        <TablerEnum
+                            v-model='respondentCountLabel'
+                            label='Number of Respondents'
+                            :options='respondentCountOptions'
+                        />
                     </div>
-                    <div
+                    <TablerInlineAlert
                         v-if='error'
-                        class='text-danger small'
-                    >
-                        {{ error }}
-                    </div>
+                        severity='danger'
+                        title='Error'
+                        :description='error'
+                    />
                 </div>
                 <div class='modal-footer'>
                     <button
@@ -127,7 +105,13 @@
 </template>
 
 <script setup lang='ts'>
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
+import {
+    TablerEnum,
+    TablerInlineAlert,
+    TablerInput,
+    TablerToggle,
+} from '@tak-ps/vue-tabler';
 import { MAX_RESPONDENTS } from '../../../../lib/consensus.ts';
 
 export interface SetupResult {
@@ -160,6 +144,12 @@ const respondentCount = ref(
     Math.min(Math.max(props.initialRespondentCount, 1), MAX_RESPONDENTS),
 );
 const error = ref('');
+
+const respondentCountOptions = Array.from({ length: maxRespondents }, (_, i) => String(i + 1));
+const respondentCountLabel = computed({
+    get: () => String(respondentCount.value),
+    set: (label: string) => { respondentCount.value = Number(label) || 1; },
+});
 
 // Keep the filename following the incident name until the user diverges it.
 watch(incidentName, (next, prev) => {

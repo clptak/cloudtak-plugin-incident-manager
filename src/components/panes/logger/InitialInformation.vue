@@ -1,212 +1,219 @@
 <template>
     <div>
         <!-- CFS / Call Notes -->
-        <div class='card mb-3'>
-            <div
-                class='card-header d-flex align-items-center cursor-pointer user-select-none'
-                role='button'
-                tabindex='0'
-                :aria-expanded='cfsExpanded'
-                @click='cfsExpanded = !cfsExpanded'
-                @keydown.enter.prevent='cfsExpanded = !cfsExpanded'
-                @keydown.space.prevent='cfsExpanded = !cfsExpanded'
-            >
-                <h3 class='card-title mb-0'>
-                    CFS / Call Notes
-                </h3>
-                <IconChevronDown
-                    class='ms-auto transition-transform'
-                    :class='{ "rotate-180": !cfsExpanded }'
-                    :size='20'
-                    stroke='1.5'
-                />
-            </div>
-            <div
-                v-show='cfsExpanded'
-                class='card-body'
-            >
-                <label class='form-label mb-1'>Paste full CFS text (header + Remarks section)</label>
-                <textarea
-                    v-model='cadText'
-                    class='form-control'
-                    rows='10'
-                    placeholder='Paste the full MPS Call Notes here — include the Remarks section with timestamped log entries.'
-                />
-
-                <div class='mt-3'>
-                    <button
-                        class='btn btn-primary'
-                        @click='parse'
-                    >
-                        Parse &amp; Build
-                    </button>
-                </div>
-
-                <div
-                    v-if='!activeMission'
-                    class='form-text text-warning mt-2'
-                >
-                    No active mission. Select one in Create | Open first.
-                </div>
-                <div
-                    v-else
-                    class='form-text mt-2'
-                >
-                    Active DataSync: <strong>{{ activeMission.name }}</strong>
-                </div>
-
-                <div
-                    v-if='status'
-                    class='mt-2 fw-bold'
-                    :class='statusError ? "text-danger" : "text-success"'
-                >
-                    {{ status }}
-                </div>
-            </div>
+        <div
+            v-if='!cfsExpanded'
+            class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+            role='button'
+            tabindex='0'
+            :aria-expanded='false'
+            @click='cfsExpanded = true'
+            @keydown.enter.prevent='cfsExpanded = true'
+            @keydown.space.prevent='cfsExpanded = true'
+        >
+            <p class='text-uppercase text-white-50 small mb-0'>
+                CFS / Call Notes
+            </p>
+            <IconChevronDown
+                class='ms-auto transition-transform text-white-50 rotate-180'
+                :size='20'
+                stroke='1.5'
+            />
         </div>
+        <TablerBorder
+            v-else
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <div
+                    class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='true'
+                    @click='cfsExpanded = false'
+                    @keydown.enter.prevent='cfsExpanded = false'
+                    @keydown.space.prevent='cfsExpanded = false'
+                >
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        CFS / Call Notes
+                    </p>
+                    <IconChevronDown
+                        class='ms-auto transition-transform text-white-50'
+                        :size='20'
+                        stroke='1.5'
+                    />
+                </div>
+            </template>
+
+            <TablerInput
+                v-model='cadText'
+                label='Paste full CFS text (header + Remarks section)'
+                :rows='10'
+                placeholder='Paste the full MPS Call Notes here — include the Remarks section with timestamped log entries.'
+            />
+
+            <div class='mt-3'>
+                <button
+                    class='btn btn-primary'
+                    @click='parse'
+                >
+                    Parse &amp; Build
+                </button>
+            </div>
+
+            <TablerInlineAlert
+                v-if='!activeMission'
+                class='mt-3'
+                severity='warning'
+                title='Mission Required'
+                description='No active mission. Select one in Create | Open first.'
+            />
+            <p
+                v-else
+                class='form-text mt-2'
+            >
+                Active DataSync: <strong>{{ activeMission.name }}</strong>
+            </p>
+
+            <TablerInlineAlert
+                v-if='status'
+                class='mt-2'
+                :severity='statusError ? "danger" : "success"'
+                :title='statusError ? "Error" : "Success"'
+                :description='status'
+            />
+        </TablerBorder>
 
         <!-- Incident Information -->
-        <div class='card'>
-            <div class='card-header'>
-                <h3 class='card-title mb-0'>
+        <TablerBorder
+            class='cloudtak-accent text-white'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0'>
                     Incident Information
-                </h3>
-            </div>
-            <div class='card-body'>
-                <div class='row g-3'>
-                    <div class='col-md-6'>
-                        <label class='form-label'>Incident Name</label>
-                        <input
-                            v-model='incidentForm.incidentName'
-                            type='text'
-                            class='form-control form-control-sm'
-                            placeholder='e.g. Smith Search'
-                        >
-                    </div>
-                    <div class='col-md-6'>
-                        <label class='form-label'>Activity Number</label>
-                        <input
-                            v-model='incidentForm.eventId'
-                            type='text'
-                            class='form-control form-control-sm'
-                            placeholder='e.g. A12345678'
-                        >
-                    </div>
-                    <div class='col-md-6'>
-                        <label class='form-label'>Department Report Number</label>
-                        <input
-                            v-model='incidentForm.incidentId'
-                            type='text'
-                            class='form-control form-control-sm'
-                            placeholder='e.g. R1234567'
-                        >
-                    </div>
-                    <div class='col-md-6'>
-                        <label class='form-label'>State Mission Number</label>
-                        <input
-                            v-model='incidentForm.demaMission'
-                            type='text'
-                            class='form-control form-control-sm'
-                            :class='{ "is-invalid": demaInvalid }'
-                            placeholder='e.g. 2025-12345'
-                        >
-                        <div
-                            v-if='demaInvalid'
-                            class='invalid-feedback d-block'
-                        >
-                            Format: 20YY-NNNNN (e.g. 2025-12345)
-                        </div>
-                    </div>
-                    <div class='col-md-6'>
-                        <label class='form-label'>IC Coordinator&apos;s Name</label>
-                        <input
-                            v-model='incidentForm.icCoordinator'
-                            type='text'
-                            class='form-control form-control-sm'
-                            placeholder='Coordinator name'
-                        >
-                        <div class='form-text'>
-                            Will be populated from your TAK Portal user (future).
-                        </div>
-                    </div>
-                    <div class='col-md-6'>
-                        <label class='form-label'>Incident Conclusion Time</label>
-                        <input
-                            v-model='incidentForm.incidentConclusionTime'
-                            type='datetime-local'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
-                    <div class='col-md-8'>
-                        <label class='form-label'>Assignment</label>
-                        <textarea
-                            v-model='incidentForm.assignmentText'
-                            class='form-control form-control-sm'
-                            rows='3'
-                            placeholder='Assignment details'
-                        />
-                    </div>
-                    <div class='col-md-4'>
-                        <label class='form-label'>Assignment Date/Time</label>
-                        <input
-                            v-model='incidentForm.assignmentDateTime'
-                            type='datetime-local'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
-                </div>
-
-                <div
-                    v-if='!activeMission'
-                    class='form-text text-warning mt-2'
-                >
-                    No active mission. Select one in Create | Open first.
-                </div>
-                <div
-                    v-else
-                    class='form-text mt-2'
-                >
-                    Active DataSync: <strong>{{ activeMission.name }}</strong>
-                </div>
-
-                <p class='text-muted small mt-2 mb-0'>
-                    Save stores fields in <strong>mission_schema.json</strong>;
-                    Send to DataSync posts a mission log entry.
                 </p>
+            </template>
 
-                <div
-                    v-if='demaInvalid'
-                    class='form-text text-warning mt-2'
-                >
-                    Fix the state mission number format before saving.
+            <div class='row g-3'>
+                <div class='col-md-6'>
+                    <TablerInput
+                        v-model='incidentForm.incidentName'
+                        label='Incident Name'
+                        placeholder='e.g. Smith Search'
+                    />
                 </div>
-
-                <div class='d-flex flex-wrap gap-2 mt-3'>
-                    <button
-                        class='btn btn-primary btn-sm'
-                        :disabled='savingIncident || sendingIncident || demaInvalid'
-                        @click='onSaveIncidentInfo'
-                    >
-                        {{ savingIncident ? 'Saving…' : 'Save' }}
-                    </button>
-                    <button
-                        class='btn btn-outline-secondary btn-sm'
-                        :disabled='sendingIncident || savingIncident || demaInvalid'
-                        @click='onSendIncidentInfo'
-                    >
-                        {{ sendingIncident ? 'Sending…' : 'Send to DataSync' }}
-                    </button>
+                <div class='col-md-6'>
+                    <TablerInput
+                        v-model='incidentForm.eventId'
+                        label='Activity Number'
+                        placeholder='e.g. A12345678'
+                    />
                 </div>
-
-                <div
-                    v-if='incidentStatus'
-                    class='mt-2 fw-bold'
-                    :class='incidentStatusError ? "text-danger" : "text-success"'
-                >
-                    {{ incidentStatus }}
+                <div class='col-md-6'>
+                    <TablerInput
+                        v-model='incidentForm.incidentId'
+                        label='Department Report Number'
+                        placeholder='e.g. R1234567'
+                    />
+                </div>
+                <div class='col-md-6'>
+                    <TablerInput
+                        v-model='incidentForm.demaMission'
+                        label='State Mission Number'
+                        placeholder='e.g. 2025-12345'
+                        :error='demaInvalid ? "Format: 20YY-NNNNN (e.g. 2025-12345)" : ""'
+                    />
+                </div>
+                <div class='col-md-6'>
+                    <TablerInput
+                        v-model='incidentForm.icCoordinator'
+                        label='IC Coordinator&apos;s Name'
+                        placeholder='Coordinator name'
+                        description='Will be populated from your TAK Portal user (future).'
+                    />
+                </div>
+                <div class='col-md-6'>
+                    <TablerInput
+                        v-model='incidentForm.incidentConclusionTime'
+                        label='Incident Conclusion Time'
+                        type='datetime-local'
+                    />
+                </div>
+                <div class='col-md-8'>
+                    <TablerInput
+                        v-model='incidentForm.assignmentText'
+                        label='Assignment'
+                        :rows='3'
+                        placeholder='Assignment details'
+                    />
+                </div>
+                <div class='col-md-4'>
+                    <TablerInput
+                        v-model='incidentForm.assignmentDateTime'
+                        label='Assignment Date/Time'
+                        type='datetime-local'
+                    />
                 </div>
             </div>
-        </div>
+
+            <TablerInlineAlert
+                v-if='!activeMission'
+                class='mt-3'
+                severity='warning'
+                title='Mission Required'
+                description='No active mission. Select one in Create | Open first.'
+            />
+            <p
+                v-else
+                class='form-text mt-2'
+            >
+                Active DataSync: <strong>{{ activeMission.name }}</strong>
+            </p>
+
+            <p class='text-muted small mt-2 mb-0'>
+                Save stores fields in <strong>mission_schema.json</strong>;
+                Send to DataSync posts a mission log entry.
+            </p>
+
+            <TablerInlineAlert
+                v-if='demaInvalid'
+                class='mt-2'
+                severity='warning'
+                title='Invalid Format'
+                description='Fix the state mission number format before saving.'
+            />
+
+            <div class='d-flex flex-wrap gap-2 mt-3'>
+                <button
+                    class='btn btn-primary btn-sm'
+                    :disabled='savingIncident || sendingIncident || demaInvalid'
+                    @click='onSaveIncidentInfo'
+                >
+                    {{ savingIncident ? 'Saving…' : 'Save' }}
+                </button>
+                <button
+                    class='btn btn-outline-secondary btn-sm'
+                    :disabled='sendingIncident || savingIncident || demaInvalid'
+                    @click='onSendIncidentInfo'
+                >
+                    {{ sendingIncident ? 'Sending…' : 'Send to DataSync' }}
+                </button>
+            </div>
+
+            <TablerInlineAlert
+                v-if='incidentStatus'
+                class='mt-2'
+                :severity='incidentStatusError ? "danger" : "success"'
+                :title='incidentStatusError ? "Error" : "Success"'
+                :description='incidentStatus'
+            />
+        </TablerBorder>
 
         <div
             v-if='showParsedModal'
@@ -340,6 +347,11 @@
 <script setup lang='ts'>
 import { ref, computed, reactive, watch, onMounted } from 'vue';
 import { IconChevronDown } from '@tabler/icons-vue';
+import {
+    TablerBorder,
+    TablerInput,
+    TablerInlineAlert,
+} from '@tak-ps/vue-tabler';
 import { getMpsRows } from '../../../lib/mpsParser.ts';
 import type { MpsRow } from '../../../lib/mpsParser.ts';
 import {

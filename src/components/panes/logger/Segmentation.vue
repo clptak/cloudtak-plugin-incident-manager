@@ -1,128 +1,143 @@
 <template>
     <div class='row g-3'>
         <div class='col-lg-8'>
-            <div class='card mb-3'>
-                <div class='card-header d-flex align-items-center'>
-                    <h3 class='card-title mb-0 flex-grow-1'>
-                        Segments
-                    </h3>
-                    <NavHelpButton help-key='segmenting-search-area' />
-                </div>
-                <div class='card-body'>
-                    <div class='alert alert-info small mb-3'>
-                        Segment names need to be numbered following ICS convention. Letters are for Divisions.
-                    </div>
-                    <label class='form-label'>Select segments from the active DataSync (multiple)</label>
-                    <div
-                        class='border rounded p-2'
-                        style='max-height: 240px; overflow:auto;'
-                    >
-                        <div
-                            v-if='loadingFeatures'
-                            class='text-muted small'
-                        >
-                            Loading mission polygons…
-                        </div>
-                        <div
-                            v-else-if='!availablePolygons.length'
-                            class='text-muted small'
-                        >
-                            No numbered segment polygons in the active DataSync.
-                        </div>
-                        <label
-                            v-for='p in availablePolygons'
-                            :key='p.uid'
-                            class='d-flex gap-2 align-items-center py-1'
-                            style='cursor:pointer'
-                        >
-                            <input
-                                v-model='segmentUids'
-                                type='checkbox'
-                                :value='p.uid'
-                                class='form-check-input'
-                            >
-                            <span>{{ p.callsign }}</span>
-                        </label>
-                    </div>
-                    <button
-                        class='btn btn-primary btn-sm mt-2'
-                        :disabled='!segmentUids.length || saving'
-                        @click='onAddSegments'
-                    >
-                        Add {{ segmentUids.length }} segment{{ segmentUids.length === 1 ? '' : 's' }} to this search
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <div class='col-12'>
-            <div class='card'>
-                <div class='card-header py-2'>
-                    <h3 class='card-title mb-0'>
-                        Segments in this search ({{ segmentRows.length }})
-                    </h3>
-                </div>
-                <div class='card-body py-2'>
-                    <div
-                        v-if='loadingSegments'
-                        class='text-muted small'
-                    >
-                        Loading…
-                    </div>
-                    <div
-                        v-else-if='!segmentRows.length'
-                        class='text-muted small'
-                    >
-                        No segments registered yet. Select polygons above to add them.
-                    </div>
-                    <table
-                        v-else
-                        class='table table-sm table-vcenter mb-0'
-                    >
-                        <thead>
-                            <tr>
-                                <th>Segment</th>
-                                <th>Area (mi²)</th>
-                                <th class='text-end' />
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr
-                                v-for='row in segmentRows'
-                                :key='row.uid'
-                            >
-                                <td>
-                                    <FeatureCallsignCell
-                                        :uid='row.uid'
-                                        :callsign='row.callsign'
-                                        @fly='onFlyTo(row.uid)'
-                                    />
-                                </td>
-                                <td>{{ formatSqMi(areaForUid(row.uid)) }}</td>
-                                <td class='text-end'>
-                                    <button
-                                        type='button'
-                                        class='btn btn-sm btn-link text-danger p-0'
-                                        :disabled='saving'
-                                        @click='removeSegment(row.uid)'
-                                    >
-                                        Remove
-                                    </button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <div class='col-12'>
-            <div
-                v-if='!activeMission'
-                class='form-text text-warning'
+            <TablerBorder
+                class='cloudtak-accent text-white mb-3'
+                :fill-height='false'
+                :shadow='false'
+                gap='sm'
             >
-                No active mission. Select one in Create | Open first.
-            </div>
+                <template #label>
+                    <p class='text-uppercase text-white-50 small mb-0 d-flex align-items-center gap-2 w-100'>
+                        <span>Segments</span>
+                        <span
+                            class='ms-auto d-inline-flex'
+                            @click.stop
+                        >
+                            <NavHelpButton help-key='segmenting-search-area' />
+                        </span>
+                    </p>
+                </template>
+
+                <TablerInlineAlert
+                    class='mb-3'
+                    severity='info'
+                    description='Segment names need to be numbered following ICS convention. Letters are for Divisions.'
+                />
+                <label class='form-label'>Select segments from the active DataSync (multiple)</label>
+                <div
+                    class='border rounded p-2'
+                    style='max-height: 240px; overflow:auto;'
+                >
+                    <div
+                        v-if='loadingFeatures'
+                        class='text-muted small'
+                    >
+                        Loading mission polygons…
+                    </div>
+                    <div
+                        v-else-if='!availablePolygons.length'
+                        class='text-muted small'
+                    >
+                        No numbered segment polygons in the active DataSync.
+                    </div>
+                    <label
+                        v-for='p in availablePolygons'
+                        :key='p.uid'
+                        class='d-flex gap-2 align-items-center py-1'
+                        style='cursor:pointer'
+                    >
+                        <input
+                            v-model='segmentUids'
+                            type='checkbox'
+                            :value='p.uid'
+                            class='form-check-input'
+                        >
+                        <span>{{ p.callsign }}</span>
+                    </label>
+                </div>
+                <button
+                    class='btn btn-primary btn-sm mt-2'
+                    :disabled='!segmentUids.length || saving'
+                    @click='onAddSegments'
+                >
+                    Add {{ segmentUids.length }} segment{{ segmentUids.length === 1 ? '' : 's' }} to this search
+                </button>
+            </TablerBorder>
+        </div>
+
+        <div class='col-12'>
+            <TablerBorder
+                class='cloudtak-accent text-white'
+                :fill-height='false'
+                :shadow='false'
+                gap='sm'
+            >
+                <template #label>
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Segments in this search ({{ segmentRows.length }})
+                    </p>
+                </template>
+
+                <div
+                    v-if='loadingSegments'
+                    class='text-muted small'
+                >
+                    Loading…
+                </div>
+                <div
+                    v-else-if='!segmentRows.length'
+                    class='text-muted small'
+                >
+                    No segments registered yet. Select polygons above to add them.
+                </div>
+                <table
+                    v-else
+                    class='table table-sm table-vcenter mb-0'
+                >
+                    <thead>
+                        <tr>
+                            <th>Segment</th>
+                            <th>Area (mi²)</th>
+                            <th class='text-end' />
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr
+                            v-for='row in segmentRows'
+                            :key='row.uid'
+                        >
+                            <td>
+                                <FeatureCallsignCell
+                                    :uid='row.uid'
+                                    :callsign='row.callsign'
+                                    @fly='onFlyTo(row.uid)'
+                                />
+                            </td>
+                            <td>{{ formatSqMi(areaForUid(row.uid)) }}</td>
+                            <td class='text-end'>
+                                <button
+                                    type='button'
+                                    class='btn btn-sm btn-link text-danger p-0'
+                                    :disabled='saving'
+                                    @click='removeSegment(row.uid)'
+                                >
+                                    Remove
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </TablerBorder>
+        </div>
+
+        <div class='col-12'>
+            <TablerInlineAlert
+                v-if='!activeMission'
+                severity='warning'
+                title='Mission Required'
+                description='No active mission. Select one in Create | Open first.'
+            />
             <div
                 v-else
                 class='form-text d-flex flex-wrap align-items-center gap-2'
@@ -138,19 +153,23 @@
                     {{ loadingFeatures ? 'Loading…' : 'Refresh map objects' }}
                 </button>
             </div>
-            <div
+            <TablerInlineAlert
                 v-if='status'
-                class='fw-bold mt-1'
-                :class='statusError ? "text-danger" : "text-success"'
-            >
-                {{ status }}
-            </div>
+                class='mt-2'
+                :severity='statusError ? "danger" : "success"'
+                :title='statusError ? "Error" : "Success"'
+                :description='status'
+            />
         </div>
     </div>
 </template>
 
 <script setup lang='ts'>
 import { computed, onMounted, ref, watch } from 'vue';
+import {
+    TablerBorder,
+    TablerInlineAlert,
+} from '@tak-ps/vue-tabler';
 import Subscription from '../../../../../../src/base/subscription.ts';
 import type { Feature } from '../../../../../../src/types.ts';
 import { useIncident } from '../../../composables/useIncident.ts';

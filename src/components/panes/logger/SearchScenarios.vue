@@ -1,11 +1,17 @@
 <template>
-    <div class='card'>
-        <div class='card-header'>
-            <h3 class='card-title mb-0'>
+    <TablerBorder
+        class='cloudtak-accent text-white'
+        :fill-height='false'
+        :shadow='false'
+        gap='sm'
+    >
+        <template #label>
+            <p class='text-uppercase text-white-50 small mb-0'>
                 Search Scenarios Worksheet
-            </h3>
-        </div>
-        <div class='card-body'>
+            </p>
+        </template>
+
+        <div>
             <p class='text-muted small mb-3'>
                 Describe likely scenarios (letters A–F).
                 <strong>Save</strong> stores them in <strong>mission_schema.json</strong>;
@@ -30,7 +36,7 @@
                 <div
                     v-for='s in visibleSent'
                     :key='s.key'
-                    class='border rounded p-2 mb-1 bg-body-secondary'
+                    class='cloudtak-accent border rounded-3 p-2 mb-1'
                 >
                     <div class='small d-flex align-items-center justify-content-between'>
                         <span>
@@ -55,7 +61,7 @@
             <div
                 v-for='letter in editorLetters'
                 :key='letter'
-                class='border rounded p-2 mb-2'
+                class='cloudtak-accent border rounded-3 p-2 mb-2'
             >
                 <div class='fw-bold mb-2 d-flex align-items-center justify-content-between'>
                     <span>Scenario {{ letter }}</span>
@@ -70,46 +76,27 @@
                         </button>
                     </span>
                 </div>
-                <textarea
+                <TablerInput
                     v-model='drafts[letter].description'
-                    class='form-control form-control-sm mb-2'
-                    rows='2'
+                    :rows='2'
                     :placeholder='`Description for Scenario ${letter}`'
                 />
-                <div class='row g-2'>
+                <div class='row g-2 mt-0'>
                     <div class='col-md-4'>
-                        <label class='form-label small mb-1'>Mobility</label>
-                        <select
-                            v-model='drafts[letter].mobility'
-                            class='form-select form-select-sm'
-                        >
-                            <option value=''>
-                                —
-                            </option>
-                            <option value='mobile'>
-                                Mobile
-                            </option>
-                            <option value='immobile'>
-                                Immobile
-                            </option>
-                        </select>
+                        <TablerEnum
+                            :model-value='mobilityLabel(letter)'
+                            label='Mobility'
+                            :options='MOBILITY_OPTIONS'
+                            @update:model-value='setMobilityLabel(letter, $event)'
+                        />
                     </div>
                     <div class='col-md-4'>
-                        <label class='form-label small mb-1'>Responsiveness</label>
-                        <select
-                            v-model='drafts[letter].responsiveness'
-                            class='form-select form-select-sm'
-                        >
-                            <option value=''>
-                                —
-                            </option>
-                            <option value='responsive'>
-                                Responsive
-                            </option>
-                            <option value='unresponsive'>
-                                Unresponsive
-                            </option>
-                        </select>
+                        <TablerEnum
+                            :model-value='responsivenessLabel(letter)'
+                            label='Responsiveness'
+                            :options='RESPONSIVENESS_OPTIONS'
+                            @update:model-value='setResponsivenessLabel(letter, $event)'
+                        />
                     </div>
                     <div class='col-md-4'>
                         <label class='form-label small mb-1'>Priority</label>
@@ -186,33 +173,76 @@
                 Add at least one scenario description to enable Save / PDF.
             </div>
 
-            <div
+            <TablerInlineAlert
                 v-if='!activeMission'
-                class='form-text text-warning'
-            >
-                No active mission. Select one in Create | Open first.
-            </div>
+                class='mt-2'
+                severity='warning'
+                title='No Active Mission'
+                description='Select one in Create | Open first.'
+            />
             <div
                 v-else
                 class='form-text'
             >
                 Active DataSync: <strong>{{ activeMission.name }}</strong>
             </div>
-            <div
+            <TablerInlineAlert
                 v-if='status'
-                class='fw-bold mt-1'
-                :class='statusError ? "text-danger" : "text-success"'
-            >
-                {{ status }}
-            </div>
+                class='mt-2'
+                :severity='statusError ? "danger" : "success"'
+                :title='statusError ? "Error" : "Success"'
+                :description='status'
+            />
 
-            <div class='card mt-3'>
-                <div class='card-header py-2'>
-                    <h4 class='card-title mb-0 fs-6'>
-                        Scenarios Record Sheet PDF
-                    </h4>
-                </div>
-                <div class='card-body py-2'>
+            <!-- Scenarios Record Sheet PDF -->
+            <div
+                v-if='!pdfExpanded'
+                class='cloudtak-accent border rounded-3 text-white mt-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+                role='button'
+                tabindex='0'
+                :aria-expanded='false'
+                @click='pdfExpanded = true'
+                @keydown.enter.prevent='pdfExpanded = true'
+                @keydown.space.prevent='pdfExpanded = true'
+            >
+                <p class='text-uppercase text-white-50 small mb-0'>
+                    Scenarios Record Sheet PDF
+                </p>
+                <IconChevronDown
+                    class='ms-auto transition-transform text-white-50 rotate-180'
+                    :size='20'
+                    stroke='1.5'
+                />
+            </div>
+            <TablerBorder
+                v-else
+                class='cloudtak-accent text-white mt-3'
+                :fill-height='false'
+                :shadow='false'
+                gap='sm'
+            >
+                <template #label>
+                    <div
+                        class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                        role='button'
+                        tabindex='0'
+                        :aria-expanded='true'
+                        @click='pdfExpanded = false'
+                        @keydown.enter.prevent='pdfExpanded = false'
+                        @keydown.space.prevent='pdfExpanded = false'
+                    >
+                        <p class='text-uppercase text-white-50 small mb-0'>
+                            Scenarios Record Sheet PDF
+                        </p>
+                        <IconChevronDown
+                            class='ms-auto transition-transform text-white-50'
+                            :size='20'
+                            stroke='1.5'
+                        />
+                    </div>
+                </template>
+
+                <div>
                     <p class='text-muted small mb-2'>
                         Prefills from ICS 201 / Initial Information when available.
                         Edit header and Prepared By before downloading.
@@ -220,70 +250,54 @@
                     </p>
                     <div class='row g-2 mb-2'>
                         <div class='col-md-6'>
-                            <label class='form-label small mb-1'>Incident Name</label>
-                            <input
+                            <TablerInput
                                 v-model='pdfHeader.incidentName'
-                                type='text'
-                                class='form-control form-control-sm'
-                                :readonly='incidentNameReadonly'
-                            >
+                                label='Incident Name'
+                                :disabled='incidentNameReadonly'
+                            />
                         </div>
                         <div class='col-md-6'>
-                            <label class='form-label small mb-1'>Incident Number</label>
-                            <input
+                            <TablerInput
                                 v-model='pdfHeader.incidentNumber'
-                                type='text'
-                                class='form-control form-control-sm'
-                                :readonly='incidentNumberReadonly'
-                            >
+                                label='Incident Number'
+                                :disabled='incidentNumberReadonly'
+                            />
                         </div>
                         <div class='col-md-3'>
-                            <label class='form-label small mb-1'>Date</label>
-                            <input
+                            <TablerInput
                                 v-model='pdfHeader.date'
-                                type='text'
-                                class='form-control form-control-sm'
-                            >
+                                label='Date'
+                            />
                         </div>
                         <div class='col-md-3'>
-                            <label class='form-label small mb-1'>Time</label>
-                            <input
+                            <TablerInput
                                 v-model='pdfHeader.time'
-                                type='text'
-                                class='form-control form-control-sm'
-                            >
+                                label='Time'
+                            />
                         </div>
                         <div class='col-md-6'>
-                            <label class='form-label small mb-1'>Prepared by (Name)</label>
-                            <input
+                            <TablerInput
                                 v-model='pdfHeader.preparedByName'
-                                type='text'
-                                class='form-control form-control-sm'
-                            >
+                                label='Prepared by (Name)'
+                            />
                         </div>
                         <div class='col-md-4'>
-                            <label class='form-label small mb-1'>Position / Title</label>
-                            <input
+                            <TablerInput
                                 v-model='pdfHeader.positionTitle'
-                                type='text'
-                                class='form-control form-control-sm'
-                            >
+                                label='Position / Title'
+                            />
                         </div>
                         <div class='col-md-4'>
-                            <label class='form-label small mb-1'>Signature</label>
-                            <input
+                            <TablerInput
                                 v-model='pdfHeader.signature'
-                                type='text'
-                                class='form-control form-control-sm'
-                            >
+                                label='Signature'
+                            />
                         </div>
                         <div class='col-md-4'>
-                            <label class='form-label small mb-1'>Date / Time</label>
-                            <input
+                            <TablerInput
                                 v-model='pdfHeader.preparedDateTime'
-                                type='text'
-                                class='form-control form-control-sm'
-                            >
+                                label='Date / Time'
+                            />
                         </div>
                     </div>
                     <div class='d-flex flex-wrap gap-2'>
@@ -305,13 +319,15 @@
                         </button>
                     </div>
                 </div>
-            </div>
+            </TablerBorder>
         </div>
-    </div>
+    </TablerBorder>
 </template>
 
 <script setup lang='ts'>
 import { reactive, ref, computed, onMounted, watch } from 'vue';
+import { IconChevronDown } from '@tabler/icons-vue';
+import { TablerBorder, TablerInput, TablerEnum, TablerInlineAlert } from '@tak-ps/vue-tabler';
 import { loadIncidentSubscription } from '../../../lib/incidentSubscription.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import { loadIcs201FromMission } from '../../../lib/ics201.ts';
@@ -360,6 +376,28 @@ function blankDraft(): Draft {
     return { description: '', mobility: '', responsiveness: '', priority: null, logId: undefined };
 }
 
+const MOBILITY_OPTIONS = ['—', 'Mobile', 'Immobile'];
+const MOBILITY_LABEL_BY_VALUE: Record<string, string> = { '': '—', mobile: 'Mobile', immobile: 'Immobile' };
+const MOBILITY_VALUE_BY_LABEL: Record<string, string> = { '—': '', Mobile: 'mobile', Immobile: 'immobile' };
+
+function mobilityLabel(letter: string): string {
+    return MOBILITY_LABEL_BY_VALUE[drafts[letter].mobility] ?? '—';
+}
+function setMobilityLabel(letter: string, label: string): void {
+    drafts[letter].mobility = MOBILITY_VALUE_BY_LABEL[label] ?? '';
+}
+
+const RESPONSIVENESS_OPTIONS = ['—', 'Responsive', 'Unresponsive'];
+const RESPONSIVENESS_LABEL_BY_VALUE: Record<string, string> = { '': '—', responsive: 'Responsive', unresponsive: 'Unresponsive' };
+const RESPONSIVENESS_VALUE_BY_LABEL: Record<string, string> = { '—': '', Responsive: 'responsive', Unresponsive: 'unresponsive' };
+
+function responsivenessLabel(letter: string): string {
+    return RESPONSIVENESS_LABEL_BY_VALUE[drafts[letter].responsiveness] ?? '—';
+}
+function setResponsivenessLabel(letter: string, label: string): void {
+    drafts[letter].responsiveness = RESPONSIVENESS_VALUE_BY_LABEL[label] ?? '';
+}
+
 function blankPdfHeader(): ScenariosRecordSheetHeader {
     const date = nowBriefingDate();
     const time = nowBriefingTime();
@@ -385,6 +423,7 @@ const editingKeys = ref<string[]>([]);
 const pdfHeader = reactive<ScenariosRecordSheetHeader>(blankPdfHeader());
 const incidentNameReadonly = ref(false);
 const incidentNumberReadonly = ref(false);
+const pdfExpanded = ref(true);
 
 const sentKeys = computed(() => new Set(sentScenarios.value.map((s) => s.key)));
 // A letter is "used up" for new-scenario slots if it is sent OR currently being edited.
@@ -801,3 +840,13 @@ async function addPdfToDataSync(): Promise<void> {
     }
 }
 </script>
+
+<style scoped>
+.rotate-180 {
+    transform: rotate(-90deg);
+}
+
+.transition-transform {
+    transition: transform 0.2s ease-out;
+}
+</style>

@@ -95,13 +95,13 @@
                             </table>
                         </div>
                         <div class='col-md-6'>
-                            <div class='card'>
-                                <div class='card-header py-2'>
-                                    <h4 class='card-title mb-0'>
+                            <div class='cloudtak-accent border rounded-3 text-white'>
+                                <div class='px-3 pt-2'>
+                                    <p class='text-uppercase text-white-50 small mb-0'>
                                         Instructions
-                                    </h4>
+                                    </p>
                                 </div>
-                                <div class='card-body py-2 small text-primary'>
+                                <div class='px-3 pb-3 pt-2 small text-primary'>
                                     <template v-if='isOconnor'>
                                         <p class='mb-1'>
                                             The R.O.W. requires a percentage.
@@ -143,18 +143,20 @@
                             </div>
                         </div>
                     </div>
-                    <div
+                    <TablerInlineAlert
                         v-if='flyError'
-                        class='text-danger small mt-2'
-                    >
-                        {{ flyError }}
-                    </div>
-                    <div
+                        class='mt-2'
+                        severity='danger'
+                        title='Error'
+                        :description='flyError'
+                    />
+                    <TablerInlineAlert
                         v-if='error'
-                        class='text-danger small mt-2'
-                    >
-                        {{ error }}
-                    </div>
+                        class='mt-2'
+                        severity='danger'
+                        title='Error'
+                        :description='error'
+                    />
                 </div>
                 <div class='modal-footer'>
                     <button
@@ -180,6 +182,7 @@
 
 <script setup lang='ts'>
 import { computed, reactive, ref } from 'vue';
+import { TablerInlineAlert } from '@tak-ps/vue-tabler';
 import {
     OCONNOR_LETTERS,
     methodLabel,

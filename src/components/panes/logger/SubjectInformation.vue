@@ -1,48 +1,107 @@
 <template>
-    <div class='card'>
-        <div class='card-header d-flex align-items-center justify-content-between'>
-            <h3 class='card-title mb-0'>
-                Subject Information
-            </h3>
-            <button
-                type='button'
-                class='btn btn-outline-primary btn-sm'
-                :disabled='drafts.length >= MAX_SUBJECTS || !availableNumbers.length'
-                @click='addSubject'
-            >
-                + Add Subject
-            </button>
-        </div>
-        <div class='card-body'>
-            <p class='text-muted small mb-3'>
-                Enter details for one or more missing subjects.
-                Send posts each filled subject as a DataSync log entry and upserts it into
-                <strong>mission_schema.json</strong> (<code>incident_response.subjects</code>).
+    <TablerBorder
+        class='cloudtak-accent text-white'
+        :fill-height='false'
+        :shadow='false'
+        gap='sm'
+    >
+        <template #label>
+            <p class='text-uppercase text-white-50 small mb-0 d-flex align-items-center gap-2 w-100'>
+                <span>Subject Information</span>
+                <button
+                    type='button'
+                    class='btn btn-outline-primary btn-sm ms-auto'
+                    :disabled='drafts.length >= MAX_SUBJECTS || !availableNumbers.length'
+                    @click='addSubject'
+                >
+                    + Add Subject
+                </button>
             </p>
+        </template>
 
+        <p class='text-muted small mb-3'>
+            Enter details for one or more missing subjects.
+            Send posts each filled subject as a DataSync log entry and upserts it into
+            <strong>mission_schema.json</strong> (<code>incident_response.subjects</code>).
+        </p>
+
+        <div
+            v-if='loadingSent'
+            class='text-muted small mb-2'
+        >
+            Loading saved subjects…
+        </div>
+
+        <template
+            v-for='draft in drafts'
+            :key='draft.id'
+        >
+            <!-- Collapsed subject row -->
             <div
-                v-if='loadingSent'
-                class='text-muted small mb-2'
+                v-if='!draft.expanded'
+                class='cloudtak-accent border rounded-3 text-white mb-2 px-3 py-2 d-flex align-items-center gap-2 cursor-pointer user-select-none'
+                role='button'
+                tabindex='0'
+                :aria-expanded='false'
+                @click='toggleDraft(draft.id)'
+                @keydown.enter.prevent='toggleDraft(draft.id)'
+                @keydown.space.prevent='toggleDraft(draft.id)'
             >
-                Loading saved subjects…
+                <IconChevronDown
+                    class='transition-transform text-white-50 rotate-180'
+                    :size='18'
+                    stroke='1.5'
+                />
+                <span class='fw-bold'>
+                    Subject {{ displayNumber(draft.form.subjectCaseID) }}
+                    <span
+                        v-if='draftSummary(draft.form)'
+                        class='text-white-50 fw-normal'
+                    > — {{ draftSummary(draft.form) }}</span>
+                </span>
+                <span
+                    v-if='draft.form.logId || isSent(draft.form.subjectCaseID)'
+                    class='badge bg-success-lt text-success ms-1'
+                >saved</span>
+                <span
+                    v-else-if='hasFilledFields(draft.form)'
+                    class='badge bg-warning-lt text-warning ms-1'
+                >draft</span>
+                <button
+                    v-if='drafts.length > 1'
+                    type='button'
+                    class='btn btn-sm btn-link text-danger ms-auto p-0'
+                    title='Remove subject'
+                    @click.stop='removeDraft(draft.id)'
+                >
+                    Remove
+                </button>
             </div>
 
+            <!-- Expanded subject card -->
             <div
-                v-for='draft in drafts'
-                :key='draft.id'
-                class='card mb-2'
+                v-else
+                class='cloudtak-accent border rounded-3 text-white mb-2'
             >
                 <div
-                    class='card-header py-2 d-flex align-items-center gap-2'
-                    style='cursor: pointer;'
+                    class='d-flex align-items-center gap-2 px-3 py-2 cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='true'
                     @click='toggleDraft(draft.id)'
+                    @keydown.enter.prevent='toggleDraft(draft.id)'
+                    @keydown.space.prevent='toggleDraft(draft.id)'
                 >
-                    <span class='me-1'>{{ draft.expanded ? '▾' : '▸' }}</span>
+                    <IconChevronDown
+                        class='transition-transform text-white-50'
+                        :size='18'
+                        stroke='1.5'
+                    />
                     <span class='fw-bold'>
                         Subject {{ displayNumber(draft.form.subjectCaseID) }}
                         <span
                             v-if='draftSummary(draft.form)'
-                            class='text-muted fw-normal'
+                            class='text-white-50 fw-normal'
                         > — {{ draftSummary(draft.form) }}</span>
                     </span>
                     <span
@@ -63,55 +122,39 @@
                         Remove
                     </button>
                 </div>
-                <div
-                    v-show='draft.expanded'
-                    class='card-body pt-3'
-                >
+                <div class='px-3 pb-3 pt-1'>
                     <div class='row g-3'>
                         <div class='col-md-4'>
-                            <label class='form-label'>Subject Number</label>
-                            <select
-                                v-model='draft.form.subjectCaseID'
-                                class='form-select'
-                            >
-                                <option
-                                    v-for='n in SUBJECT_NUMBERS'
-                                    :key='n'
-                                    :value='n'
-                                    :disabled='isNumberUsed(n, draft.id)'
-                                >
-                                    {{ displayNumber(n) }}
-                                </option>
-                            </select>
+                            <TablerEnum
+                                :model-value='displayNumber(draft.form.subjectCaseID)'
+                                label='Subject Number'
+                                :options='subjectNumberOptions(draft)'
+                                @update:model-value='onSubjectNumberLabelChange(draft, $event)'
+                            />
                         </div>
                         <div class='col-md-8'>
-                            <label class='form-label'>Subject Full Name</label>
-                            <input
+                            <TablerInput
                                 v-model='draft.form.subjectName'
-                                type='text'
-                                class='form-control'
+                                label='Subject Full Name'
                                 placeholder='Subject Full Name'
-                            >
+                            />
                         </div>
 
                         <div class='col-md-4'>
-                            <label class='form-label'>Date of Birth</label>
-                            <input
+                            <TablerInput
                                 v-model='draft.form.subjectDateOfBirth'
+                                label='Date of Birth'
                                 type='date'
-                                class='form-control'
                                 @change='onDobChange(draft.form)'
-                            >
+                            />
                         </div>
                         <div class='col-md-4'>
-                            <label class='form-label'>Age</label>
-                            <input
+                            <TablerInput
                                 v-model='draft.form.subjectAge'
-                                type='text'
-                                class='form-control'
+                                label='Age'
                                 :disabled='!!draft.form.subjectDateOfBirth'
                                 :placeholder='draft.form.subjectDateOfBirth ? "Calculated from date of birth" : "Subject Age"'
-                            >
+                            />
                             <div
                                 v-if='draft.form.subjectDateOfBirth'
                                 class='form-text'
@@ -127,197 +170,123 @@
                             </div>
                         </div>
                         <div class='col-md-4'>
-                            <label class='form-label'>Gender</label>
-                            <select
-                                v-model='draft.form.subjectGender'
-                                class='form-select'
-                            >
-                                <option value=''>
-                                    Select Gender
-                                </option>
-                                <option value='male'>
-                                    Male
-                                </option>
-                                <option value='female'>
-                                    Female
-                                </option>
-                                <option value='other'>
-                                    Other
-                                </option>
-                            </select>
+                            <TablerEnum
+                                :model-value='genderLabel(draft.form.subjectGender)'
+                                label='Gender'
+                                :options='GENDER_OPTIONS'
+                                @update:model-value='onGenderLabelChange(draft, $event)'
+                            />
                         </div>
                         <div class='col-md-4'>
-                            <label class='form-label'>Category</label>
-                            <select
-                                v-model='draft.form.subjectCategory'
-                                class='form-select'
-                            >
-                                <option value=''>
-                                    Select Category
-                                </option>
-                                <option
-                                    v-for='c in CATEGORIES'
-                                    :key='c.value'
-                                    :value='c.value'
-                                >
-                                    {{ c.label }}
-                                </option>
-                            </select>
+                            <TablerEnum
+                                :model-value='categoryLabelFor(draft.form.subjectCategory)'
+                                label='Category'
+                                :options='CATEGORY_OPTIONS'
+                                @update:model-value='onCategoryLabelChange(draft, $event)'
+                            />
                         </div>
 
                         <div class='col-12'>
-                            <label class='form-label'>Description</label>
-                            <input
+                            <TablerInput
                                 v-model='draft.form.subjectDescription'
-                                type='text'
-                                class='form-control'
+                                label='Description'
                                 placeholder='General description or notes'
-                            >
+                            />
                         </div>
                         <div class='col-md-4'>
-                            <label class='form-label'>Height</label>
-                            <input
+                            <TablerInput
                                 v-model='draft.form.subjectHeight'
-                                type='text'
-                                class='form-control'
+                                label='Height'
                                 placeholder='Height'
-                            >
+                            />
                         </div>
                         <div class='col-md-4'>
-                            <label class='form-label'>Weight</label>
-                            <input
+                            <TablerInput
                                 v-model='draft.form.subjectWeight'
-                                type='text'
-                                class='form-control'
+                                label='Weight'
                                 placeholder='Weight'
-                            >
+                            />
                         </div>
                         <div class='col-md-4'>
-                            <label class='form-label'>Hair Color</label>
-                            <input
+                            <TablerInput
                                 v-model='draft.form.subjectHairColor'
-                                type='text'
-                                class='form-control'
+                                label='Hair Color'
                                 placeholder='Hair Color'
-                            >
+                            />
                         </div>
                         <div class='col-md-4'>
-                            <label class='form-label'>Facial Hair</label>
-                            <select
-                                class='form-select'
-                                :value='yesNoSelectValue(draft.form.subjectFacialHair)'
-                                @change='draft.form.subjectFacialHair = parseYesNoSelect(($event.target as HTMLSelectElement).value)'
-                            >
-                                <option value=''>
-                                    —
-                                </option>
-                                <option value='true'>
-                                    Yes
-                                </option>
-                                <option value='false'>
-                                    No
-                                </option>
-                            </select>
+                            <TablerEnum
+                                :model-value='yesNoLabel(draft.form.subjectFacialHair)'
+                                label='Facial Hair'
+                                :options='YES_NO_OPTIONS'
+                                @update:model-value='draft.form.subjectFacialHair = onYesNoLabelChange($event)'
+                            />
                         </div>
                         <div class='col-md-4'>
-                            <label class='form-label'>Glasses</label>
-                            <select
-                                class='form-select'
-                                :value='yesNoSelectValue(draft.form.subjectGlasses)'
-                                @change='draft.form.subjectGlasses = parseYesNoSelect(($event.target as HTMLSelectElement).value)'
-                            >
-                                <option value=''>
-                                    —
-                                </option>
-                                <option value='true'>
-                                    Yes
-                                </option>
-                                <option value='false'>
-                                    No
-                                </option>
-                            </select>
+                            <TablerEnum
+                                :model-value='yesNoLabel(draft.form.subjectGlasses)'
+                                label='Glasses'
+                                :options='YES_NO_OPTIONS'
+                                @update:model-value='draft.form.subjectGlasses = onYesNoLabelChange($event)'
+                            />
                         </div>
                         <div class='col-md-4'>
-                            <label class='form-label'>Other Distinguishing Marks</label>
-                            <input
+                            <TablerInput
                                 v-model='draft.form.subjectDistinguishingMarks'
-                                type='text'
-                                class='form-control'
+                                label='Other Distinguishing Marks'
                                 placeholder='Other Distinguishing Marks'
-                            >
+                            />
                         </div>
                         <div class='col-md-6'>
-                            <label class='form-label'>Clothing Description</label>
-                            <input
+                            <TablerInput
                                 v-model='draft.form.subjectClothing'
-                                type='text'
-                                class='form-control'
+                                label='Clothing Description'
                                 placeholder='Clothing Description'
-                            >
+                            />
                         </div>
                         <div class='col-md-6'>
-                            <label class='form-label'>Footwear (type and size)</label>
-                            <input
+                            <TablerInput
                                 v-model='draft.form.subjectFootwear'
-                                type='text'
-                                class='form-control'
+                                label='Footwear (type and size)'
                                 placeholder='Footwear (type and size)'
-                            >
+                            />
                         </div>
                         <div class='col-md-6'>
-                            <label class='form-label'>Vehicle Description</label>
-                            <input
+                            <TablerInput
                                 v-model='draft.form.subjectVehicle'
-                                type='text'
-                                class='form-control'
+                                label='Vehicle Description'
                                 placeholder='Vehicle Description'
-                            >
+                            />
                         </div>
                         <div class='col-md-6'>
-                            <label class='form-label'>Medical Conditions</label>
-                            <input
+                            <TablerInput
                                 v-model='draft.form.subjectMedicalConditions'
-                                type='text'
-                                class='form-control'
+                                label='Medical Conditions'
                                 placeholder='Medical Conditions'
-                            >
+                            />
                         </div>
                         <div class='col-md-6'>
-                            <label class='form-label'>Experience</label>
-                            <input
+                            <TablerInput
                                 v-model='draft.form.subjectExperience'
-                                type='text'
-                                class='form-control'
+                                label='Experience'
                                 placeholder='Experience'
-                            >
+                            />
                         </div>
                         <div class='col-12'>
-                            <label class='form-label'>Equipment</label>
-                            <input
+                            <TablerInput
                                 v-model='draft.form.subjectEquipment'
-                                type='text'
-                                class='form-control'
+                                label='Equipment'
                                 placeholder='Equipment'
-                            >
+                            />
                         </div>
 
                         <div class='col-md-6'>
-                            <label class='form-label'>Photo from DataSync</label>
-                            <select
-                                v-model='draft.form.subjectPhoto'
-                                class='form-select'
-                            >
-                                <option value=''>
-                                    Select Photo From DataSync
-                                </option>
-                                <option
-                                    v-for='c in missionPhotos'
-                                    :key='c.uid'
-                                    :value='c.uid'
-                                >
-                                    {{ c.name || c.uid }}
-                                </option>
-                            </select>
+                            <TablerEnum
+                                :model-value='photoLabelForUid(draft.form.subjectPhoto)'
+                                label='Photo from DataSync'
+                                :options='photoOptions'
+                                @update:model-value='onPhotoLabelChange(draft, $event)'
+                            />
                             <div
                                 v-if='loadingFeatures'
                                 class='form-text'
@@ -333,124 +302,108 @@
                         </div>
 
                         <div class='col-12'>
-                            <label class='form-label'>Subject IPP</label>
-                            <select
-                                v-model='draft.form.subjectIppFromTak'
-                                class='form-select mb-2'
+                            <TablerEnum
+                                :model-value='ippLabelForValue(draft.form.subjectIppFromTak)'
+                                label='Subject IPP'
+                                :options='ippOptions'
                                 :disabled='!!draft.form.subjectIpp.trim()'
-                            >
-                                <option value=''>
-                                    Subject IPP from DataSync
-                                </option>
-                                <option
-                                    v-for='m in missionMarkers'
-                                    :key='m.uid'
-                                    :value='ippOptionValue(m)'
-                                >
-                                    {{ markerLabel(m) }}
-                                </option>
-                            </select>
-                            <div class='small text-muted mb-1'>
+                                @update:model-value='onIppLabelChange(draft, $event)'
+                            />
+                            <div class='small text-muted my-1'>
                                 OR
                             </div>
-                            <input
+                            <TablerInput
                                 v-model='draft.form.subjectIpp'
-                                type='text'
-                                class='form-control'
                                 :disabled='!!draft.form.subjectIppFromTak'
                                 placeholder='Enter Subject IPP Coordinates (lat, lon)'
-                            >
+                            />
                         </div>
 
                         <div class='col-md-6'>
-                            <label class='form-label'>Time Subject Went Missing</label>
-                            <input
+                            <TablerInput
                                 v-model='draft.form.subjectTimeWentMissing'
+                                label='Time Subject Went Missing'
                                 type='datetime-local'
-                                class='form-control'
-                            >
+                            />
                         </div>
                         <div class='col-md-6'>
-                            <label class='form-label'>Time Subject Reported Missing</label>
-                            <input
+                            <TablerInput
                                 v-model='draft.form.subjectTimeReportedMissing'
+                                label='Time Subject Reported Missing'
                                 type='datetime-local'
-                                class='form-control'
-                            >
+                            />
                         </div>
 
                         <div class='col-md-6'>
-                            <label class='form-label'>Reported Missing By</label>
-                            <select
-                                v-model='draft.form.subjectReportedMissingBy'
-                                class='form-select'
-                            >
-                                <option value=''>
-                                    Select Who Reported Subject Missing
-                                </option>
-                                <option
-                                    v-for='r in REPORTED_BY'
-                                    :key='r'
-                                    :value='r'
-                                >
-                                    {{ r }}
-                                </option>
-                            </select>
+                            <TablerEnum
+                                :model-value='reportedByLabel(draft.form.subjectReportedMissingBy)'
+                                label='Reported Missing By'
+                                :options='REPORTED_BY_OPTIONS'
+                                @update:model-value='onReportedByLabelChange(draft, $event)'
+                            />
                         </div>
                     </div>
                 </div>
             </div>
+        </template>
 
-            <div
-                v-if='!availableNumbers.length && drafts.length >= MAX_SUBJECTS'
-                class='form-text text-muted'
-            >
-                All {{ MAX_SUBJECTS }} subject slots are in use for this mission.
-            </div>
-
-            <div class='mt-3'>
-                <button
-                    type='button'
-                    class='btn btn-primary btn-sm'
-                    :disabled='posting || !filledCount'
-                    @click='onSend'
-                >
-                    {{ posting ? 'Sending…' : `Send ${filledCount} subject${filledCount === 1 ? '' : 's'} to DataSync` }}
-                </button>
-                <button
-                    type='button'
-                    class='btn btn-outline-secondary btn-sm ms-2'
-                    @click='resetDrafts'
-                >
-                    Clear Fields
-                </button>
-            </div>
-
-            <div
-                v-if='!activeMission'
-                class='form-text text-warning mt-2'
-            >
-                No active mission. Select one in Create | Open first.
-            </div>
-            <div
-                v-else
-                class='form-text mt-2'
-            >
-                Active DataSync: <strong>{{ activeMission.name }}</strong>
-            </div>
-            <div
-                v-if='status'
-                class='fw-bold mt-1'
-                :class='statusError ? "text-danger" : "text-success"'
-            >
-                {{ status }}
-            </div>
+        <div
+            v-if='!availableNumbers.length && drafts.length >= MAX_SUBJECTS'
+            class='form-text text-muted'
+        >
+            All {{ MAX_SUBJECTS }} subject slots are in use for this mission.
         </div>
-    </div>
+
+        <div class='mt-3'>
+            <button
+                type='button'
+                class='btn btn-primary btn-sm'
+                :disabled='posting || !filledCount'
+                @click='onSend'
+            >
+                {{ posting ? 'Sending…' : `Send ${filledCount} subject${filledCount === 1 ? '' : 's'} to DataSync` }}
+            </button>
+            <button
+                type='button'
+                class='btn btn-outline-secondary btn-sm ms-2'
+                @click='resetDrafts'
+            >
+                Clear Fields
+            </button>
+        </div>
+
+        <TablerInlineAlert
+            v-if='!activeMission'
+            class='mt-2'
+            severity='warning'
+            title='Mission Required'
+            description='No active mission. Select one in Create | Open first.'
+        />
+        <p
+            v-else
+            class='form-text mt-2'
+        >
+            Active DataSync: <strong>{{ activeMission.name }}</strong>
+        </p>
+        <TablerInlineAlert
+            v-if='status'
+            class='mt-2'
+            :severity='statusError ? "danger" : "success"'
+            :title='statusError ? "Error" : "Success"'
+            :description='status'
+        />
+    </TablerBorder>
 </template>
 
 <script setup lang='ts'>
 import { ref, computed, onMounted, watch } from 'vue';
+import { IconChevronDown } from '@tabler/icons-vue';
+import {
+    TablerBorder,
+    TablerInput,
+    TablerEnum,
+    TablerInlineAlert,
+} from '@tak-ps/vue-tabler';
 import type { Feature } from '../../../../../../src/types.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import {
@@ -492,6 +445,13 @@ const REPORTED_BY = [
     'ARFCC',
     'Other',
 ] as const;
+
+const GENDER_OPTIONS = ['Select Gender', 'Male', 'Female', 'Other'];
+const CATEGORY_OPTIONS = ['Select Category', ...CATEGORIES.map((c) => c.label)];
+const YES_NO_OPTIONS = ['—', 'Yes', 'No'];
+const REPORTED_BY_OPTIONS = ['Select Who Reported Subject Missing', ...REPORTED_BY];
+const PHOTO_PLACEHOLDER = 'Select Photo From DataSync';
+const IPP_PLACEHOLDER = 'Subject IPP from DataSync';
 
 interface SubjectDraft {
     id: string;
@@ -555,16 +515,6 @@ function hasFilledFields(f: SubjectForm): boolean {
     return hasFilledSubjectFields(f);
 }
 
-function yesNoSelectValue(value: boolean | null): string {
-    if (value === true) return 'true';
-    if (value === false) return 'false';
-    return '';
-}
-
-function parseYesNoSelect(value: string): boolean | null {
-    return parseSubjectYesNo(value);
-}
-
 const filledDrafts = computed(() => drafts.value.filter((d) => hasFilledFields(d.form)));
 const filledCount = computed(() => filledDrafts.value.length);
 
@@ -576,6 +526,64 @@ const availableNumbers = computed(() =>
 
 function isNumberUsed(number: string, draftId: string): boolean {
     return drafts.value.some((d) => d.id !== draftId && d.form.subjectCaseID === number);
+}
+
+function subjectNumberOptions(draft: SubjectDraft): string[] {
+    return SUBJECT_NUMBERS
+        .filter((n) => !isNumberUsed(n, draft.id))
+        .map((n) => displayNumber(n));
+}
+
+function onSubjectNumberLabelChange(draft: SubjectDraft, label: string): void {
+    const match = SUBJECT_NUMBERS.find((n) => displayNumber(n) === label);
+    if (match) draft.form.subjectCaseID = match;
+}
+
+function genderLabel(value: string): string {
+    if (value === 'male') return 'Male';
+    if (value === 'female') return 'Female';
+    if (value === 'other') return 'Other';
+    return 'Select Gender';
+}
+
+function onGenderLabelChange(draft: SubjectDraft, label: string): void {
+    if (label === 'Male') draft.form.subjectGender = 'male';
+    else if (label === 'Female') draft.form.subjectGender = 'female';
+    else if (label === 'Other') draft.form.subjectGender = 'other';
+    else draft.form.subjectGender = '';
+}
+
+function categoryLabelFor(value: string): string {
+    if (!value) return 'Select Category';
+    return CATEGORIES.find((c) => c.value === value)?.label ?? 'Select Category';
+}
+
+function onCategoryLabelChange(draft: SubjectDraft, label: string): void {
+    if (label === 'Select Category') {
+        draft.form.subjectCategory = '';
+        return;
+    }
+    draft.form.subjectCategory = CATEGORIES.find((c) => c.label === label)?.value ?? '';
+}
+
+function yesNoLabel(value: boolean | null): string {
+    if (value === true) return 'Yes';
+    if (value === false) return 'No';
+    return '—';
+}
+
+function onYesNoLabelChange(label: string): boolean | null {
+    if (label === 'Yes') return parseSubjectYesNo('true');
+    if (label === 'No') return parseSubjectYesNo('false');
+    return parseSubjectYesNo('');
+}
+
+function reportedByLabel(value: string): string {
+    return value || 'Select Who Reported Subject Missing';
+}
+
+function onReportedByLabelChange(draft: SubjectDraft, label: string): void {
+    draft.form.subjectReportedMissingBy = label === 'Select Who Reported Subject Missing' ? '' : label;
 }
 
 function isSent(number: string): boolean {
@@ -641,6 +649,46 @@ function markerLabel(m: MissionMarker): string {
         return `${m.callsign} (${m.coords[1].toFixed(5)}, ${m.coords[0].toFixed(5)})`;
     }
     return m.callsign;
+}
+
+const photoOptions = computed(() => [
+    PHOTO_PLACEHOLDER,
+    ...missionPhotos.value.map((c) => c.name || c.uid),
+]);
+
+function photoLabelForUid(uid: string): string {
+    if (!uid) return PHOTO_PLACEHOLDER;
+    const photo = missionPhotos.value.find((c) => c.uid === uid);
+    return photo ? (photo.name || photo.uid) : PHOTO_PLACEHOLDER;
+}
+
+function onPhotoLabelChange(draft: SubjectDraft, label: string): void {
+    if (label === PHOTO_PLACEHOLDER) {
+        draft.form.subjectPhoto = '';
+        return;
+    }
+    const photo = missionPhotos.value.find((c) => (c.name || c.uid) === label);
+    draft.form.subjectPhoto = photo?.uid ?? '';
+}
+
+const ippOptions = computed(() => [
+    IPP_PLACEHOLDER,
+    ...missionMarkers.value.map((m) => markerLabel(m)),
+]);
+
+function ippLabelForValue(value: string): string {
+    if (!value) return IPP_PLACEHOLDER;
+    const marker = missionMarkers.value.find((m) => ippOptionValue(m) === value);
+    return marker ? markerLabel(marker) : IPP_PLACEHOLDER;
+}
+
+function onIppLabelChange(draft: SubjectDraft, label: string): void {
+    if (label === IPP_PLACEHOLDER) {
+        draft.form.subjectIppFromTak = '';
+        return;
+    }
+    const marker = missionMarkers.value.find((m) => markerLabel(m) === label);
+    draft.form.subjectIppFromTak = marker ? ippOptionValue(marker) : '';
 }
 
 function rebuildDraftsFromSent(): void {
