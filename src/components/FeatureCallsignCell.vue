@@ -22,7 +22,7 @@
     <!-- Rendered in place (no Teleport) so the modal also works inside the popout window. -->
     <div
         v-if='modalOpen'
-        class='modal modal-blur show d-block'
+        class='modal modal-blur incident-modal show d-block'
         tabindex='-1'
         role='dialog'
         @click.self='modalOpen = false'

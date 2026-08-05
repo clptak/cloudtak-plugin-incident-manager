@@ -118,6 +118,7 @@ import { IconMenu2 } from '@tabler/icons-vue';
 import IncidentNavList from './IncidentNavList.vue';
 import MissionRequiredModal from './MissionRequiredModal.vue';
 import './incidentSideNav.css';
+import './incidentModal.css';
 import {
     ALL_NAV_ITEMS,
     NAV_SECTIONS,
@@ -270,5 +271,12 @@ onMounted(() => {
 .incident-manager-pane :deep(.list-group-item) {
     background-color: var(--cloudtak-inset-bg) !important;
     border-color: var(--cloudtak-inset-border);
+}
+
+.incident-manager-pane :deep(.alert-info) {
+    --tblr-alert-color: var(--tblr-body-color);
+    background-color: var(--cloudtak-inset-bg) !important;
+    border-color: var(--cloudtak-inset-border) !important;
+    color: var(--tblr-body-color) !important;
 }
 </style>

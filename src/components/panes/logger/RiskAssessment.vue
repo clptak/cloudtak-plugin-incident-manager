@@ -841,7 +841,7 @@
 
         <div
             v-if='showMitigationModal'
-            class='modal modal-blur show d-block'
+            class='modal modal-blur incident-modal show d-block'
             tabindex='-1'
             role='dialog'
         >
