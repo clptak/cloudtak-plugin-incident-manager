@@ -16,21 +16,23 @@
         <RiskAssessment v-else-if='sub === "risk-assessment"' />
         <IncidentPost v-else-if='sub === "incident-post"' />
 
-        <div
+        <TablerBorder
             v-else
-            class='card'
+            class='cloudtak-accent text-white'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
         >
-            <div class='card-body'>
-                <p class='text-muted mb-0'>
-                    Stub for the "{{ subLabel }}" logger sub-pane.
-                </p>
-            </div>
-        </div>
+            <p class='text-muted mb-0'>
+                Stub for the "{{ subLabel }}" logger sub-pane.
+            </p>
+        </TablerBorder>
     </div>
 </template>
 
 <script setup lang='ts'>
 import { computed, defineAsyncComponent } from 'vue';
+import { TablerBorder } from '@tak-ps/vue-tabler';
 
 const InitialInformation = defineAsyncComponent(() => import('./logger/InitialInformation.vue'));
 const SubjectInformation = defineAsyncComponent(() => import('./logger/SubjectInformation.vue'));

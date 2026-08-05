@@ -76,12 +76,13 @@
             <div class='small text-muted mb-2'>
                 {{ activeMission.name }} — showing {{ displayRows.length }} of {{ rows.length }} entr{{ rows.length === 1 ? 'y' : 'ies' }}
             </div>
-            <div
+            <TablerInlineAlert
                 v-if='error'
-                class='text-danger small mb-2'
-            >
-                {{ error }}
-            </div>
+                class='mb-2'
+                severity='danger'
+                title='Error'
+                :description='error'
+            />
 
             <div
                 v-if='showInfoPanels'
@@ -91,47 +92,61 @@
                     v-if='initialInfoRows.length'
                     class='col-lg-6'
                 >
-                    <h4 class='h5 mb-2'>
-                        Initial Information
-                    </h4>
-                    <div class='card'>
-                        <div class='card-body py-2'>
-                            <dl class='row mb-0 small'>
-                                <template
-                                    v-for='row in initialInfoRows'
-                                    :key='row.label'
-                                >
-                                    <dt class='col-sm-4 text-muted'>
-                                        {{ row.label }}
-                                    </dt>
-                                    <dd class='col-sm-8 mb-1'>
-                                        {{ row.value }}
-                                    </dd>
-                                </template>
-                            </dl>
-                        </div>
-                    </div>
+                    <TablerBorder
+                        class='cloudtak-accent text-white'
+                        :fill-height='false'
+                        :shadow='false'
+                        gap='sm'
+                    >
+                        <template #label>
+                            <p class='text-uppercase text-white-50 small mb-0'>
+                                Initial Information
+                            </p>
+                        </template>
+
+                        <dl class='row mb-0 small'>
+                            <template
+                                v-for='row in initialInfoRows'
+                                :key='row.label'
+                            >
+                                <dt class='col-sm-4 text-muted'>
+                                    {{ row.label }}
+                                </dt>
+                                <dd class='col-sm-8 mb-1'>
+                                    {{ row.value }}
+                                </dd>
+                            </template>
+                        </dl>
+                    </TablerBorder>
                 </div>
                 <div
                     v-if='subjects.length'
                     :class='initialInfoRows.length ? "col-lg-6" : "col-12"'
                 >
-                    <h4 class='h5 mb-2'>
-                        Subject Information
-                    </h4>
-                    <div
-                        v-for='s in subjects'
-                        :key='s.subjectCaseID'
-                        class='card mb-2'
+                    <TablerBorder
+                        class='cloudtak-accent text-white'
+                        :fill-height='false'
+                        :shadow='false'
+                        gap='sm'
                     >
-                        <div class='card-header py-2'>
-                            <strong>Subject {{ displaySubjectNumber(s.subjectCaseID) }}</strong>
-                            <span
-                                v-if='s.subjectName'
-                                class='text-muted ms-2'
-                            >{{ s.subjectName }}</span>
-                        </div>
-                        <div class='card-body py-2'>
+                        <template #label>
+                            <p class='text-uppercase text-white-50 small mb-0'>
+                                Subject Information
+                            </p>
+                        </template>
+
+                        <div
+                            v-for='s in subjects'
+                            :key='s.subjectCaseID'
+                            class='cloudtak-accent border rounded-3 mb-2 p-2'
+                        >
+                            <div class='mb-1'>
+                                <strong>Subject {{ displaySubjectNumber(s.subjectCaseID) }}</strong>
+                                <span
+                                    v-if='s.subjectName'
+                                    class='text-muted ms-2'
+                                >{{ s.subjectName }}</span>
+                            </div>
                             <dl class='row mb-0 small'>
                                 <template
                                     v-for='row in subjectDetailRows(s)'
@@ -146,192 +161,252 @@
                                 </template>
                             </dl>
                         </div>
-                    </div>
+                    </TablerBorder>
                 </div>
             </div>
 
-            <div
-                v-if='teams.length'
-                class='card mb-3'
-            >
+            <template v-if='teams.length'>
                 <div
-                    class='card-header py-2 d-flex align-items-center cursor-pointer user-select-none'
+                    v-if='!teamsExpanded'
+                    class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
                     role='button'
                     tabindex='0'
-                    :aria-expanded='teamsExpanded'
-                    @click='teamsExpanded = !teamsExpanded'
-                    @keydown.enter.prevent='teamsExpanded = !teamsExpanded'
-                    @keydown.space.prevent='teamsExpanded = !teamsExpanded'
+                    :aria-expanded='false'
+                    @click='teamsExpanded = true'
+                    @keydown.enter.prevent='teamsExpanded = true'
+                    @keydown.space.prevent='teamsExpanded = true'
                 >
-                    <h4 class='h5 mb-0'>
+                    <p class='text-uppercase text-white-50 small mb-0'>
                         Teams
-                    </h4>
+                    </p>
                     <span class='text-muted small ms-2'>({{ teams.length }})</span>
                     <IconChevronDown
-                        class='ms-auto transition-transform'
-                        :class='{ "rotate-180": !teamsExpanded }'
+                        class='ms-auto transition-transform text-white-50 rotate-180'
                         :size='18'
                         stroke='1.5'
                     />
                 </div>
-                <div
-                    v-show='teamsExpanded'
-                    class='card-body py-2'
+                <TablerBorder
+                    v-else
+                    class='cloudtak-accent text-white mb-3'
+                    :fill-height='false'
+                    :shadow='false'
+                    gap='sm'
                 >
+                    <template #label>
+                        <div
+                            class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                            role='button'
+                            tabindex='0'
+                            :aria-expanded='true'
+                            @click='teamsExpanded = false'
+                            @keydown.enter.prevent='teamsExpanded = false'
+                            @keydown.space.prevent='teamsExpanded = false'
+                        >
+                            <p class='text-uppercase text-white-50 small mb-0'>
+                                Teams
+                            </p>
+                            <span class='text-muted small ms-2'>({{ teams.length }})</span>
+                            <IconChevronDown
+                                class='ms-auto transition-transform text-white-50'
+                                :size='18'
+                                stroke='1.5'
+                            />
+                        </div>
+                    </template>
+
                     <div
                         v-for='team in teams'
                         :key='team.title'
-                        class='card mb-2'
+                        class='cloudtak-accent border rounded-3 mb-2 p-2'
                     >
-                        <div class='card-header py-2'>
+                        <div>
                             <strong>{{ team.title }}</strong>
                             <span
                                 v-if='team.assignmentCallsign'
                                 class='text-muted ms-2'
                             >{{ team.assignmentCallsign }}</span>
                         </div>
-                        <div class='card-body py-2'>
-                            <div
-                                v-if='team.description'
-                                class='text-muted small mb-2'
+                        <div
+                            v-if='team.description'
+                            class='text-muted small mb-2'
+                        >
+                            {{ team.description }}
+                        </div>
+                        <ul
+                            v-if='team.children.length'
+                            class='list-unstyled mb-0 small'
+                        >
+                            <li
+                                v-for='(child, childIndex) in team.children'
+                                :key='`${team.title}-${childIndex}`'
                             >
-                                {{ team.description }}
-                            </div>
-                            <ul
-                                v-if='team.children.length'
-                                class='list-unstyled mb-0 small'
-                            >
-                                <li
-                                    v-for='(child, childIndex) in team.children'
-                                    :key='`${team.title}-${childIndex}`'
-                                >
-                                    {{ formatTeamRosterChild(child) }}
-                                </li>
-                            </ul>
-                            <div
-                                v-else
-                                class='text-muted small'
-                            >
-                                No roster entries on the org chart.
-                            </div>
+                                {{ formatTeamRosterChild(child) }}
+                            </li>
+                        </ul>
+                        <div
+                            v-else
+                            class='text-muted small'
+                        >
+                            No roster entries on the org chart.
                         </div>
                     </div>
-                </div>
-            </div>
+                </TablerBorder>
+            </template>
 
-            <div
-                v-if='resourceAssignments.length'
-                class='card mb-3'
-            >
+            <template v-if='resourceAssignments.length'>
                 <div
-                    class='card-header py-2 d-flex align-items-center cursor-pointer user-select-none'
+                    v-if='!resourceAssignmentsExpanded'
+                    class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
                     role='button'
                     tabindex='0'
-                    :aria-expanded='resourceAssignmentsExpanded'
-                    @click='resourceAssignmentsExpanded = !resourceAssignmentsExpanded'
-                    @keydown.enter.prevent='resourceAssignmentsExpanded = !resourceAssignmentsExpanded'
-                    @keydown.space.prevent='resourceAssignmentsExpanded = !resourceAssignmentsExpanded'
+                    :aria-expanded='false'
+                    @click='resourceAssignmentsExpanded = true'
+                    @keydown.enter.prevent='resourceAssignmentsExpanded = true'
+                    @keydown.space.prevent='resourceAssignmentsExpanded = true'
                 >
-                    <h4 class='h5 mb-0'>
+                    <p class='text-uppercase text-white-50 small mb-0'>
                         Resource Assignments
-                    </h4>
+                    </p>
                     <span class='text-muted small ms-2'>({{ resourceAssignments.length }})</span>
                     <IconChevronDown
-                        class='ms-auto transition-transform'
-                        :class='{ "rotate-180": !resourceAssignmentsExpanded }'
+                        class='ms-auto transition-transform text-white-50 rotate-180'
                         :size='18'
                         stroke='1.5'
                     />
                 </div>
-                <div
-                    v-show='resourceAssignmentsExpanded'
-                    class='card-body py-2'
+                <TablerBorder
+                    v-else
+                    class='cloudtak-accent text-white mb-3'
+                    :fill-height='false'
+                    :shadow='false'
+                    gap='sm'
                 >
+                    <template #label>
+                        <div
+                            class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                            role='button'
+                            tabindex='0'
+                            :aria-expanded='true'
+                            @click='resourceAssignmentsExpanded = false'
+                            @keydown.enter.prevent='resourceAssignmentsExpanded = false'
+                            @keydown.space.prevent='resourceAssignmentsExpanded = false'
+                        >
+                            <p class='text-uppercase text-white-50 small mb-0'>
+                                Resource Assignments
+                            </p>
+                            <span class='text-muted small ms-2'>({{ resourceAssignments.length }})</span>
+                            <IconChevronDown
+                                class='ms-auto transition-transform text-white-50'
+                                :size='18'
+                                stroke='1.5'
+                            />
+                        </div>
+                    </template>
+
                     <div
                         v-for='assignment in resourceAssignments'
                         :key='assignment.id'
-                        class='card mb-2'
+                        class='cloudtak-accent border rounded-3 mb-2 p-2'
                     >
-                        <div class='card-header py-2'>
+                        <div class='mb-1'>
                             <strong>{{ assignment.resourceIdentifier }}</strong>
                         </div>
-                        <div class='card-body py-2'>
-                            <dl class='row mb-0 small'>
-                                <template
-                                    v-for='row in resourceAssignmentDetailRows(assignment)'
-                                    :key='row.label'
-                                >
-                                    <dt class='col-sm-4 text-muted'>
-                                        {{ row.label }}
-                                    </dt>
-                                    <dd class='col-sm-8 mb-1'>
-                                        {{ row.value }}
-                                    </dd>
-                                </template>
-                            </dl>
-                        </div>
+                        <dl class='row mb-0 small'>
+                            <template
+                                v-for='row in resourceAssignmentDetailRows(assignment)'
+                                :key='row.label'
+                            >
+                                <dt class='col-sm-4 text-muted'>
+                                    {{ row.label }}
+                                </dt>
+                                <dd class='col-sm-8 mb-1'>
+                                    {{ row.value }}
+                                </dd>
+                            </template>
+                        </dl>
                     </div>
-                </div>
-            </div>
+                </TablerBorder>
+            </template>
 
-            <div
-                v-if='workAssignments.length'
-                class='card mb-3'
-            >
+            <template v-if='workAssignments.length'>
                 <div
-                    class='card-header py-2 d-flex align-items-center cursor-pointer user-select-none'
+                    v-if='!workAssignmentsExpanded'
+                    class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
                     role='button'
                     tabindex='0'
-                    :aria-expanded='workAssignmentsExpanded'
-                    @click='workAssignmentsExpanded = !workAssignmentsExpanded'
-                    @keydown.enter.prevent='workAssignmentsExpanded = !workAssignmentsExpanded'
-                    @keydown.space.prevent='workAssignmentsExpanded = !workAssignmentsExpanded'
+                    :aria-expanded='false'
+                    @click='workAssignmentsExpanded = true'
+                    @keydown.enter.prevent='workAssignmentsExpanded = true'
+                    @keydown.space.prevent='workAssignmentsExpanded = true'
                 >
-                    <h4 class='h5 mb-0'>
+                    <p class='text-uppercase text-white-50 small mb-0'>
                         Work Assignments
-                    </h4>
+                    </p>
                     <span class='text-muted small ms-2'>({{ workAssignments.length }})</span>
                     <IconChevronDown
-                        class='ms-auto transition-transform'
-                        :class='{ "rotate-180": !workAssignmentsExpanded }'
+                        class='ms-auto transition-transform text-white-50 rotate-180'
                         :size='18'
                         stroke='1.5'
                     />
                 </div>
-                <div
-                    v-show='workAssignmentsExpanded'
-                    class='card-body py-2'
+                <TablerBorder
+                    v-else
+                    class='cloudtak-accent text-white mb-3'
+                    :fill-height='false'
+                    :shadow='false'
+                    gap='sm'
                 >
+                    <template #label>
+                        <div
+                            class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                            role='button'
+                            tabindex='0'
+                            :aria-expanded='true'
+                            @click='workAssignmentsExpanded = false'
+                            @keydown.enter.prevent='workAssignmentsExpanded = false'
+                            @keydown.space.prevent='workAssignmentsExpanded = false'
+                        >
+                            <p class='text-uppercase text-white-50 small mb-0'>
+                                Work Assignments
+                            </p>
+                            <span class='text-muted small ms-2'>({{ workAssignments.length }})</span>
+                            <IconChevronDown
+                                class='ms-auto transition-transform text-white-50'
+                                :size='18'
+                                stroke='1.5'
+                            />
+                        </div>
+                    </template>
+
                     <div
                         v-for='assignment in workAssignments'
                         :key='assignment.id'
-                        class='card mb-2'
+                        class='cloudtak-accent border rounded-3 mb-2 p-2'
                     >
-                        <div class='card-header py-2'>
+                        <div class='mb-1'>
                             <strong>Assignment {{ assignment.assignmentNumber }}</strong>
                             <span
                                 v-if='assignment.teamLabel'
                                 class='text-muted ms-2'
                             >{{ assignment.teamLabel }}</span>
                         </div>
-                        <div class='card-body py-2'>
-                            <dl class='row mb-0 small'>
-                                <template
-                                    v-for='row in workAssignmentDetailRows(assignment)'
-                                    :key='row.label'
-                                >
-                                    <dt class='col-sm-4 text-muted'>
-                                        {{ row.label }}
-                                    </dt>
-                                    <dd class='col-sm-8 mb-1'>
-                                        {{ row.value }}
-                                    </dd>
-                                </template>
-                            </dl>
-                        </div>
+                        <dl class='row mb-0 small'>
+                            <template
+                                v-for='row in workAssignmentDetailRows(assignment)'
+                                :key='row.label'
+                            >
+                                <dt class='col-sm-4 text-muted'>
+                                    {{ row.label }}
+                                </dt>
+                                <dd class='col-sm-8 mb-1'>
+                                    {{ row.value }}
+                                </dd>
+                            </template>
+                        </dl>
                     </div>
-                </div>
-            </div>
+                </TablerBorder>
+            </template>
 
             <div class='table-responsive'>
                 <table class='table table-sm table-vcenter table-striped table-hover mb-0 dashboard-log-table'>
@@ -394,6 +469,7 @@
 <script setup lang='ts'>
 import { ref, reactive, computed, watch, onMounted } from 'vue';
 import { IconChevronDown } from '@tabler/icons-vue';
+import { TablerBorder, TablerInlineAlert } from '@tak-ps/vue-tabler';
 import type { DBSubscriptionLog } from '../../../../../src/database.ts';
 import { useIncident } from '../../composables/useIncident.ts';
 import { loadIncidentSubscription } from '../../lib/incidentSubscription.ts';

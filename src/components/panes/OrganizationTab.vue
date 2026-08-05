@@ -53,40 +53,45 @@
             <strong>×</strong> to remove a node, or <strong>Clear canvas</strong> to start over.
         </p>
 
-        <div
+        <TablerInlineAlert
             v-if='syncStatus'
-            class='alert small py-2 mb-2 flex-shrink-0'
-            :class='syncStatusError ? "alert-danger" : "alert-success"'
-        >
-            {{ syncStatus }}
-        </div>
+            class='mb-2 flex-shrink-0'
+            :severity='syncStatusError ? "danger" : "success"'
+            :title='syncStatusError ? "Error" : "Success"'
+            :description='syncStatus'
+        />
 
-        <div
+        <TablerInlineAlert
             v-if='!loadingRoster && !members.length'
-            class='alert alert-info small mb-2 flex-shrink-0'
-        >
-            No D4H roster in this browser. Open the <strong>D4H</strong> plugin, configure
-            Team Manager, and run <strong>Sync now</strong>, then click <strong>Refresh D4H</strong>.
-        </div>
+            class='mb-2 flex-shrink-0'
+            severity='info'
+            title='No D4H Roster'
+            description='No D4H roster in this browser. Open the D4H plugin, configure Team Manager, and run Sync now, then click Refresh D4H.'
+        />
 
         <div class='d-flex gap-2 flex-grow-1 min-height-0 overflow-hidden assignments-workspace'>
             <!-- Palette -->
-            <div
-                class='card flex-shrink-0 d-flex flex-column min-height-0 assignments-palette'
+            <TablerBorder
+                class='cloudtak-accent text-white flex-shrink-0 min-height-0 assignments-palette'
                 style='width: 300px;'
+                :fill-height='false'
+                :shadow='false'
+                gap='sm'
             >
-                <div class='card-header py-2 small fw-semibold flex-shrink-0'>
-                    Palette
-                </div>
-                <div class='card-body p-2 overflow-auto flex-grow-1 min-height-0'>
-                    <input
-                        v-model='paletteSearch'
-                        type='search'
-                        class='form-control form-control-sm mb-2'
-                        placeholder='Search palette…'
-                        autocomplete='off'
-                    >
+                <template #label>
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Palette
+                    </p>
+                </template>
 
+                <TablerInput
+                    v-model='paletteSearch'
+                    icon='search'
+                    placeholder='Search palette…'
+                    autocomplete='off'
+                />
+
+                <div class='overflow-auto flex-grow-1 min-height-0'>
                     <details class='palette-collapse mb-2'>
                         <summary class='palette-collapse__summary'>
                             Resource teams ({{ filteredResourceAssignments.length }})
@@ -106,60 +111,46 @@
                             <div
                                 v-for='assignment in filteredResourceAssignments'
                                 :key='assignment.id'
-                                class='card card-sm mb-2'
+                                class='cloudtak-accent border rounded-3 text-white mb-2 p-2'
                             >
-                                <div class='card-body p-2'>
-                                    <div class='fw-semibold small text-truncate mb-1'>
-                                        {{ assignment.resourceIdentifier }}
-                                    </div>
-                                    <div class='mb-2'>
-                                        <label class='form-label small mb-1'>Assignment</label>
-                                        <select
-                                            :value='assignment.assignmentUid ?? ""'
-                                            class='form-select form-select-sm'
-                                            :disabled='!activeMission || loadingCots'
-                                            @change='onResourceTeamAssignmentChange(assignment.id, ($event.target as HTMLSelectElement).value)'
-                                        >
-                                            <option value=''>
-                                                {{ assignmentSelectLabel }}
-                                            </option>
-                                            <option
-                                                v-for='cot in filteredMissionCots'
-                                                :key='cot.uid'
-                                                :value='cot.uid'
+                                <div class='fw-semibold small text-truncate mb-1'>
+                                    {{ assignment.resourceIdentifier }}
+                                </div>
+                                <TablerEnum
+                                    class='mb-2'
+                                    :model-value='resourceAssignmentLabel(assignment)'
+                                    label='Assignment'
+                                    :options='resourceAssignmentOptions'
+                                    :disabled='!activeMission || loadingCots'
+                                    @update:model-value='onResourceAssignmentLabelChange(assignment.id, $event)'
+                                />
+                                <div
+                                    class='cloudtak-accent border rounded-3'
+                                    draggable='true'
+                                    style='cursor: grab;'
+                                    @dragstart='onResourceTeamDragStart($event, assignment)'
+                                    @dragend='onPaletteDragEnd'
+                                >
+                                    <div class='py-2 px-2 d-flex align-items-center gap-2'>
+                                        <IconTag
+                                            :size='18'
+                                            stroke='1.5'
+                                        />
+                                        <div class='small min-width-0'>
+                                            <div
+                                                class='text-muted'
+                                                style='font-size: 0.72rem;'
                                             >
-                                                {{ cot.callsign }}
-                                            </option>
-                                        </select>
-                                    </div>
-                                    <div
-                                        class='card card-sm border-primary-subtle bg-light'
-                                        draggable='true'
-                                        style='cursor: grab;'
-                                        @dragstart='onResourceTeamDragStart($event, assignment)'
-                                        @dragend='onPaletteDragEnd'
-                                    >
-                                        <div class='card-body py-2 px-2 d-flex align-items-center gap-2'>
-                                            <IconTag
-                                                :size='18'
-                                                stroke='1.5'
-                                            />
-                                            <div class='small min-width-0'>
-                                                <div
-                                                    class='text-muted'
-                                                    style='font-size: 0.72rem;'
-                                                >
-                                                    {{ resourceAssignmentDescription(assignment) }}
-                                                </div>
+                                                {{ resourceAssignmentDescription(assignment) }}
                                             </div>
                                         </div>
                                     </div>
-                                    <div
-                                        class='text-muted mt-1'
-                                        style='font-size: 0.68rem;'
-                                    >
-                                        Drag onto the chart
-                                    </div>
+                                </div>
+                                <div
+                                    class='text-muted mt-1'
+                                    style='font-size: 0.68rem;'
+                                >
+                                    Drag onto the chart
                                 </div>
                             </div>
                         </div>
@@ -180,55 +171,47 @@
                             <div
                                 v-for='pos in filteredIcsPositions'
                                 :key='pos.key'
-                                class='card card-sm mb-2'
+                                class='cloudtak-accent border rounded-3 text-white mb-2 p-2'
                             >
-                                <div class='card-body p-2'>
-                                    <label class='form-label small mb-1'>{{ pos.title }}</label>
-                                    <select
-                                        v-model='asSingleSlot(icsSlots[pos.key]).d4hMemberId'
-                                        class='form-select form-select-sm mb-1'
-                                    >
-                                        <option value=''>
-                                            — D4H —
-                                        </option>
-                                        <option
-                                            v-for='m in configurationMembers'
-                                            :key='m.id'
-                                            :value='m.id'
-                                        >
-                                            {{ m.name }}
-                                        </option>
-                                    </select>
-                                    <input
-                                        v-model='asSingleSlot(icsSlots[pos.key]).customName'
-                                        type='text'
-                                        class='form-control form-control-sm mb-1'
-                                        placeholder='Or type name'
-                                        autocomplete='off'
-                                    >
-                                    <div
-                                        class='card card-sm border-secondary-subtle bg-light'
-                                        draggable='true'
-                                        style='cursor: grab;'
-                                        @dragstart='onRolePositionDragStart($event, pos, icsSlots[pos.key])'
-                                        @dragend='onPaletteDragEnd'
-                                    >
-                                        <div class='card-body py-2 px-2 d-flex align-items-center gap-2'>
-                                            <IconShield
-                                                :size='16'
-                                                stroke='1.5'
-                                            />
-                                            <div class='small'>
-                                                <div class='fw-semibold'>
-                                                    {{ rolePositionPreview(pos, icsSlots[pos.key]).title }}
-                                                </div>
-                                                <div
-                                                    v-if='rolePositionPreview(pos, icsSlots[pos.key]).description'
-                                                    class='text-muted'
-                                                    style='font-size: 0.72rem;'
-                                                >
-                                                    {{ rolePositionPreview(pos, icsSlots[pos.key]).description }}
-                                                </div>
+                                <p class='fw-semibold small text-white mb-1'>
+                                    {{ pos.title }}
+                                </p>
+                                <TablerEnum
+                                    class='mb-1'
+                                    :model-value='memberLabelForSlot(icsSlots[pos.key])'
+                                    label='D4H Member'
+                                    :options='memberOptions'
+                                    @update:model-value='onMemberLabelChangeForSlot(icsSlots[pos.key], $event)'
+                                />
+                                <TablerInput
+                                    v-model='asSingleSlot(icsSlots[pos.key]).customName'
+                                    class='mb-1'
+                                    label='Custom Name'
+                                    placeholder='Or type name'
+                                    autocomplete='off'
+                                />
+                                <div
+                                    class='cloudtak-accent border rounded-3'
+                                    draggable='true'
+                                    style='cursor: grab;'
+                                    @dragstart='onRolePositionDragStart($event, pos, icsSlots[pos.key])'
+                                    @dragend='onPaletteDragEnd'
+                                >
+                                    <div class='py-2 px-2 d-flex align-items-center gap-2'>
+                                        <IconShield
+                                            :size='16'
+                                            stroke='1.5'
+                                        />
+                                        <div class='small'>
+                                            <div class='fw-semibold'>
+                                                {{ rolePositionPreview(pos, icsSlots[pos.key]).title }}
+                                            </div>
+                                            <div
+                                                v-if='rolePositionPreview(pos, icsSlots[pos.key]).description'
+                                                class='text-muted'
+                                                style='font-size: 0.72rem;'
+                                            >
+                                                {{ rolePositionPreview(pos, icsSlots[pos.key]).description }}
                                             </div>
                                         </div>
                                     </div>
@@ -252,55 +235,47 @@
                             <div
                                 v-for='pos in filteredRescuePositions'
                                 :key='pos.key'
-                                class='card card-sm mb-2'
+                                class='cloudtak-accent border rounded-3 text-white mb-2 p-2'
                             >
-                                <div class='card-body p-2'>
-                                    <label class='form-label small mb-1'>{{ pos.title }}</label>
-                                    <select
-                                        v-model='asSingleSlot(rescueSlots[pos.key]).d4hMemberId'
-                                        class='form-select form-select-sm mb-1'
-                                    >
-                                        <option value=''>
-                                            — D4H —
-                                        </option>
-                                        <option
-                                            v-for='m in configurationMembers'
-                                            :key='m.id'
-                                            :value='m.id'
-                                        >
-                                            {{ m.name }}
-                                        </option>
-                                    </select>
-                                    <input
-                                        v-model='asSingleSlot(rescueSlots[pos.key]).customName'
-                                        type='text'
-                                        class='form-control form-control-sm mb-1'
-                                        placeholder='Or type name'
-                                        autocomplete='off'
-                                    >
-                                    <div
-                                        class='card card-sm border-secondary-subtle bg-light'
-                                        draggable='true'
-                                        style='cursor: grab;'
-                                        @dragstart='onRolePositionDragStart($event, pos, rescueSlots[pos.key])'
-                                        @dragend='onPaletteDragEnd'
-                                    >
-                                        <div class='card-body py-2 px-2 d-flex align-items-center gap-2'>
-                                            <IconLifebuoy
-                                                :size='16'
-                                                stroke='1.5'
-                                            />
-                                            <div class='small'>
-                                                <div class='fw-semibold'>
-                                                    {{ rolePositionPreview(pos, rescueSlots[pos.key]).title }}
-                                                </div>
-                                                <div
-                                                    v-if='rolePositionPreview(pos, rescueSlots[pos.key]).description'
-                                                    class='text-muted'
-                                                    style='font-size: 0.72rem;'
-                                                >
-                                                    {{ rolePositionPreview(pos, rescueSlots[pos.key]).description }}
-                                                </div>
+                                <p class='fw-semibold small text-white mb-1'>
+                                    {{ pos.title }}
+                                </p>
+                                <TablerEnum
+                                    class='mb-1'
+                                    :model-value='memberLabelForSlot(rescueSlots[pos.key])'
+                                    label='D4H Member'
+                                    :options='memberOptions'
+                                    @update:model-value='onMemberLabelChangeForSlot(rescueSlots[pos.key], $event)'
+                                />
+                                <TablerInput
+                                    v-model='asSingleSlot(rescueSlots[pos.key]).customName'
+                                    class='mb-1'
+                                    label='Custom Name'
+                                    placeholder='Or type name'
+                                    autocomplete='off'
+                                />
+                                <div
+                                    class='cloudtak-accent border rounded-3'
+                                    draggable='true'
+                                    style='cursor: grab;'
+                                    @dragstart='onRolePositionDragStart($event, pos, rescueSlots[pos.key])'
+                                    @dragend='onPaletteDragEnd'
+                                >
+                                    <div class='py-2 px-2 d-flex align-items-center gap-2'>
+                                        <IconLifebuoy
+                                            :size='16'
+                                            stroke='1.5'
+                                        />
+                                        <div class='small'>
+                                            <div class='fw-semibold'>
+                                                {{ rolePositionPreview(pos, rescueSlots[pos.key]).title }}
+                                            </div>
+                                            <div
+                                                v-if='rolePositionPreview(pos, rescueSlots[pos.key]).description'
+                                                class='text-muted'
+                                                style='font-size: 0.72rem;'
+                                            >
+                                                {{ rolePositionPreview(pos, rescueSlots[pos.key]).description }}
                                             </div>
                                         </div>
                                     </div>
@@ -310,13 +285,13 @@
                             <div
                                 v-for='label in filteredRescueGroupLabels'
                                 :key='label.key'
-                                class='card card-sm mb-2'
+                                class='cloudtak-accent border rounded-3 text-white mb-2'
                                 draggable='true'
                                 style='cursor: grab;'
                                 @dragstart='onRescueGroupLabelDragStart($event, label)'
                                 @dragend='onPaletteDragEnd'
                             >
-                                <div class='card-body py-2 px-2 d-flex align-items-center gap-2'>
+                                <div class='py-2 px-2 d-flex align-items-center gap-2'>
                                     <IconLifebuoy
                                         :size='16'
                                         stroke='1.5'
@@ -349,13 +324,13 @@
                             <div
                                 v-for='m in filteredMembers'
                                 :key='m.id'
-                                class='card card-sm mb-2'
+                                class='cloudtak-accent border rounded-3 text-white mb-2'
                                 draggable='true'
                                 style='cursor: grab;'
                                 @dragstart='onMemberDragStart($event, m)'
                                 @dragend='onPaletteDragEnd'
                             >
-                                <div class='card-body py-2 px-2'>
+                                <div class='py-2 px-2'>
                                     <div class='fw-semibold small text-truncate'>
                                         {{ m.name }}
                                     </div>
@@ -370,11 +345,21 @@
                         </div>
                     </details>
                 </div>
-            </div>
+            </TablerBorder>
 
             <!-- HastyTeam canvas -->
-            <div class='card flex-grow-1 min-width-0 min-height-0 d-flex flex-column overflow-hidden assignments-canvas'>
-                <div class='card-body p-0 flex-grow-1 min-height-0 assignments-chart'>
+            <TablerBorder
+                class='cloudtak-accent text-white flex-grow-1 min-width-0 min-height-0 overflow-hidden assignments-canvas'
+                :fill-height='false'
+                :shadow='false'
+                gap='sm'
+            >
+                <template #label>
+                    <p class='text-uppercase text-white-50 small mb-0 px-2 pt-2'>
+                        Org Chart
+                    </p>
+                </template>
+                <div class='flex-grow-1 min-height-0 assignments-chart'>
                     <HastyTeam
                         v-model='teamTree'
                         :node-width='200'
@@ -384,7 +369,7 @@
                         <template #block='{ node, dragover, draggingSelf }'>
                             <div
                                 v-if='node'
-                                class='card shadow-sm'
+                                class='cloudtak-accent border rounded-3 text-white'
                                 style='width: 200px;'
                                 :class='{
                                     "border-primary": dragover,
@@ -394,7 +379,7 @@
                                 @dragstart.stop='onNodeDragStart($event, node.id)'
                                 @dragend='onPaletteDragEnd'
                             >
-                                <div class='card-body py-2 px-3'>
+                                <div class='py-2 px-3'>
                                     <div class='d-flex align-items-start gap-2 mb-1'>
                                         <IconUsers
                                             v-if='node.type === "team"'
@@ -453,7 +438,7 @@
                         </template>
                     </HastyTeam>
                 </div>
-            </div>
+            </TablerBorder>
         </div>
     </div>
 </template>
@@ -462,6 +447,12 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { HastyTeam } from '../../vendor/vue-hasty-team/index.ts';
 import { IconLifebuoy, IconShield, IconTag, IconUser, IconUsers, IconX } from '@tabler/icons-vue';
+import {
+    TablerBorder,
+    TablerInput,
+    TablerEnum,
+    TablerInlineAlert,
+} from '@tak-ps/vue-tabler';
 import { useIncident } from '../../composables/useIncident.ts';
 import type { RescueGroupLabel } from '../../data/rescueManagementPositions.ts';
 import type { RolePositionDef } from '../../data/rolePositionTypes.ts';
@@ -521,6 +512,8 @@ const loadingOrgChart = ref(false);
 const savingOrgChart = ref(false);
 const persistStatus = ref('');
 
+const MEMBER_PLACEHOLDER = '— D4H —';
+
 let saveOrgChartTimer: ReturnType<typeof setTimeout> | null = null;
 let saveOrgChartGeneration = 0;
 
@@ -560,6 +553,48 @@ const assignmentSelectLabel = computed(() => {
     if (!missionCots.value.length) return 'No CoTs on this DataSync';
     return '— CoT assignment —';
 });
+
+const resourceAssignmentOptions = computed(() => [
+    assignmentSelectLabel.value,
+    ...filteredMissionCots.value.map((cot) => cot.callsign),
+]);
+
+const memberOptions = computed(() => [
+    MEMBER_PLACEHOLDER,
+    ...configurationMembers.value.map((m) => m.name),
+]);
+
+function resourceAssignmentLabel(assignment: ResourceAssignment): string {
+    if (!assignment.assignmentUid) return assignmentSelectLabel.value;
+    const cot = missionCots.value.find((c) => c.uid === assignment.assignmentUid);
+    return cot?.callsign ?? assignmentSelectLabel.value;
+}
+
+async function onResourceAssignmentLabelChange(id: string, label: string): Promise<void> {
+    if (label === assignmentSelectLabel.value) {
+        await onResourceTeamAssignmentChange(id, '');
+        return;
+    }
+    const cot = filteredMissionCots.value.find((c) => c.callsign === label);
+    await onResourceTeamAssignmentChange(id, cot?.uid ?? '');
+}
+
+function memberLabelForSlot(slot: RoleSlotConfig): string {
+    const single = asSingleSlot(slot);
+    if (single.d4hMemberId === '') return MEMBER_PLACEHOLDER;
+    const member = configurationMembers.value.find((m) => m.id === single.d4hMemberId);
+    return member ? member.name : MEMBER_PLACEHOLDER;
+}
+
+function onMemberLabelChangeForSlot(slot: RoleSlotConfig, label: string): void {
+    const single = asSingleSlot(slot);
+    if (label === MEMBER_PLACEHOLDER) {
+        single.d4hMemberId = '';
+        return;
+    }
+    const member = configurationMembers.value.find((m) => m.name === label);
+    if (member) single.d4hMemberId = member.id;
+}
 
 function memberSubtitle(m: D4HMember): string {
     return [m.ref, m.position].filter(Boolean).join(' · ') || 'D4H member';
@@ -815,6 +850,15 @@ watch(teamTree, () => {
 .assignments-palette,
 .assignments-canvas {
     height: 100%;
+}
+
+.assignments-palette :deep(.card-body) {
+    min-height: 0;
+}
+
+.assignments-canvas :deep(.card-body) {
+    min-height: 0;
+    padding: 0;
 }
 
 .assignments-chart {

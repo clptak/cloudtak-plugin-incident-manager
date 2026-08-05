@@ -5,130 +5,195 @@
         </h3>
 
         <!-- Initial Actions -->
-        <div class='card mb-3'>
-            <div
-                class='card-header d-flex align-items-center cursor-pointer user-select-none'
-                role='button'
-                tabindex='0'
-                :aria-expanded='expandedSections.initial'
-                @click='toggleSection("initial")'
-                @keydown.enter.prevent='toggleSection("initial")'
-                @keydown.space.prevent='toggleSection("initial")'
-            >
-                <h4 class='card-title mb-0'>
-                    Initial Actions
-                </h4>
-                <IconChevronDown
-                    class='ms-auto transition-transform'
-                    :class='{ "rotate-180": !expandedSections.initial }'
-                    :size='20'
-                    stroke='1.5'
-                />
-            </div>
-            <div
-                v-show='expandedSections.initial'
-                class='card-body'
-            >
-                <div class='row g-3'>
-                    <div
-                        v-for='card in taskCards'
-                        :key='card.key'
-                        class='col-md-4'
-                    >
-                        <div class='card h-100'>
-                            <div class='card-body d-flex flex-column'>
-                                <h4 class='card-title'>
-                                    {{ card.label }}
-                                </h4>
-                                <p class='text-muted small mb-3'>
-                                    {{ card.description }}
-                                </p>
-                                <button
-                                    type='button'
-                                    class='btn btn-primary btn-sm mt-auto align-self-start'
-                                    @click='toggleChecklist(card.key)'
-                                >
-                                    {{ activeChecklist === card.key ? 'Close Checklist' : 'Open Checklist' }}
-                                </button>
-                            </div>
-                        </div>
+        <div
+            v-if='!expandedSections.initial'
+            class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+            role='button'
+            tabindex='0'
+            :aria-expanded='false'
+            @click='toggleSection("initial")'
+            @keydown.enter.prevent='toggleSection("initial")'
+            @keydown.space.prevent='toggleSection("initial")'
+        >
+            <p class='text-uppercase text-white-50 small mb-0'>
+                Initial Actions
+            </p>
+            <IconChevronDown
+                class='ms-auto transition-transform text-white-50 rotate-180'
+                :size='20'
+                stroke='1.5'
+            />
+        </div>
+        <TablerBorder
+            v-else
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <div
+                    class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='true'
+                    @click='toggleSection("initial")'
+                    @keydown.enter.prevent='toggleSection("initial")'
+                    @keydown.space.prevent='toggleSection("initial")'
+                >
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Initial Actions
+                    </p>
+                    <IconChevronDown
+                        class='ms-auto transition-transform text-white-50'
+                        :size='20'
+                        stroke='1.5'
+                    />
+                </div>
+            </template>
+
+            <div class='row g-3'>
+                <div
+                    v-for='card in taskCards'
+                    :key='card.key'
+                    class='col-md-4'
+                >
+                    <div class='cloudtak-accent border rounded-3 text-white h-100 p-3 d-flex flex-column'>
+                        <h4 class='mb-2'>
+                            {{ card.label }}
+                        </h4>
+                        <p class='text-muted small mb-3'>
+                            {{ card.description }}
+                        </p>
+                        <button
+                            type='button'
+                            class='btn btn-primary btn-sm mt-auto align-self-start'
+                            @click='toggleChecklist(card.key)'
+                        >
+                            {{ activeChecklist === card.key ? 'Close Checklist' : 'Open Checklist' }}
+                        </button>
                     </div>
                 </div>
-
-                <InvestigateChecklist
-                    v-if='activeChecklist === "investigate"'
-                    @close='closeChecklist'
-                />
-                <ContainChecklist
-                    v-else-if='activeChecklist === "contain"'
-                    @close='closeChecklist'
-                />
-                <SearchChecklist
-                    v-else-if='activeChecklist === "search"'
-                    @close='closeChecklist'
-                />
             </div>
-        </div>
+
+            <InvestigateChecklist
+                v-if='activeChecklist === "investigate"'
+                @close='closeChecklist'
+            />
+            <ContainChecklist
+                v-else-if='activeChecklist === "contain"'
+                @close='closeChecklist'
+            />
+            <SearchChecklist
+                v-else-if='activeChecklist === "search"'
+                @close='closeChecklist'
+            />
+        </TablerBorder>
 
         <!-- Concurrent Actions -->
-        <div class='card mb-3'>
-            <div
-                class='card-header d-flex align-items-center cursor-pointer user-select-none'
-                role='button'
-                tabindex='0'
-                :aria-expanded='expandedSections.concurrent'
-                @click='toggleSection("concurrent")'
-                @keydown.enter.prevent='toggleSection("concurrent")'
-                @keydown.space.prevent='toggleSection("concurrent")'
-            >
-                <h4 class='card-title mb-0'>
-                    Concurrent Actions
-                </h4>
-                <IconChevronDown
-                    class='ms-auto transition-transform'
-                    :class='{ "rotate-180": !expandedSections.concurrent }'
-                    :size='20'
-                    stroke='1.5'
-                />
-            </div>
-            <div
-                v-show='expandedSections.concurrent'
-                class='card-body'
+        <div
+            v-if='!expandedSections.concurrent'
+            class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+            role='button'
+            tabindex='0'
+            :aria-expanded='false'
+            @click='toggleSection("concurrent")'
+            @keydown.enter.prevent='toggleSection("concurrent")'
+            @keydown.space.prevent='toggleSection("concurrent")'
+        >
+            <p class='text-uppercase text-white-50 small mb-0'>
+                Concurrent Actions
+            </p>
+            <IconChevronDown
+                class='ms-auto transition-transform text-white-50 rotate-180'
+                :size='20'
+                stroke='1.5'
             />
         </div>
+        <TablerBorder
+            v-else
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <div
+                    class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='true'
+                    @click='toggleSection("concurrent")'
+                    @keydown.enter.prevent='toggleSection("concurrent")'
+                    @keydown.space.prevent='toggleSection("concurrent")'
+                >
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Concurrent Actions
+                    </p>
+                    <IconChevronDown
+                        class='ms-auto transition-transform text-white-50'
+                        :size='20'
+                        stroke='1.5'
+                    />
+                </div>
+            </template>
+        </TablerBorder>
 
         <!-- Successive Actions -->
-        <div class='card mb-3'>
-            <div
-                class='card-header d-flex align-items-center cursor-pointer user-select-none'
-                role='button'
-                tabindex='0'
-                :aria-expanded='expandedSections.successive'
-                @click='toggleSection("successive")'
-                @keydown.enter.prevent='toggleSection("successive")'
-                @keydown.space.prevent='toggleSection("successive")'
-            >
-                <h4 class='card-title mb-0'>
-                    Successive Actions
-                </h4>
-                <IconChevronDown
-                    class='ms-auto transition-transform'
-                    :class='{ "rotate-180": !expandedSections.successive }'
-                    :size='20'
-                    stroke='1.5'
-                />
-            </div>
-            <div
-                v-show='expandedSections.successive'
-                class='card-body'
+        <div
+            v-if='!expandedSections.successive'
+            class='cloudtak-accent border rounded-3 text-white px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+            role='button'
+            tabindex='0'
+            :aria-expanded='false'
+            @click='toggleSection("successive")'
+            @keydown.enter.prevent='toggleSection("successive")'
+            @keydown.space.prevent='toggleSection("successive")'
+        >
+            <p class='text-uppercase text-white-50 small mb-0'>
+                Successive Actions
+            </p>
+            <IconChevronDown
+                class='ms-auto transition-transform text-white-50 rotate-180'
+                :size='20'
+                stroke='1.5'
             />
         </div>
+        <TablerBorder
+            v-else
+            class='cloudtak-accent text-white'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <div
+                    class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='true'
+                    @click='toggleSection("successive")'
+                    @keydown.enter.prevent='toggleSection("successive")'
+                    @keydown.space.prevent='toggleSection("successive")'
+                >
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Successive Actions
+                    </p>
+                    <IconChevronDown
+                        class='ms-auto transition-transform text-white-50'
+                        :size='20'
+                        stroke='1.5'
+                    />
+                </div>
+            </template>
+        </TablerBorder>
     </div>
 </template>
 
 <script setup lang='ts'>
 import { reactive, ref, defineAsyncComponent } from 'vue';
 import { IconChevronDown } from '@tabler/icons-vue';
+import { TablerBorder } from '@tak-ps/vue-tabler';
 
 const InvestigateChecklist = defineAsyncComponent(() => import('./task/InvestigateChecklist.vue'));
 const ContainChecklist = defineAsyncComponent(() => import('./task/ContainChecklist.vue'));

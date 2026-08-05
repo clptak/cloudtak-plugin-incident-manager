@@ -1,16 +1,22 @@
 <template>
-    <div class='card'>
-        <div class='card-header d-flex align-items-center'>
-            <h3 class='card-title mb-0'>
-                Generate Report Template
-            </h3>
-            <span class='badge bg-blue-lt ms-auto'>Patrol Report</span>
-        </div>
-        <div class='card-body'>
-            <p class='text-muted small mb-3'>
-                Produces a patrol report (.md) from the active DataSync mission's log entries.
+    <TablerBorder
+        class='cloudtak-accent text-white'
+        :fill-height='false'
+        :shadow='false'
+        gap='sm'
+    >
+        <template #label>
+            <p class='text-uppercase text-white-50 small mb-0 d-flex align-items-center gap-2 w-100'>
+                <span>Generate Report Template</span>
+                <span class='badge bg-blue-lt ms-auto'>Patrol Report</span>
             </p>
+        </template>
 
+        <p class='text-muted small mb-0'>
+            Produces a patrol report (.md) from the active DataSync mission's log entries.
+        </p>
+
+        <div>
             <button
                 class='btn btn-primary'
                 :disabled='loading'
@@ -19,61 +25,64 @@
                 {{ loading ? 'Generating…' : 'Generate from active mission' }}
             </button>
 
-            <div
+            <TablerInlineAlert
                 v-if='!activeMission'
-                class='form-text text-warning'
-            >
-                No active mission. Select one in Create | Open first.
-            </div>
-            <div
+                class='mt-2'
+                severity='warning'
+                title='Mission Required'
+                description='No active mission. Select one in Create | Open first.'
+            />
+            <p
                 v-else
-                class='form-text'
+                class='form-text mt-2 mb-0'
             >
                 Active DataSync: <strong>{{ activeMission.name }}</strong>
-            </div>
-            <div
+            </p>
+            <TablerInlineAlert
                 v-if='error'
-                class='text-danger small mt-1'
-            >
-                {{ error }}
-            </div>
-
-            <div
-                v-if='report'
-                class='mt-3'
-            >
-                <div class='d-flex align-items-center mb-2'>
-                    <h4 class='mb-0'>
-                        Report Preview
-                    </h4>
-                    <div class='ms-auto btn-list'>
-                        <button
-                            class='btn btn-success btn-sm'
-                            @click='download'
-                        >
-                            Download .md
-                        </button>
-                        <button
-                            class='btn btn-outline-secondary btn-sm'
-                            @click='copy'
-                        >
-                            {{ copied ? 'Copied' : 'Copy' }}
-                        </button>
-                    </div>
-                </div>
-                <textarea
-                    v-model='report'
-                    class='form-control font-monospace'
-                    style='font-size:0.82rem; min-height:380px; white-space:pre;'
-                    spellcheck='false'
-                />
-            </div>
+                class='mt-2'
+                severity='danger'
+                title='Error'
+                :description='error'
+            />
         </div>
-    </div>
+
+        <div v-if='report'>
+            <div class='d-flex align-items-center mb-2'>
+                <h4 class='mb-0 text-white'>
+                    Report Preview
+                </h4>
+                <div class='ms-auto btn-list'>
+                    <button
+                        class='btn btn-success btn-sm'
+                        @click='download'
+                    >
+                        Download .md
+                    </button>
+                    <button
+                        class='btn btn-outline-secondary btn-sm'
+                        @click='copy'
+                    >
+                        {{ copied ? 'Copied' : 'Copy' }}
+                    </button>
+                </div>
+            </div>
+            <TablerInput
+                v-model='report'
+                class='report-textarea'
+                :rows='16'
+            />
+        </div>
+    </TablerBorder>
 </template>
 
 <script setup lang='ts'>
 import { ref } from 'vue';
+import {
+    TablerBorder,
+    TablerInput,
+    TablerInlineAlert,
+} from '@tak-ps/vue-tabler';
 import { useIncident } from '../../composables/useIncident.ts';
 import { loadIncidentSubscription } from '../../lib/incidentSubscription.ts';
 import {
@@ -254,3 +263,12 @@ async function copy(): Promise<void> {
     }
 }
 </script>
+
+<style scoped>
+.report-textarea :deep(textarea) {
+    font-size: 0.82rem;
+    min-height: 380px;
+    white-space: pre;
+    font-family: var(--tblr-font-monospace, monospace);
+}
+</style>

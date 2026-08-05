@@ -3,14 +3,19 @@
         <h3 class='mb-3'>
             CASIE
         </h3>
-        <div class='card'>
-            <div class='card-body'>
-                <p class='text-muted mb-0'>
-                    CASIE — coming soon.
-                </p>
-            </div>
-        </div>
+        <TablerBorder
+            class='cloudtak-accent text-white'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <p class='text-muted mb-0'>
+                CASIE — coming soon.
+            </p>
+        </TablerBorder>
     </div>
 </template>
 
-<script setup lang='ts'></script>
+<script setup lang='ts'>
+import { TablerBorder } from '@tak-ps/vue-tabler';
+</script>
