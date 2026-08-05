@@ -69,6 +69,10 @@ export default class IncidentManagerPlugin implements PluginInstance {
                     return () => {
                         if (appStore.isMobileDetected) {
                             return h(MenuTemplate, { name: 'Incident Manager' }, {
+                                header: () => [
+                                    h(IconTarget, { size: 22, stroke: '1.5', class: 'flex-shrink-0' }),
+                                    h('span', { class: 'fw-semibold ms-2' }, 'Incident Manager'),
+                                ],
                                 default: () => h(IncidentManagerPane),
                             });
                         }
