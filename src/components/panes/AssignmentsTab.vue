@@ -6,7 +6,7 @@
             </h3>
             <button
                 type='button'
-                class='btn btn-outline-primary btn-sm ms-auto'
+                class='btn btn-outline-secondary btn-sm ms-auto'
                 :disabled='loadingCots'
                 @click='onRefreshMissionCots'
             >
@@ -16,21 +16,13 @@
 
         <div
             v-if='!setupReminderDismissed'
-            class='border rounded p-2 mb-3 bg-body-secondary small'
+            class='mb-3'
         >
-            <div class='d-flex gap-2'>
-                <IconInfoCircle
-                    :size='18'
-                    stroke='1.5'
-                    class='text-azure flex-shrink-0 mt-1'
-                />
-                <div>
-                    Before creating mission assignments, attach your assignments (lines, polygons)
-                    to this DataSync Mission. If assignments or segments were drawn in other GIS systems,
-                    import the GeoJSON file from that platform. If the Caltopo Sync plugin is installed,
-                    you can create a sync pair to import them into this DataSync.
-                </div>
-            </div>
+            <TablerInlineAlert
+                severity='info'
+                title='Setup Reminder'
+                description='Before creating mission assignments, attach your assignments (lines, polygons) to this DataSync Mission. If assignments or segments were drawn in other GIS systems, import the GeoJSON file from that platform. If the Caltopo Sync plugin is installed, you can create a sync pair to import them into this DataSync.'
+            />
             <div class='text-end mt-1'>
                 <button
                     type='button'
@@ -47,139 +39,121 @@
             Each log links to the selected map object via <code>entryUid</code>.
         </p>
 
-        <div
+        <TablerInlineAlert
             v-if='!activeMission'
-            class='alert alert-info small mb-3'
-        >
-            Select a mission in <strong>Create | Open</strong> before managing assignments.
-        </div>
+            class='mb-3'
+            severity='info'
+            title='Mission required'
+            description='Select a mission in Create | Open before managing assignments.'
+        />
 
-        <div
+        <TablerInlineAlert
             v-if='statusMessage'
-            class='alert small py-2 mb-3'
-            :class='statusError ? "alert-danger" : "alert-success"'
+            class='mb-3'
+            :severity='statusError ? "danger" : "success"'
+            :title='statusError ? "Error" : "Saved"'
+            :description='statusMessage'
+        />
+
+        <TablerBorder
+            class='cloudtak-accent text-white mb-3'
+            :shadow='false'
+            :fill-height='false'
+            gap='sm'
         >
-            {{ statusMessage }}
-        </div>
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0'>
+                    New Assignment
+                </p>
+            </template>
 
-        <div class='card mb-3'>
-            <div class='card-header py-2 small fw-semibold'>
-                New assignment
-            </div>
-            <div class='card-body'>
-                <div class='row g-2 align-items-end'>
-                    <div class='col-md-1'>
-                        <label class='form-label small mb-1'>#</label>
-                        <input
-                            v-model.number='form.assignmentNumber'
-                            type='number'
-                            min='1'
-                            step='1'
-                            class='form-control form-control-sm'
-                            :class='{ "is-invalid": assignmentNumberInvalid }'
-                            :disabled='!activeMission || saving'
-                        >
-                    </div>
-                    <div class='col-md-2'>
-                        <label class='form-label small mb-1'>Team</label>
-                        <select
-                            v-model='form.teamResourceAssignmentId'
-                            class='form-select form-select-sm'
-                            :disabled='!activeMission || saving || !teamOptions.length'
-                            @change='onFormTeamChange'
-                        >
-                            <option value=''>
-                                {{ teamSelectLabel }}
-                            </option>
-                            <option
-                                v-for='team in teamOptions'
-                                :key='team.id'
-                                :value='team.id'
-                            >
-                                {{ team.resourceIdentifier }}
-                            </option>
-                        </select>
-                    </div>
-                    <div class='col-md-2'>
-                        <label class='form-label small mb-1'>Assignment</label>
-                        <select
-                            v-model='form.assignmentUid'
-                            class='form-select form-select-sm'
-                            :disabled='!activeMission || saving || loadingCots'
-                            @change='onFormAssignmentChange'
-                        >
-                            <option value=''>
-                                {{ assignmentSelectLabel }}
-                            </option>
-                            <option
-                                v-for='cot in missionCots'
-                                :key='cot.uid'
-                                :value='cot.uid'
-                            >
-                                {{ cot.callsign }}
-                            </option>
-                        </select>
-                    </div>
-                    <div class='col-md-3'>
-                        <label class='form-label small mb-1'>Instructions</label>
-                        <input
-                            v-model='form.instructions'
-                            type='text'
-                            class='form-control form-control-sm'
-                            placeholder='Task instructions'
-                            :disabled='!activeMission || saving'
-                        >
-                    </div>
-                    <div class='col-md-2'>
-                        <label class='form-label small mb-1'>Started</label>
-                        <input
-                            v-model='form.started'
-                            type='datetime-local'
-                            class='form-control form-control-sm'
-                            :disabled='!activeMission || saving'
-                        >
-                    </div>
-                    <div class='col-md-2'>
-                        <label class='form-label small mb-1'>Completed</label>
-                        <input
-                            v-model='form.completed'
-                            type='datetime-local'
-                            class='form-control form-control-sm'
-                            :disabled='!activeMission || saving'
-                        >
-                    </div>
+            <div class='row g-2'>
+                <div class='col-md-1'>
+                    <TablerInput
+                        v-model='formAssignmentNumber'
+                        label='#'
+                        type='number'
+                        :error='assignmentNumberInvalid ? "Invalid" : ""'
+                        :disabled='!activeMission || saving'
+                    />
                 </div>
-                <div class='d-flex flex-wrap gap-2 mt-3'>
-                    <button
-                        type='button'
-                        class='btn btn-primary btn-sm'
-                        :disabled='saving'
-                        @click='onAddClick'
-                    >
-                        {{ saving ? 'Saving…' : 'Add assignment' }}
-                    </button>
-                    <button
-                        type='button'
-                        class='btn btn-outline-secondary btn-sm'
-                        :disabled='saving'
-                        @click='resetForm'
-                    >
-                        Clear form
-                    </button>
+                <div class='col-md-2'>
+                    <TablerEnum
+                        v-model='formTeamLabel'
+                        label='Team'
+                        :options='teamFormOptions'
+                        :disabled='!activeMission || saving || !teamOptions.length'
+                    />
+                </div>
+                <div class='col-md-2'>
+                    <TablerEnum
+                        v-model='formAssignmentLabel'
+                        label='Assignment'
+                        :options='assignmentFormOptions'
+                        :disabled='!activeMission || saving || loadingCots'
+                    />
+                </div>
+                <div class='col-md-3'>
+                    <TablerInput
+                        v-model='form.instructions'
+                        label='Instructions'
+                        placeholder='Task instructions'
+                        :disabled='!activeMission || saving'
+                    />
+                </div>
+                <div class='col-md-2'>
+                    <TablerInput
+                        v-model='form.started'
+                        label='Started'
+                        type='datetime-local'
+                        :disabled='!activeMission || saving'
+                    />
+                </div>
+                <div class='col-md-2'>
+                    <TablerInput
+                        v-model='form.completed'
+                        label='Completed'
+                        type='datetime-local'
+                        :disabled='!activeMission || saving'
+                    />
                 </div>
             </div>
-        </div>
+            <div class='d-flex flex-wrap gap-2 mt-3'>
+                <button
+                    type='button'
+                    class='btn btn-primary btn-sm'
+                    :disabled='saving'
+                    @click='onAddClick'
+                >
+                    {{ saving ? 'Saving…' : 'Add assignment' }}
+                </button>
+                <button
+                    type='button'
+                    class='btn btn-outline-secondary btn-sm'
+                    :disabled='saving'
+                    @click='resetForm'
+                >
+                    Clear form
+                </button>
+            </div>
+        </TablerBorder>
 
-        <div
+        <TablerBorder
             v-if='activeMission'
-            class='card'
+            class='cloudtak-accent text-white'
+            :shadow='false'
+            :fill-height='false'
+            gap='sm'
         >
-            <div class='card-header py-2 small fw-semibold'>
-                Mission assignments ({{ assignments.length }})
-            </div>
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0'>
+                    Mission Assignments ({{ assignments.length }})
+                </p>
+            </template>
+
             <div
                 v-if='!assignments.length && !loading'
-                class='card-body text-muted small'
+                class='text-muted small'
             >
                 No assignments yet.
             </div>
@@ -209,74 +183,51 @@
                             :key='row.id'
                         >
                             <td>
-                                <input
-                                    :value='row.assignmentNumber'
+                                <TablerInput
+                                    :model-value='row.assignmentNumber'
                                     type='number'
-                                    min='1'
-                                    step='1'
-                                    class='form-control form-control-sm'
                                     :disabled='saving || sending'
-                                    @change='onNumberChange(row.id, ($event.target as HTMLInputElement).value)'
-                                >
+                                    @update:model-value='onNumberChange(row.id, String($event))'
+                                />
                             </td>
                             <td>
-                                <select
-                                    :value='row.teamResourceAssignmentId'
-                                    class='form-select form-select-sm'
+                                <TablerEnum
+                                    :model-value='teamLabelForId(row.teamResourceAssignmentId)'
+                                    :options='teamRowOptions'
                                     :disabled='saving || sending || !teamOptions.length'
-                                    @change='onRowTeamChange(row.id, ($event.target as HTMLSelectElement).value)'
-                                >
-                                    <option
-                                        v-for='team in teamOptions'
-                                        :key='team.id'
-                                        :value='team.id'
-                                    >
-                                        {{ team.resourceIdentifier }}
-                                    </option>
-                                </select>
+                                    @update:model-value='onRowTeamLabelChange(row.id, $event)'
+                                />
                             </td>
                             <td>
-                                <select
-                                    :value='row.assignmentUid'
-                                    class='form-select form-select-sm'
+                                <TablerEnum
+                                    :model-value='callsignForUid(row.assignmentUid)'
+                                    :options='assignmentRowOptions'
                                     :disabled='saving || sending || loadingCots'
-                                    @change='onRowAssignmentChange(row.id, ($event.target as HTMLSelectElement).value)'
-                                >
-                                    <option
-                                        v-for='cot in missionCots'
-                                        :key='cot.uid'
-                                        :value='cot.uid'
-                                    >
-                                        {{ cot.callsign }}
-                                    </option>
-                                </select>
+                                    @update:model-value='onRowAssignmentLabelChange(row.id, $event)'
+                                />
                             </td>
                             <td>
-                                <input
-                                    :value='row.instructions'
-                                    type='text'
-                                    class='form-control form-control-sm'
+                                <TablerInput
+                                    :model-value='row.instructions'
                                     :disabled='saving || sending'
-                                    @change='onFieldChange(row.id, "instructions", ($event.target as HTMLInputElement).value)'
-                                >
+                                    @update:model-value='onFieldChange(row.id, "instructions", String($event))'
+                                />
                             </td>
                             <td>
-                                <input
-                                    :value='row.started'
+                                <TablerInput
+                                    :model-value='row.started'
                                     type='datetime-local'
-                                    class='form-control form-control-sm'
                                     :disabled='saving || sending'
-                                    @change='onFieldChange(row.id, "started", ($event.target as HTMLInputElement).value)'
-                                >
+                                    @update:model-value='onFieldChange(row.id, "started", String($event))'
+                                />
                             </td>
                             <td>
-                                <input
-                                    :value='row.completed'
+                                <TablerInput
+                                    :model-value='row.completed'
                                     type='datetime-local'
-                                    class='form-control form-control-sm'
                                     :disabled='saving || sending'
-                                    @change='onFieldChange(row.id, "completed", ($event.target as HTMLInputElement).value)'
-                                >
+                                    @update:model-value='onFieldChange(row.id, "completed", String($event))'
+                                />
                             </td>
                             <td>
                                 <button
@@ -315,7 +266,7 @@
                     </tbody>
                 </table>
             </div>
-        </div>
+        </TablerBorder>
 
         <div
             v-if='noResourcesModalOpen'
@@ -373,7 +324,12 @@
 
 <script setup lang='ts'>
 import { computed, onMounted, ref, watch } from 'vue';
-import { IconInfoCircle } from '@tabler/icons-vue';
+import {
+    TablerBorder,
+    TablerInput,
+    TablerEnum,
+    TablerInlineAlert,
+} from '@tak-ps/vue-tabler';
 import { useIncident } from '../../composables/useIncident.ts';
 import { useResourceAssignments } from '../../composables/useResourceAssignments.ts';
 import { useWorkAssignments } from '../../composables/useWorkAssignments.ts';
@@ -469,6 +425,63 @@ const assignmentSelectLabel = computed(() => {
     return '— Map object —';
 });
 
+const teamFormOptions = computed(() => [
+    teamSelectLabel.value,
+    ...teamOptions.value.map((team) => team.resourceIdentifier),
+]);
+
+const assignmentFormOptions = computed(() => [
+    assignmentSelectLabel.value,
+    ...missionCots.value.map((cot) => cot.callsign),
+]);
+
+const teamRowOptions = computed(() => teamOptions.value.map((team) => team.resourceIdentifier));
+const assignmentRowOptions = computed(() => missionCots.value.map((cot) => cot.callsign));
+
+const formAssignmentNumber = computed({
+    get(): string {
+        return String(form.value.assignmentNumber ?? '');
+    },
+    set(raw: string): void {
+        const n = Number(raw);
+        form.value.assignmentNumber = Number.isFinite(n) ? n : 0;
+    },
+});
+
+const formTeamLabel = computed({
+    get(): string {
+        if (!form.value.teamResourceAssignmentId) return teamSelectLabel.value;
+        return teamLabelForId(form.value.teamResourceAssignmentId) || teamSelectLabel.value;
+    },
+    set(label: string): void {
+        if (!label || label === teamSelectLabel.value) {
+            form.value.teamResourceAssignmentId = '';
+            form.value.teamLabel = '';
+            return;
+        }
+        const team = teamOptions.value.find((entry) => entry.resourceIdentifier === label);
+        form.value.teamResourceAssignmentId = team?.id ?? '';
+        form.value.teamLabel = team?.resourceIdentifier ?? '';
+    },
+});
+
+const formAssignmentLabel = computed({
+    get(): string {
+        if (!form.value.assignmentUid) return assignmentSelectLabel.value;
+        return callsignForUid(form.value.assignmentUid) || assignmentSelectLabel.value;
+    },
+    set(label: string): void {
+        if (!label || label === assignmentSelectLabel.value) {
+            form.value.assignmentUid = '';
+            form.value.assignmentCallsign = '';
+            return;
+        }
+        const cot = missionCots.value.find((entry) => entry.callsign === label);
+        form.value.assignmentUid = cot?.uid ?? '';
+        form.value.assignmentCallsign = cot?.callsign ?? '';
+    },
+});
+
 function teamLabelForId(id: string): string {
     return teamOptions.value.find((t) => t.id === id)?.resourceIdentifier ?? '';
 }
@@ -486,14 +499,6 @@ function resetForm(): void {
         assignmentNumber: nextNumber,
         started: nowDatetimeLocal(),
     };
-}
-
-function onFormTeamChange(): void {
-    form.value.teamLabel = teamLabelForId(form.value.teamResourceAssignmentId);
-}
-
-function onFormAssignmentChange(): void {
-    form.value.assignmentCallsign = callsignForUid(form.value.assignmentUid);
 }
 
 async function onRefreshMissionCots(): Promise<void> {
@@ -596,6 +601,12 @@ async function onRowTeamChange(id: string, teamId: string): Promise<void> {
     });
 }
 
+async function onRowTeamLabelChange(id: string, label: string): Promise<void> {
+    const team = teamOptions.value.find((entry) => entry.resourceIdentifier === label);
+    if (!team) return;
+    await onRowTeamChange(id, team.id);
+}
+
 async function onRowAssignmentChange(id: string, uid: string): Promise<void> {
     if (!activeMission.value) return;
     await updateAssignment(activeMission.value, id, {
@@ -603,6 +614,12 @@ async function onRowAssignmentChange(id: string, uid: string): Promise<void> {
         assignmentCallsign: callsignForUid(uid),
     });
     await fileCotsIntoAssignmentFolder([uid]);
+}
+
+async function onRowAssignmentLabelChange(id: string, label: string): Promise<void> {
+    const cot = missionCots.value.find((entry) => entry.callsign === label);
+    if (!cot) return;
+    await onRowAssignmentChange(id, cot.uid);
 }
 
 async function onSendStart(id: string): Promise<void> {

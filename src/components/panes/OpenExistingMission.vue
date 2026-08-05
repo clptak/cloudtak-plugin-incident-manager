@@ -1,15 +1,15 @@
 <template>
     <div>
-        <div class='d-flex align-items-center mb-2'>
-            <input
-                v-model='filter'
-                type='text'
-                class='form-control form-control-sm'
-                placeholder='Filter missions by name…'
-                style='max-width: 320px;'
-            >
+        <div class='d-flex align-items-start gap-2 mb-2'>
+            <div class='flex-fill'>
+                <TablerInput
+                    v-model='filter'
+                    placeholder='Filter missions by name…'
+                    icon='search'
+                />
+            </div>
             <button
-                class='btn btn-sm btn-outline-secondary ms-2'
+                class='btn btn-sm btn-outline-secondary mt-1'
                 :disabled='loading'
                 @click='fetchMissions'
             >
@@ -17,12 +17,13 @@
             </button>
         </div>
 
-        <div
+        <TablerInlineAlert
             v-if='error'
-            class='text-danger small mb-2'
-        >
-            {{ error }}
-        </div>
+            class='mb-2'
+            severity='danger'
+            title='Error'
+            :description='error'
+        />
 
         <div
             v-if='!loading && !filtered.length'
@@ -31,11 +32,11 @@
             No missions found.
         </div>
 
-        <div class='list-group'>
+        <div class='d-flex flex-column gap-2'>
             <div
                 v-for='mission in filtered'
                 :key='mission.guid'
-                class='list-group-item'
+                class='cloudtak-accent border rounded-3 text-white px-2 py-2'
             >
                 <div class='d-flex align-items-center'>
                     <div class='me-2'>
@@ -74,17 +75,18 @@
                     v-if='typeof missionPasswords[mission.guid] === "string"'
                     class='mt-2'
                 >
-                    <div class='d-flex align-items-center'>
-                        <input
-                            v-model='missionPasswords[mission.guid]'
-                            type='password'
-                            autocomplete='new-password'
-                            class='form-control form-control-sm'
-                            placeholder='Password'
-                            @keyup.enter='openMission(mission, true)'
-                        >
+                    <div class='d-flex align-items-start gap-2'>
+                        <div class='flex-fill'>
+                            <TablerInput
+                                v-model='missionPasswords[mission.guid]'
+                                type='password'
+                                autocomplete='new-password'
+                                placeholder='Password'
+                                @submit='openMission(mission, true)'
+                            />
+                        </div>
                         <button
-                            class='btn btn-sm btn-primary ms-2'
+                            class='btn btn-sm btn-primary mt-1'
                             :disabled='openingGuid === mission.guid'
                             @click='openMission(mission, true)'
                         >
@@ -105,6 +107,7 @@
 
 <script setup lang='ts'>
 import { ref, computed, onMounted } from 'vue';
+import { TablerInput, TablerInlineAlert } from '@tak-ps/vue-tabler';
 import { server } from '../../../../../src/std.ts';
 import type { Mission } from '../../../../../src/types.ts';
 import { useMapStore } from '../../../../../src/stores/map.ts';

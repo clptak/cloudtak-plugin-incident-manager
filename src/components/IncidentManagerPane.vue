@@ -1,5 +1,5 @@
 <template>
-    <div class='incident-manager-pane d-flex flex-column gap-2 p-2 p-md-3 h-100 w-100 overflow-hidden min-height-0'>
+    <div class='incident-manager-pane d-flex flex-column gap-2 px-3 py-3 h-100 w-100 overflow-hidden min-height-0'>
         <!-- Mobile: offcanvas nav -->
         <div
             id='incident-manager-nav'
@@ -67,22 +67,13 @@
                     </span>
                 </div>
 
-                <ul class='nav nav-tabs incident-h-tabs flex-shrink-0 mb-2 mb-md-3 flex-nowrap overflow-auto'>
-                    <li
-                        v-for='tab in hTabs'
-                        :key='tab.key'
-                        class='nav-item'
-                    >
-                        <button
-                            type='button'
-                            class='nav-link text-nowrap'
-                            :class='{ active: activeHTab === tab.key }'
-                            @click='selectHTabGuarded(tab.key)'
-                        >
-                            {{ tab.label }}
-                        </button>
-                    </li>
-                </ul>
+                <div class='incident-h-tabs flex-shrink-0 mb-2 mb-md-3 overflow-auto'>
+                    <TablerPillGroup
+                        :model-value='activeHTab'
+                        :options='hTabOptions'
+                        @update:model-value='selectHTabGuarded'
+                    />
+                </div>
 
                 <div
                     class='tab-content flex-grow-1 min-height-0'
@@ -122,7 +113,7 @@
 
 <script setup lang='ts'>
 import { onMounted, defineAsyncComponent, computed, ref, watch } from 'vue';
-import { TablerIconButton } from '@tak-ps/vue-tabler';
+import { TablerIconButton, TablerPillGroup } from '@tak-ps/vue-tabler';
 import { IconMenu2 } from '@tabler/icons-vue';
 import IncidentNavList from './IncidentNavList.vue';
 import MissionRequiredModal from './MissionRequiredModal.vue';
@@ -186,6 +177,11 @@ const hTabs = [
     { key: 'risk-assessment', label: 'Risk Assessment' },
 ] as const;
 
+const hTabOptions = hTabs.map((tab) => ({
+    value: tab.key,
+    label: tab.label,
+}));
+
 const {
     activeKey,
     activeHTab,
@@ -241,3 +237,38 @@ onMounted(() => {
     void restoreActiveMissionOnMap();
 });
 </script>
+
+<style scoped>
+.incident-manager-pane {
+    /* Match Mission Info insets; Tabler form surfaces are primary-tinted */
+    --tabler-input-bg: var(--cloudtak-inset-bg);
+    --tblr-bg-forms: var(--cloudtak-inset-bg);
+    --tblr-card-bg: var(--cloudtak-inset-bg);
+    --bs-card-bg: var(--cloudtak-inset-bg);
+}
+
+/*
+ * FloatingPane does not get MainMenu's `.cloudtak-bg → panel-bg` remap.
+ * Solid dark `.cloudtak-bg` (#283547) and Bootstrap `.card` read as blue-grey
+ * slabs. Paint them with inset tokens so sections match Mission Logs tone.
+ * Note: `bg-opacity-*` does nothing on `.cloudtak-bg` (solid !important hex).
+ */
+.incident-manager-pane :deep(.cloudtak-bg) {
+    background-color: var(--cloudtak-inset-bg) !important;
+    border-color: var(--cloudtak-inset-border);
+}
+
+.incident-manager-pane :deep(.card) {
+    background-color: var(--cloudtak-inset-bg) !important;
+    border-color: var(--cloudtak-inset-border);
+}
+
+.incident-manager-pane :deep(.card-header) {
+    background-color: transparent !important;
+}
+
+.incident-manager-pane :deep(.list-group-item) {
+    background-color: var(--cloudtak-inset-bg) !important;
+    border-color: var(--cloudtak-inset-border);
+}
+</style>

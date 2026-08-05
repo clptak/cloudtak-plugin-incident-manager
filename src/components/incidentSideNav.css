@@ -46,7 +46,7 @@
 }
 
 .incident-side-nav .incident-nav-item.active {
-    background: var(--bs-nav-pills-link-active-bg, var(--bs-primary, #206bc4));
+    background: var(--bs-nav-pills-link-active-bg, var(--bs-primary));
     color: var(--bs-nav-pills-link-active-color, #fff);
     font-weight: 600;
 }
@@ -55,7 +55,7 @@
     padding-inline-start: 1.75rem;
     font-size: var(--bs-nav-link-font-size, 1rem);
     font-weight: 400;
-    color: var(--bs-nav-link-color, var(--bs-link-color, #6c7a91));
+    color: var(--bs-nav-link-color, var(--bs-link-color));
 }
 
 .incident-side-nav .incident-nav-item-row {
@@ -80,7 +80,7 @@
 
 .incident-side-nav .incident-nav-sub:hover,
 .incident-side-nav .incident-nav-sub:focus-visible {
-    color: var(--bs-nav-link-hover-color, var(--bs-link-hover-color, #1e293b));
+    color: var(--bs-nav-link-hover-color, var(--bs-link-hover-color));
 }
 
 .incident-side-nav .incident-nav-sub.active {
@@ -132,21 +132,6 @@
 
 .incident-h-tabs {
     flex-shrink: 0;
-}
-
-.incident-h-tabs .nav-link {
-    color: color-mix(in srgb, var(--tblr-body-color, var(--bs-body-color)) 88%, transparent);
-    font-weight: 500;
-}
-
-.incident-h-tabs .nav-link:hover,
-.incident-h-tabs .nav-link:focus-visible {
-    color: var(--tblr-body-color, var(--bs-body-color));
-}
-
-.incident-h-tabs .nav-link.active {
-    color: var(--tblr-body-color, var(--bs-body-color));
-    font-weight: 600;
 }
 
 .incident-mobile-nav-label {
