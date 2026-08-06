@@ -2,7 +2,9 @@
 
 import Subscription from '../../../../src/base/subscription.ts';
 import { formatCoordPair } from '../../../../src/base/utils/coordinateFormat.ts';
+import type { ActiveMission } from '../composables/useIncident.ts';
 import { parseCoordinates } from './coords.ts';
+import { loadSchemaSubscription } from './incidentSubscription.ts';
 import { resolveMissionIppLocation } from './missionIpp.ts';
 import { incidentFormFromSchema, loadMissionSchema, type MissionSchema } from './missionSchema.ts';
 import {
@@ -182,6 +184,8 @@ export async function loadIrBriefingFromMission(
     missionGuid: string,
     missionToken?: string,
     missionName?: string,
+    /** Full active mission — schema reads route to the mgmt sync when present. */
+    activeMission?: ActiveMission,
 ): Promise<LoadedIrBriefing> {
     const form = blankIrBriefingForm();
     const sources: IrBriefingSources = { ippLatLng: null };
@@ -189,7 +193,8 @@ export async function loadIrBriefingFromMission(
     const sub = await Subscription.load(missionGuid, { missiontoken: missionToken ?? '', reload: false });
     const logs = await sub.log.list({ refresh: true });
 
-    const { schema } = await loadMissionSchema(sub);
+    const schemaSub = activeMission?.mgmt ? await loadSchemaSubscription(activeMission) : sub;
+    const { schema } = await loadMissionSchema(schemaSub);
     const incident = incidentFormFromSchema(schema);
     form.incidentCommander = incident.icCoordinator.trim();
     form.incidentName = incident.incidentName.trim();

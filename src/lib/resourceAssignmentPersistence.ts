@@ -1,7 +1,7 @@
 /** Persist resource assignments in mission_schema.json (incident_response.resource_assignments). */
 
 import type { ActiveMission } from '../composables/useIncident.ts';
-import { loadIncidentSubscription, subscriptionMissionToken } from './incidentSubscription.ts';
+import { loadSchemaSubscription, schemaMissionToken } from './incidentSubscription.ts';
 import {
     applyMissionContextToSchema,
     loadMissionSchema,
@@ -46,7 +46,7 @@ export function applyResourceAssignmentsToSchema(
 export async function loadResourceAssignmentsFromMission(
     mission: ActiveMission,
 ): Promise<{ assignments: ResourceAssignment[]; defaultAgency: string; contentHash?: string }> {
-    const sub = await loadIncidentSubscription(mission);
+    const sub = await loadSchemaSubscription(mission);
     const loaded = await loadMissionSchema(sub);
     return {
         assignments: resourceAssignmentsFromSchema(loaded.schema),
@@ -61,7 +61,7 @@ export async function saveResourceAssignmentsToMission(
     contentHash?: string,
     defaultAgency?: string,
 ): Promise<string | undefined> {
-    const sub = await loadIncidentSubscription(mission);
+    const sub = await loadSchemaSubscription(mission);
     const loaded = await loadMissionSchema(sub);
 
     applyResourceAssignmentsToSchema(loaded.schema, assignments);
@@ -73,7 +73,7 @@ export async function saveResourceAssignmentsToMission(
     const saved = await saveMissionSchema(sub, loaded.schema, {
         contentHash: contentHash ?? loaded.contentHash,
         legacyLogId: loaded.legacyLogId,
-        missionToken: subscriptionMissionToken(sub, mission),
+        missionToken: schemaMissionToken(sub, mission),
     });
 
     return saved.contentHash;

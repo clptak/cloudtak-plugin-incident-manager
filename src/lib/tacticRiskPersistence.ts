@@ -1,7 +1,7 @@
 /** Persist shared tactic risk assessments in mission_schema.json (risk.tactic_assessments). */
 
 import type { ActiveMission } from '../composables/useIncident.ts';
-import { loadIncidentSubscription, subscriptionMissionToken } from './incidentSubscription.ts';
+import { loadSchemaSubscription, schemaMissionToken } from './incidentSubscription.ts';
 import {
     applyMissionContextToSchema,
     loadMissionSchema,
@@ -53,7 +53,7 @@ export function applyTacticAssessmentsToSchema(
 export async function loadTacticAssessmentsFromMission(
     mission: ActiveMission,
 ): Promise<{ assessments: TacticRiskMap; contentHash?: string }> {
-    const sub = await loadIncidentSubscription(mission);
+    const sub = await loadSchemaSubscription(mission);
     const loaded = await loadMissionSchema(sub);
     return {
         assessments: tacticAssessmentsFromSchema(loaded.schema),
@@ -66,7 +66,7 @@ export async function saveTacticAssessmentsToMission(
     assessments: TacticRiskMap,
     contentHash?: string,
 ): Promise<string | undefined> {
-    const sub = await loadIncidentSubscription(mission);
+    const sub = await loadSchemaSubscription(mission);
     const loaded = await loadMissionSchema(sub);
 
     applyTacticAssessmentsToSchema(loaded.schema, assessments);
@@ -75,7 +75,7 @@ export async function saveTacticAssessmentsToMission(
     const saved = await saveMissionSchema(sub, loaded.schema, {
         contentHash: contentHash ?? loaded.contentHash,
         legacyLogId: loaded.legacyLogId,
-        missionToken: subscriptionMissionToken(sub, mission),
+        missionToken: schemaMissionToken(sub, mission),
     });
 
     return saved.contentHash;

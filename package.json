@@ -5,7 +5,8 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "typecheck": "vue-tsc --noEmit -p tsconfig.json"
+    "typecheck": "vue-tsc --noEmit -p tsconfig.json",
+    "test": "node --experimental-strip-types --test 'src/domain/*.test.ts'"
   },
   "peerDependencies": {
     "@tabler/icons-vue": "^3.0.0",

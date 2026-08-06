@@ -331,7 +331,7 @@
 import { reactive, ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { IconInfoCircle, IconChevronDown } from '@tabler/icons-vue';
 import { TablerBorder, TablerInput, TablerInlineAlert } from '@tak-ps/vue-tabler';
-import { loadSchemaSubscription, schemaMission } from '../../../lib/incidentSubscription.ts';
+import { loadIncidentSubscription } from '../../../lib/incidentSubscription.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import { loadIcs201FromMission } from '../../../lib/ics201.ts';
 import { nowBriefingDate, nowBriefingTime } from '../../../lib/irBriefing.ts';
@@ -538,7 +538,6 @@ async function prefillPdfHeader(): Promise<void> {
             activeMission.value.guid,
             activeMission.value.token,
             activeMission.value.name,
-            activeMission.value,
         );
         const form = loaded.form;
         pdfHeader.incidentName = form.incidentName.trim() || activeMission.value.name || '';
@@ -620,7 +619,7 @@ async function send(): Promise<void> {
     try {
         const breakdown = factors.map((f) => `${f.label}: ${f.value}`).join('; ');
         const content = `Search Urgency: ${level.value.label} (total ${total.value}/21). ${breakdown}`;
-        const sub = await loadSchemaSubscription(activeMission.value);
+        const sub = await loadIncidentSubscription(activeMission.value);
         await sub.log.create({
             content,
             keywords: ['search-urgency', `urgency:${level.value.label}`, `total:${total.value}`],
@@ -670,14 +669,13 @@ async function addPdfToDataSync(): Promise<void> {
     statusError.value = false;
     try {
         const bytes = await generatePdfBytes();
-        const planningTarget = schemaMission(activeMission.value);
         await uploadMissionFile(
-            planningTarget.guid,
+            activeMission.value.guid,
             URGENCY_RATING_CHART_MISSION_FILENAME,
             bytes,
-            { missionToken: planningTarget.missionToken },
+            { missionToken: activeMission.value.token },
         );
-        const sub = await loadSchemaSubscription(activeMission.value);
+        const sub = await loadIncidentSubscription(activeMission.value);
         await sub.fetch();
         status.value = `Added ${URGENCY_RATING_CHART_MISSION_FILENAME} to ${activeMission.value.name}.`;
     } catch (err) {

@@ -8,6 +8,14 @@ import OverlayManager from '../../../../src/base/overlay.ts';
  * pane navigation survive closing the float pane (and page reloads in-tab).
  */
 
+/** Reference to a DataSync mission (guid + name + owner/subscription token). */
+export interface MissionRef {
+    guid: string;
+    name: string;
+    /** Mission password/token for MissionAuthorization (DataSync writes). */
+    missionToken?: string;
+}
+
 export interface ActiveMission {
     guid: string;
     name: string;
@@ -15,6 +23,12 @@ export interface ActiveMission {
     missionToken?: string;
     /** @deprecated Use missionToken. Kept for older sessionStorage entries. */
     token?: string;
+    /**
+     * Sworn-only management DataSync holding mission_schema.json and planning
+     * products (Phase 1, multi-op architecture). Absent on incidents created
+     * before the dual-sync model — schema I/O then falls back to the main sync.
+     */
+    mgmt?: MissionRef;
 }
 
 export interface PaneNavState {
@@ -110,6 +124,16 @@ function loadMissionFromSession(): ActiveMission | null {
             && typeof (parsed as ActiveMission).name === 'string'
         ) {
             const m = parsed as ActiveMission & { missionToken?: string };
+            const mgmt = m.mgmt
+                && typeof m.mgmt === 'object'
+                && typeof m.mgmt.guid === 'string'
+                && typeof m.mgmt.name === 'string'
+                ? {
+                    guid: m.mgmt.guid,
+                    name: m.mgmt.name,
+                    missionToken: typeof m.mgmt.missionToken === 'string' ? m.mgmt.missionToken : undefined,
+                }
+                : undefined;
             return {
                 guid: m.guid,
                 name: m.name,
@@ -117,6 +141,7 @@ function loadMissionFromSession(): ActiveMission | null {
                     ? m.missionToken
                     : (typeof m.token === 'string' ? m.token : undefined),
                 token: typeof m.token === 'string' ? m.token : undefined,
+                mgmt,
             };
         }
     } catch {

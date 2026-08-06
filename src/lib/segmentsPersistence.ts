@@ -1,7 +1,7 @@
 /** Persist search segments in mission_schema.json (top-level segments map keyed by CoT UUID). */
 
 import type { ActiveMission } from '../composables/useIncident.ts';
-import { loadIncidentSubscription, subscriptionMissionToken } from './incidentSubscription.ts';
+import { loadSchemaSubscription, schemaMissionToken } from './incidentSubscription.ts';
 import {
     applyMissionContextToSchema,
     loadMissionSchema,
@@ -44,7 +44,7 @@ export function applySegmentsToSchema(schema: MissionSchema, segments: SegmentMa
 export async function loadSegmentsFromMission(
     mission: ActiveMission,
 ): Promise<{ segments: SegmentMap; contentHash?: string }> {
-    const sub = await loadIncidentSubscription(mission);
+    const sub = await loadSchemaSubscription(mission);
     const loaded = await loadMissionSchema(sub);
     return {
         segments: segmentsFromSchema(loaded.schema),
@@ -57,7 +57,7 @@ export async function saveSegmentsToMission(
     segments: SegmentMap,
     contentHash?: string,
 ): Promise<string | undefined> {
-    const sub = await loadIncidentSubscription(mission);
+    const sub = await loadSchemaSubscription(mission);
     const loaded = await loadMissionSchema(sub);
 
     applySegmentsToSchema(loaded.schema, segments);
@@ -66,7 +66,7 @@ export async function saveSegmentsToMission(
     const saved = await saveMissionSchema(sub, loaded.schema, {
         contentHash: contentHash ?? loaded.contentHash,
         legacyLogId: loaded.legacyLogId,
-        missionToken: subscriptionMissionToken(sub, mission),
+        missionToken: schemaMissionToken(sub, mission),
     });
 
     return saved.contentHash;

@@ -8,7 +8,7 @@ import {
     type InitialConsensusState,
     type OconnorLetter,
 } from './consensus.ts';
-import { loadIncidentSubscription, subscriptionMissionToken } from './incidentSubscription.ts';
+import { loadSchemaSubscription, schemaMissionToken } from './incidentSubscription.ts';
 import {
     applyMissionContextToSchema,
     loadMissionSchema,
@@ -102,7 +102,7 @@ export interface LoadedCasie {
 }
 
 export async function loadCasieFromMission(mission: ActiveMission): Promise<LoadedCasie> {
-    const sub = await loadIncidentSubscription(mission);
+    const sub = await loadSchemaSubscription(mission);
     const loaded = await loadMissionSchema(sub);
     return {
         consensus: consensusFromSchema(loaded.schema),
@@ -121,7 +121,7 @@ export async function saveCasieToMission(
         contentHash?: string;
     },
 ): Promise<string | undefined> {
-    const sub = await loadIncidentSubscription(mission);
+    const sub = await loadSchemaSubscription(mission);
     const loaded = await loadMissionSchema(sub);
 
     applyConsensusToSchema(loaded.schema, consensus);
@@ -133,7 +133,7 @@ export async function saveCasieToMission(
     const saved = await saveMissionSchema(sub, loaded.schema, {
         contentHash: opts?.contentHash ?? loaded.contentHash,
         legacyLogId: loaded.legacyLogId,
-        missionToken: subscriptionMissionToken(sub, mission),
+        missionToken: schemaMissionToken(sub, mission),
     });
 
     return saved.contentHash;

@@ -1,7 +1,7 @@
 /** Persist search scenarios in mission_schema.json (incident_response.scenarios). */
 
 import type { ActiveMission } from '../composables/useIncident.ts';
-import { loadIncidentSubscription, subscriptionMissionToken } from './incidentSubscription.ts';
+import { loadSchemaSubscription, schemaMissionToken } from './incidentSubscription.ts';
 import {
     applyMissionContextToSchema,
     loadMissionSchema,
@@ -37,7 +37,7 @@ export function applySearchScenariosToSchema(
 export async function loadSearchScenariosFromMission(
     mission: ActiveMission,
 ): Promise<{ scenarios: SearchScenario[]; contentHash?: string }> {
-    const sub = await loadIncidentSubscription(mission);
+    const sub = await loadSchemaSubscription(mission);
     const loaded = await loadMissionSchema(sub);
     return {
         scenarios: searchScenariosFromSchema(loaded.schema),
@@ -50,7 +50,7 @@ export async function saveSearchScenariosToMission(
     scenarios: SearchScenario[],
     contentHash?: string,
 ): Promise<string | undefined> {
-    const sub = await loadIncidentSubscription(mission);
+    const sub = await loadSchemaSubscription(mission);
     const loaded = await loadMissionSchema(sub);
 
     applySearchScenariosToSchema(loaded.schema, scenarios);
@@ -59,7 +59,7 @@ export async function saveSearchScenariosToMission(
     const saved = await saveMissionSchema(sub, loaded.schema, {
         contentHash: contentHash ?? loaded.contentHash,
         legacyLogId: loaded.legacyLogId,
-        missionToken: subscriptionMissionToken(sub, mission),
+        missionToken: schemaMissionToken(sub, mission),
     });
 
     return saved.contentHash;

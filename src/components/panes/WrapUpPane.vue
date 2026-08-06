@@ -84,7 +84,7 @@ import {
     TablerInlineAlert,
 } from '@tak-ps/vue-tabler';
 import { useIncident } from '../../composables/useIncident.ts';
-import { loadIncidentSubscription } from '../../lib/incidentSubscription.ts';
+import { listAllIncidentLogs, loadSchemaSubscription } from '../../lib/incidentSubscription.ts';
 import {
     assignmentDataFromSchema,
     incidentFormFromSchema,
@@ -205,9 +205,9 @@ async function generate(): Promise<void> {
     if (!activeMission.value) return;
     loading.value = true; error.value = ''; report.value = '';
     try {
-        const sub = await loadIncidentSubscription(activeMission.value);
-        const { schema } = await loadMissionSchema(sub);
-        const logs = await sub.log.list({ refresh: true });
+        const schemaSub = await loadSchemaSubscription(activeMission.value);
+        const { schema } = await loadMissionSchema(schemaSub);
+        const logs = await listAllIncidentLogs(activeMission.value);
         const assignmentData = assignmentDataFromSchema(schema);
         const generatedAt = Date.now();
         const { reportNumber, icCoordinator } = resolveReportMeta(schema);

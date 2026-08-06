@@ -26,7 +26,8 @@ import {
     organizationFromOrgChartLogs,
     type Ics201TreeOrganization,
 } from './orgChartExport.ts';
-import { loadIncidentSubscription } from './incidentSubscription.ts';
+import type { ActiveMission } from '../composables/useIncident.ts';
+import { listAllIncidentLogs, loadSchemaSubscription } from './incidentSubscription.ts';
 import {
     assignmentDataFromSchema,
     incidentFormFromSchema,
@@ -833,16 +834,10 @@ function parsePostTag(tag: string): {
  * migration/save side effects of loadOrgChartFromMission.
  */
 async function loadIcs201OrgFromTree(
-    missionGuid: string,
-    missionName?: string,
-    missionToken?: string,
+    mission: ActiveMission,
 ): Promise<Ics201TreeOrganization | null> {
     try {
-        const sub = await loadIncidentSubscription({
-            guid: missionGuid,
-            name: missionName ?? '',
-            missionToken,
-        });
+        const sub = await loadSchemaSubscription(mission);
         const { schema } = await loadMissionSchema(sub);
         const tree = orgChartFromSchemaValue(schema.assignments_org_chart);
         if (!treeHasContent(tree)) return null;
@@ -863,6 +858,12 @@ export async function loadIcs201FromMission(
     missionGuid: string,
     missionToken?: string,
     missionName?: string,
+    /**
+     * Full active mission (with `mgmt` for dual-sync incidents). Schema and
+     * planning reads route to the management sync when present; logs and map
+     * features always come from the main mission sync.
+     */
+    activeMission?: ActiveMission,
 ): Promise<LoadedIcs201> {
     const form = blankIcs201Form();
     const sources: Ics201Sources = {
@@ -871,10 +872,21 @@ export async function loadIcs201FromMission(
         missionGuid,
     };
 
-    const sub = await Subscription.load(missionGuid, { missiontoken: missionToken ?? '', reload: false });
-    const logs = await sub.log.list({ refresh: true });
+    const schemaTarget: ActiveMission = activeMission ?? {
+        guid: missionGuid,
+        name: missionName ?? '',
+        missionToken,
+    };
 
-    const { schema } = await loadMissionSchema(sub);
+    const sub = await Subscription.load(missionGuid, { missiontoken: missionToken ?? '', reload: false });
+    // Dual-sync incidents keep planning logs (objectives, ICS-201, org) on the
+    // mgmt sync and field logs on the main sync — merge for the full picture.
+    const logs = schemaTarget.mgmt
+        ? await listAllIncidentLogs(schemaTarget)
+        : await sub.log.list({ refresh: true });
+
+    const schemaSub = schemaTarget.mgmt ? await loadSchemaSubscription(schemaTarget) : sub;
+    const { schema } = await loadMissionSchema(schemaSub);
     const incident = incidentFormFromSchema(schema);
     if (
         incident.incidentName.trim()
@@ -917,11 +929,7 @@ export async function loadIcs201FromMission(
     // mission_schema.json) first, then legacy `resources`-tagged logs.
     let assignmentRows: Ics201ResourceRow[] = [];
     try {
-        const { assignments } = await loadResourceAssignmentsFromMission({
-            guid: missionGuid,
-            name: missionName ?? '',
-            missionToken,
-        });
+        const { assignments } = await loadResourceAssignmentsFromMission(schemaTarget);
         assignmentRows = resourceRowsFromAssignments(assignments);
     } catch {
         // mission_schema.json may be absent or unreadable; log rows still apply
@@ -936,7 +944,7 @@ export async function loadIcs201FromMission(
     // §9 Current Organization: prefer the live Organization tab chart
     // (assignments_org_chart in mission_schema.json); fall back to synced
     // `ics-org` logs for missions without a chart.
-    const treeOrg = await loadIcs201OrgFromTree(missionGuid, missionName, missionToken);
+    const treeOrg = await loadIcs201OrgFromTree(schemaTarget);
     const orgChart = treeOrg
         ? {
             ...treeOrg.roles,

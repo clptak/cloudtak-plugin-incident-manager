@@ -644,7 +644,7 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { IconChevronDown, IconPlus, IconX } from '@tabler/icons-vue';
 import { TablerBorder, TablerInput, TablerInlineAlert } from '@tak-ps/vue-tabler';
-import { loadIncidentSubscription } from '../../../lib/incidentSubscription.ts';
+import { loadSchemaSubscription, schemaMission } from '../../../lib/incidentSubscription.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import {
     actionRowCapacity,
@@ -818,6 +818,7 @@ async function loadAll(preserveUserFields = false): Promise<void> {
             activeMission.value.guid,
             activeMission.value.token,
             activeMission.value.name,
+            activeMission.value,
         );
         sources.ippLatLng = loaded.sources.ippLatLng;
         sources.missionName = loaded.sources.missionName;
@@ -902,10 +903,11 @@ async function saveToMission(): Promise<void> {
     status.value = '';
     statusError.value = false;
     try {
+        const planningTarget = schemaMission(activeMission.value);
         const logId = await saveIcs201ToMission(
-            activeMission.value.guid,
+            planningTarget.guid,
             form,
-            activeMission.value.token,
+            planningTarget.missionToken,
         );
         form.logId = logId;
         status.value = 'Saved ICS 201 to mission log.';
@@ -966,13 +968,14 @@ async function addPdfToDataSync(): Promise<void> {
     statusError.value = false;
     try {
         const bytes = await generatePdfBytes();
+        const planningTarget = schemaMission(activeMission.value);
         await uploadMissionFile(
-            activeMission.value.guid,
+            planningTarget.guid,
             ICS201_MISSION_FILENAME,
             bytes,
-            { missionToken: activeMission.value.token },
+            { missionToken: planningTarget.missionToken },
         );
-        const sub = await loadIncidentSubscription(activeMission.value);
+        const sub = await loadSchemaSubscription(activeMission.value);
         await sub.fetch();
         status.value = `Added ${ICS201_MISSION_FILENAME} to ${activeMission.value.name}.`;
     } catch (err) {

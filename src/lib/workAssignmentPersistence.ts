@@ -1,7 +1,7 @@
 /** Persist work assignments in mission_schema.json (incident_response.work_assignments). */
 
 import type { ActiveMission } from '../composables/useIncident.ts';
-import { loadIncidentSubscription, subscriptionMissionToken } from './incidentSubscription.ts';
+import { loadSchemaSubscription, schemaMissionToken } from './incidentSubscription.ts';
 import {
     applyMissionContextToSchema,
     loadMissionSchema,
@@ -38,7 +38,7 @@ export function applyWorkAssignmentsToSchema(
 export async function loadWorkAssignmentsFromMission(
     mission: ActiveMission,
 ): Promise<{ assignments: WorkAssignment[]; contentHash?: string }> {
-    const sub = await loadIncidentSubscription(mission);
+    const sub = await loadSchemaSubscription(mission);
     const loaded = await loadMissionSchema(sub);
     return {
         assignments: workAssignmentsFromSchema(loaded.schema),
@@ -51,7 +51,7 @@ export async function saveWorkAssignmentsToMission(
     assignments: WorkAssignment[],
     contentHash?: string,
 ): Promise<string | undefined> {
-    const sub = await loadIncidentSubscription(mission);
+    const sub = await loadSchemaSubscription(mission);
     const loaded = await loadMissionSchema(sub);
 
     applyWorkAssignmentsToSchema(loaded.schema, assignments);
@@ -60,7 +60,7 @@ export async function saveWorkAssignmentsToMission(
     const saved = await saveMissionSchema(sub, loaded.schema, {
         contentHash: contentHash ?? loaded.contentHash,
         legacyLogId: loaded.legacyLogId,
-        missionToken: subscriptionMissionToken(sub, mission),
+        missionToken: schemaMissionToken(sub, mission),
     });
 
     return saved.contentHash;

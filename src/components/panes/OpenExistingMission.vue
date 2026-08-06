@@ -137,7 +137,9 @@ async function fetchMissions(): Promise<void> {
     loading.value = true;
     try {
         const res = await Subscription.list();
-        list.value = res.items;
+        // Management siblings are opened implicitly with their incident —
+        // hide them so the incident is always entered via its common map.
+        list.value = res.items.filter((m) => !m.name.endsWith(' - MGMT'));
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
     } finally {
@@ -208,11 +210,53 @@ async function openMission(mission: Mission, usePassword = false): Promise<void>
 
         const finalToken = fetchedToken || sub?.missiontoken || undefined;
 
+        // Dual-sync incidents: re-attach the Sworn-side management sibling
+        // (`<name> - MGMT`). Only users with the management channel can see it —
+        // for everyone else the lookup 404s and the incident opens single-sync.
+        let mgmt: { guid: string; name: string; missionToken?: string } | undefined;
+        try {
+            const mgmtName = `${mission.name} - MGMT`;
+            const { data: mgmtData } = await server.GET('/api/marti/missions/{:name}', {
+                params: {
+                    path: { ':name': mgmtName },
+                    query: { changes: false, logs: false },
+                },
+            });
+            if (mgmtData?.guid) {
+                const mgmtToken = (mgmtData as { token?: string }).token || undefined;
+                // Server-side subscription so schema writes can resolve a mission
+                // token even in sessions that didn't create the incident.
+                if (!OverlayManager.loadedByMode('mission', mgmtData.guid)) {
+                    await OverlayManager.createLoaded({
+                        name: mgmtData.name,
+                        url: `/mission/${encodeURIComponent(mgmtData.guid)}`,
+                        type: 'geojson',
+                        mode: 'mission',
+                        mode_id: mgmtData.guid,
+                        token: mgmtToken,
+                    });
+                }
+                const mgmtSub = await Subscription.load(mgmtData.guid, {
+                    missiontoken: mgmtToken ?? '',
+                    subscribed: true,
+                    reload: false,
+                });
+                mgmt = {
+                    guid: mgmtData.guid,
+                    name: mgmtData.name,
+                    missionToken: mgmtToken || mgmtSub?.missiontoken || undefined,
+                };
+            }
+        } catch {
+            // No management sibling visible — pre-Phase-1 incident or no channel access.
+        }
+
         setActiveMission({
             guid: mission.guid,
             name: mission.name,
             missionToken: finalToken,
             token: finalToken,
+            mgmt,
         });
 
         delete missionPasswords.value[mission.guid];

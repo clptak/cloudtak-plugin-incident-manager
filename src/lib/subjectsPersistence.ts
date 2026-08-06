@@ -1,7 +1,7 @@
 /** Persist subject information in mission_schema.json (incident_response.subjects array). */
 
 import type { ActiveMission } from '../composables/useIncident.ts';
-import { loadIncidentSubscription, subscriptionMissionToken } from './incidentSubscription.ts';
+import { loadSchemaSubscription, schemaMissionToken } from './incidentSubscription.ts';
 import {
     applyMissionContextToSchema,
     loadMissionSchema,
@@ -168,7 +168,7 @@ export function resolveSubjects(
 export async function loadSubjectsFromMission(
     mission: ActiveMission,
 ): Promise<{ subjects: SubjectForm[]; contentHash?: string; schema: MissionSchema }> {
-    const sub = await loadIncidentSubscription(mission);
+    const sub = await loadSchemaSubscription(mission);
     const loaded = await loadMissionSchema(sub);
     return {
         subjects: subjectsFromSchema(loaded.schema),
@@ -184,7 +184,7 @@ export async function saveSubjectsToMission(
     contentHash?: string,
 ): Promise<string | undefined> {
     if (!forms.length) return contentHash;
-    const sub = await loadIncidentSubscription(mission);
+    const sub = await loadSchemaSubscription(mission);
     const loaded = await loadMissionSchema(sub);
 
     upsertSubjectsInSchema(loaded.schema, forms);
@@ -193,7 +193,7 @@ export async function saveSubjectsToMission(
     const saved = await saveMissionSchema(sub, loaded.schema, {
         contentHash: contentHash ?? loaded.contentHash,
         legacyLogId: loaded.legacyLogId,
-        missionToken: subscriptionMissionToken(sub, mission),
+        missionToken: schemaMissionToken(sub, mission),
     });
 
     return saved.contentHash;

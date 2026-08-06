@@ -426,7 +426,7 @@ import {
     saveSubjectsToMission,
 } from '../../../lib/subjectsPersistence.ts';
 import { loadMissionSchema } from '../../../lib/missionSchema.ts';
-import { loadIncidentSubscription } from '../../../lib/incidentSubscription.ts';
+import { loadIncidentSubscription, loadSchemaSubscription } from '../../../lib/incidentSubscription.ts';
 
 const { activeMission, requireActiveMission } = useIncident();
 
@@ -756,7 +756,8 @@ async function loadSent(): Promise<void> {
     try {
         const sub = await loadIncidentSubscription(activeMission.value);
         const logs = await sub.log.list({ refresh: true });
-        const loaded = await loadMissionSchema(sub);
+        const schemaSub = await loadSchemaSubscription(activeMission.value);
+        const loaded = await loadMissionSchema(schemaSub);
 
         const logByNumber = new Map<string, SentSubject>();
         for (const log of logs) {

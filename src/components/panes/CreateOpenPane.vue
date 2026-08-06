@@ -243,12 +243,28 @@
 
                 <div class='row g-2 mt-1'>
                     <div class='col-12'>
-                        <label class='form-label'>Channels</label>
+                        <label class='form-label'>Field Channels</label>
                         <GroupSelect
                             v-model='form.groups'
                             :active='true'
                             direction='IN'
                         />
+                        <div class='form-text'>
+                            Volunteers &amp; field personnel — the incident common map is shared here.
+                        </div>
+                    </div>
+                    <div class='col-12'>
+                        <label class='form-label'>Management Channels</label>
+                        <GroupSelect
+                            v-model='form.mgmtGroups'
+                            :active='true'
+                            direction='IN'
+                        />
+                        <div class='form-text'>
+                            IMT only — a second &quot;{{ finalName }} - MGMT&quot; DataSync holding
+                            mission_schema.json and planning products is created on these channels.
+                            Field channels never see it.
+                        </div>
                     </div>
                 </div>
 
@@ -460,6 +476,8 @@ const form = reactive({
     description: '',
     nameOverride: '',
     groups: [] as string[],
+    /** IMT-only channels for the Sworn-side management (planning) sync. */
+    mgmtGroups: [] as string[],
     createCaltopo: false,
 });
 
@@ -625,9 +643,12 @@ async function createMission(): Promise<void> {
     loading.value = true;
 
     try {
+        // Incident common map: field channels + management channels, so the IMT
+        // always sees it even with the field channel toggled off (Phase 0 T3/T4).
+        const commonGroups = [...new Set([...form.groups, ...form.mgmtGroups])];
         const body: Mission_Create = {
             name: finalName.value,
-            group: form.groups,
+            group: commonGroups,
             description: form.description || '',
             keywords: buildKeywords(),
         };
@@ -635,6 +656,27 @@ async function createMission(): Promise<void> {
 
         const res = await server.POST('/api/marti/mission', { body });
         if (res.error) throw new Error(res.error.message);
+
+        // Sworn-only management sync: mission_schema.json + planning products.
+        // Never carries field channels — this is the Phase 1 leak fix.
+        let mgmt: { guid: string; name: string; missionToken?: string } | undefined;
+        if (form.mgmtGroups.length) {
+            const mgmtBody: Mission_Create = {
+                name: `${finalName.value} - MGMT`,
+                group: form.mgmtGroups,
+                description: `Management / planning sync for ${finalName.value}`,
+                keywords: buildKeywords(),
+            };
+            mgmtBody.defaultRole = 'MISSION_SUBSCRIBER';
+
+            const mgmtRes = await server.POST('/api/marti/mission', { body: mgmtBody });
+            if (mgmtRes.error) throw new Error(`Management sync failed: ${mgmtRes.error.message}`);
+            mgmt = {
+                guid: mgmtRes.data.guid,
+                name: mgmtRes.data.name,
+                missionToken: mgmtRes.data.token,
+            };
+        }
 
         // Register as a loaded overlay + make active, matching MissionCreate.vue
         await OverlayManager.createLoaded({
@@ -652,9 +694,12 @@ async function createMission(): Promise<void> {
             guid: res.data.guid,
             name: res.data.name,
             missionToken: res.data.token,
+            mgmt,
         });
 
-        status.value = `Created DataSync "${res.data.name}".`;
+        status.value = mgmt
+            ? `Created DataSyncs "${res.data.name}" + "${mgmt.name}" (planning).`
+            : `Created DataSync "${res.data.name}" — no management channels selected; planning data will be visible on the field channels.`;
 
         // Optional Caltopo map via the caltopo-sync plugin
         if (form.createCaltopo) {

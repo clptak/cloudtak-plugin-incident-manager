@@ -419,6 +419,7 @@ async function loadAll(preserveBriefingFields = false): Promise<void> {
             activeMission.value.guid,
             activeMission.value.token,
             activeMission.value.name,
+            activeMission.value,
         );
         ippLatLng = loaded.sources.ippLatLng;
 

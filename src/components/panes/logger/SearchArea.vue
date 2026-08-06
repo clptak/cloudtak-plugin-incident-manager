@@ -742,7 +742,7 @@ import FeatureCallsignCell from '../../FeatureCallsignCell.vue';
 import { areaSqMi, formatSqMi } from '../../../lib/geometryArea.ts';
 import { loadMissionSchema } from '../../../lib/missionSchema.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
-import { loadIncidentSubscription, missionAuthToken } from '../../../lib/incidentSubscription.ts';
+import { loadIncidentSubscription, loadSchemaSubscription, missionAuthToken } from '../../../lib/incidentSubscription.ts';
 import NavHelpButton from '../../NavHelpButton.vue';
 
 const SEARCH_AREA_KEYWORD = 'search-area';
@@ -1030,9 +1030,10 @@ async function loadAreas(sub?: LoadedSub): Promise<void> {
 }
 
 /** Prefill Theoretical Time Reported Missing from CFS Created in mission_schema.json. */
-async function loadTimeReportedMissing(sub: LoadedSub): Promise<void> {
+async function loadTimeReportedMissing(_sub: LoadedSub): Promise<void> {
     try {
-        const { schema } = await loadMissionSchema(sub);
+        const schemaSub = await loadSchemaSubscription(activeMission.value!);
+        const { schema } = await loadMissionSchema(schemaSub);
         const created = schema.cad_data?.call_timestamps?.call_created?.trim() ?? '';
         if (created) {
             timeReportedMissing.value = created;

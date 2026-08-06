@@ -1,7 +1,7 @@
 /** Persist the Assignments org chart in mission_schema.json (not mission logs). */
 
 import type { ActiveMission } from '../composables/useIncident.ts';
-import { loadIncidentSubscription, subscriptionMissionToken } from './incidentSubscription.ts';
+import { loadSchemaSubscription, schemaMissionToken } from './incidentSubscription.ts';
 import { normalizeLogKeywords, type MissionLogLike } from './incidentInfo.ts';
 import {
     applyMissionContextToSchema,
@@ -61,7 +61,7 @@ function latestOrgChartFromLogs(logs: MissionLogLike[]): HastyTreeNode | null {
 }
 
 async function deleteLegacyOrgChartLogs(
-    sub: Awaited<ReturnType<typeof loadIncidentSubscription>>,
+    sub: Awaited<ReturnType<typeof loadSchemaSubscription>>,
 ): Promise<number> {
     if (!sub.log.delete) return 0;
 
@@ -85,7 +85,7 @@ async function deleteLegacyOrgChartLogs(
 export async function loadOrgChartFromMission(
     mission: ActiveMission,
 ): Promise<{ tree: HastyTreeNode; contentHash?: string; migratedFromLog?: boolean }> {
-    const sub = await loadIncidentSubscription(mission);
+    const sub = await loadSchemaSubscription(mission);
     const loaded = await loadMissionSchema(sub);
     let tree = orgChartFromSchemaValue(loaded.schema.assignments_org_chart);
     let migratedFromLog = false;
@@ -105,7 +105,7 @@ export async function loadOrgChartFromMission(
         const saved = await saveMissionSchema(sub, loaded.schema, {
             contentHash: loaded.contentHash,
             legacyLogId: loaded.legacyLogId,
-            missionToken: subscriptionMissionToken(sub, mission),
+            missionToken: schemaMissionToken(sub, mission),
         });
         await deleteLegacyOrgChartLogs(sub);
         return { tree, contentHash: saved.contentHash, migratedFromLog: true };
@@ -120,7 +120,7 @@ export async function saveOrgChartToMission(
     tree: HastyTreeNode,
     contentHash?: string,
 ): Promise<string | undefined> {
-    const sub = await loadIncidentSubscription(mission);
+    const sub = await loadSchemaSubscription(mission);
     const loaded = await loadMissionSchema(sub);
 
     applyOrgChartToSchema(loaded.schema, tree);
@@ -129,7 +129,7 @@ export async function saveOrgChartToMission(
     const saved = await saveMissionSchema(sub, loaded.schema, {
         contentHash: contentHash ?? loaded.contentHash,
         legacyLogId: loaded.legacyLogId,
-        missionToken: subscriptionMissionToken(sub, mission),
+        missionToken: schemaMissionToken(sub, mission),
     });
 
     return saved.contentHash;

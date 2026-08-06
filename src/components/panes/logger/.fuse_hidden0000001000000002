@@ -824,12 +824,11 @@ async function addPdfToDataSync(): Promise<void> {
     statusError.value = false;
     try {
         const bytes = await generatePdfBytes();
-        const planningTarget = schemaMission(activeMission.value);
         await uploadMissionFile(
-            planningTarget.guid,
+            activeMission.value.guid,
             SCENARIOS_RECORD_SHEET_MISSION_FILENAME,
             bytes,
-            { missionToken: planningTarget.missionToken },
+            { missionToken: activeMission.value.token },
         );
         const sub = await loadSchemaSubscription(activeMission.value);
         await sub.fetch();

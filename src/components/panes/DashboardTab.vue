@@ -472,7 +472,7 @@ import { IconChevronDown } from '@tabler/icons-vue';
 import { TablerBorder, TablerInlineAlert } from '@tak-ps/vue-tabler';
 import type { DBSubscriptionLog } from '../../../../../src/database.ts';
 import { useIncident } from '../../composables/useIncident.ts';
-import { loadIncidentSubscription } from '../../lib/incidentSubscription.ts';
+import { listAllIncidentLogs, loadSchemaSubscription } from '../../lib/incidentSubscription.ts';
 import {
     exportDashboardCsv,
     exportDashboardPdf,
@@ -707,9 +707,9 @@ async function exportPdf(): Promise<void> {
     try {
         let info = initialInfo.value;
         if (!info) {
-            const sub = await loadIncidentSubscription(mission);
-            const { schema } = await loadMissionSchema(sub);
-            const logs = await sub.log.list({ refresh: true });
+            const schemaSub = await loadSchemaSubscription(mission);
+            const { schema } = await loadMissionSchema(schemaSub);
+            const logs = await listAllIncidentLogs(mission);
             info = resolveIncidentInfoForm(schema, logs);
         }
         exportDashboardPdf(
@@ -737,9 +737,9 @@ async function refresh(): Promise<void> {
     loading.value = true; error.value = '';
     try {
         const mission = activeMission.value;
-        const sub = await loadIncidentSubscription(mission);
-        const { schema } = await loadMissionSchema(sub);
-        const logs = await sub.log.list({ refresh: true });
+        const schemaSub = await loadSchemaSubscription(mission);
+        const { schema } = await loadMissionSchema(schemaSub);
+        const logs = await listAllIncidentLogs(mission);
         const [orgChartLoaded, resourceLoaded, workLoaded, roster] = await Promise.all([
             loadOrgChartFromMission(mission),
             loadResourceAssignmentsFromMission(mission),

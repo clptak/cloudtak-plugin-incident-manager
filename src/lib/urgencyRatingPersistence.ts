@@ -1,7 +1,7 @@
 /** Persist search urgency rating in mission_schema.json (incident_response.urgency_rating). */
 
 import type { ActiveMission } from '../composables/useIncident.ts';
-import { loadIncidentSubscription, subscriptionMissionToken } from './incidentSubscription.ts';
+import { loadSchemaSubscription, schemaMissionToken } from './incidentSubscription.ts';
 import {
     applyMissionContextToSchema,
     loadMissionSchema,
@@ -37,7 +37,7 @@ export function applyUrgencyRatingToSchema(
 export async function loadUrgencyRatingFromMission(
     mission: ActiveMission,
 ): Promise<{ rating: UrgencyRating | null; contentHash?: string }> {
-    const sub = await loadIncidentSubscription(mission);
+    const sub = await loadSchemaSubscription(mission);
     const loaded = await loadMissionSchema(sub);
     return {
         rating: urgencyRatingFromSchema(loaded.schema),
@@ -50,7 +50,7 @@ export async function saveUrgencyRatingToMission(
     rating: UrgencyRating,
     contentHash?: string,
 ): Promise<string | undefined> {
-    const sub = await loadIncidentSubscription(mission);
+    const sub = await loadSchemaSubscription(mission);
     const loaded = await loadMissionSchema(sub);
 
     applyUrgencyRatingToSchema(loaded.schema, rating);
@@ -59,7 +59,7 @@ export async function saveUrgencyRatingToMission(
     const saved = await saveMissionSchema(sub, loaded.schema, {
         contentHash: contentHash ?? loaded.contentHash,
         legacyLogId: loaded.legacyLogId,
-        missionToken: subscriptionMissionToken(sub, mission),
+        missionToken: schemaMissionToken(sub, mission),
     });
 
     return saved.contentHash;
