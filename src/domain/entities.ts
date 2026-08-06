@@ -64,6 +64,24 @@ export interface DebriefRecord {
     recordedAt?: string;
 }
 
+/**
+ * An assignment published to an OP sync: a segment (or portion) tasked to a
+ * resource for one operational period. The polygon is re-published INTO the
+ * OP sync (new feature uid) so volunteers receive it via their channel.
+ */
+export interface OpAssignment {
+    opNumber: number;
+    segmentUid: string;
+    /** Feature uid of the polygon copy living in the OP sync. */
+    opFeatureUid?: string;
+    /** Human label shown to volunteers (defaults to the segment callsign). */
+    label: string;
+    /** Resource/team tasked (may be assigned at briefing). */
+    team?: string;
+    notes?: string;
+    createdAt?: string;
+}
+
 /** Per-segment rollup across all closed/debriefed OPs. */
 export interface SegmentRollup {
     uid: string;

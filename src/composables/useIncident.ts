@@ -52,6 +52,7 @@ const VALID_NAV_KEYS = new Set([
     'search-area',
     'segmentation',
     'initial-consensus',
+    'operational-periods',
     'incident-post',
     'generate-report-template',
 ]);

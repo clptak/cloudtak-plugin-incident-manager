@@ -15,6 +15,7 @@
         <SearchScenarios v-else-if='sub === "search-scenarios"' />
         <RiskAssessment v-else-if='sub === "risk-assessment"' />
         <IncidentPost v-else-if='sub === "incident-post"' />
+        <AreaSearch v-else-if='sub === "operational-periods"' />
 
         <TablerBorder
             v-else
@@ -45,6 +46,7 @@ const Ics201 = defineAsyncComponent(() => import('./logger/Ics201.vue'));
 const SearchScenarios = defineAsyncComponent(() => import('./logger/SearchScenarios.vue'));
 const RiskAssessment = defineAsyncComponent(() => import('./logger/RiskAssessment.vue'));
 const IncidentPost = defineAsyncComponent(() => import('./logger/IncidentPost.vue'));
+const AreaSearch = defineAsyncComponent(() => import('./logger/AreaSearch.vue'));
 
 const props = defineProps<{ sub: string }>();
 
@@ -60,6 +62,7 @@ const labels: Record<string, string> = {
     'search-scenarios': 'Search Scenarios',
     'risk-assessment': 'Risk Assessment',
     'incident-post': 'Incident POST',
+    'operational-periods': 'Operational Periods',
 };
 
 const subLabel = computed(() => labels[props.sub] ?? props.sub);

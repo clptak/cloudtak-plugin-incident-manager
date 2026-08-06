@@ -17,6 +17,8 @@ export interface ResourceAssignment {
     /** Mission CoT uuid for assignment linkage (DataSync log entryUid). */
     assignmentUid?: string;
     assignmentCallsign?: string;
+    /** Operational period this resource is assigned to (Area Search phase). */
+    opNumber?: number | null;
 }
 
 export const RESOURCE_ASSIGNMENT_STATUSES: { value: ResourceAssignmentStatus; label: string }[] = [
@@ -90,7 +92,13 @@ export function blankResourceAssignmentForm(): Omit<ResourceAssignment, 'id'> {
         eta: null,
         status: 'planned',
         timeArrived: '',
+        opNumber: null,
     };
+}
+
+function normalizeOpNumber(value: unknown): number | null {
+    const n = Number(value);
+    return Number.isInteger(n) && n > 0 ? n : null;
 }
 
 /** Shape written to mission_schema.json → incident_response.resource_assignments[]. */
@@ -108,6 +116,7 @@ export function resourceAssignmentToSchemaRecord(a: ResourceAssignment): Resourc
         timeArrived: a.timeArrived.trim(),
         assignmentUid,
         assignmentCallsign: assignmentUid ? assignmentCallsign : undefined,
+        opNumber: normalizeOpNumber(a.opNumber),
     };
 }
 
@@ -152,6 +161,7 @@ export function normalizeResourceAssignment(raw: unknown): ResourceAssignment | 
         timeArrived: String(r.timeArrived ?? r.resource_arrived_dtg ?? '').trim(),
         assignmentUid: String(r.assignmentUid ?? '').trim() || undefined,
         assignmentCallsign: String(r.assignmentCallsign ?? '').trim() || undefined,
+        opNumber: normalizeOpNumber(r.opNumber),
     };
 }
 

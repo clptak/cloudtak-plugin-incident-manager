@@ -4,7 +4,7 @@
  * Adapters in src/lib implement them over the existing DataSync plumbing.
  */
 
-import type { DebriefRecord, OpPeriodRegistryEntry } from './entities.ts';
+import type { DebriefRecord, OpAssignment, OpPeriodRegistryEntry } from './entities.ts';
 
 /** Registry persistence on the management sync (tak_missions[] in schema). */
 export interface RegistryStore {
@@ -41,4 +41,28 @@ export interface OpPeriodGateway {
 export interface DebriefStore {
     load(): Promise<DebriefRecord[]>;
     append(record: DebriefRecord): Promise<void>;
+}
+
+/** Read segment polygon geometry (from wherever the segment features live). */
+export interface SegmentGeometrySource {
+    getPolygon(uid: string): Promise<{
+        callsign: string;
+        ring: [number, number][];
+        center: [number, number];
+    } | null>;
+}
+
+/** Publish a polygon feature into an OP sync; returns the new feature uid. */
+export interface OpFeaturePublisher {
+    publishPolygon(op: OpPeriodRegistryEntry, polygon: {
+        callsign: string;
+        ring: [number, number][];
+        center: [number, number];
+    }): Promise<string>;
+}
+
+/** Running assignment list — stored on the management sync. */
+export interface AssignmentStore {
+    load(): Promise<OpAssignment[]>;
+    append(assignment: OpAssignment): Promise<void>;
 }

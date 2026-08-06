@@ -48,7 +48,9 @@ export const NAV_SECTIONS: NavSection[] = [
         key: 'h-area',
         label: 'Area Search',
         helpKey: 'area-search',
-        items: [],
+        items: [
+            { key: 'operational-periods', label: 'Operational Periods' },
+        ],
     },
     {
         key: 'h-wrapup',

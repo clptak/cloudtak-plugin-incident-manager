@@ -50,6 +50,12 @@
         />
 
         <TablerInlineAlert
+            v-if='opRegistryError'
+            severity='warning'
+            title='Operational Periods'
+            :description='opRegistryError'
+        />
+        <TablerInlineAlert
             v-if='statusMessage'
             class='mb-3'
             :severity='statusError ? "danger" : "success"'
@@ -207,6 +213,17 @@
                         :disabled='!activeMission || saving'
                     />
                 </div>
+                <div
+                    v-if='opLabelOptions.length > 1'
+                    class='col-md-3'
+                >
+                    <TablerEnum
+                        v-model='formOpLabel'
+                        label='Operational Period'
+                        :options='opLabelOptions'
+                        :disabled='!activeMission || saving'
+                    />
+                </div>
             </div>
 
             <div class='d-flex flex-wrap gap-2 mt-3'>
@@ -270,6 +287,12 @@
                                 Status
                             </th>
                             <th>Time Arrived</th>
+                            <th
+                                v-if='opLabelOptions.length > 1'
+                                style='width: 100px;'
+                            >
+                                OP
+                            </th>
                             <th style='width: 72px;' />
                         </tr>
                     </thead>
@@ -333,6 +356,14 @@
                                     @update:model-value='onFieldChange(assignment.id, "timeArrived", String($event))'
                                 />
                             </td>
+                            <td v-if='opLabelOptions.length > 1'>
+                                <TablerEnum
+                                    :model-value='opLabelFor(assignment.opNumber)'
+                                    :options='opLabelOptions'
+                                    :disabled='saving'
+                                    @update:model-value='onOpLabelChange(assignment.id, $event)'
+                                />
+                            </td>
                             <td>
                                 <button
                                     type='button'
@@ -375,6 +406,9 @@ import {
     type ResourceAssignment,
     type ResourceAssignmentStatus,
 } from '../../lib/resourceAssignments.ts';
+import type { OpPeriodRegistryEntry } from '../../domain/entities.ts';
+import { currentOpPeriod } from '../../domain/registry.ts';
+import { createRegistryStore } from '../../lib/registryPersistence.ts';
 
 const { activeMission, requireActiveMission, selectHTabGuarded } = useIncident();
 const {
@@ -442,6 +476,55 @@ const resourceTypeOptions = RESOURCE_TYPE_OPTIONS;
 const statusOptions = RESOURCE_ASSIGNMENT_STATUSES;
 const statusLabelOptions = statusOptions.map((opt) => opt.label);
 const rowResourceOptions = ['—', ...resourceTypeOptions];
+
+// ── Operational periods (Area Search phase) ────────────────────────────────
+const OP_NONE_LABEL = '— none —';
+const opRegistry = ref<OpPeriodRegistryEntry[]>([]);
+const opLabelOptions = computed(() => [
+    OP_NONE_LABEL,
+    ...opRegistry.value.map((op) => `OP${op.opNumber}`),
+]);
+
+function opLabelFor(opNumber?: number | null): string {
+    return Number.isInteger(opNumber) && (opNumber as number) > 0 ? `OP${opNumber}` : OP_NONE_LABEL;
+}
+
+function opNumberFromLabel(label: string): number | null {
+    const match = /^OP(\d+)$/.exec(label);
+    return match ? Number(match[1]) : null;
+}
+
+const formOpLabel = computed({
+    get(): string { return opLabelFor(form.value.opNumber); },
+    set(label: string): void { form.value.opNumber = opNumberFromLabel(label); },
+});
+
+const opRegistryError = ref('');
+
+async function loadOpRegistry(): Promise<void> {
+    const mission = activeMission.value;
+    opRegistryError.value = '';
+    if (!mission?.mgmt) {
+        opRegistry.value = [];
+        return;
+    }
+    try {
+        opRegistry.value = await createRegistryStore(mission).load();
+        // Default new resources to the current (open) OP when one exists.
+        if (form.value.opNumber == null) {
+            const current = currentOpPeriod(opRegistry.value);
+            if (current) form.value.opNumber = current.opNumber;
+        }
+    } catch (err) {
+        opRegistry.value = [];
+        opRegistryError.value = `Operational periods unavailable: ${err instanceof Error ? err.message : String(err)}`;
+    }
+}
+
+async function onOpLabelChange(id: string, label: string): Promise<void> {
+    if (!activeMission.value) return;
+    await updateAssignment(activeMission.value, id, { opNumber: opNumberFromLabel(label) });
+}
 
 const resourceFormOptions = computed(() => [RESOURCE_PLACEHOLDER, ...resourceTypeOptions]);
 const agencyFormOptions = computed(() => [AGENCY_PLACEHOLDER, ...agencyOptions.value]);
@@ -581,6 +664,7 @@ async function createAssignment(): Promise<void> {
         eta,
         status: form.value.status,
         timeArrived: form.value.timeArrived.trim(),
+        opNumber: form.value.opNumber ?? null,
     });
 
     resetForm();
@@ -629,6 +713,7 @@ watch(() => activeMission.value?.guid, async (guid) => {
     await loadForMission(guid ? activeMission.value : null);
     defaultAgencyInput.value = defaultAgency.value;
     applyEffectiveDefaultToForm(true);
+    await loadOpRegistry();
 }, { immediate: true });
 
 watch(defaultAgency, (value) => {
