@@ -94,7 +94,7 @@ export function createSegmentGeometrySource(mission: ActiveMission): SegmentGeom
     return {
         async getPolygon(uid: string) {
             const sub = await loadIncidentSubscription(mission);
-            const feats = await sub.feature.list({ refresh: true }) as PolygonFeatureLike[];
+            const feats = await sub.feature.list({ refresh: true }) as unknown as PolygonFeatureLike[];
             const feat = feats.find((f) => String(f.id ?? '') === uid);
             if (!feat) return null;
             const ring = ringFromFeature(feat);

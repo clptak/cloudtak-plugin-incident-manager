@@ -403,8 +403,8 @@
 <script setup lang='ts'>
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { TablerBorder, TablerInlineAlert, TablerInput } from '@tak-ps/vue-tabler';
-import { server } from '../../../../../src/std.ts';
-import GroupSelect from '../../../../../src/components/CloudTAK/util/GroupSelect.vue';
+import { server } from '../../../../../../src/std.ts';
+import GroupSelect from '../../../../../../src/components/CloudTAK/util/GroupSelect.vue';
 import { useIncident } from '../../../composables/useIncident.ts';
 import type { DebriefRecord, OpAssignment, OpPeriodRegistryEntry } from '../../../domain/entities.ts';
 import { currentOpPeriod, nextOpNumber } from '../../../domain/registry.ts';

@@ -992,7 +992,7 @@ async function loadAreas(sub?: LoadedSub): Promise<void> {
     loadingAreas.value = true;
     try {
         const s = sub ?? await loadSub();
-        await loadTimeReportedMissing(s);
+        await loadTimeReportedMissing();
         const logs = await s.log.list({ refresh: true });
         const kw = (keywords: string[] | undefined, prefix: string): string => {
             const t = keywords?.find((k) => k.startsWith(prefix));
@@ -1030,7 +1030,7 @@ async function loadAreas(sub?: LoadedSub): Promise<void> {
 }
 
 /** Prefill Theoretical Time Reported Missing from CFS Created in mission_schema.json. */
-async function loadTimeReportedMissing(_sub: LoadedSub): Promise<void> {
+async function loadTimeReportedMissing(): Promise<void> {
     try {
         const schemaSub = await loadSchemaSubscription(activeMission.value!);
         const { schema } = await loadMissionSchema(schemaSub);
