@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { DebriefRecord, SegmentState } from './entities.ts';
-import { computeRollup, cumulativePod, splitSegment } from './rollup.ts';
+import * as historyModule from './history.ts';
+import {
+    computeRollup,
+    cumulativePod,
+    fractionsFromAreas,
+    splitDebriefRecords,
+    splitSegment,
+} from './rollup.ts';
 
 function record(partial: Partial<DebriefRecord> & { segmentUid: string; pod: number }): DebriefRecord {
     return { opNumber: 1, ...partial };
@@ -80,6 +87,31 @@ test('splitSegment: children inherit POA by fraction with lineage', () => {
     assert.equal(a2.poa, 10);
     assert.equal(a1.parentUid, 'a');
     assert.equal(a2.parentUid, 'a');
+});
+
+test('splitDebriefRecords + splitSegment: replay is preserved across a split', () => {
+    // Search parent 'a' at POD 50 in OP1, then split a → a1 (75%) + a2 (25%).
+    const { computeOpHistory } = historyModule;
+    const records: DebriefRecord[] = [record({ segmentUid: 'a', pod: 50 })];
+    const before = computeOpHistory(SEGMENTS, ROW, records);
+
+    const splitSegs = splitSegment(SEGMENTS, 'a', [
+        { uid: 'a1', fraction: 0.75 },
+        { uid: 'a2', fraction: 0.25 },
+    ]);
+    const splitRecs = splitDebriefRecords(records, 'a', ['a1', 'a2']);
+    const after = computeOpHistory(splitSegs, ROW, splitRecs);
+
+    // Children's combined POA equals the parent's, all else unchanged
+    const combined = after.final.poa.a1 + after.final.poa.a2;
+    assert.ok(Math.abs(combined - before.final.poa.a) < 0.05, `${combined} vs ${before.final.poa.a}`);
+    assert.ok(Math.abs(after.final.poa.b - before.final.poa.b) < 0.05);
+    assert.ok(Math.abs(after.final.cumulativePos - before.final.cumulativePos) < 0.05);
+});
+
+test('fractionsFromAreas: normalizes and validates', () => {
+    assert.deepEqual(fractionsFromAreas([3, 1]), [0.75, 0.25]);
+    assert.throws(() => fractionsFromAreas([1, 0]));
 });
 
 test('splitSegment: rejects bad fractions, unknown parents, duplicate uids', () => {

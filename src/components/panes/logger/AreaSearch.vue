@@ -14,6 +14,21 @@
         />
 
         <template v-else>
+            <TablerInlineAlert
+                v-if='error'
+                class='mb-3'
+                severity='danger'
+                title='Error'
+                :description='error'
+            />
+            <TablerInlineAlert
+                v-if='notice'
+                class='mb-3'
+                severity='success'
+                title='Done'
+                :description='notice'
+            />
+
             <!-- ── Operational Periods ─────────────────────────────────── -->
             <TablerBorder
                 class='cloudtak-accent text-white mb-3'
@@ -390,19 +405,6 @@
                     </div>
                 </div>
             </TablerBorder>
-
-            <TablerInlineAlert
-                v-if='error'
-                severity='danger'
-                title='Error'
-                :description='error'
-            />
-            <TablerInlineAlert
-                v-if='notice'
-                severity='success'
-                title='Done'
-                :description='notice'
-            />
         </template>
     </div>
 </template>
@@ -410,6 +412,7 @@
 <script setup lang='ts'>
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { TablerBorder, TablerInlineAlert, TablerInput } from '@tak-ps/vue-tabler';
+import OverlayManager from '../../../../../../src/base/overlay.ts';
 import { server } from '../../../../../../src/std.ts';
 import GroupSelect from '../../../../../../src/components/CloudTAK/util/GroupSelect.vue';
 import { useIncident } from '../../../composables/useIncident.ts';

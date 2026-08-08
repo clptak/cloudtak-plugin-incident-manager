@@ -170,35 +170,100 @@ interface PointFeatureLike {
 }
 
 /**
+ * Find the incident IPP marker. Authoritative pointer: the `area:ipp` log on
+ * the planning (MGMT) sync — the IPP may be an arbitrary chosen marker whose
+ * callsign is NOT `IPP-*`. Fallback: any `IPP-*` point on the common map.
+ */
+async function findIppFeature(mission: ActiveMission): Promise<PointFeatureLike | null> {
+    // 1. area:ipp log → uid (planning logs; falls back to common on old incidents)
+    let ippUid = '';
+    try {
+        const planningSub = await loadSchemaSubscription(mission);
+        const logs = await planningSub.log.list({ refresh: true });
+        for (const log of logs) {
+            const keywords = (log as { keywords?: string[] }).keywords;
+            if (!keywords?.includes('search-area')) continue;
+            const area = keywords.find((k) => k.startsWith('area:'))?.slice('area:'.length);
+            if (area !== 'ipp') continue;
+            const uid = keywords.find((k) => k.startsWith('uid:'))?.slice('uid:'.length);
+            if (uid) ippUid = uid;
+        }
+    } catch { /* logs unavailable — regex fallback below */ }
+
+    // The marker may live on the common map OR the MGMT sync (managers with
+    // the MGMT overlay active drop markers there) — search both.
+    const feats: PointFeatureLike[] = [];
+    try {
+        const sub = await loadIncidentSubscription(mission);
+        feats.push(...await sub.feature.list({ refresh: true }) as unknown as PointFeatureLike[]);
+    } catch { /* common map unavailable */ }
+    if (mission.mgmt) {
+        try {
+            const mgmtSub = await loadSchemaSubscription(mission);
+            feats.push(...await mgmtSub.feature.list({ refresh: true }) as unknown as PointFeatureLike[]);
+        } catch { /* mgmt map unavailable */ }
+    }
+
+    if (ippUid) {
+        const byUid = feats.find((f) => String(f.id ?? '') === ippUid && f.geometry?.type === 'Point');
+        if (byUid) return byUid;
+    }
+    return feats.find((f) => {
+        const callsign = f.properties?.callsign ?? '';
+        return /^IPP-/i.test(callsign) && f.geometry?.type === 'Point';
+    }) ?? null;
+}
+
+/**
  * Copy the incident's IPP marker into an OP sync so every operational period
- * carries it. The IPP point lives on the common map (callsign `IPP-<type>`);
- * a fixed uid per OP (`ipp-<op guid>`) makes republishing idempotent.
- * Returns the published uid, or null when no IPP is set yet.
+ * carries it. A fixed uid per OP (`ipp-<op guid>`) makes republishing
+ * idempotent. Publication is verified against the OP mission and retried
+ * (same silent-association failure mode as polygons). Returns the published
+ * uid, or null when no IPP is set yet.
  */
 export async function publishIppToOp(
     mission: ActiveMission,
     op: OpPeriodRegistryEntry,
 ): Promise<string | null> {
-    const sub = await loadIncidentSubscription(mission);
-    const feats = await sub.feature.list({ refresh: true }) as unknown as PointFeatureLike[];
-    const ipp = feats.find((f) => {
-        const callsign = f.properties?.callsign ?? '';
-        return /^IPP-/i.test(callsign) && f.geometry?.type === 'Point';
-    });
+    const ipp = await findIppFeature(mission);
     if (!ipp) return null;
 
     const coords = ipp.geometry?.coordinates;
     if (!Array.isArray(coords) || coords.length < 2) return null;
 
-    return pushPointToMission({
+    // Reuse the OP's existing IPP copy when present (idempotent republish);
+    // otherwise a fresh UUID — TAK ingest is only proven with UUID-shaped uids.
+    const callsign = ipp.properties?.callsign ?? 'IPP';
+    let uid = '';
+    try {
+        const opSub = await Subscription.load(op.guid, {
+            missiontoken: op.ownerToken ?? '',
+            reload: false,
+        });
+        const opFeats = await opSub.feature.list({ refresh: true }) as unknown as PointFeatureLike[];
+        const existing = opFeats.find(
+            (f) => f.geometry?.type === 'Point' && f.properties?.callsign === callsign,
+        );
+        if (existing) uid = String(existing.id ?? '');
+    } catch { /* fresh uid below */ }
+    if (!uid) uid = globalThis.crypto.randomUUID();
+    const push = () => pushPointToMission({
         missionGuid: op.guid,
         missionToken: op.ownerToken,
-        callsign: ipp.properties?.callsign ?? 'IPP',
+        callsign,
         point: [Number(coords[0]), Number(coords[1])],
         type: ipp.properties?.type ?? 'a-f-G',
         icon: ipp.properties?.icon,
-        id: `ipp-${op.guid}`,
+        id: uid,
     });
+
+    await push();
+    for (let attempt = 0; attempt < 4; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
+        if (await verifyInMission(op, uid)) return uid;
+        if (attempt < 3) await push();
+    }
+    throw new Error(`IPP did not appear in ${op.name} after retries — try "Publish IPP" again.`);
 }
 
 /** True when the uid is present in the OP mission's feature list. */

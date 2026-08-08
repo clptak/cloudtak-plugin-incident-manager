@@ -150,6 +150,41 @@ export function splitSegment(
     ];
 }
 
+/**
+ * Rewrite debrief history for a segment split: each record of the parent
+ * becomes one record per child with the SAME pod/coverage/op. A uniform
+ * search of the parent applies equally to every child, so the replayed POA
+ * mass is preserved exactly (children start at fraction·parentPOA and shift
+ * by the same factor). Records for other segments pass through untouched.
+ */
+export function splitDebriefRecords(
+    records: DebriefRecord[],
+    parentUid: string,
+    childUids: string[],
+): DebriefRecord[] {
+    if (childUids.length < 2) throw new Error('splitDebriefRecords: need at least 2 children');
+    const out: DebriefRecord[] = [];
+    for (const record of records) {
+        if (record.segmentUid !== parentUid) {
+            out.push(record);
+            continue;
+        }
+        for (const childUid of childUids) {
+            out.push({ ...record, segmentUid: childUid });
+        }
+    }
+    return out;
+}
+
+/** Area-proportional fractions (normalized) for split children. */
+export function fractionsFromAreas(areas: number[]): number[] {
+    if (areas.some((a) => !Number.isFinite(a) || a <= 0)) {
+        throw new Error('fractionsFromAreas: every child needs a positive area');
+    }
+    const total = areas.reduce((a, b) => a + b, 0);
+    return areas.map((a) => a / total);
+}
+
 function round2(value: number): number {
     return Math.round(value * 100) / 100;
 }
