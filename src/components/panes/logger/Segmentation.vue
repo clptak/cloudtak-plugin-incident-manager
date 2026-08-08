@@ -216,6 +216,8 @@ interface MissionFeatureRef {
     uid: string;
     callsign: string;
     areaSqMi?: number;
+    onCommonMap?: boolean;
+    geometry?: Feature['geometry'];
 }
 
 interface SegmentRow {
