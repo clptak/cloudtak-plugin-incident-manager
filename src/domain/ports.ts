@@ -43,26 +43,43 @@ export interface DebriefStore {
     append(record: DebriefRecord): Promise<void>;
 }
 
-/** Read segment polygon geometry (from wherever the segment features live). */
-export interface SegmentGeometrySource {
-    getPolygon(uid: string): Promise<{
-        callsign: string;
-        ring: [number, number][];
-        center: [number, number];
-    } | null>;
+/** Style carried from the source polygon so OP copies render identically. */
+export interface PolygonStyle {
+    stroke?: string;
+    fill?: string;
+    fillOpacity?: number;
+    strokeWidth?: number;
+    strokeStyle?: 'solid' | 'dashed' | 'dotted' | 'outlined';
 }
 
-/** Publish a polygon feature into an OP sync; returns the new feature uid. */
+export interface PolygonPayload {
+    callsign: string;
+    ring: [number, number][];
+    center: [number, number];
+    style?: PolygonStyle;
+}
+
+/** Read segment polygon geometry (from wherever the segment features live). */
+export interface SegmentGeometrySource {
+    getPolygon(uid: string): Promise<PolygonPayload | null>;
+}
+
+/**
+ * Publish a polygon feature into an OP sync; returns the feature uid.
+ * Pass `existingUid` on republish — TAK treats a repeated uid as an update,
+ * which prevents duplicate polygons on subscriber maps.
+ */
 export interface OpFeaturePublisher {
-    publishPolygon(op: OpPeriodRegistryEntry, polygon: {
-        callsign: string;
-        ring: [number, number][];
-        center: [number, number];
-    }): Promise<string>;
+    publishPolygon(
+        op: OpPeriodRegistryEntry,
+        polygon: PolygonPayload,
+        existingUid?: string,
+    ): Promise<string>;
 }
 
 /** Running assignment list — stored on the management sync. */
 export interface AssignmentStore {
     load(): Promise<OpAssignment[]>;
-    append(assignment: OpAssignment): Promise<void>;
+    /** Insert or replace keyed by (opNumber, segmentUid). */
+    upsert(assignment: OpAssignment): Promise<void>;
 }

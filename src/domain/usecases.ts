@@ -81,23 +81,29 @@ export async function publishAssignments(
     if (op.status === 'closed') throw new Error('publishAssignments: OP is closed');
     if (!input.segmentUids.length) throw new Error('publishAssignments: no segments selected');
 
+    const existing = await deps.assignments.load();
     const published: OpAssignment[] = [];
     for (const segmentUid of input.segmentUids) {
         const polygon = await deps.geometry.getPolygon(segmentUid);
         if (!polygon) {
             throw new Error(`publishAssignments: no polygon found for segment ${segmentUid}`);
         }
-        const opFeatureUid = await deps.publisher.publishPolygon(op, polygon);
+        // Republish reuses the prior feature uid — TAK updates in place instead
+        // of duplicating polygons on subscriber maps.
+        const prior = existing.find(
+            (a) => a.opNumber === op.opNumber && a.segmentUid === segmentUid,
+        );
+        const opFeatureUid = await deps.publisher.publishPolygon(op, polygon, prior?.opFeatureUid);
         const assignment: OpAssignment = {
             opNumber: op.opNumber,
             segmentUid,
             opFeatureUid,
             label: polygon.callsign || segmentUid,
-            createdAt: (deps.now?.() ?? new Date()).toISOString(),
+            createdAt: prior?.createdAt ?? (deps.now?.() ?? new Date()).toISOString(),
         };
         if (input.team?.trim()) assignment.team = input.team.trim();
         if (input.notes?.trim()) assignment.notes = input.notes.trim();
-        await deps.assignments.append(assignment);
+        await deps.assignments.upsert(assignment);
         published.push(assignment);
     }
     return published;

@@ -5,9 +5,15 @@
  * - OpFeaturePublisher: re-publish the polygon into the OP sync.
  */
 
+import Subscription from '../../../../src/base/subscription.ts';
 import type { ActiveMission } from '../composables/useIncident.ts';
 import type { OpAssignment, OpPeriodRegistryEntry } from '../domain/entities.ts';
-import type { AssignmentStore, OpFeaturePublisher, SegmentGeometrySource } from '../domain/ports.ts';
+import type {
+    AssignmentStore,
+    OpFeaturePublisher,
+    PolygonStyle,
+    SegmentGeometrySource,
+} from '../domain/ports.ts';
 import { loadIncidentSubscription, loadSchemaSubscription, schemaMissionToken } from './incidentSubscription.ts';
 import { pushPolygonToMission } from './missionFeatures.ts';
 import { loadMissionSchema, saveMissionSchema, type MissionSchema } from './missionSchema.ts';
@@ -41,10 +47,12 @@ export function createAssignmentStore(mission: ActiveMission): AssignmentStore {
             return opAssignmentsFromSchema(schema);
         },
 
-        async append(assignment: OpAssignment): Promise<void> {
+        async upsert(assignment: OpAssignment): Promise<void> {
             const sub = await loadSchemaSubscription(mission);
             const loaded = await loadMissionSchema(sub);
-            const existing = opAssignmentsFromSchema(loaded.schema);
+            const existing = opAssignmentsFromSchema(loaded.schema).filter(
+                (a) => !(a.opNumber === assignment.opNumber && a.segmentUid === assignment.segmentUid),
+            );
             (loaded.schema.incident_response as Record<string, unknown>).op_assignments = [
                 ...existing,
                 assignment,
@@ -63,11 +71,32 @@ interface PolygonFeatureLike {
     properties?: {
         callsign?: string;
         center?: [number, number];
+        stroke?: string;
+        fill?: string;
+        'fill-opacity'?: number;
+        'stroke-width'?: number;
+        'stroke-style'?: string;
     };
     geometry?: {
         type?: string;
         coordinates?: unknown;
     };
+}
+
+/** Carry the manager-drawn style onto the OP copy so it renders identically. */
+function styleFromFeature(feat: PolygonFeatureLike): PolygonStyle | undefined {
+    const props = feat.properties;
+    if (!props) return undefined;
+    const style: PolygonStyle = {};
+    if (typeof props.stroke === 'string') style.stroke = props.stroke;
+    if (typeof props.fill === 'string') style.fill = props.fill;
+    if (typeof props['fill-opacity'] === 'number') style.fillOpacity = props['fill-opacity'];
+    if (typeof props['stroke-width'] === 'number') style.strokeWidth = props['stroke-width'];
+    if (props['stroke-style'] === 'solid' || props['stroke-style'] === 'dashed'
+        || props['stroke-style'] === 'dotted' || props['stroke-style'] === 'outlined') {
+        style.strokeStyle = props['stroke-style'];
+    }
+    return Object.keys(style).length ? style : undefined;
 }
 
 function ringFromFeature(feat: PolygonFeatureLike): [number, number][] | null {
@@ -120,22 +149,56 @@ export function createSegmentGeometrySource(mission: ActiveMission): SegmentGeom
                 callsign: feat.properties?.callsign || uid,
                 ring,
                 center,
+                style: styleFromFeature(feat),
             };
         },
     };
 }
 
-/** Publishes polygon copies into the OP sync with the OP owner token. */
+/** True when the uid is present in the OP mission's feature list. */
+async function verifyInMission(op: OpPeriodRegistryEntry, uid: string): Promise<boolean> {
+    try {
+        const sub = await Subscription.load(op.guid, {
+            missiontoken: op.ownerToken ?? '',
+            reload: false,
+        });
+        const feats = await sub.feature.list({ refresh: true }) as unknown as PolygonFeatureLike[];
+        return feats.some((f) => String(f.id ?? '') === uid);
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Publishes polygon copies into the OP sync with the OP owner token.
+ * The websocket publish path can deliver the CoT without the mission
+ * association landing (observed in the field: polygon on subscriber maps but
+ * absent from the DataSync) — so each publish is VERIFIED against the OP
+ * mission's feature list and retried with the SAME uid until it lands.
+ */
 export function createOpFeaturePublisher(): OpFeaturePublisher {
     return {
-        async publishPolygon(op: OpPeriodRegistryEntry, polygon) {
-            return pushPolygonToMission({
+        async publishPolygon(op: OpPeriodRegistryEntry, polygon, existingUid?: string) {
+            const push = () => pushPolygonToMission({
                 missionGuid: op.guid,
                 missionToken: op.ownerToken,
                 callsign: polygon.callsign,
                 ring: polygon.ring,
                 center: polygon.center,
+                style: polygon.style,
+                id: existingUid,
             });
+
+            let uid = await push();
+            existingUid = uid;
+            for (let attempt = 0; attempt < 4; attempt++) {
+                await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
+                if (await verifyInMission(op, uid)) return uid;
+                if (attempt < 3) uid = await push();
+            }
+            throw new Error(
+                `Assignment "${polygon.callsign}" did not appear in ${op.name} after retries — check the OP sync and republish.`,
+            );
         },
     };
 }

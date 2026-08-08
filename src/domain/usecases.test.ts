@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { DebriefRecord, OpPeriodRegistryEntry } from './entities.ts';
+import type { DebriefRecord, OpAssignment, OpPeriodRegistryEntry } from './entities.ts';
 import type { DebriefStore, OpPeriodGateway, RegistryStore } from './ports.ts';
 import {
     checkInSubscriber,
@@ -99,8 +99,8 @@ test('publishAssignments: republishes polygons into the OP sync and records the 
     const op: OpPeriodRegistryEntry = {
         opNumber: 2, name: 'X - OP2', guid: 'g2', status: 'open', channels: [],
     };
-    const stored: unknown[] = [];
-    const published: string[] = [];
+    const stored: OpAssignment[] = [];
+    const published: { callsign: string; existingUid?: string }[] = [];
     const deps = {
         geometry: {
             async getPolygon(uid: string) {
@@ -109,28 +109,42 @@ test('publishAssignments: republishes polygons into the OP sync and records the 
                     callsign: `Seg ${uid}`,
                     ring: [[0, 0], [0, 1], [1, 1], [0, 0]] as [number, number][],
                     center: [0.33, 0.66] as [number, number],
+                    style: { stroke: '#ff9900' },
                 };
             },
         },
         publisher: {
-            async publishPolygon(_op: OpPeriodRegistryEntry, polygon: { callsign: string }) {
-                published.push(polygon.callsign);
-                return `op-feat-${published.length}`;
+            async publishPolygon(_op: OpPeriodRegistryEntry, polygon: { callsign: string }, existingUid?: string) {
+                published.push({ callsign: polygon.callsign, existingUid });
+                return existingUid ?? `op-feat-${published.length}`;
             },
         },
         assignments: {
-            async load() { return []; },
-            async append(a: unknown) { stored.push(a); },
+            async load() { return [...stored]; },
+            async upsert(a: OpAssignment) {
+                const i = stored.findIndex(
+                    (s) => s.opNumber === a.opNumber && s.segmentUid === a.segmentUid,
+                );
+                if (i >= 0) stored[i] = a;
+                else stored.push(a);
+            },
         },
         now: NOW,
     };
 
     const result = await publishAssignments(deps, op, { segmentUids: ['s1', 's2'], team: 'Team 3' });
     assert.equal(result.length, 2);
-    assert.deepEqual(published, ['Seg s1', 'Seg s2']);
+    assert.deepEqual(published.map((p) => p.callsign), ['Seg s1', 'Seg s2']);
     assert.equal(result[0].opFeatureUid, 'op-feat-1');
     assert.equal(result[1].team, 'Team 3');
     assert.equal(stored.length, 2);
+
+    // Republish of s1: reuses the prior feature uid (no duplicate polygon)
+    // and replaces the list entry instead of appending.
+    await publishAssignments(deps, op, { segmentUids: ['s1'], team: 'Team 5' });
+    assert.equal(published.at(-1)?.existingUid, 'op-feat-1');
+    assert.equal(stored.length, 2);
+    assert.equal(stored.find((a) => a.segmentUid === 's1')?.team, 'Team 5');
 
     await assert.rejects(() => publishAssignments(deps, op, { segmentUids: [] }));
     await assert.rejects(() => publishAssignments(deps, op, { segmentUids: ['missing'] }));
