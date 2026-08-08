@@ -183,7 +183,32 @@ import FeatureCallsignCell from '../../FeatureCallsignCell.vue';
 import { flyToFeature } from '../../../lib/flyToFeature.ts';
 import { areaSqMi, formatSqMi } from '../../../lib/geometryArea.ts';
 import { ensureMissionFolder } from '../../../lib/folder.ts';
-import { missionAuthToken } from '../../../lib/incidentSubscription.ts';
+import {
+    loadSchemaSubscription,
+    missionAuthToken,
+    schemaMission,
+} from '../../../lib/incidentSubscription.ts';
+import { deletePolygonFromMission, pushPolygonToMission } from '../../../lib/missionFeatures.ts';
+
+function ringFromGeometry(geometry: unknown): [number, number][] | null {
+    const geom = geometry as { type?: string; coordinates?: unknown };
+    const coords = geom?.type === 'Polygon' ? geom.coordinates
+        : geom?.type === 'MultiPolygon' && Array.isArray(geom.coordinates) ? (geom.coordinates as unknown[])[0]
+            : null;
+    if (!Array.isArray(coords) || !Array.isArray(coords[0])) return null;
+    const ring: [number, number][] = [];
+    for (const point of coords[0] as unknown[]) {
+        if (!Array.isArray(point) || point.length < 2) return null;
+        ring.push([Number(point[0]), Number(point[1])]);
+    }
+    return ring.length >= 4 ? ring : null;
+}
+
+function ringCentroid(ring: [number, number][]): [number, number] {
+    let lon = 0; let lat = 0;
+    for (const [x, y] of ring) { lon += x; lat += y; }
+    return [lon / ring.length, lat / ring.length];
+}
 
 const SEGMENTS_FOLDER = 'Segments';
 
@@ -246,9 +271,10 @@ async function loadFeatures(): Promise<void> {
     }
     loadingFeatures.value = true;
     try {
-        const sub = await loadSub();
-        const feats = await sub.feature.list({ refresh: true });
-        missionPolygons.value = feats
+        // Candidates come from BOTH maps: hand-drawn polygons land on the common
+        // map (CloudTAK draws onto the map's active mission); registered segments
+        // live on the MGMT sync. Registration MOVES common-map polygons to MGMT.
+        const collect = (feats: Feature[], onCommonMap: boolean) => feats
             .filter((f: Feature) => {
                 const t = (f.geometry as { type?: string })?.type;
                 if (t !== 'Polygon' && t !== 'MultiPolygon') return false;
@@ -261,8 +287,24 @@ async function loadFeatures(): Promise<void> {
                     uid: String(f.id),
                     callsign: (props.callsign as string).trim(),
                     areaSqMi: areaSqMi(f.geometry),
+                    onCommonMap,
+                    geometry: f.geometry,
                 };
             });
+
+        const commonSub = await loadSub();
+        const commonFeats = collect(await commonSub.feature.list({ refresh: true }), true);
+
+        let mgmtFeats: typeof commonFeats = [];
+        if (activeMission.value.mgmt) {
+            try {
+                const mgmtSub = await loadSchemaSubscription(activeMission.value);
+                mgmtFeats = collect(await mgmtSub.feature.list({ refresh: true }), false);
+            } catch { /* mgmt features unavailable — common list still usable */ }
+        }
+
+        const seen = new Set(mgmtFeats.map((f) => f.uid));
+        missionPolygons.value = [...mgmtFeats, ...commonFeats.filter((f) => !seen.has(f.uid))];
     } catch {
         missionPolygons.value = [];
     } finally {
@@ -319,31 +361,57 @@ async function onAddSegments(): Promise<void> {
     status.value = '';
     statusError.value = false;
     try {
-        const addedUids = [...segmentUids.value];
+        const mission = activeMission.value;
+        const planning = schemaMission(mission);
         const next: SegmentMap = { ...segments.value };
         const now = new Date().toISOString();
-        let n = 0;
-        for (const uid of addedUids) {
+        const registeredUids: string[] = [];
+        let moved = 0;
+        for (const uid of [...segmentUids.value]) {
             const poly = missionPolygons.value.find((p) => p.uid === uid);
-            next[uid] = {
-                callsign: poly?.callsign ?? uid,
-                created: next[uid]?.created || now,
+            let finalUid = uid;
+            // Hand-drawn polygons land on the common (field-visible) map — MOVE
+            // them to the MGMT sync at registration so segments stay Sworn-side.
+            if (poly?.onCommonMap && mission.mgmt && poly.geometry) {
+                const ring = ringFromGeometry(poly.geometry);
+                if (ring) {
+                    finalUid = await pushPolygonToMission({
+                        missionGuid: planning.guid,
+                        missionToken: planning.missionToken,
+                        callsign: poly.callsign,
+                        ring,
+                        center: ringCentroid(ring),
+                    });
+                    try {
+                        await deletePolygonFromMission({
+                            missionGuid: mission.guid,
+                            uid,
+                            missiontoken: missionAuthToken(mission) || undefined,
+                        });
+                    } catch { /* copy exists in MGMT; stale common copy is cosmetic */ }
+                    moved++;
+                }
+            }
+            next[finalUid] = {
+                callsign: poly?.callsign ?? finalUid,
+                created: next[finalUid]?.created || now,
             };
-            n++;
+            registeredUids.push(finalUid);
         }
-        contentHash.value = await saveSegmentsToMission(activeMission.value, next, contentHash.value);
+        contentHash.value = await saveSegmentsToMission(mission, next, contentHash.value);
         segments.value = next;
         segmentUids.value = [];
-        // Polygons already exist on the mission — direct attach files them into
-        // the folder (same as Mission → Layers drag-drop / Subjective).
+        // File segment polygons into the Segments folder on the MGMT sync.
         try {
-            const sub = await loadSub();
+            const sub = mission.mgmt ? await loadSchemaSubscription(mission) : await loadSub();
             const folder = await ensureMissionFolder(sub, SEGMENTS_FOLDER);
-            await sub.layer.attachFeatures(folder.uid, addedUids);
+            await sub.layer.attachFeatures(folder.uid, registeredUids);
         } catch (attachErr) {
             console.warn('Failed to file segments into Segments folder', attachErr);
         }
-        status.value = `Saved ${n} segment${n === 1 ? '' : 's'} to ${activeMission.value.name}.`;
+        await loadFeatures();
+        status.value = `Saved ${registeredUids.length} segment${registeredUids.length === 1 ? '' : 's'}`
+            + (moved ? ` (${moved} moved to ${mission.mgmt?.name ?? 'MGMT'})` : '') + '.';
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);

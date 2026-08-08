@@ -687,6 +687,18 @@ async function createMission(): Promise<void> {
             token: res.data.token,
             mode_id: res.data.guid,
         });
+        // Load the MGMT overlay too so planning features (search areas, rings,
+        // segments) render on the manager's map.
+        if (mgmt) {
+            await OverlayManager.createLoaded({
+                name: mgmt.name,
+                url: `/mission/${encodeURIComponent(mgmt.guid)}`,
+                type: 'geojson',
+                mode: 'mission',
+                token: mgmt.missionToken,
+                mode_id: mgmt.guid,
+            });
+        }
         const sub = await mapStore.loadMission(res.data.guid);
         if (sub) await mapStore.makeActiveMission(sub);
 

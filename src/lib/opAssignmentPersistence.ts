@@ -89,13 +89,26 @@ function centroid(ring: [number, number][]): [number, number] {
     return [lon / ring.length, lat / ring.length];
 }
 
-/** Reads segment polygons from the incident common map's mission features. */
+/**
+ * Reads segment polygons — MGMT sync first (segments are moved there at
+ * registration), falling back to the common map for pre-move segments.
+ */
 export function createSegmentGeometrySource(mission: ActiveMission): SegmentGeometrySource {
     return {
         async getPolygon(uid: string) {
-            const sub = await loadIncidentSubscription(mission);
-            const feats = await sub.feature.list({ refresh: true }) as unknown as PolygonFeatureLike[];
-            const feat = feats.find((f) => String(f.id ?? '') === uid);
+            let feat: PolygonFeatureLike | undefined;
+            if (mission.mgmt) {
+                try {
+                    const mgmtSub = await loadSchemaSubscription(mission);
+                    const mgmtFeats = await mgmtSub.feature.list({ refresh: true }) as unknown as PolygonFeatureLike[];
+                    feat = mgmtFeats.find((f) => String(f.id ?? '') === uid);
+                } catch { /* fall through to the common map */ }
+            }
+            if (!feat) {
+                const sub = await loadIncidentSubscription(mission);
+                const feats = await sub.feature.list({ refresh: true }) as unknown as PolygonFeatureLike[];
+                feat = feats.find((f) => String(f.id ?? '') === uid);
+            }
             if (!feat) return null;
             const ring = ringFromFeature(feat);
             if (!ring) return null;

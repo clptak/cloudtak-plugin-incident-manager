@@ -742,7 +742,7 @@ import FeatureCallsignCell from '../../FeatureCallsignCell.vue';
 import { areaSqMi, formatSqMi } from '../../../lib/geometryArea.ts';
 import { loadMissionSchema } from '../../../lib/missionSchema.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
-import { loadIncidentSubscription, loadSchemaSubscription, missionAuthToken } from '../../../lib/incidentSubscription.ts';
+import { loadIncidentSubscription, loadSchemaSubscription, missionAuthToken, schemaMission } from '../../../lib/incidentSubscription.ts';
 import NavHelpButton from '../../NavHelpButton.vue';
 
 const SEARCH_AREA_KEYWORD = 'search-area';
@@ -932,8 +932,23 @@ const loadingAreas = ref(false);
 
 type LoadedSub = Awaited<ReturnType<typeof loadIncidentSubscription>>;
 
+/**
+ * Search Transition artifacts are planning products: polygons and area logs
+ * live on the MGMT sync (Sworn-only). Only the IPP point marker and the
+ * "choose DataSync object" list use the common (field-visible) sync.
+ */
 async function loadSub(): Promise<LoadedSub> {
+    return loadSchemaSubscription(activeMission.value!);
+}
+
+async function loadCommonSub(): Promise<LoadedSub> {
     return loadIncidentSubscription(activeMission.value!);
+}
+
+/** Mission target for planning polygons (MGMT sync when present). */
+function planningTarget(): { guid: string; missionToken?: string } {
+    const target = schemaMission(activeMission.value!);
+    return { guid: target.guid, missionToken: target.missionToken };
 }
 
 // ---- Sequential accordion state -------------------------------------------
@@ -1107,7 +1122,7 @@ async function loadFeatures(sub?: LoadedSub): Promise<void> {
     }
     loadingFeatures.value = true;
     try {
-        const s = sub ?? await loadSub();
+        const s = sub ?? await loadCommonSub();
         const feats = await s.feature.list({ refresh: true });
         const toRef = (f: { id: unknown; properties?: unknown; geometry?: unknown }): MissionFeatureRef => {
             const props = (f.properties ?? {}) as { callsign?: string };
@@ -1282,9 +1297,10 @@ async function upsertRing(
     const ring = circleRing(center[0], center[1], milesToMeters(miles));
     const existing = sentAreas.value.find((a) => a.key === key);
 
+    const planning = planningTarget();
     const uuid = await pushPolygonToMission({
-        missionGuid: activeMission.value!.guid,
-        missionToken: missionAuthToken(activeMission.value!),
+        missionGuid: planning.guid,
+        missionToken: planning.missionToken,
         callsign: label,
         ring,
         center,
@@ -1310,9 +1326,10 @@ async function insertLpbRing(
     if (!center) throw new Error('No IPP center set.');
     const ring = circleRing(center[0], center[1], milesToMeters(miles));
 
+    const planning = planningTarget();
     const uuid = await pushPolygonToMission({
-        missionGuid: activeMission.value!.guid,
-        missionToken: missionAuthToken(activeMission.value!),
+        missionGuid: planning.guid,
+        missionToken: planning.missionToken,
         callsign: label,
         ring,
         center,
@@ -1554,10 +1571,14 @@ async function removeArea(area: SentArea): Promise<void> {
         const ownsFeature = area.key === 'theoretical' || area.key.startsWith('lpb:') || area.key === IPP_KEY;
         if (ownsFeature) {
             try {
+                // Polygons live on the MGMT sync; the IPP point on the common map.
+                const target = area.key === IPP_KEY
+                    ? { guid: activeMission.value.guid, missionToken: missionAuthToken(activeMission.value) }
+                    : planningTarget();
                 await deletePolygonFromMission({
-                    missionGuid: activeMission.value.guid,
+                    missionGuid: target.guid,
                     uid: area.uuid,
-                    missiontoken: missionAuthToken(activeMission.value) || undefined,
+                    missiontoken: target.missionToken || undefined,
                 });
             } catch { /* feature may already be gone; leave the log removal authoritative */ }
         }
