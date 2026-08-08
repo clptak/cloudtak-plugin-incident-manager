@@ -354,11 +354,23 @@
             All {{ MAX_SUBJECTS }} subject slots are in use for this mission.
         </div>
 
-        <div class='mt-3'>
+        <p class='form-text mb-1 mt-3'>
+            Save stores subjects in <strong>mission_schema.json</strong>;
+            Send to DataSync also posts mission log entries.
+        </p>
+        <div>
             <button
                 type='button'
                 class='btn btn-primary btn-sm'
-                :disabled='posting || !filledCount'
+                :disabled='savingSchema || posting || !filledCount'
+                @click='onSave'
+            >
+                {{ savingSchema ? 'Saving…' : 'Save' }}
+            </button>
+            <button
+                type='button'
+                class='btn btn-outline-secondary btn-sm ms-2'
+                :disabled='posting || savingSchema || !filledCount'
                 @click='onSend'
             >
                 {{ posting ? 'Sending…' : `Send ${filledCount} subject${filledCount === 1 ? '' : 's'} to DataSync` }}
@@ -500,6 +512,7 @@ const missionPhotos = ref<MissionPhoto[]>([]);
 const loadingSent = ref(false);
 const loadingFeatures = ref(false);
 const posting = ref(false);
+const savingSchema = ref(false);
 const status = ref('');
 const statusError = ref(false);
 
@@ -814,6 +827,24 @@ watch(() => activeMission.value?.guid, () => {
 async function onSend(): Promise<void> {
     if (!requireActiveMission()) return;
     await send();
+}
+
+/** Save filled subjects to mission_schema.json only — no DataSync log entries. */
+async function onSave(): Promise<void> {
+    if (!requireActiveMission() || !activeMission.value || !filledCount.value) return;
+    savingSchema.value = true;
+    status.value = '';
+    statusError.value = false;
+    try {
+        const forms = filledDrafts.value.map((d) => ({ ...d.form }));
+        await saveSubjectsToMission(activeMission.value, forms);
+        status.value = `Saved ${forms.length} subject${forms.length === 1 ? '' : 's'} to mission_schema.json.`;
+    } catch (err) {
+        statusError.value = true;
+        status.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        savingSchema.value = false;
+    }
 }
 
 async function send(): Promise<void> {

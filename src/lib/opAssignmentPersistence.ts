@@ -6,6 +6,7 @@
  */
 
 import Subscription from '../../../../src/base/subscription.ts';
+import { pushPointToMission } from './missionFeatures.ts';
 import type { ActiveMission } from '../composables/useIncident.ts';
 import type { OpAssignment, OpPeriodRegistryEntry } from '../domain/entities.ts';
 import type {
@@ -153,6 +154,51 @@ export function createSegmentGeometrySource(mission: ActiveMission): SegmentGeom
             };
         },
     };
+}
+
+interface PointFeatureLike {
+    id?: string | number;
+    properties?: {
+        callsign?: string;
+        icon?: string;
+        type?: string;
+    };
+    geometry?: {
+        type?: string;
+        coordinates?: unknown;
+    };
+}
+
+/**
+ * Copy the incident's IPP marker into an OP sync so every operational period
+ * carries it. The IPP point lives on the common map (callsign `IPP-<type>`);
+ * a fixed uid per OP (`ipp-<op guid>`) makes republishing idempotent.
+ * Returns the published uid, or null when no IPP is set yet.
+ */
+export async function publishIppToOp(
+    mission: ActiveMission,
+    op: OpPeriodRegistryEntry,
+): Promise<string | null> {
+    const sub = await loadIncidentSubscription(mission);
+    const feats = await sub.feature.list({ refresh: true }) as unknown as PointFeatureLike[];
+    const ipp = feats.find((f) => {
+        const callsign = f.properties?.callsign ?? '';
+        return /^IPP-/i.test(callsign) && f.geometry?.type === 'Point';
+    });
+    if (!ipp) return null;
+
+    const coords = ipp.geometry?.coordinates;
+    if (!Array.isArray(coords) || coords.length < 2) return null;
+
+    return pushPointToMission({
+        missionGuid: op.guid,
+        missionToken: op.ownerToken,
+        callsign: ipp.properties?.callsign ?? 'IPP',
+        point: [Number(coords[0]), Number(coords[1])],
+        type: ipp.properties?.type ?? 'a-f-G',
+        icon: ipp.properties?.icon,
+        id: `ipp-${op.guid}`,
+    });
 }
 
 /** True when the uid is present in the OP mission's feature list. */

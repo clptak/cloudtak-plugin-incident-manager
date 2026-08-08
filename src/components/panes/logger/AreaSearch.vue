@@ -88,6 +88,13 @@
                         class='mt-3'
                     >
                         <button
+                            class='btn btn-outline-primary me-2'
+                            :disabled='busy'
+                            @click='onPublishIpp'
+                        >
+                            Publish IPP to OP{{ currentOp.opNumber }}
+                        </button>
+                        <button
                             class='btn btn-outline-danger'
                             :disabled='busy'
                             @click='onCloseOp'
@@ -420,6 +427,7 @@ import {
     createAssignmentStore,
     createOpFeaturePublisher,
     createSegmentGeometrySource,
+    publishIppToOp,
 } from '../../../lib/opAssignmentPersistence.ts';
 import { loadResourceAssignmentsFromMission } from '../../../lib/resourceAssignmentPersistence.ts';
 import type { ResourceAssignment } from '../../../lib/resourceAssignments.ts';
@@ -564,7 +572,15 @@ async function onOpenOp(): Promise<void> {
             { registry: createRegistryStore(mission), gateway },
             { incidentName: mission.name, channels: opChannels.value },
         );
-        notice.value = `Opened ${entry.name}.`;
+        // Every OP carries the incident IPP (idempotent per-OP uid).
+        let ippNote = '';
+        try {
+            const ippUid = await publishIppToOp(mission, entry);
+            ippNote = ippUid ? ' IPP published.' : ' No IPP set yet — publish it from Search Area, then reopen this pane.';
+        } catch (ippErr) {
+            ippNote = ` IPP publish failed: ${ippErr instanceof Error ? ippErr.message : String(ippErr)}`;
+        }
+        notice.value = `Opened ${entry.name}.${ippNote}`;
         await refresh();
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
@@ -589,6 +605,25 @@ async function onCloseOp(): Promise<void> {
         );
         notice.value = `Closed ${closed.name}; volunteers demoted and field channels removed.`;
         await refresh();
+    } catch (err) {
+        error.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        busy.value = false;
+    }
+}
+
+/** Re-publish the incident IPP into the current OP (idempotent — same uid). */
+async function onPublishIpp(): Promise<void> {
+    const mission = activeMission.value;
+    const op = currentOp.value;
+    if (!mission?.mgmt || !op) return;
+    busy.value = true;
+    error.value = ''; notice.value = '';
+    try {
+        const uid = await publishIppToOp(mission, op);
+        notice.value = uid
+            ? `Published IPP to ${op.name}.`
+            : 'No IPP found on the incident map — set it in Search Area first.';
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
     } finally {
