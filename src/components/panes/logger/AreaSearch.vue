@@ -74,6 +74,24 @@
                             {{ op.openedAt ? shortDt(op.openedAt) : '' }}
                             {{ op.closedAt ? `→ ${shortDt(op.closedAt)}` : '' }}
                         </span>
+                        <button
+                            v-if='op.status !== "closed"'
+                            class='btn btn-link btn-sm p-0'
+                            :disabled='busy'
+                            @click='makeMapActive(op.guid, op.name)'
+                        >
+                            Set active
+                        </button>
+                    </div>
+                    <div class='form-text mb-1'>
+                        Active mission = where new markers, clues, and logs land.
+                        <button
+                            class='btn btn-link btn-sm p-0 align-baseline'
+                            :disabled='busy'
+                            @click='makeMapActive(activeMission.guid, activeMission.name)'
+                        >
+                            Set common map active
+                        </button>
                     </div>
 
                     <div
@@ -413,6 +431,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { TablerBorder, TablerInlineAlert, TablerInput } from '@tak-ps/vue-tabler';
 import OverlayManager from '../../../../../../src/base/overlay.ts';
+import { useMapStore } from '../../../../../../src/stores/map.ts';
 import { server } from '../../../../../../src/std.ts';
 import GroupSelect from '../../../../../../src/components/CloudTAK/util/GroupSelect.vue';
 import { useIncident } from '../../../composables/useIncident.ts';
@@ -541,6 +560,7 @@ async function refresh(): Promise<void> {
         }
         if (currentOp.value) {
             debriefForm.opNumber = currentOp.value.opNumber;
+            await ensureOpOverlay(currentOp.value);
             await refreshSubscribers();
         } else if (registry.value.length) {
             debriefForm.opNumber = registry.value[registry.value.length - 1].opNumber;
@@ -575,6 +595,9 @@ async function onOpenOp(): Promise<void> {
             { registry: createRegistryStore(mission), gateway },
             { incidentName: mission.name, channels: opChannels.value },
         );
+        await ensureOpOverlay(entry);
+        // The new OP becomes the working mission: clues/logs land there by default.
+        await makeMapActive(entry.guid, entry.name);
         // Every OP carries the incident IPP (idempotent per-OP uid).
         let ippNote = '';
         try {
@@ -612,6 +635,41 @@ async function onCloseOp(): Promise<void> {
         error.value = err instanceof Error ? err.message : String(err);
     } finally {
         busy.value = false;
+    }
+}
+
+const mapStore = useMapStore();
+
+/**
+ * Make a mission the MAP's active mission — where drawn markers, clues, and
+ * logs go by default. Distinct from the plugin's incident selection.
+ */
+async function makeMapActive(guid: string, label: string): Promise<void> {
+    try {
+        const sub = await mapStore.loadMission(guid);
+        if (sub) {
+            await mapStore.makeActiveMission(sub);
+            notice.value = `${label} is now the active mission — new markers and logs go there.`;
+        }
+    } catch (err) {
+        error.value = `Could not activate ${label}: ${err instanceof Error ? err.message : String(err)}`;
+    }
+}
+
+/** Make sure the OP mission renders as a map overlay on this device. */
+async function ensureOpOverlay(op: OpPeriodRegistryEntry): Promise<void> {
+    try {
+        if (OverlayManager.loadedByMode('mission', op.guid)) return;
+        await OverlayManager.createLoaded({
+            name: op.name,
+            url: `/mission/${encodeURIComponent(op.guid)}`,
+            type: 'geojson',
+            mode: 'mission',
+            mode_id: op.guid,
+            token: op.ownerToken,
+        });
+    } catch (err) {
+        console.warn('Failed to attach OP overlay', op.name, err);
     }
 }
 

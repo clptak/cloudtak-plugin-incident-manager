@@ -1,6 +1,8 @@
 import { Preferences } from '@capacitor/preferences';
 import Subscription from '../../../../src/base/subscription.ts';
 import type { ActiveMission } from '../composables/useIncident.ts';
+import { registryFromSchemaValue } from '../domain/registry.ts';
+import { loadMissionSchema } from './missionSchema.ts';
 
 /** CloudTAK session bearer token (not the mission password/token). */
 export async function sessionToken(): Promise<string> {
@@ -81,21 +83,48 @@ export function schemaMissionToken(
 type IncidentLogs = Awaited<ReturnType<Subscription['log']['list']>>;
 
 /**
- * All logs for an incident: main-sync logs plus, on dual-sync incidents,
- * management-sync logs (planning entries — scenarios, urgency, objectives,
- * ICS-201). De-duplicated by id. Volunteers lack channel access to the mgmt
- * sync, so for them this quietly returns main-sync logs only.
+ * All logs for an incident: the main sync, plus (on dual-sync incidents) the
+ * management sync (planning entries — scenarios, urgency, objectives,
+ * ICS-201) and every registered OP sync (field logs, clue entries).
+ * De-duplicated by id. Missions the caller can't reach (volunteers vs MGMT,
+ * anyone vs a channel-stripped closed OP) are quietly skipped.
  */
 export async function listAllIncidentLogs(mission: ActiveMission): Promise<IncidentLogs> {
     const sub = await loadIncidentSubscription(mission);
-    const logs = await sub.log.list({ refresh: true });
-    if (!mission.mgmt) return logs;
+    const merged: IncidentLogs = [...await sub.log.list({ refresh: true })];
+    if (!mission.mgmt) return merged;
+
+    const seen = new Set(merged.map((l) => String(l.id)));
+    const add = (logs: IncidentLogs) => {
+        for (const log of logs) {
+            const id = String(log.id);
+            if (seen.has(id)) continue;
+            seen.add(id);
+            merged.push(log);
+        }
+    };
+
+    let registryGuids: { guid: string; ownerToken?: string }[] = [];
     try {
         const schemaSub = await loadSchemaSubscription(mission);
-        const mgmtLogs = await schemaSub.log.list({ refresh: true });
-        const seen = new Set(logs.map((l) => String(l.id)));
-        return [...logs, ...mgmtLogs.filter((l) => !seen.has(String(l.id)))];
+        add(await schemaSub.log.list({ refresh: true }));
+        // OP registry lives in the mgmt schema — read it for the OP syncs.
+        const { schema } = await loadMissionSchema(schemaSub);
+        registryGuids = registryFromSchemaValue(schema.tak_missions);
     } catch {
-        return logs;
+        return merged;
     }
+
+    for (const op of registryGuids) {
+        try {
+            const opSub = await Subscription.load(op.guid, {
+                missiontoken: op.ownerToken ?? '',
+                reload: false,
+            });
+            add(await opSub.log.list({ refresh: true }));
+        } catch {
+            /* OP sync unreachable (deleted / no access) — skip */
+        }
+    }
+    return merged;
 }
