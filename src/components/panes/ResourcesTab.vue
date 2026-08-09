@@ -594,7 +594,7 @@ const canCreate = computed(() =>
 );
 
 function statusLabelFor(status: ResourceAssignmentStatus): string {
-    return statusOptions.find((opt) => opt.value === status)?.label ?? 'Planned';
+    return statusOptions.find((opt) => opt.value === status)?.label ?? 'Requested';
 }
 
 function rebuildAgencyOptions(): void {

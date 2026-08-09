@@ -3,7 +3,7 @@
 import { ASSIGNMENT_RESOURCES } from '../data/assignmentResources.ts';
 import type { D4HExternalResource } from './d4hTypes.ts';
 
-export type ResourceAssignmentStatus = 'current' | 'planned';
+export type ResourceAssignmentStatus = 'requested' | 'have' | 'need' | 'demobilized' | 'cancelled';
 
 export interface ResourceAssignment {
     id: string;
@@ -22,9 +22,21 @@ export interface ResourceAssignment {
 }
 
 export const RESOURCE_ASSIGNMENT_STATUSES: { value: ResourceAssignmentStatus; label: string }[] = [
-    { value: 'planned', label: 'Planned' },
-    { value: 'current', label: 'Current' },
+    { value: 'requested', label: 'Requested' },
+    { value: 'have', label: 'Have' },
+    { value: 'need', label: 'Need' },
+    { value: 'demobilized', label: 'Demobilized' },
+    { value: 'cancelled', label: 'Cancelled' },
 ];
+
+export function resourceStatusLabel(status: ResourceAssignmentStatus): string {
+    return RESOURCE_ASSIGNMENT_STATUSES.find((s) => s.value === status)?.label ?? 'Requested';
+}
+
+/** Resources still in play — excludes demobilized and cancelled. */
+export function isActiveResource(a: ResourceAssignment): boolean {
+    return a.status !== 'demobilized' && a.status !== 'cancelled';
+}
 
 export const DEFAULT_AGENCY = '';
 
@@ -72,7 +84,7 @@ export function resourceAssignmentDescription(a: ResourceAssignment): string {
     const parts = [
         a.resource,
         a.agency,
-        a.status === 'current' ? 'Current' : 'Planned',
+        resourceStatusLabel(a.status),
     ];
     if (a.eta != null && !Number.isNaN(a.eta)) {
         parts.push(`ETA ${a.eta}`);
@@ -90,7 +102,7 @@ export function blankResourceAssignmentForm(): Omit<ResourceAssignment, 'id'> {
         agency: DEFAULT_AGENCY,
         timeOrdered: '',
         eta: null,
-        status: 'planned',
+        status: 'requested',
         timeArrived: '',
         opNumber: null,
     };
@@ -134,7 +146,13 @@ export function mergeResourceAssignmentPatch(
 }
 
 function normalizeStatus(value: unknown): ResourceAssignmentStatus {
-    return value === 'current' ? 'current' : 'planned';
+    if (RESOURCE_ASSIGNMENT_STATUSES.some((s) => s.value === value)) {
+        return value as ResourceAssignmentStatus;
+    }
+    // Legacy values from pre-Phase-4 incidents
+    if (value === 'current') return 'have';
+    if (value === 'planned') return 'requested';
+    return 'requested';
 }
 
 function normalizeEta(value: unknown): number | null {

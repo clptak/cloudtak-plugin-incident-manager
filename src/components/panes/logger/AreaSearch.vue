@@ -190,7 +190,7 @@
                     <div class='row g-2 mt-1'>
                         <div class='col-md-6'>
                             <template v-if='opResourceOptions.length'>
-                                <label class='form-label'>Team / Resource (optional)</label>
+                                <label class='form-label'>Team / Resource</label>
                                 <select
                                     v-model='assignTeam'
                                     class='form-select form-select-sm'
@@ -211,7 +211,7 @@
                             <template v-else>
                                 <TablerInput
                                     v-model='assignTeam'
-                                    label='Team / Resource (optional)'
+                                    label='Team / Resource'
                                     placeholder='No resources assigned to this OP — set OP in Resources'
                                 />
                             </template>
@@ -452,7 +452,7 @@ import {
     publishIppToOp,
 } from '../../../lib/opAssignmentPersistence.ts';
 import { loadResourceAssignmentsFromMission } from '../../../lib/resourceAssignmentPersistence.ts';
-import type { ResourceAssignment } from '../../../lib/resourceAssignments.ts';
+import { isActiveResource, type ResourceAssignment } from '../../../lib/resourceAssignments.ts';
 import { loadSchemaSubscription } from '../../../lib/incidentSubscription.ts';
 import { loadMissionSchema } from '../../../lib/missionSchema.ts';
 import { createOpPeriodGateway } from '../../../lib/opPeriodGateway.ts';
@@ -483,17 +483,20 @@ const currentOp = computed(() => currentOpPeriod(registry.value));
 const nextOp = computed(() => nextOpNumber(registry.value));
 const segmentUids = computed(() => Object.keys(segments.value));
 const resources = ref<ResourceAssignment[]>([]);
-/** Resource identifiers assigned (in the Resources screen) to the current OP. */
+/**
+ * Resource identifiers assigned (in the Resources screen) to the current OP,
+ * excluding demobilized/cancelled resources.
+ */
 const opResourceOptions = computed(() => {
     const op = currentOp.value;
     if (!op) return [];
     return resources.value
-        .filter((r) => r.opNumber === op.opNumber && r.resourceIdentifier.trim())
+        .filter((r) => r.opNumber === op.opNumber && r.resourceIdentifier.trim() && isActiveResource(r))
         .map((r) => r.resourceIdentifier.trim());
 });
 /** Same idea for the debrief form, but keyed to the OP selected there. */
 const debriefResourceOptions = computed(() => resources.value
-    .filter((r) => r.opNumber === debriefForm.opNumber && r.resourceIdentifier.trim())
+    .filter((r) => r.opNumber === debriefForm.opNumber && r.resourceIdentifier.trim() && isActiveResource(r))
     .map((r) => r.resourceIdentifier.trim()));
 const assignedThisOp = computed(() => new Set(
     assignments.value

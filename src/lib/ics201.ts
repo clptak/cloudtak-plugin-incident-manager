@@ -37,7 +37,7 @@ import {
 import { orgChartFromSchemaValue } from './orgChartPersistence.ts';
 import { treeHasContent } from './hastyTeamTree.ts';
 import { loadResourceAssignmentsFromMission } from './resourceAssignmentPersistence.ts';
-import type { ResourceAssignment } from './resourceAssignments.ts';
+import { resourceStatusLabel, type ResourceAssignment } from './resourceAssignments.ts';
 
 export const ICS201_KEYWORD = 'ics-201';
 export const RESOURCES_KEYWORD = 'resources';
@@ -542,7 +542,7 @@ export function parseResourcesLogContent(content: string): Ics201ResourceRow[] {
     const status = fields.get('status') ?? '';
 
     if (agency || identifier || ordered || eta || notes || arrivedRaw) {
-        const noteParts = [notes, status && status.toLowerCase() !== 'current' ? `Status: ${status}` : '']
+        const noteParts = [notes, status && !['current', 'have'].includes(status.toLowerCase()) ? `Status: ${status}` : '']
             .map((p) => p.trim())
             .filter(Boolean);
         return [{
@@ -598,7 +598,7 @@ export function resourceRowsFromAssignments(assignments: ResourceAssignment[]): 
     return assignments.slice(0, MAX_RESOURCE_ROWS).map((a) => {
         const noteParts = [
             a.agency.trim(),
-            a.status === 'planned' ? 'Status: Planned' : '',
+            a.status !== 'have' ? `Status: ${resourceStatusLabel(a.status)}` : '',
             a.assignmentCallsign?.trim() ? `Assignment: ${a.assignmentCallsign.trim()}` : '',
         ].filter(Boolean);
         return {
