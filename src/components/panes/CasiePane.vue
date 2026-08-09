@@ -54,22 +54,40 @@
                     <table class='table table-sm small mb-0 align-middle'>
                         <thead>
                             <tr>
-                                <th>Segment</th>
+                                <th
+                                    role='button'
+                                    class='user-select-none'
+                                    title='Sort by segment'
+                                    @click='setSort("segment")'
+                                >
+                                    Segment{{ sortIndicator('segment') }}
+                                </th>
                                 <th
                                     v-for='step in history.steps'
                                     :key='step.opNumber'
-                                    class='text-end'
+                                    role='button'
+                                    class='text-end user-select-none'
+                                    :title='`Sort by POA after ${step.opNumber === 0 ? "Initial" : `OP${step.opNumber}`}`'
+                                    @click='setSort(step.opNumber)'
                                 >
-                                    {{ step.opNumber === 0 ? 'Initial' : `OP${step.opNumber}` }}
+                                    {{ step.opNumber === 0 ? 'Initial' : `OP${step.opNumber}` }}{{ sortIndicator(step.opNumber) }}
                                 </th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr
-                                v-for='seg in inputs.segments'
+                                v-for='seg in sortedSegments'
                                 :key='seg.uid'
                             >
-                                <td>{{ inputs.segmentLabels[seg.uid] }}</td>
+                                <td>
+                                    <button
+                                        class='btn btn-link btn-sm p-0 align-baseline'
+                                        title='Center map on this segment'
+                                        @click='onFlyTo(seg.uid)'
+                                    >
+                                        {{ inputs.segmentLabels[seg.uid] }}
+                                    </button>
+                                </td>
                                 <td
                                     v-for='step in history.steps'
                                     :key='step.opNumber'
@@ -253,7 +271,7 @@
                             </thead>
                             <tbody>
                                 <tr
-                                    v-for='seg in inputs.segments'
+                                    v-for='seg in sortedSegments'
                                     :key='seg.uid'
                                 >
                                     <td>{{ inputs.segmentLabels[seg.uid] }}</td>
@@ -316,6 +334,7 @@ import {
     type OpHistory,
     type Scenario,
 } from '../../domain/history.ts';
+import { flyToFeature } from '../../lib/flyToFeature.ts';
 import { loadRollupInputs, saveScenarios, type RollupInputs } from '../../lib/rollupPersistence.ts';
 
 const { activeMission } = useIncident();
@@ -343,6 +362,47 @@ const draft = reactive<Scenario>({
 
 const history = computed(() =>
     computeOpHistory(inputs.value.segments, inputs.value.rowPoa, inputs.value.records));
+
+// ── Table sorting: by segment label or by POA of any OP column ────────────
+type SortKey = 'segment' | number;
+const sortKey = ref<SortKey>('segment');
+const sortDir = ref<'asc' | 'desc'>('asc');
+
+function setSort(key: SortKey): void {
+    if (sortKey.value === key) {
+        sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        sortKey.value = key;
+        // Alphabetical defaults ascending; POA columns default descending
+        // (highest-probability segments first — the planning question).
+        sortDir.value = key === 'segment' ? 'asc' : 'desc';
+    }
+}
+
+function sortIndicator(key: SortKey): string {
+    if (sortKey.value !== key) return '';
+    return sortDir.value === 'asc' ? ' ▲' : ' ▼';
+}
+
+const sortedSegments = computed(() => {
+    const dir = sortDir.value === 'asc' ? 1 : -1;
+    const key = sortKey.value;
+    const labels = inputs.value.segmentLabels;
+    const list = [...inputs.value.segments];
+    if (key === 'segment') {
+        return list.sort((a, b) => dir * (labels[a.uid] ?? a.uid).localeCompare(
+            labels[b.uid] ?? b.uid, undefined, { numeric: true }));
+    }
+    const step = history.value.steps.find((s) => s.opNumber === key);
+    return list.sort((a, b) => dir * ((step?.poa[a.uid] ?? 0) - (step?.poa[b.uid] ?? 0)));
+});
+
+async function onFlyTo(uid: string): Promise<void> {
+    const found = await flyToFeature(uid);
+    if (!found) {
+        error.value = 'Segment is not on the map yet — check the MGMT overlay is loaded.';
+    }
+}
 
 const realOpNumbers = computed(() => opNumbersIn(inputs.value.records));
 
