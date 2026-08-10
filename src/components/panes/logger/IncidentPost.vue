@@ -77,13 +77,24 @@
             Maximum of {{ MAX_OBJECTIVES }} objectives (one ICS 234-CG page).
         </div>
 
-        <div class='mt-3 d-flex flex-wrap align-items-center gap-2'>
+        <p class='form-text mb-1 mt-3'>
+            Save stores the matrix in <strong>mission_schema.json</strong>;
+            Send to DataSync posts mission log entries.
+        </p>
+        <div class='d-flex flex-wrap align-items-center gap-2'>
             <button
                 class='btn btn-primary btn-sm'
-                :disabled='saving || (!filledRowCount && !pendingDeletions)'
+                :disabled='saving || savingSchema || !filledRowCount'
+                @click='onSaveSchema'
+            >
+                {{ savingSchema ? 'Saving…' : 'Save' }}
+            </button>
+            <button
+                class='btn btn-outline-secondary btn-sm'
+                :disabled='saving || savingSchema || (!filledRowCount && !pendingDeletions)'
                 @click='onSave'
             >
-                {{ saving ? 'Saving…' : `Save ${filledRowCount} objective${filledRowCount === 1 ? '' : 's'} to DataSync` }}
+                {{ saving ? 'Sending…' : `Send ${filledRowCount} objective${filledRowCount === 1 ? '' : 's'} to DataSync` }}
             </button>
             <button
                 class='btn btn-outline-secondary btn-sm'
@@ -312,6 +323,7 @@ import { ref, computed, reactive, onMounted, watch } from 'vue';
 import { IconChevronDown } from '@tabler/icons-vue';
 import { TablerBorder, TablerInput, TablerEnum, TablerInlineAlert } from '@tak-ps/vue-tabler';
 import { loadSchemaSubscription, schemaMission } from '../../../lib/incidentSubscription.ts';
+import { saveIncidentPostToMission } from '../../../lib/incidentPostPersistence.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import ObjectiveStrategies from './ObjectiveStrategies.vue';
 import {
@@ -634,6 +646,31 @@ async function upsertCell(
     } catch {
         counters.failed++;
         return id;
+    }
+}
+
+const savingSchema = ref(false);
+const schemaContentHash = ref<string | undefined>();
+
+/** Save the matrix to mission_schema.json only — no DataSync log entries. */
+async function onSaveSchema(): Promise<void> {
+    if (!requireActiveMission() || !activeMission.value || !filledRowCount.value) return;
+    savingSchema.value = true;
+    status.value = '';
+    statusError.value = false;
+    try {
+        const filled = rows.value.filter((r) => rowHasContent(r));
+        schemaContentHash.value = await saveIncidentPostToMission(
+            activeMission.value,
+            filled,
+            schemaContentHash.value,
+        );
+        status.value = `Saved ${filled.length} objective${filled.length === 1 ? '' : 's'} to mission_schema.json.`;
+    } catch (err) {
+        statusError.value = true;
+        status.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        savingSchema.value = false;
     }
 }
 

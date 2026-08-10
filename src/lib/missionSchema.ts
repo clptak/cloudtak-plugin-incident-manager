@@ -21,6 +21,30 @@ import { fetchMissionFileText, uploadMissionFile } from './missionUpload.ts';
 /** Legacy log keyword from earlier builds; only used when migrating stored schema. */
 export const MISSION_SCHEMA_KEYWORD = 'mission-schema';
 export const MISSION_SCHEMA_FILENAME = 'mission_schema.json';
+/** Per-mission schema files end with this suffix (legacy name still readable). */
+export const MISSION_SCHEMA_SUFFIX = '_DataSync.json';
+
+function sanitizeFilePart(value: string): string {
+    return value.trim().replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ');
+}
+
+/**
+ * Unique per-mission schema filename:
+ *   `{Department Report #} {Search Name}_DataSync.json`
+ * falling back to the CAD activity number when there is no report number, and
+ * to the legacy `mission_schema.json` when neither identifiers nor a search
+ * name exist yet.
+ */
+export function missionSchemaFilename(schema: MissionSchema): string {
+    const report = String(schema.cad_data?.report_number ?? '').trim()
+        || String(schema.incident_id ?? '').trim();
+    const activity = String(schema.cad_data?.activity_number ?? '').trim();
+    const id = report || activity;
+    const searchName = String(schema.incident_response?.incident_name ?? '').trim()
+        || String(schema.tak_mission ?? '').trim();
+    const base = sanitizeFilePart([id, searchName].filter(Boolean).join(' '));
+    return base ? `${base}${MISSION_SCHEMA_SUFFIX}` : MISSION_SCHEMA_FILENAME;
+}
 
 export interface MissionLogEntry {
     source: string;
@@ -384,6 +408,7 @@ export function appendMpsRowsToSchema(
 }
 
 function isMissionSchemaContentName(name: string | undefined): boolean {
+    if (name?.endsWith(MISSION_SCHEMA_SUFFIX)) return true;
     if (!name) return false;
     return name === MISSION_SCHEMA_FILENAME
         || name.endsWith(`/${MISSION_SCHEMA_FILENAME}`)
@@ -479,14 +504,15 @@ export async function saveMissionSchema(
     const hashBeforeUpload = findLatestSchemaContent(await sub.contents.list())?.hash;
 
     const missionToken = opts?.missionToken;
-    const uploadHash = await uploadMissionFile(sub.guid, MISSION_SCHEMA_FILENAME, bytes, {
+    const filename = missionSchemaFilename(schema);
+    const uploadHash = await uploadMissionFile(sub.guid, filename, bytes, {
         missionToken,
     });
 
     if (sub.fetch) await sub.fetch();
 
     let latest = uploadHash
-        ? { hash: uploadHash, name: MISSION_SCHEMA_FILENAME }
+        ? { hash: uploadHash, name: filename }
         : await waitForLatestSchemaContent(sub, hashBeforeUpload);
 
     if (!latest?.hash) {
