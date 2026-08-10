@@ -478,7 +478,7 @@ const statusLabelOptions = statusOptions.map((opt) => opt.label);
 const rowResourceOptions = ['—', ...resourceTypeOptions];
 
 // ── Operational periods (Area Search phase) ────────────────────────────────
-const OP_NONE_LABEL = '— none —';
+const OP_NONE_LABEL = 'Initial Response';
 const opRegistry = ref<OpPeriodRegistryEntry[]>([]);
 const opLabelOptions = computed(() => [
     OP_NONE_LABEL,

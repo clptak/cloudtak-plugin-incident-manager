@@ -593,9 +593,16 @@ export function resourcesFromLogs(logs: MissionLogLike[]): Ics201ResourceRow[] {
     return padResources(entries.slice(0, MAX_RESOURCE_ROWS).map((e) => e.row));
 }
 
-/** Map Resources-screen mission assignments (mission_schema.json) to ICS 201 resource rows. */
+/**
+ * Map Resources-screen mission assignments (mission_schema.json) to ICS 201
+ * resource rows. The ICS 201 is an Initial Response product: only resources
+ * on the Initial Response period (no OP assignment) are included — OP1+
+ * resources belong to that period's IAP, not the 201.
+ */
 export function resourceRowsFromAssignments(assignments: ResourceAssignment[]): Ics201ResourceRow[] {
-    return assignments.slice(0, MAX_RESOURCE_ROWS).map((a) => {
+    return assignments
+        .filter((a) => a.opNumber == null)
+        .slice(0, MAX_RESOURCE_ROWS).map((a) => {
         const noteParts = [
             a.agency.trim(),
             a.status !== 'have' ? `Status: ${resourceStatusLabel(a.status)}` : '',
