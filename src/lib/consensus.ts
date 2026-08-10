@@ -117,17 +117,27 @@ export function oconnorValues(
     letters: Record<string, OconnorLetter>,
     segmentUids: string[],
 ): Record<string, number> {
+    // WinCASIE III semantics (verified against a WC3 trail.txt): weights are
+    // REBASED per respondent so their worst-used letter weighs 1, preserving
+    // letter spacing. E.g. letters {A,C,E,G} → weights 7:5:3:1 (not 9:7:5:3),
+    // while {A,D,F,I} → 9:6:4:1 (I is already the floor).
+    const used = segmentUids
+        .map((uid) => letters[uid])
+        .filter((l): l is OconnorLetter => Boolean(l));
+    const worstWeight = used.length ? Math.min(...used.map((l) => OCONNOR_WEIGHTS[l])) : 1;
+    const rebased = (letter: OconnorLetter): number => OCONNOR_WEIGHTS[letter] - worstWeight + 1;
+
     const out: Record<string, number> = {};
     let totalWeight = 0;
     for (const uid of segmentUids) {
         const letter = letters[uid];
-        totalWeight += letter ? OCONNOR_WEIGHTS[letter] : 0;
+        totalWeight += letter ? rebased(letter) : 0;
     }
     const remaining = 100 - row;
     for (const uid of segmentUids) {
         const letter = letters[uid];
         out[uid] = letter && totalWeight > 0
-            ? (remaining * OCONNOR_WEIGHTS[letter]) / totalWeight
+            ? (remaining * rebased(letter)) / totalWeight
             : 0;
     }
     return out;

@@ -8,6 +8,7 @@
 import {
     consensusForSegment,
     consensusRow,
+    methodLabel,
     type InitialConsensusState,
 } from './consensus.ts';
 
@@ -48,6 +49,71 @@ export interface Wc3FileContents {
     nam: string;
     hst: string;
     ioc: string;
+    trail: string;
+}
+
+/** WC3 audit-trail timestamp: (MM/DD/YYYY h:mm AM/PM). */
+function trailTimestamp(when: Date): string {
+    const mm = String(when.getMonth() + 1).padStart(2, '0');
+    const dd = String(when.getDate()).padStart(2, '0');
+    const h24 = when.getHours();
+    const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+    const min = String(when.getMinutes()).padStart(2, '0');
+    const ampm = h24 < 12 ? 'AM' : 'PM';
+    return `(${mm}/${dd}/${when.getFullYear()} ${h12}:${min} ${ampm})`;
+}
+
+/** Left text padded so the timestamp column matches WC3's trail layout. */
+function trailLine(text: string, when: Date): string {
+    return `${text.padEnd(62)}${trailTimestamp(when)}`;
+}
+
+function trailPercent(value: number): string {
+    return `${value.toFixed(2)}%`;
+}
+
+/**
+ * WinCASIE III `trail.txt` audit log for the exported consensus, matching the
+ * WC3 format (verified against a real Richardson2 trail).
+ */
+export function buildWc3Trail(
+    consensus: InitialConsensusState,
+    segments: Wc3SegmentRef[],
+    opts?: { basename?: string; path?: string; now?: Date },
+): string {
+    const now = opts?.now ?? new Date();
+    const basename = opts?.basename
+        ?? safeWc3Basename((consensus.filename || consensus.incident_name || 'consensus').trim());
+    const respondents = consensus.respondents;
+
+    const lines: string[] = [
+        trailLine(`Audit trail started for "${consensus.incident_name || basename}".`, now),
+        trailLine('Created new consensus', now),
+        `New filename: ${basename}`,
+        `  Path: ${opts?.path ?? ''}`,
+        `  Number of segments (excluding ROW): ${segments.length}`,
+        `  Number of responses: ${respondents.length}`,
+    ];
+
+    for (const resp of respondents) {
+        const label = `${methodLabel(resp.method)} Consensus ${resp.name.toUpperCase()}`;
+        const parts = [`R.O.W.: ${trailPercent(resp.row)}`];
+        segments.forEach((seg, i) => {
+            const value = trailPercent(resp.values[seg.uid] ?? 0);
+            const letter = resp.method === 'oconnor' && resp.letters[seg.uid]
+                ? ` (${resp.letters[seg.uid]})`
+                : '';
+            parts.push(`${i + 1}: ${value}${letter}`);
+        });
+        lines.push(`    ${label}: ${parts.join(', ')}`);
+    }
+
+    lines.push(`  POA R.O.W.   : ${trailPercent(consensusRow(respondents))}`);
+    segments.forEach((seg, i) => {
+        lines.push(`  POA Segment ${i + 1}: ${trailPercent(consensusForSegment(respondents, seg.uid))}`);
+    });
+    lines.push('');
+    return lines.join(CRLF) + CRLF;
 }
 
 /** Build WC3 text file contents from an accepted consensus + segments. */
@@ -88,6 +154,7 @@ export function buildWc3Files(
         nam: joinLines([consensus.incident_name]),
         hst: '',
         ioc: '',
+        trail: buildWc3Trail(consensus, segments),
     };
 }
 
@@ -245,6 +312,7 @@ export function downloadWc3Zip(
         { path: `${folder}${basename}.nam`, data: enc.encode(files.nam) },
         { path: `${folder}${basename}.poa`, data: enc.encode(files.poa) },
         { path: `${folder}${basename}.pod`, data: enc.encode(files.pod) },
+        { path: `${folder}trail.txt`, data: enc.encode(files.trail) },
     ];
     const blob = buildStoreZip(entries);
     const zipName = `${basename}.zip`;
