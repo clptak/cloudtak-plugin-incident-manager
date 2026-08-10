@@ -29,6 +29,8 @@ export interface RollupInputs {
     scenarios: Scenario[];
     historyEvents: CasieHistoryEvent[];
     consensusUpdatedAt: string;
+    /** Full consensus state — needed by the WC3 period export. */
+    consensus: InitialConsensusState | null;
 }
 
 function consensusHasValues(consensus: InitialConsensusState | null): boolean {
@@ -65,6 +67,7 @@ export async function loadRollupInputs(mission: ActiveMission): Promise<RollupIn
         ),
         historyEvents: casieHistoryFromSchema(schema),
         consensusUpdatedAt: consensus?.updated ?? '',
+        consensus,
     };
 }
 

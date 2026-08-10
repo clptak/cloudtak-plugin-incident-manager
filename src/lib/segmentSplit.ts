@@ -113,6 +113,79 @@ export async function carveSegmentRemainder(
     });
 }
 
+export interface ExpansionSegmentInput {
+    uid: string;
+    callsign: string;
+    /** Percent of the CURRENT R.O.W. mass allocated to this new segment. */
+    pct: number;
+}
+
+/**
+ * WinCASIE "Expand Search Area": new segments are funded out of R.O.W.
+ * The proportions (ROW retained + each new segment) must sum to 100 and are
+ * applied per respondent: row → row·pRow/100, newSeg → row·pᵢ/100 — existing
+ * segments are untouched and every respondent's total mass is preserved.
+ */
+export async function expandSearchArea(
+    mission: ActiveMission,
+    input: {
+        rowRetainedPct: number;
+        additions: ExpansionSegmentInput[];
+        note: string;
+    },
+): Promise<void> {
+    if (!input.additions.length) throw new Error('Expansion needs at least one new segment');
+    const total = input.rowRetainedPct + input.additions.reduce((a, s) => a + s.pct, 0);
+    if (Math.abs(total - 100) > 0.01) {
+        throw new Error(`Proportions must sum to 100% (currently ${total.toFixed(2)}%)`);
+    }
+    if (!input.note.trim()) throw new Error('A note explaining the expansion is required');
+
+    const sub = await loadSchemaSubscription(mission);
+    const loaded = await loadMissionSchema(sub);
+    const schema = loaded.schema;
+
+    const segments: SegmentMap = segmentsFromSchema(schema);
+    const now = new Date().toISOString();
+    for (const addition of input.additions) {
+        if (segments[addition.uid]) throw new Error(`Segment ${addition.callsign} already registered`);
+        segments[addition.uid] = {
+            callsign: addition.callsign,
+            created: now,
+            expandedFromRow: true,
+        };
+    }
+    applySegmentsToSchema(schema, segments);
+
+    const ir = schema.incident_response as Record<string, unknown>;
+    const casie = ir.casie as Record<string, unknown> | undefined;
+    const consensus = casie?.initial_consensus as {
+        respondents?: { row?: number; values?: Record<string, number> }[];
+    } | undefined;
+    for (const respondent of consensus?.respondents ?? []) {
+        const row = typeof respondent.row === 'number' ? respondent.row : 0;
+        if (!respondent.values) respondent.values = {};
+        for (const addition of input.additions) {
+            respondent.values[addition.uid] = Math.round(row * addition.pct) / 100;
+        }
+        respondent.row = Math.round(row * input.rowRetainedPct) / 100;
+    }
+
+    appendCasieHistory(
+        schema,
+        `Expanded search area: R.O.W. retains ${input.rowRetainedPct}%, `
+        + input.additions.map((a) => `${a.callsign} (${a.pct}%)`).join(', ')
+        + ` — Note: ${input.note.trim()}`,
+        now,
+    );
+
+    await saveMissionSchema(sub, schema, {
+        contentHash: loaded.contentHash,
+        legacyLogId: loaded.legacyLogId,
+        missionToken: schemaMissionToken(sub, mission),
+    });
+}
+
 export async function splitRegisteredSegment(
     mission: ActiveMission,
     parentUid: string,

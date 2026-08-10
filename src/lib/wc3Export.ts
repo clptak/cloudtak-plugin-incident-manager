@@ -79,7 +79,13 @@ function trailPercent(value: number): string {
 export function buildWc3Trail(
     consensus: InitialConsensusState,
     segments: Wc3SegmentRef[],
-    opts?: { basename?: string; path?: string; now?: Date },
+    opts?: {
+        basename?: string;
+        path?: string;
+        now?: Date;
+        /** Post-consensus audit events (debriefs, splits, expansions), pre-filtered by the caller. */
+        events?: { at: string; text: string }[];
+    },
 ): string {
     const now = opts?.now ?? new Date();
     const basename = opts?.basename
@@ -112,8 +118,68 @@ export function buildWc3Trail(
     segments.forEach((seg, i) => {
         lines.push(`  POA Segment ${i + 1}: ${trailPercent(consensusForSegment(respondents, seg.uid))}`);
     });
+    for (const event of opts?.events ?? []) {
+        const when = event.at ? new Date(event.at) : now;
+        lines.push(trailLine(event.text, Number.isNaN(when.getTime()) ? now : when));
+    }
     lines.push('');
     return lines.join(CRLF) + CRLF;
+}
+
+/**
+ * Period export ("through OP k"): same WC3 file set as the consensus export,
+ * but .poa reflects the POA AFTER the chosen OP, .pod carries cumulative POD
+ * through it, and trail.txt stops at that point.
+ */
+export function downloadWc3PeriodZip(
+    consensus: InitialConsensusState,
+    segments: Wc3SegmentRef[],
+    period: {
+        throughOp: number;
+        /** Percent values (0–100). */
+        rowPoaPct: number;
+        poaPctByUid: Record<string, number>;
+        cpodPctByUid: Record<string, number>;
+        events: { at: string; text: string }[];
+    },
+): string {
+    const basename = safeWc3Basename(
+        `${(consensus.filename || consensus.incident_name || 'consensus').trim()}-OP${period.throughOp}`,
+    );
+    const files = buildWc3Files(consensus, segments);
+
+    const poaLines: Array<string | number> = [
+        segments.length,
+        formatPoaFraction(period.rowPoaPct),
+    ];
+    for (const seg of segments) {
+        poaLines.push(formatPoaFraction(period.poaPctByUid[seg.uid] ?? 0));
+    }
+    files.poa = joinLines(poaLines);
+
+    const podLines: Array<string | number> = [segments.length, formatPoaFraction(0)];
+    for (const seg of segments) {
+        podLines.push(formatPoaFraction(period.cpodPctByUid[seg.uid] ?? 0));
+    }
+    files.pod = joinLines(podLines);
+
+    files.trail = buildWc3Trail(consensus, segments, { basename, events: period.events });
+
+    const enc = new TextEncoder();
+    const folder = `${basename}/`;
+    const entries: ZipEntry[] = [
+        { path: `${folder}${basename}.con`, data: enc.encode(files.con) },
+        { path: `${folder}${basename}.hst`, data: enc.encode(files.hst) },
+        { path: `${folder}${basename}.ioc`, data: enc.encode(files.ioc) },
+        { path: `${folder}${basename}.nam`, data: enc.encode(files.nam) },
+        { path: `${folder}${basename}.poa`, data: enc.encode(files.poa) },
+        { path: `${folder}${basename}.pod`, data: enc.encode(files.pod) },
+        { path: `${folder}trail.txt`, data: enc.encode(files.trail) },
+    ];
+    const blob = buildStoreZip(entries);
+    const zipName = `${basename}.zip`;
+    downloadBlob(blob, zipName);
+    return zipName;
 }
 
 /** Build WC3 text file contents from an accepted consensus + segments. */

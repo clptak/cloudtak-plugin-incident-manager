@@ -2,8 +2,34 @@
     <div>
         <h3 class='mb-3 d-flex align-items-center gap-2'>
             CASIE — Search Progress
+            <template v-if='loaded && inputs.hasConsensus'>
+                <select
+                    v-model.number='exportThroughOp'
+                    class='form-select form-select-sm w-auto ms-auto'
+                    title='Export the WinCASIE III file set as of this operational period'
+                >
+                    <option :value='0'>
+                        Initial Consensus
+                    </option>
+                    <option
+                        v-for='n in realOpNumbers'
+                        :key='n'
+                        :value='n'
+                    >
+                        Through OP{{ n }}
+                    </option>
+                </select>
+                <button
+                    class='btn btn-outline-success btn-sm'
+                    :disabled='loading || !inputs.consensus'
+                    @click='onExportWc3'
+                >
+                    WinCASIE Export
+                </button>
+            </template>
             <button
-                class='btn btn-outline-primary btn-sm ms-auto'
+                class='btn btn-outline-primary btn-sm'
+                :class='{ "ms-auto": !(loaded && inputs.hasConsensus) }'
                 :disabled='loading'
                 @click='refresh'
             >
@@ -138,6 +164,150 @@
                     effective detection for the segment. Recomputed from the Initial
                     Consensus + debrief records — nothing here is hand-entered.
                 </p>
+            </TablerBorder>
+
+            <!-- ── Expand Search Area (WC3) ────────────────────────────── -->
+            <TablerBorder
+                class='cloudtak-accent text-white mb-3'
+                :fill-height='false'
+                :shadow='false'
+                gap='sm'
+            >
+                <template #label>
+                    <p class='text-uppercase text-white-50 small mb-0 d-flex align-items-center w-100'>
+                        <span>Expand Search Area</span>
+                        <button
+                            v-if='!expandOpen'
+                            class='btn btn-outline-primary btn-sm ms-auto'
+                            @click='startExpansion'
+                        >
+                            Expand…
+                        </button>
+                    </p>
+                </template>
+
+                <p
+                    v-if='!expandOpen'
+                    class='text-muted small mb-0'
+                >
+                    Add new segments funded out of R.O.W. — used when the subject may be
+                    outside the current search area.
+                </p>
+
+                <template v-else>
+                    <div class='d-flex align-items-center gap-2 mb-2'>
+                        <label class='form-label mb-0'>Number of new segments</label>
+                        <select
+                            v-model.number='expandCount'
+                            class='form-select form-select-sm w-auto'
+                            @change='rebuildExpansionRows'
+                        >
+                            <option
+                                v-for='n in 6'
+                                :key='n'
+                                :value='n'
+                            >
+                                {{ n }}
+                            </option>
+                        </select>
+                        <button
+                            class='btn btn-link btn-sm p-0'
+                            title='Split the allocated share equally among the new segments'
+                            @click='equalizeExpansion'
+                        >
+                            All new segments equally likely
+                        </button>
+                        <button
+                            class='btn btn-link btn-sm p-0 ms-auto'
+                            :disabled='loadingExpandPolys'
+                            @click='loadExpandCandidates'
+                        >
+                            {{ loadingExpandPolys ? 'Loading…' : 'Refresh polygons' }}
+                        </button>
+                    </div>
+                    <p class='form-text mt-0'>
+                        Draw the new segment polygons on the map now (the map stays live), Refresh,
+                        and select them below. Each share you allocate is deducted from
+                        R.O.W. automatically (current R.O.W. mass: {{ fmt(history.final.rowPoa) }}%).
+                    </p>
+
+                    <div class='row g-2 align-items-center mb-1'>
+                        <div class='col-4'>
+                            <span class='form-label mb-0'>R.O.W. retains</span>
+                        </div>
+                        <div class='col-3'>
+                            <span
+                                class='fw-bold'
+                                :class='expandRowRetained < 0 ? "text-danger" : "text-success"'
+                            >{{ expandRowRetained }}%</span>
+                        </div>
+                        <div class='col-5 form-text mt-0'>
+                            Auto: 100% minus what you allocate below.
+                        </div>
+                    </div>
+                    <div
+                        v-for='(seg, i) in expandRows'
+                        :key='i'
+                        class='row g-2 align-items-end mb-1'
+                    >
+                        <div class='col-4'>
+                            <TablerInput
+                                v-model='seg.callsign'
+                                :label='i === 0 ? "New segment" : undefined'
+                            />
+                        </div>
+                        <div class='col-3'>
+                            <TablerInput
+                                v-model='seg.pct'
+                                :label='i === 0 ? "% of R.O.W." : undefined'
+                            />
+                        </div>
+                        <div class='col-5'>
+                            <select
+                                v-model='seg.polygonUid'
+                                class='form-select form-select-sm'
+                            >
+                                <option value=''>
+                                    — no polygon yet —
+                                </option>
+                                <option
+                                    v-for='p in availableExpandPolys(seg.polygonUid)'
+                                    :key='p.uid'
+                                    :value='p.uid'
+                                >
+                                    {{ p.callsign }} · {{ p.source }}
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+                    <div
+                        v-if='expandRowRetained < 0'
+                        class='small mb-2 text-danger'
+                    >
+                        Allocated more than 100% — reduce the segment shares.
+                    </div>
+                    <TablerInput
+                        v-model='expandNote'
+                        label='Note (required — recorded in History)'
+                        placeholder='Why the search area is being expanded'
+                    />
+                    <div class='d-flex gap-2 mt-2'>
+                        <button
+                            class='btn btn-primary btn-sm'
+                            :disabled='savingExpansion || !expansionValid'
+                            @click='applyExpansion'
+                        >
+                            {{ savingExpansion ? 'Working…' : 'Accept' }}
+                        </button>
+                        <button
+                            class='btn btn-outline-secondary btn-sm'
+                            :disabled='savingExpansion'
+                            @click='expandOpen = false'
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </template>
             </TablerBorder>
 
             <!-- ── History (WC3-style audit trail) ─────────────────────── -->
@@ -365,8 +535,14 @@ import {
     type OpHistory,
     type Scenario,
 } from '../../domain/history.ts';
+import Subscription from '../../../../../src/base/subscription.ts';
 import { flyToFeature } from '../../lib/flyToFeature.ts';
+import { schemaMission } from '../../lib/incidentSubscription.ts';
+import { deletePolygonFromMission, pushPolygonToMission } from '../../lib/missionFeatures.ts';
 import { loadRollupInputs, saveScenarios, type RollupInputs } from '../../lib/rollupPersistence.ts';
+import { expandSearchArea } from '../../lib/segmentSplit.ts';
+import { downloadWc3PeriodZip } from '../../lib/wc3Export.ts';
+import { computeRollup } from '../../domain/rollup.ts';
 
 const { activeMission } = useIncident();
 
@@ -543,6 +719,259 @@ async function deleteScenario(name: string): Promise<void> {
         error.value = err instanceof Error ? err.message : String(err);
     } finally {
         savingScenario.value = false;
+    }
+}
+
+// ── WinCASIE III period export ────────────────────────────────────────────
+const exportThroughOp = ref(0);
+
+function onExportWc3(): void {
+    const consensus = inputs.value.consensus;
+    if (!consensus) return;
+    error.value = '';
+    try {
+        const throughOp = exportThroughOp.value;
+        const segments = sortedSegments.value.map((seg) => ({
+            uid: seg.uid,
+            callsign: inputs.value.segmentLabels[seg.uid] ?? seg.uid,
+        }));
+
+        // State as of the chosen OP
+        const step = history.value.steps.find((s) => s.opNumber === throughOp)
+            ?? history.value.steps[0];
+        const recordsThrough = inputs.value.records.filter((r) => r.opNumber <= throughOp);
+        const rollup = computeRollup(inputs.value.segments, inputs.value.rowPoa, recordsThrough);
+        const cpodPctByUid: Record<string, number> = {};
+        for (const seg of rollup.segments) cpodPctByUid[seg.uid] = seg.cumulativePod;
+
+        // Trail cutoff: last debrief in scope (or consensus time for OP0);
+        // split/expansion events after that instant are excluded.
+        const cutoff = recordsThrough.reduce(
+            (acc, r) => (r.recordedAt && r.recordedAt > acc ? r.recordedAt : acc),
+            inputs.value.consensusUpdatedAt,
+        );
+        const events = [
+            ...recordsThrough.map((r) => ({
+                at: r.recordedAt ?? '',
+                text: `OP${r.opNumber}: ${inputs.value.segmentLabels[r.segmentUid] ?? r.segmentUid} `
+                    + `POD ${r.pod}%${r.coverage !== undefined && r.coverage < 1 ? ` over ${Math.round(r.coverage * 100)}%` : ''}`
+                    + `${r.resource ? ` (${r.resource})` : ''}`,
+            })),
+            ...inputs.value.historyEvents.filter((e) => !cutoff || (e.at && e.at <= cutoff)),
+        ].sort((a, b) => (a.at || '').localeCompare(b.at || ''));
+
+        const zipName = downloadWc3PeriodZip(consensus, segments, {
+            throughOp,
+            rowPoaPct: step.rowPoa,
+            poaPctByUid: step.poa,
+            cpodPctByUid,
+            events,
+        });
+        // eslint-disable-next-line no-console
+        console.info(`WinCASIE export downloaded: ${zipName}`);
+    } catch (err) {
+        error.value = err instanceof Error ? err.message : String(err);
+    }
+}
+
+// ── Expand Search Area (WC3): new segments funded out of R.O.W. ──────────
+interface ExpandRow {
+    callsign: string;
+    pct: string;
+    polygonUid: string;
+}
+interface ExpandPoly {
+    uid: string;
+    callsign: string;
+    source: string;
+    sourceGuid: string;
+    sourceToken?: string;
+    onMgmt: boolean;
+    geometry: unknown;
+}
+
+const expandOpen = ref(false);
+const expandCount = ref(3);
+const expandRows = ref<ExpandRow[]>([]);
+const expandNote = ref('');
+const expandPolys = ref<ExpandPoly[]>([]);
+const loadingExpandPolys = ref(false);
+const savingExpansion = ref(false);
+
+function nextSegmentNumber(): { start: number; width: number } {
+    let max = 0;
+    let width = 2;
+    for (const label of Object.values(inputs.value.segmentLabels)) {
+        const match = /^(\d+)$/.exec(label.trim());
+        if (!match) continue;
+        const n = Number(match[1]);
+        if (n > max) { max = n; width = match[1].length; }
+    }
+    return { start: max + 1, width };
+}
+
+function rebuildExpansionRows(): void {
+    const { start, width } = nextSegmentNumber();
+    expandRows.value = Array.from({ length: expandCount.value }, (_, i) => ({
+        callsign: String(start + i).padStart(width, '0'),
+        pct: '0',
+        polygonUid: '',
+    }));
+}
+
+function startExpansion(): void {
+    expandOpen.value = true;
+    expandNote.value = '';
+    rebuildExpansionRows();
+    void loadExpandCandidates();
+}
+
+/** Redistribute the currently allocated total equally among the segments. */
+function equalizeExpansion(): void {
+    const allocated = expandRows.value.reduce((a, s) => a + (Number(s.pct) || 0), 0);
+    if (allocated <= 0) return;
+    const share = Math.floor((allocated / expandRows.value.length) * 100) / 100;
+    expandRows.value.forEach((seg, i) => {
+        seg.pct = i === expandRows.value.length - 1
+            ? String(Math.round((allocated - share * (expandRows.value.length - 1)) * 100) / 100)
+            : String(share);
+    });
+}
+
+const expandAllocated = computed(() =>
+    Math.round(expandRows.value.reduce((a, s) => a + (Number(s.pct) || 0), 0) * 100) / 100);
+
+/** R.O.W. share auto-deducts as segment proportions are entered. */
+const expandRowRetained = computed(() => Math.round((100 - expandAllocated.value) * 100) / 100);
+
+const expansionValid = computed(() =>
+    expandRowRetained.value >= 0
+    && expandAllocated.value > 0
+    && expandNote.value.trim().length > 0
+    && expandRows.value.every((s) => s.callsign.trim()));
+
+function availableExpandPolys(current: string): ExpandPoly[] {
+    const taken = new Set(expandRows.value.map((s) => s.polygonUid).filter((u) => u && u !== current));
+    return expandPolys.value.filter((p) => !taken.has(p.uid));
+}
+
+/** Unregistered polygons from the common map, MGMT, and open OP syncs. */
+async function loadExpandCandidates(): Promise<void> {
+    const mission = activeMission.value;
+    if (!mission?.mgmt) return;
+    loadingExpandPolys.value = true;
+    try {
+        const registered = new Set(inputs.value.segments.map((s) => s.uid));
+        const sources = [
+            { label: 'common map', guid: mission.guid, token: mission.missionToken, onMgmt: false },
+            { label: 'MGMT', guid: mission.mgmt.guid, token: mission.mgmt.missionToken, onMgmt: true },
+            ...inputs.value.registry
+                .filter((op) => op.status !== 'closed')
+                .map((op) => ({ label: op.name, guid: op.guid, token: op.ownerToken, onMgmt: false })),
+        ];
+        const found: ExpandPoly[] = [];
+        const seen = new Set<string>();
+        for (const source of sources) {
+            try {
+                const sub = await Subscription.load(source.guid, {
+                    missiontoken: source.token ?? '',
+                    reload: false,
+                });
+                const feats = await sub.feature.list({ refresh: true }) as unknown as {
+                    id?: string | number;
+                    properties?: { callsign?: string };
+                    geometry?: { type?: string };
+                }[];
+                for (const f of feats) {
+                    const uid = String(f.id ?? '');
+                    const type = f.geometry?.type;
+                    if (!uid || seen.has(uid) || registered.has(uid)) continue;
+                    if (type !== 'Polygon' && type !== 'MultiPolygon') continue;
+                    seen.add(uid);
+                    found.push({
+                        uid,
+                        callsign: f.properties?.callsign || uid,
+                        source: source.label,
+                        sourceGuid: source.guid,
+                        sourceToken: source.token,
+                        onMgmt: source.onMgmt,
+                        geometry: f.geometry,
+                    });
+                }
+            } catch { /* unreachable source — skip */ }
+        }
+        expandPolys.value = found;
+    } finally {
+        loadingExpandPolys.value = false;
+    }
+}
+
+function expandRing(geometry: unknown): [number, number][] | null {
+    const geom = geometry as { type?: string; coordinates?: unknown };
+    const coords = geom?.type === 'Polygon' ? geom.coordinates
+        : geom?.type === 'MultiPolygon' && Array.isArray(geom.coordinates)
+            ? (geom.coordinates as unknown[])[0]
+            : null;
+    if (!Array.isArray(coords) || !Array.isArray(coords[0])) return null;
+    const ring: [number, number][] = [];
+    for (const point of coords[0] as unknown[]) {
+        if (!Array.isArray(point) || point.length < 2) return null;
+        ring.push([Number(point[0]), Number(point[1])]);
+    }
+    return ring.length >= 4 ? ring : null;
+}
+
+async function applyExpansion(): Promise<void> {
+    const mission = activeMission.value;
+    if (!mission?.mgmt || !expansionValid.value) return;
+    savingExpansion.value = true;
+    error.value = '';
+    try {
+        const planning = schemaMission(mission);
+        const additions: { uid: string; callsign: string; pct: number }[] = [];
+        for (const row of expandRows.value) {
+            const callsign = row.callsign.trim();
+            let uid = globalThis.crypto.randomUUID();
+            const poly = expandPolys.value.find((p) => p.uid === row.polygonUid);
+            if (poly) {
+                if (poly.onMgmt) {
+                    uid = poly.uid;
+                } else {
+                    const ring = expandRing(poly.geometry);
+                    if (ring) {
+                        let lon = 0; let lat = 0;
+                        for (const [x, y] of ring) { lon += x; lat += y; }
+                        uid = await pushPolygonToMission({
+                            missionGuid: planning.guid,
+                            missionToken: planning.missionToken,
+                            callsign,
+                            ring,
+                            center: [lon / ring.length, lat / ring.length],
+                        });
+                        try {
+                            await deletePolygonFromMission({
+                                missionGuid: poly.sourceGuid,
+                                uid: poly.uid,
+                                missiontoken: poly.sourceToken || undefined,
+                            });
+                        } catch { /* cosmetic */ }
+                    }
+                }
+            }
+            additions.push({ uid, callsign, pct: Number(row.pct) || 0 });
+        }
+
+        await expandSearchArea(mission, {
+            rowRetainedPct: expandRowRetained.value,
+            additions: additions.filter((a) => a.pct > 0),
+            note: expandNote.value,
+        });
+        expandOpen.value = false;
+        await refresh();
+    } catch (err) {
+        error.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        savingExpansion.value = false;
     }
 }
 
