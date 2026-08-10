@@ -14,6 +14,7 @@ import { consensusFromSchema } from './casiePersistence.ts';
 import { debriefsFromSchema } from './debriefPersistence.ts';
 import { loadSchemaSubscription, schemaMissionToken } from './incidentSubscription.ts';
 import { loadMissionSchema, saveMissionSchema } from './missionSchema.ts';
+import { casieHistoryFromSchema, type CasieHistoryEvent } from './segmentSplit.ts';
 import { segmentsFromSchema } from './segmentsPersistence.ts';
 
 export interface RollupInputs {
@@ -26,6 +27,8 @@ export interface RollupInputs {
     records: DebriefRecord[];
     registry: OpPeriodRegistryEntry[];
     scenarios: Scenario[];
+    historyEvents: CasieHistoryEvent[];
+    consensusUpdatedAt: string;
 }
 
 function consensusHasValues(consensus: InitialConsensusState | null): boolean {
@@ -60,6 +63,8 @@ export async function loadRollupInputs(mission: ActiveMission): Promise<RollupIn
         scenarios: scenariosFromValue(
             (schema.incident_response as Record<string, unknown>).casie_scenarios,
         ),
+        historyEvents: casieHistoryFromSchema(schema),
+        consensusUpdatedAt: consensus?.updated ?? '',
     };
 }
 

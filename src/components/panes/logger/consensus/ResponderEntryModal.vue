@@ -133,10 +133,17 @@
                                     </template>
                                     <template v-else>
                                         <p class='mb-1'>
-                                            Rank R.O.W. and each segment on a scale of 0 to 100.
+                                            The R.O.W. requires a percentage.
+                                        </p>
+                                        <p class='mb-1'>
+                                            Each segment requires a positive number from 1 to 1000.
+                                            The numbers 1 and 1000 do not have to be used. It is
+                                            not a percentage.
                                         </p>
                                         <p class='mb-0'>
-                                            Values are independent and do not need to total 100.
+                                            If one segment has the number 100 assigned to it and
+                                            another the number 25, the subject is considered 4 times
+                                            as likely to be in the first segment than the second.
                                         </p>
                                     </template>
                                 </div>
@@ -187,6 +194,7 @@ import {
     OCONNOR_LETTERS,
     methodLabel,
     oconnorValues,
+    proportionalValues,
     validateRespondentEntry,
     type ConsensusRespondent,
     type OconnorLetter,
@@ -204,7 +212,12 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-    accept: [result: { row: number; letters: Record<string, OconnorLetter>; values: Record<string, number> }];
+    accept: [result: {
+        row: number;
+        letters: Record<string, OconnorLetter>;
+        ratings: Record<string, number>;
+        values: Record<string, number>;
+    }];
     cancel: [];
 }>();
 
@@ -214,12 +227,17 @@ const isOconnor = computed(() => props.respondent.method === 'oconnor');
 const isMattson = computed(() => props.respondent.method === 'mattson');
 const methodTitle = computed(() => `${methodLabel(props.respondent.method)} Consensus`);
 
+const isProportional = computed(() => props.respondent.method === 'proportional');
+
 const row = ref<number>(props.respondent.row);
 const letters = reactive<Record<string, OconnorLetter | ''>>({});
 const values = reactive<Record<string, number>>({});
 for (const seg of props.segments) {
     letters[seg.uid] = props.respondent.letters[seg.uid] ?? '';
-    values[seg.uid] = props.respondent.values[seg.uid] ?? 0;
+    // Proportional edits the raw 1–1000 ratings; other methods edit values.
+    values[seg.uid] = props.respondent.method === 'proportional'
+        ? (props.respondent.ratings?.[seg.uid] ?? 0)
+        : (props.respondent.values[seg.uid] ?? 0);
 }
 
 const error = ref('');
@@ -245,14 +263,21 @@ function onAccept(): void {
     }
 
     const rowNum = Number(row.value) || 0;
+    const entered: Record<string, number> = Object.fromEntries(
+        uids.map((uid) => [uid, Number(values[uid]) || 0]),
+    );
+    const ratings: Record<string, number> = isProportional.value ? entered : {};
     const finalValues: Record<string, number> = isOconnor.value
         ? oconnorValues(rowNum, cleanLetters, uids)
-        : Object.fromEntries(uids.map((uid) => [uid, Number(values[uid]) || 0]));
+        : isProportional.value
+            ? proportionalValues(rowNum, ratings, uids)
+            : entered;
 
     const candidate: ConsensusRespondent = {
         ...props.respondent,
         row: rowNum,
         letters: cleanLetters,
+        ratings,
         values: finalValues,
     };
 
@@ -262,6 +287,6 @@ function onAccept(): void {
         return;
     }
     error.value = '';
-    emit('accept', { row: rowNum, letters: cleanLetters, values: finalValues });
+    emit('accept', { row: rowNum, letters: cleanLetters, ratings, values: finalValues });
 }
 </script>

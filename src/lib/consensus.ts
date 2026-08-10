@@ -6,7 +6,9 @@
  * - O'Connor: R.O.W. is a percentage; each segment gets a letter A–I (A = very
  *   likely … I = very unlikely). Letters map to weights A=9 … I=1 and the
  *   remaining (100 − R.O.W.) percent is split proportionally to the weights.
- * - Proportional: each value (incl. R.O.W.) is an independent 0–100 rating.
+ * - Proportional: R.O.W. is a percentage; each segment gets a relative
+ *   likelihood rating (1–1000, not a percentage) and the remaining
+ *   (100 − R.O.W.) percent is split proportionally to the ratings.
  *
  * The consensus column is the arithmetic mean across respondents per row.
  */
@@ -31,7 +33,12 @@ export interface ConsensusRespondent {
     row: number;
     /** O'Connor letter per segment UID (only meaningful when method is oconnor). */
     letters: Record<string, OconnorLetter>;
-    /** POA value per segment UID (derived from letters for O'Connor). */
+    /**
+     * Proportional raw ratings (1–1000 relative weights) per segment UID —
+     * only meaningful when method is proportional (WinCASIE III semantics).
+     */
+    ratings?: Record<string, number>;
+    /** POA value per segment UID (derived from letters/ratings for O'Connor/proportional). */
     values: Record<string, number>;
 }
 
@@ -148,6 +155,26 @@ function mean(values: number[]): number {
     return values.reduce((sum, v) => sum + v, 0) / values.length;
 }
 
+/**
+ * Proportional (WinCASIE III): ROW is a percentage; segment ratings are
+ * relative weights (1–1000). The remaining (100 − ROW) percent is split in
+ * proportion to the ratings. Verified against WC3: ROW 15 with ratings
+ * 100/25/50/75 → 34.00 / 8.50 / 17.00 / 25.50.
+ */
+export function proportionalValues(
+    row: number,
+    ratings: Record<string, number>,
+    segmentUids: string[],
+): Record<string, number> {
+    const total = segmentUids.reduce((sum, uid) => sum + (ratings[uid] ?? 0), 0);
+    const remaining = 100 - row;
+    const out: Record<string, number> = {};
+    for (const uid of segmentUids) {
+        out[uid] = total > 0 ? (remaining * (ratings[uid] ?? 0)) / total : 0;
+    }
+    return out;
+}
+
 export function consensusRow(respondents: ConsensusRespondent[]): number {
     return mean(respondents.map((r) => r.row));
 }
@@ -177,6 +204,15 @@ export function validateRespondentEntry(
         for (const uid of segmentUids) {
             if (!resp.letters[uid]) {
                 return 'Every segment requires a letter (A–I).';
+            }
+        }
+        return null;
+    }
+    if (resp.method === 'proportional') {
+        for (const uid of segmentUids) {
+            const rating = resp.ratings?.[uid];
+            if (!Number.isFinite(rating) || (rating as number) < 1 || (rating as number) > 1000) {
+                return 'Every segment requires a positive number from 1 to 1000 (relative likelihood, not a percentage).';
             }
         }
         return null;

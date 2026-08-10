@@ -49,11 +49,19 @@ function sanitizeRespondent(raw: unknown, index: number): ConsensusRespondent {
         }
     }
 
+    const ratings: Record<string, number> = {};
+    if (rec.ratings && typeof rec.ratings === 'object' && !Array.isArray(rec.ratings)) {
+        for (const [uid, value] of Object.entries(rec.ratings as Record<string, unknown>)) {
+            ratings[uid] = asNumber(value);
+        }
+    }
+
     return {
         name: asString(rec.name, `Responder ${index + 1}`) || `Responder ${index + 1}`,
         method,
         row: asNumber(rec.row, 100),
         letters,
+        ratings,
         values,
     };
 }

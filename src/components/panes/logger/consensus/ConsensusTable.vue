@@ -225,6 +225,7 @@ function onMethodAccept(result: { name: string; method: ConsensusMethod }): void
 function onEntryAccept(result: {
     row: number;
     letters: Record<string, OconnorLetter>;
+    ratings: Record<string, number>;
     values: Record<string, number>;
 }): void {
     const idx = entryIndex.value;
@@ -234,6 +235,7 @@ function onEntryAccept(result: {
         ...current,
         row: result.row,
         letters: result.letters,
+        ratings: result.ratings,
         values: result.values,
     });
     entryIndex.value = null;

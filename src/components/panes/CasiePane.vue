@@ -140,6 +140,37 @@
                 </p>
             </TablerBorder>
 
+            <!-- ── History (WC3-style audit trail) ─────────────────────── -->
+            <TablerBorder
+                class='cloudtak-accent text-white mb-3'
+                :fill-height='false'
+                :shadow='false'
+                gap='sm'
+            >
+                <template #label>
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        History
+                    </p>
+                </template>
+
+                <div
+                    v-if='!auditTrail.length'
+                    class='text-muted small'
+                >
+                    No history yet — events appear as the consensus is accepted,
+                    assignments are debriefed, and segments are split.
+                </div>
+                <div
+                    v-for='(line, i) in auditTrail'
+                    :key='i'
+                    class='d-flex gap-2 border-bottom py-1 small font-monospace'
+                >
+                    <span class='text-muted'>{{ String(i + 1).padStart(3, '0') }}</span>
+                    <span class='flex-grow-1'>{{ line.text }}</span>
+                    <span class='text-muted text-nowrap'>{{ line.when }}</span>
+                </div>
+            </TablerBorder>
+
             <!-- ── What-if scenarios ───────────────────────────────────── -->
             <TablerBorder
                 class='cloudtak-accent text-white mb-3'
@@ -405,6 +436,39 @@ async function onFlyTo(uid: string): Promise<void> {
 }
 
 const realOpNumbers = computed(() => opNumbersIn(inputs.value.records));
+
+// ── WC3-style audit trail: consensus + debriefs + splits, chronological ───
+function trailWhen(iso: string): string {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const h24 = d.getHours();
+    const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+    return `(${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()} `
+        + `${h12}:${String(d.getMinutes()).padStart(2, '0')} ${h24 < 12 ? 'AM' : 'PM'})`;
+}
+
+const auditTrail = computed(() => {
+    const events: { at: string; text: string }[] = [];
+    if (inputs.value.consensusUpdatedAt) {
+        events.push({ at: inputs.value.consensusUpdatedAt, text: 'Initial Consensus accepted' });
+    }
+    for (const record of inputs.value.records) {
+        const label = inputs.value.segmentLabels[record.segmentUid] ?? record.segmentUid;
+        const coverage = record.coverage !== undefined && record.coverage < 1
+            ? ` over ${Math.round(record.coverage * 100)}%`
+            : '';
+        const resource = record.resource ? ` (${record.resource})` : '';
+        events.push({
+            at: record.recordedAt ?? '',
+            text: `OP${record.opNumber}: ${label} POD ${record.pod}%${coverage}${resource}`,
+        });
+    }
+    events.push(...inputs.value.historyEvents);
+    return events
+        .sort((a, b) => (a.at || '').localeCompare(b.at || ''))
+        .map((e) => ({ text: e.text, when: trailWhen(e.at) }));
+});
 
 const canCompute = computed(() => draft.hypotheticals.some(
     (h) => h.segmentUid && Number.isFinite(h.pod) && h.pod > 0,

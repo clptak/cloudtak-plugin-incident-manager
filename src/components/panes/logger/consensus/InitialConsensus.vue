@@ -133,7 +133,10 @@
                                         <span
                                             v-if='resp.method === "oconnor" && resp.letters[seg.uid]'
                                             class='text-secondary me-1'
-                                        >({{ resp.letters[seg.uid] }})</span>{{ formatPoa(resp.values[seg.uid] ?? 0) }}
+                                        >({{ resp.letters[seg.uid] }})</span><span
+                                            v-else-if='resp.method === "proportional" && resp.ratings?.[seg.uid]'
+                                            class='text-secondary me-1'
+                                        >({{ resp.ratings[seg.uid] }})</span>{{ formatPoa(resp.values[seg.uid] ?? 0) }}
                                     </td>
                                     <td class='text-end text-success'>
                                         {{ formatPoa(consensusForSegment(consensus.respondents, seg.uid)) }}

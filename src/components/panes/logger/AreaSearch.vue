@@ -313,7 +313,7 @@
             >
                 <template #label>
                     <p class='text-uppercase text-white-50 small mb-0'>
-                        Debrief — POD Capture
+                        Add Complete Search Assignment
                     </p>
                 </template>
 
@@ -399,8 +399,114 @@
                     :disabled='busy || !debriefForm.segmentUid'
                     @click='onRecordDebrief'
                 >
-                    Record Debrief
+                    Record Completed Assignment
                 </button>
+
+                <!-- ── Incomplete-segment split (ISM) — inline, map stays usable ── -->
+                <div
+                    v-if='splitPrompt'
+                    class='cloudtak-accent border border-warning rounded-3 mt-3 p-3'
+                >
+                    <p class='text-uppercase text-warning small mb-1'>
+                        Split {{ splitPrompt.label }} — only {{ splitPrompt.completedPct }}% completed
+                    </p>
+                    <p class='form-text mt-0 mb-2'>
+                        The map stays live: edit {{ splitPrompt.label }}'s boundary on the MGMT
+                        sync down to the searched portion, draw the remainder as
+                        <strong>{{ splitNewName }}</strong>, then hit Refresh and select it below.
+                        The searched portion keeps the POD; the remainder takes the rest of the POA.
+                    </p>
+                    <div class='row g-2'>
+                        <div class='col-md-4'>
+                            <TablerInput
+                                v-model='splitRetainedPct'
+                                label='POA retained in searched portion (%)'
+                            />
+                            <div class='form-text'>
+                                Remainder gets {{ splitRemainderPct }}%.
+                            </div>
+                        </div>
+                        <div class='col-md-4'>
+                            <TablerInput
+                                v-model='splitNewName'
+                                label='New segment name'
+                            />
+                        </div>
+                        <div class='col-md-4'>
+                            <label class='form-label d-flex align-items-center'>
+                                Remainder polygon
+                                <button
+                                    class='btn btn-link btn-sm p-0 ms-auto'
+                                    :disabled='loadingRemainder'
+                                    @click='loadRemainderCandidates'
+                                >
+                                    {{ loadingRemainder ? 'Loading…' : 'Refresh' }}
+                                </button>
+                            </label>
+                            <div
+                                v-if='!remainderCandidates.length'
+                                class='text-muted small'
+                            >
+                                No unregistered polygons found yet.
+                            </div>
+                            <label
+                                v-for='p in remainderCandidates'
+                                :key='p.uid'
+                                class='form-check d-flex align-items-center gap-2 mb-1'
+                            >
+                                <input
+                                    v-model='selectedRemainderUid'
+                                    type='radio'
+                                    class='form-check-input'
+                                    :value='p.uid'
+                                >
+                                <span class='form-check-label small'>
+                                    {{ p.callsign }}
+                                    <span class='text-muted'>· {{ formatSqMi(p.areaSqMi) }} mi² · {{ p.source }}</span>
+                                </span>
+                                <button
+                                    class='btn btn-link btn-sm p-0 ms-auto'
+                                    title='Center map on this polygon'
+                                    @click.prevent='flyToCandidate(p.uid)'
+                                >
+                                    locate
+                                </button>
+                            </label>
+                            <label class='form-check d-flex align-items-center gap-2 mb-1'>
+                                <input
+                                    v-model='selectedRemainderUid'
+                                    type='radio'
+                                    class='form-check-input'
+                                    value=''
+                                >
+                                <span class='form-check-label small text-muted'>No polygon yet</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class='d-flex flex-wrap gap-2 mt-2'>
+                        <button
+                            class='btn btn-primary btn-sm'
+                            :disabled='busy || !splitInputsValid'
+                            @click='onSplitYes'
+                        >
+                            {{ busy ? 'Working…' : 'Split and record' }}
+                        </button>
+                        <button
+                            class='btn btn-outline-secondary btn-sm'
+                            :disabled='busy'
+                            @click='onSplitNo'
+                        >
+                            Don't split — record partial coverage
+                        </button>
+                        <button
+                            class='btn btn-link btn-sm'
+                            :disabled='busy'
+                            @click='splitPrompt = null'
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
 
                 <div
                     v-if='debriefs.length'
@@ -445,6 +551,12 @@ import {
     recordDebrief,
 } from '../../../domain/usecases.ts';
 import { createDebriefStore } from '../../../lib/debriefPersistence.ts';
+import Subscription from '../../../../../../src/base/subscription.ts';
+import { flyToFeature } from '../../../lib/flyToFeature.ts';
+import { areaSqMi, formatSqMi } from '../../../lib/geometryArea.ts';
+import { loadSchemaSubscription, schemaMission } from '../../../lib/incidentSubscription.ts';
+import { deletePolygonFromMission, pushPolygonToMission } from '../../../lib/missionFeatures.ts';
+import { carveSegmentRemainder } from '../../../lib/segmentSplit.ts';
 import {
     createAssignmentStore,
     createOpFeaturePublisher,
@@ -453,7 +565,6 @@ import {
 } from '../../../lib/opAssignmentPersistence.ts';
 import { loadResourceAssignmentsFromMission } from '../../../lib/resourceAssignmentPersistence.ts';
 import { isActiveResource, type ResourceAssignment } from '../../../lib/resourceAssignments.ts';
-import { loadSchemaSubscription } from '../../../lib/incidentSubscription.ts';
 import { loadMissionSchema } from '../../../lib/missionSchema.ts';
 import { createOpPeriodGateway } from '../../../lib/opPeriodGateway.ts';
 import { createRegistryStore } from '../../../lib/registryPersistence.ts';
@@ -739,28 +850,270 @@ async function onCheckIn(sub: { clientUid: string; username: string }): Promise<
     }
 }
 
+// ── Incomplete-segment split prompt (ISM) ──────────────────────────────
+const splitPrompt = ref<{ label: string; completedPct: number } | null>(null);
+const splitRetainedPct = ref('');
+const splitNewName = ref('');
+
+interface RemainderCandidate {
+    uid: string;
+    callsign: string;
+    source: string;
+    sourceGuid: string;
+    sourceToken?: string;
+    onMgmt: boolean;
+    geometry: unknown;
+    areaSqMi?: number;
+    style?: { stroke?: string; fill?: string };
+}
+
+/**
+ * Next segment name in numeric sequence: highest integer callsign + 1,
+ * zero-padded to the prevailing width (e.g. segments 01–04 → "05").
+ */
+function nextSegmentName(): string {
+    let max = 0;
+    let width = 2;
+    for (const uid of Object.keys(segments.value)) {
+        const callsign = (segments.value[uid]?.callsign ?? '').trim();
+        const match = /^(\d+)$/.exec(callsign);
+        if (!match) continue;
+        const n = Number(match[1]);
+        if (n > max) {
+            max = n;
+            width = match[1].length;
+        }
+    }
+    return String(max + 1).padStart(width, '0');
+}
+
+async function flyToCandidate(uid: string): Promise<void> {
+    const found = await flyToFeature(uid);
+    if (!found) error.value = 'Polygon is not rendered on your map — check its mission overlay is loaded.';
+}
+const remainderCandidates = ref<RemainderCandidate[]>([]);
+const selectedRemainderUid = ref('');
+const loadingRemainder = ref(false);
+
+function polyRing(geometry: unknown): [number, number][] | null {
+    const geom = geometry as { type?: string; coordinates?: unknown };
+    const coords = geom?.type === 'Polygon' ? geom.coordinates
+        : geom?.type === 'MultiPolygon' && Array.isArray(geom.coordinates)
+            ? (geom.coordinates as unknown[])[0]
+            : null;
+    if (!Array.isArray(coords) || !Array.isArray(coords[0])) return null;
+    const ring: [number, number][] = [];
+    for (const point of coords[0] as unknown[]) {
+        if (!Array.isArray(point) || point.length < 2) return null;
+        ring.push([Number(point[0]), Number(point[1])]);
+    }
+    return ring.length >= 4 ? ring : null;
+}
+
+function polyCentroid(ring: [number, number][]): [number, number] {
+    let lon = 0; let lat = 0;
+    for (const [x, y] of ring) { lon += x; lat += y; }
+    return [lon / ring.length, lat / ring.length];
+}
+
+/** Unregistered polygons from the common map, MGMT sync, and current OP sync. */
+async function loadRemainderCandidates(): Promise<void> {
+    const mission = activeMission.value;
+    if (!mission?.mgmt) return;
+    loadingRemainder.value = true;
+    try {
+        const registered = new Set(segmentUids.value);
+        const sources: { label: string; guid: string; token?: string; onMgmt: boolean }[] = [
+            { label: 'common map', guid: mission.guid, token: mission.missionToken, onMgmt: false },
+            { label: 'MGMT', guid: mission.mgmt.guid, token: mission.mgmt.missionToken, onMgmt: true },
+        ];
+        if (currentOp.value) {
+            sources.push({
+                label: currentOp.value.name,
+                guid: currentOp.value.guid,
+                token: currentOp.value.ownerToken,
+                onMgmt: false,
+            });
+        }
+        const found: RemainderCandidate[] = [];
+        const seen = new Set<string>();
+        for (const source of sources) {
+            try {
+                const sub = await Subscription.load(source.guid, {
+                    missiontoken: source.token ?? '',
+                    reload: false,
+                });
+                const feats = await sub.feature.list({ refresh: true }) as unknown as {
+                    id?: string | number;
+                    properties?: { callsign?: string; stroke?: string; fill?: string };
+                    geometry?: { type?: string };
+                }[];
+                for (const f of feats) {
+                    const uid = String(f.id ?? '');
+                    const type = f.geometry?.type;
+                    if (!uid || seen.has(uid) || registered.has(uid)) continue;
+                    if (type !== 'Polygon' && type !== 'MultiPolygon') continue;
+                    seen.add(uid);
+                    found.push({
+                        uid,
+                        callsign: f.properties?.callsign || uid,
+                        source: source.label,
+                        sourceGuid: source.guid,
+                        sourceToken: source.token,
+                        onMgmt: source.onMgmt,
+                        geometry: f.geometry,
+                        areaSqMi: areaSqMi(f.geometry),
+                        style: { stroke: f.properties?.stroke, fill: f.properties?.fill },
+                    });
+                }
+            } catch { /* source unreachable — skip */ }
+        }
+        remainderCandidates.value = found;
+    } finally {
+        loadingRemainder.value = false;
+    }
+}
+
+// Selecting a drawn polygon adopts its callsign as the new segment name.
+watch(selectedRemainderUid, (uid) => {
+    const candidate = remainderCandidates.value.find((c) => c.uid === uid);
+    if (candidate) splitNewName.value = candidate.callsign;
+});
+
+/**
+ * Resolve the remainder segment identity: when a drawn polygon is selected it
+ * is moved to the MGMT sync (segments' home) and its uid is used; otherwise a
+ * fresh uid registers a polygon-less segment.
+ */
+async function resolveRemainder(): Promise<{ uid: string; callsign: string }> {
+    const mission = activeMission.value!;
+    const callsign = splitNewName.value.trim();
+    const candidate = remainderCandidates.value.find((c) => c.uid === selectedRemainderUid.value);
+    if (!candidate) return { uid: globalThis.crypto.randomUUID(), callsign };
+    if (candidate.onMgmt) return { uid: candidate.uid, callsign };
+
+    const ring = polyRing(candidate.geometry);
+    if (!ring) return { uid: globalThis.crypto.randomUUID(), callsign };
+    const planning = schemaMission(mission);
+    const newUid = await pushPolygonToMission({
+        missionGuid: planning.guid,
+        missionToken: planning.missionToken,
+        callsign,
+        ring,
+        center: polyCentroid(ring),
+        style: candidate.style,
+    });
+    try {
+        await deletePolygonFromMission({
+            missionGuid: candidate.sourceGuid,
+            uid: candidate.uid,
+            missiontoken: candidate.sourceToken || undefined,
+        });
+    } catch { /* stale source copy is cosmetic */ }
+    return { uid: newUid, callsign };
+}
+
+const splitRemainderPct = computed(() => {
+    const retained = Number(splitRetainedPct.value);
+    return Number.isFinite(retained) ? Math.round((100 - retained) * 100) / 100 : '—';
+});
+const splitInputsValid = computed(() => {
+    const retained = Number(splitRetainedPct.value);
+    return Number.isFinite(retained) && retained > 0 && retained < 100
+        && splitNewName.value.trim().length > 0;
+});
+
+function buildDebriefRecord(): DebriefRecord {
+    const record: DebriefRecord = {
+        opNumber: debriefForm.opNumber,
+        segmentUid: debriefForm.segmentUid,
+        pod: Number(debriefForm.pod),
+    };
+    const coveragePct = debriefForm.coverage.trim();
+    if (coveragePct) record.coverage = Number(coveragePct) / 100;
+    if (debriefForm.resource.trim()) record.resource = debriefForm.resource.trim();
+    if (debriefForm.notes.trim()) record.notes = debriefForm.notes.trim();
+    return record;
+}
+
+async function saveDebriefRecord(record: DebriefRecord, note: string): Promise<void> {
+    const mission = activeMission.value;
+    if (!mission?.mgmt) return;
+    await recordDebrief(createDebriefStore(mission), record);
+    notice.value = note;
+    debriefForm.pod = '';
+    debriefForm.coverage = '';
+    debriefForm.notes = '';
+    debriefs.value = await createDebriefStore(mission).load();
+}
+
 async function onRecordDebrief(): Promise<void> {
     const mission = activeMission.value;
     if (!mission?.mgmt) return;
+
+    // Incomplete segment → ISM split prompt before recording.
+    const coveragePct = Number(debriefForm.coverage.trim() || '100');
+    if (Number.isFinite(coveragePct) && coveragePct > 0 && coveragePct < 100) {
+        const label = segmentLabel(debriefForm.segmentUid);
+        splitRetainedPct.value = String(coveragePct);
+        splitNewName.value = nextSegmentName();
+        selectedRemainderUid.value = '';
+        splitPrompt.value = { label, completedPct: coveragePct };
+        void loadRemainderCandidates();
+        return;
+    }
+
     busy.value = true;
     error.value = ''; notice.value = '';
     try {
-        const record: DebriefRecord = {
-            opNumber: debriefForm.opNumber,
-            segmentUid: debriefForm.segmentUid,
-            pod: Number(debriefForm.pod),
-        };
-        const coveragePct = debriefForm.coverage.trim();
-        if (coveragePct) record.coverage = Number(coveragePct) / 100;
-        if (debriefForm.resource.trim()) record.resource = debriefForm.resource.trim();
-        if (debriefForm.notes.trim()) record.notes = debriefForm.notes.trim();
+        const record = buildDebriefRecord();
+        await saveDebriefRecord(record, `Recorded POD ${record.pod}% for ${segmentLabel(record.segmentUid)}.`);
+    } catch (err) {
+        error.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        busy.value = false;
+    }
+}
 
-        await recordDebrief(createDebriefStore(mission), record);
-        notice.value = `Recorded POD ${record.pod}% for ${segmentLabel(record.segmentUid)}.`;
-        debriefForm.pod = '';
-        debriefForm.coverage = '';
-        debriefForm.notes = '';
-        debriefs.value = await createDebriefStore(mission).load();
+/** Split: parent keeps retained POA + gets the POD at full coverage; remainder becomes a new segment. */
+async function onSplitYes(): Promise<void> {
+    const mission = activeMission.value;
+    if (!mission?.mgmt || !splitPrompt.value) return;
+    busy.value = true;
+    error.value = ''; notice.value = '';
+    try {
+        const parentUid = debriefForm.segmentUid;
+        const parentLabel = segmentLabel(parentUid);
+        const remainder = await resolveRemainder();
+        const newName = remainder.callsign;
+        await carveSegmentRemainder(mission, parentUid, Number(splitRetainedPct.value) / 100, remainder);
+        const record = buildDebriefRecord();
+        delete record.coverage; // reduced segment was fully searched
+        await saveDebriefRecord(
+            record,
+            `Split ${parentLabel} (${splitRetainedPct.value}% POA retained, remainder → ${newName}) and recorded POD ${record.pod}%.`,
+        );
+        splitPrompt.value = null;
+        await refresh();
+    } catch (err) {
+        error.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        busy.value = false;
+    }
+}
+
+/** No split: record with partial coverage as entered (POD scaled by coverage). */
+async function onSplitNo(): Promise<void> {
+    if (!splitPrompt.value) return;
+    busy.value = true;
+    error.value = ''; notice.value = '';
+    try {
+        const record = buildDebriefRecord();
+        await saveDebriefRecord(
+            record,
+            `Recorded POD ${record.pod}% over ${splitPrompt.value.completedPct}% of ${segmentLabel(record.segmentUid)}.`,
+        );
+        splitPrompt.value = null;
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
     } finally {
