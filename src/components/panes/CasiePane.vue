@@ -544,7 +544,7 @@ import { expandSearchArea } from '../../lib/segmentSplit.ts';
 import { downloadWc3PeriodZip } from '../../lib/wc3Export.ts';
 import { computeRollup } from '../../domain/rollup.ts';
 
-const { activeMission } = useIncident();
+const { activeMission, casieExpandRequested } = useIncident();
 
 const inputs = ref<RollupInputs>({
     segments: [],
@@ -988,6 +988,11 @@ async function refresh(): Promise<void> {
     try {
         inputs.value = await loadRollupInputs(mission);
         loaded.value = true;
+        // Segmentation's "Expand Search Area…" button lands here with intent.
+        if (casieExpandRequested.value) {
+            casieExpandRequested.value = false;
+            if (inputs.value.hasConsensus && !expandOpen.value) startExpansion();
+        }
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
     } finally {
@@ -997,4 +1002,11 @@ async function refresh(): Promise<void> {
 
 onMounted(refresh);
 watch(() => activeMission.value?.guid, refresh);
+// Handles the already-mounted case (CASIE tab was previously open).
+watch(casieExpandRequested, (requested) => {
+    if (requested && loaded.value && inputs.value.hasConsensus) {
+        casieExpandRequested.value = false;
+        if (!expandOpen.value) startExpansion();
+    }
+});
 </script>

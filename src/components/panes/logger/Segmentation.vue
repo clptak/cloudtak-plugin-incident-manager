@@ -74,8 +74,15 @@
                 gap='sm'
             >
                 <template #label>
-                    <p class='text-uppercase text-white-50 small mb-0'>
-                        Segments in this search ({{ segmentRows.length }})
+                    <p class='text-uppercase text-white-50 small mb-0 d-flex align-items-center w-100'>
+                        <span>Segments in this search ({{ segmentRows.length }})</span>
+                        <button
+                            class='btn btn-outline-primary btn-sm ms-auto'
+                            title='Add new segments funded out of R.O.W. (CASIE Expand Search Area)'
+                            @click='goToExpand'
+                        >
+                            Expand Search Area…
+                        </button>
                     </p>
                 </template>
 
@@ -286,7 +293,19 @@ function isIntegerCallsign(callsign: string): boolean {
     return /^\d+$/.test(callsign.trim());
 }
 
-const { activeMission, requireActiveMission } = useIncident();
+const {
+    activeMission,
+    casieExpandRequested,
+    requireActiveMission,
+    selectHTabGuarded,
+} = useIncident();
+
+/** Jump to the CASIE tab with the Expand Search Area form opened. */
+function goToExpand(): void {
+    if (!requireActiveMission()) return;
+    casieExpandRequested.value = true;
+    selectHTabGuarded('casie');
+}
 
 const missionPolygons = ref<MissionFeatureRef[]>([]);
 const loadingFeatures = ref(false);

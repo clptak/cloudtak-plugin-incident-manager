@@ -172,6 +172,9 @@ const MISSION_EXEMPT_NAV_KEYS = new Set(['create-open']);
 
 const noMissionModalOpen = ref(false);
 
+/** One-shot signal: open the CASIE tab with the Expand Search Area form open. */
+const casieExpandRequested = ref(false);
+
 export function isMissionRequiredView(key: string, htab: string): boolean {
     if (htab === 'dashboard' || htab === 'organization' || htab === 'risk-assessment') return true;
     if (htab !== 'main') return false;
@@ -261,6 +264,7 @@ export function useIncident() {
         activeMission,
         activeKey,
         activeHTab,
+        casieExpandRequested,
         noMissionModalOpen,
         setActiveMission,
         selectKey,
