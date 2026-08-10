@@ -554,6 +554,9 @@ const inputs = ref<RollupInputs>({
     records: [],
     registry: [],
     scenarios: [],
+    historyEvents: [],
+    consensusUpdatedAt: '',
+    consensus: null,
 });
 const loaded = ref(false);
 const loading = ref(false);
@@ -767,7 +770,6 @@ function onExportWc3(): void {
             cpodPctByUid,
             events,
         });
-        // eslint-disable-next-line no-console
         console.info(`WinCASIE export downloaded: ${zipName}`);
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
@@ -931,7 +933,7 @@ async function applyExpansion(): Promise<void> {
         const additions: { uid: string; callsign: string; pct: number }[] = [];
         for (const row of expandRows.value) {
             const callsign = row.callsign.trim();
-            let uid = globalThis.crypto.randomUUID();
+            let uid: string = globalThis.crypto.randomUUID();
             const poly = expandPolys.value.find((p) => p.uid === row.polygonUid);
             if (poly) {
                 if (poly.onMgmt) {

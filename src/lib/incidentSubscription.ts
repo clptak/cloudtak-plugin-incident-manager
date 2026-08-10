@@ -104,7 +104,7 @@ export async function listAllIncidentLogs(mission: ActiveMission): Promise<Incid
         }
     };
 
-    let registryGuids: { guid: string; ownerToken?: string }[] = [];
+    let registryGuids: { guid: string; ownerToken?: string }[];
     try {
         const schemaSub = await loadSchemaSubscription(mission);
         add(await schemaSub.log.list({ refresh: true }));
