@@ -64,22 +64,23 @@
                                             </button>
                                         </th>
                                         <td>
-                                            <select
+                                            <div
                                                 v-if='isOconnor'
-                                                v-model='letters[seg.uid]'
-                                                class='form-select form-select-sm'
+                                                class='btn-group btn-group-sm'
+                                                role='group'
                                             >
-                                                <option value=''>
-                                                    —
-                                                </option>
-                                                <option
+                                                <button
                                                     v-for='l in letterOptions'
                                                     :key='l'
-                                                    :value='l'
+                                                    type='button'
+                                                    class='btn px-2'
+                                                    :class='letters[seg.uid] === l ? "btn-primary" : "btn-outline-secondary"'
+                                                    :title='OCONNOR_SCALE[l] || `Between ${String.fromCharCode(l.charCodeAt(0) - 1)} and ${String.fromCharCode(l.charCodeAt(0) + 1)}`'
+                                                    @click='letters[seg.uid] = l'
                                                 >
                                                     {{ l }}
-                                                </option>
-                                            </select>
+                                                </button>
+                                            </div>
                                             <input
                                                 v-else
                                                 v-model.number='values[seg.uid]'
@@ -109,15 +110,16 @@
                                         <p class='mb-1'>
                                             Each segment requires a letter according to the following scheme:
                                         </p>
-                                        <div>A - very likely</div>
-                                        <div>B</div>
-                                        <div>C - likely</div>
-                                        <div>D</div>
-                                        <div>E - even chance</div>
-                                        <div>F</div>
-                                        <div>G - unlikely</div>
-                                        <div>H</div>
-                                        <div>I - very unlikely</div>
+                                        <div
+                                            v-for='l in letterOptions'
+                                            :key='l'
+                                            class='d-flex gap-2'
+                                        >
+                                            <strong style='min-width: 1rem;'>{{ l }}</strong>
+                                            <span :class='OCONNOR_SCALE[l] ? "" : "text-muted"'>
+                                                {{ OCONNOR_SCALE[l] || '—' }}
+                                            </span>
+                                        </div>
                                     </template>
                                     <template v-else-if='isMattson'>
                                         <p class='mb-1'>
@@ -222,6 +224,15 @@ const emit = defineEmits<{
 }>();
 
 const letterOptions = OCONNOR_LETTERS;
+
+/** O'Connor anchor letters; B/D/F/H are in-between gradations. */
+const OCONNOR_SCALE: Record<string, string> = {
+    A: 'very likely',
+    C: 'likely',
+    E: 'even chance',
+    G: 'unlikely',
+    I: 'very unlikely',
+};
 
 const isOconnor = computed(() => props.respondent.method === 'oconnor');
 const isMattson = computed(() => props.respondent.method === 'mattson');
