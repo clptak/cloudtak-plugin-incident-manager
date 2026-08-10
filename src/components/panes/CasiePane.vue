@@ -557,6 +557,7 @@ const inputs = ref<RollupInputs>({
     historyEvents: [],
     consensusUpdatedAt: '',
     consensus: null,
+    clues: [],
 });
 const loaded = ref(false);
 const loading = ref(false);
