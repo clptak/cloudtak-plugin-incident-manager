@@ -128,6 +128,13 @@
                             Publish IPP to OP{{ currentOp.opNumber }}
                         </button>
                         <button
+                            class='btn btn-outline-primary me-2'
+                            :disabled='busy'
+                            @click='openClueForm'
+                        >
+                            Add Influence of Clue
+                        </button>
+                        <button
                             class='btn btn-outline-danger'
                             :disabled='busy'
                             @click='onCloseOp'
@@ -140,6 +147,155 @@
                         </div>
                     </div>
                 </template>
+            </TablerBorder>
+
+            <!-- ── Influence of Clue (ISM 8.17/8.18) — inline, map stays usable ── -->
+            <TablerBorder
+                v-if='clueFormOpen && currentOp'
+                class='cloudtak-accent text-white mb-3'
+                :fill-height='false'
+                :shadow='false'
+                gap='sm'
+            >
+                <template #label>
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Add Influence of Clue — OP{{ clueForm.opNumber }}
+                    </p>
+                </template>
+
+                <p class='form-text mt-0 mb-2'>
+                    Rate what the clue suggests — assuming it is authentic — for R.O.W. and
+                    every segment: A = strongly suggests subject IS here, E = says nothing,
+                    I = strongly suggests subject is NOT here. Authenticity then discounts
+                    the whole update.
+                </p>
+
+                <div class='row g-2'>
+                    <div class='col-md-6'>
+                        <TablerInput
+                            v-model='clueForm.description'
+                            label='Description'
+                            placeholder='e.g. Wallet found in Segment 1'
+                        />
+                        <div
+                            v-if='cluePointOptions.length'
+                            class='mt-1'
+                        >
+                            <select
+                                class='form-select form-select-sm'
+                                @change='onCluePointPick($event)'
+                            >
+                                <option value=''>
+                                    — or pick a clue marker from {{ currentOp.name }} —
+                                </option>
+                                <option
+                                    v-for='m in cluePointOptions'
+                                    :key='m.uid'
+                                    :value='m.callsign'
+                                >
+                                    {{ m.callsign }}
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class='col-md-3'>
+                        <label class='form-label'>Authenticity</label>
+                        <select
+                            v-model.number='clueForm.authIndex'
+                            class='form-select form-select-sm'
+                        >
+                            <option
+                                v-for='(opt, i) in CLUE_AUTHENTICITY_OPTIONS'
+                                :key='opt.label'
+                                :value='i'
+                            >
+                                {{ opt.label }}
+                            </option>
+                        </select>
+                    </div>
+                    <div class='col-md-3'>
+                        <TablerInput
+                            v-model='clueForm.xref'
+                            label='X Reference to paperwork'
+                        />
+                    </div>
+                </div>
+
+                <p class='text-uppercase text-white-50 small mb-1 mt-3'>
+                    Relative importance of clue
+                </p>
+                <div class='row g-3'>
+                    <div class='col-lg-7'>
+                        <div class='table-responsive'>
+                            <table class='table table-sm mb-0 align-middle w-auto'>
+                                <tbody>
+                                    <tr
+                                        v-for='row in clueLetterRows'
+                                        :key='row.key'
+                                    >
+                                        <td class='small text-muted pe-3 text-nowrap'>
+                                            {{ row.label }}
+                                        </td>
+                                        <td>
+                                            <div
+                                                class='btn-group btn-group-sm'
+                                                role='group'
+                                            >
+                                                <button
+                                                    v-for='l in CLUE_LETTERS'
+                                                    :key='l'
+                                                    type='button'
+                                                    class='btn px-2'
+                                                    :class='clueForm.letters[row.key] === l
+                                                        ? (l === "E" ? "btn-secondary" : "btn-primary")
+                                                        : "btn-outline-secondary"'
+                                                    :title='clueLetterHint(l)'
+                                                    @click='clueForm.letters[row.key] = l'
+                                                >
+                                                    {{ l }}
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class='col-lg-5'>
+                        <div class='cloudtak-accent border rounded-3 p-2 h-100'>
+                            <p class='text-uppercase text-white-50 small mb-1'>
+                                Significance of Clue (ISM Table 8.17)
+                            </p>
+                            <div
+                                v-for='l in CLUE_LETTERS'
+                                :key='l'
+                                class='small d-flex gap-2'
+                            >
+                                <strong style='min-width: 1rem;'>{{ l }}</strong>
+                                <span :class='CLUE_SCALE[l] ? "" : "text-muted"'>
+                                    {{ CLUE_SCALE[l] || '—' }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class='d-flex gap-2 mt-3'>
+                    <button
+                        class='btn btn-primary btn-sm'
+                        :disabled='busy || !clueForm.description.trim()'
+                        @click='onAcceptClue'
+                    >
+                        {{ busy ? 'Working…' : 'Accept' }}
+                    </button>
+                    <button
+                        class='btn btn-outline-secondary btn-sm'
+                        :disabled='busy'
+                        @click='clueFormOpen = false'
+                    >
+                        Cancel
+                    </button>
+                </div>
             </TablerBorder>
 
             <!-- ── Assignments ─────────────────────────────────────────── -->
@@ -550,6 +706,7 @@ import {
     publishAssignments,
     recordDebrief,
 } from '../../../domain/usecases.ts';
+import { addClueToMission, CLUE_AUTHENTICITY_OPTIONS } from '../../../lib/cluePersistence.ts';
 import { createDebriefStore } from '../../../lib/debriefPersistence.ts';
 import Subscription from '../../../../../../src/base/subscription.ts';
 import { flyToFeature } from '../../../lib/flyToFeature.ts';
@@ -843,6 +1000,107 @@ async function onCheckIn(sub: { clientUid: string; username: string }): Promise<
         await checkInSubscriber(gateway, op, sub);
         notice.value = `Checked in ${sub.username}.`;
         await refreshSubscribers();
+    } catch (err) {
+        error.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        busy.value = false;
+    }
+}
+
+// ── Influence of Clue (ISM 8.17/8.18) ──────────────────────────────────
+const CLUE_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
+/** ISM Table 8.17 — anchor letters have text; B/D/F/H are in-between. */
+const CLUE_SCALE: Record<string, string> = {
+    A: 'Clue strongly suggests subject is in this segment',
+    C: 'Clue suggests subject is in this segment',
+    E: 'Clue suggests nothing about the subject being in or out of this segment',
+    G: 'Clue suggests subject is not in this segment',
+    I: 'Clue strongly suggests subject is not in this segment',
+};
+const clueFormOpen = ref(false);
+const clueForm = reactive({
+    description: '',
+    authIndex: 0,
+    xref: '',
+    opNumber: 1,
+    letters: { ROW: 'E' } as Record<string, string>,
+});
+const cluePointOptions = ref<{ uid: string; callsign: string }[]>([]);
+
+/** R.O.W. first, then segments in ascending (numeric-aware) label order. */
+const clueLetterRows = computed(() => [
+    { key: 'ROW', label: 'R.O.W.' },
+    ...segmentUids.value
+        .map((uid) => ({ key: uid, label: segmentLabel(uid) }))
+        .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })),
+]);
+
+function clueLetterHint(letter: string): string {
+    if (letter === 'A') return 'Clue strongly suggests subject IS in this segment';
+    if (letter === 'C') return 'Clue suggests subject is in this segment';
+    if (letter === 'E') return 'Clue says nothing about this segment';
+    if (letter === 'G') return 'Clue suggests subject is NOT in this segment';
+    if (letter === 'I') return 'Clue strongly suggests subject is NOT in this segment';
+    return `Between ${String.fromCharCode(letter.charCodeAt(0) - 1)} and ${String.fromCharCode(letter.charCodeAt(0) + 1)}`;
+}
+
+function openClueForm(): void {
+    const op = currentOp.value;
+    if (!op) return;
+    clueForm.description = '';
+    clueForm.authIndex = 0;
+    clueForm.xref = '';
+    clueForm.opNumber = op.opNumber;
+    clueForm.letters = { ROW: 'E' };
+    for (const uid of segmentUids.value) clueForm.letters[uid] = 'E';
+    clueFormOpen.value = true;
+    void loadCluePoints();
+}
+
+/** Point markers in the current OP sync — likely field-reported clues. */
+async function loadCluePoints(): Promise<void> {
+    const op = currentOp.value;
+    if (!op) return;
+    try {
+        const sub = await Subscription.load(op.guid, {
+            missiontoken: op.ownerToken ?? '',
+            reload: false,
+        });
+        const feats = await sub.feature.list({ refresh: true }) as unknown as {
+            id?: string | number;
+            properties?: { callsign?: string };
+            geometry?: { type?: string };
+        }[];
+        cluePointOptions.value = feats
+            .filter((f) => f.geometry?.type === 'Point' && f.properties?.callsign)
+            .map((f) => ({ uid: String(f.id ?? ''), callsign: f.properties!.callsign! }));
+    } catch {
+        cluePointOptions.value = [];
+    }
+}
+
+function onCluePointPick(event: Event): void {
+    const callsign = (event.target as HTMLSelectElement).value;
+    if (callsign) clueForm.description = callsign;
+}
+
+async function onAcceptClue(): Promise<void> {
+    const mission = activeMission.value;
+    if (!mission?.mgmt || !clueForm.description.trim()) return;
+    busy.value = true;
+    error.value = ''; notice.value = '';
+    try {
+        const auth = CLUE_AUTHENTICITY_OPTIONS[clueForm.authIndex];
+        await addClueToMission(mission, {
+            opNumber: clueForm.opNumber,
+            description: clueForm.description.trim(),
+            authenticity: auth.alpha,
+            authenticityLabel: auth.label,
+            letters: { ...clueForm.letters },
+            xref: clueForm.xref.trim() || undefined,
+        }, Object.fromEntries(segmentUids.value.map((uid) => [uid, segmentLabel(uid)])));
+        notice.value = `Clue influence recorded: "${clueForm.description.trim()}" (${auth.label}). CASIE POAs updated.`;
+        clueFormOpen.value = false;
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
     } finally {

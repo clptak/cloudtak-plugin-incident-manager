@@ -571,7 +571,7 @@ const draft = reactive<Scenario>({
 });
 
 const history = computed(() =>
-    computeOpHistory(inputs.value.segments, inputs.value.rowPoa, inputs.value.records));
+    computeOpHistory(inputs.value.segments, inputs.value.rowPoa, inputs.value.records, inputs.value.clues));
 
 // ── Table sorting: by segment label or by POA of any OP column ────────────
 type SortKey = 'segment' | number;
@@ -678,6 +678,7 @@ function computeDraft(): void {
         inputs.value.rowPoa,
         inputs.value.records,
         { ...draft, hypotheticals: validHypotheticals() },
+        inputs.value.clues,
     );
 }
 

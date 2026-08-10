@@ -14,8 +14,46 @@
  * ever authoritative data.
  */
 
-import type { DebriefRecord, SegmentState } from './entities.ts';
+import type { ClueRecord, DebriefRecord, SegmentState } from './entities.ts';
 import { cumulativePod } from './rollup.ts';
+
+/** Clue-significance letter weights (A=9 … E=5 neutral … I=1); ratios matter. */
+const CLUE_WEIGHTS: Record<string, number> = {
+    A: 9, B: 8, C: 7, D: 6, E: 5, F: 4, G: 3, H: 2, I: 1,
+};
+
+/**
+ * Apply one clue to a POA state (percentages summing to ~100 incl. ROW):
+ * bayes posterior ∝ prior × letterWeight, renormalized; authenticity blends
+ * posterior with prior. Missing letters default to E (neutral).
+ */
+export function applyClue(
+    poa: Record<string, number>,
+    rowPoa: number,
+    clue: ClueRecord,
+): { poa: Record<string, number>; rowPoa: number } {
+    const alpha = Math.min(1, Math.max(0, clue.authenticity));
+    const weightOf = (key: string): number => CLUE_WEIGHTS[(clue.letters[key] ?? 'E').toUpperCase()] ?? 5;
+
+    let total = rowPoa * weightOf('ROW');
+    const weighted: Record<string, number> = {};
+    for (const [uid, value] of Object.entries(poa)) {
+        weighted[uid] = value * weightOf(uid);
+        total += weighted[uid];
+    }
+    if (total <= 0) return { poa: { ...poa }, rowPoa };
+
+    const out: Record<string, number> = {};
+    for (const [uid, value] of Object.entries(poa)) {
+        const bayes = (100 * weighted[uid]) / total;
+        out[uid] = Math.round((alpha * bayes + (1 - alpha) * value) * 100) / 100;
+    }
+    const rowBayes = (100 * rowPoa * weightOf('ROW')) / total;
+    return {
+        poa: out,
+        rowPoa: Math.round((alpha * rowBayes + (1 - alpha) * rowPoa) * 100) / 100,
+    };
+}
 
 export interface OpHistoryStep {
     /** 0 = initial consensus (no searching). */
@@ -72,6 +110,7 @@ export function computeOpHistory(
     segments: SegmentState[],
     rowPoa: number,
     records: DebriefRecord[],
+    clues: ClueRecord[] = [],
 ): OpHistory {
     const uids = segments.map((s) => s.uid);
     const known = new Set(uids);
@@ -79,6 +118,16 @@ export function computeOpHistory(
     let poa: Record<string, number> = {};
     for (const s of segments) poa[s.uid] = clampPct(s.poa);
     let row = clampPct(rowPoa);
+
+    // Clues found right after the Initial Consensus (opNumber 0) apply to step 0.
+    const cluesFor = (op: number) => clues
+        .filter((c) => c.opNumber === op)
+        .sort((a, b) => (a.recordedAt ?? '').localeCompare(b.recordedAt ?? ''));
+    for (const clue of cluesFor(0)) {
+        const applied = applyClue(poa, row, clue);
+        poa = applied.poa;
+        row = applied.rowPoa;
+    }
 
     const step0: OpHistoryStep = {
         opNumber: 0,
@@ -90,8 +139,14 @@ export function computeOpHistory(
     };
     const steps: OpHistoryStep[] = [step0];
 
+    // OPs come from debriefs AND clue records (a clue may be the only event).
+    const opNumbers = [...new Set([
+        ...opNumbersIn(records),
+        ...clues.map((c) => c.opNumber).filter((n) => Number.isInteger(n) && n > 0),
+    ])].sort((a, b) => a - b);
+
     let missProduct = 1; // Π (1 − OPOS/100)
-    for (const opNumber of opNumbersIn(records)) {
+    for (const opNumber of opNumbers) {
         const opRecords = records.filter((r) => r.opNumber === opNumber && known.has(r.segmentUid));
 
         const podEff: Record<string, number> = {};
@@ -124,6 +179,14 @@ export function computeOpHistory(
 
         poa = next;
         row = nextRow;
+
+        // Clues found during this OP apply after its POD shift.
+        for (const clue of cluesFor(opNumber)) {
+            const applied = applyClue(poa, row, clue);
+            poa = applied.poa;
+            row = applied.rowPoa;
+        }
+
         steps.push({
             opNumber,
             poa: { ...poa },
@@ -147,9 +210,11 @@ export function computeScenario(
     rowPoa: number,
     records: DebriefRecord[],
     scenario: Scenario,
+    clues: ClueRecord[] = [],
 ): OpHistory {
     const base = records.filter((r) => r.opNumber <= scenario.throughOp);
-    return computeOpHistory(segments, rowPoa, [...base, ...scenario.hypotheticals]);
+    const baseClues = clues.filter((c) => c.opNumber <= scenario.throughOp);
+    return computeOpHistory(segments, rowPoa, [...base, ...scenario.hypotheticals], baseClues);
 }
 
 /** Parse persisted scenarios (schema value) tolerantly. */

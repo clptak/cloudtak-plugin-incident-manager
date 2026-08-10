@@ -6,7 +6,7 @@
  */
 
 import type { ActiveMission } from '../composables/useIncident.ts';
-import type { DebriefRecord, OpPeriodRegistryEntry, SegmentState } from '../domain/entities.ts';
+import type { ClueRecord, DebriefRecord, OpPeriodRegistryEntry, SegmentState } from '../domain/entities.ts';
 import { scenariosFromValue, type Scenario } from '../domain/history.ts';
 import { registryFromSchemaValue } from '../domain/registry.ts';
 import { consensusForSegment, consensusRow, type InitialConsensusState } from './consensus.ts';
@@ -14,6 +14,7 @@ import { consensusFromSchema } from './casiePersistence.ts';
 import { debriefsFromSchema } from './debriefPersistence.ts';
 import { loadSchemaSubscription, schemaMissionToken } from './incidentSubscription.ts';
 import { loadMissionSchema, saveMissionSchema } from './missionSchema.ts';
+import { cluesFromSchema } from './cluePersistence.ts';
 import { casieHistoryFromSchema, type CasieHistoryEvent } from './segmentSplit.ts';
 import { segmentsFromSchema } from './segmentsPersistence.ts';
 
@@ -31,6 +32,7 @@ export interface RollupInputs {
     consensusUpdatedAt: string;
     /** Full consensus state — needed by the WC3 period export. */
     consensus: InitialConsensusState | null;
+    clues: ClueRecord[];
 }
 
 function consensusHasValues(consensus: InitialConsensusState | null): boolean {
@@ -68,6 +70,7 @@ export async function loadRollupInputs(mission: ActiveMission): Promise<RollupIn
         historyEvents: casieHistoryFromSchema(schema),
         consensusUpdatedAt: consensus?.updated ?? '',
         consensus,
+        clues: cluesFromSchema(schema),
     };
 }
 

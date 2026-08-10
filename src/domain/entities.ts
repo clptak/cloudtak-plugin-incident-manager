@@ -82,6 +82,26 @@ export interface OpAssignment {
     createdAt?: string;
 }
 
+/**
+ * Influence of a clue (ISM Table 8.17/8.18, WinCASIE "Add Influence of Clue").
+ * Letters A–I per segment AND ROW express what the clue suggests if authentic;
+ * authenticity discounts the update: final = α·bayes + (1−α)·prior.
+ */
+export interface ClueRecord {
+    /** OP during which the clue was found; 0 = right after Initial Consensus. */
+    opNumber: number;
+    description: string;
+    /** Authenticity probability α in [0,1]. */
+    authenticity: number;
+    /** Human label for the authenticity choice (for history display). */
+    authenticityLabel?: string;
+    /** Letter A–I per segment uid; 'ROW' key covers the Rest of the World. */
+    letters: Record<string, string>;
+    /** X-reference to paperwork (clue log number etc.). */
+    xref?: string;
+    recordedAt?: string;
+}
+
 /** Per-segment rollup across all closed/debriefed OPs. */
 export interface SegmentRollup {
     uid: string;

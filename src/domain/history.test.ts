@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { DebriefRecord, SegmentState } from './entities.ts';
-import { computeOpHistory, computeScenario, opNumbersIn, scenariosFromValue } from './history.ts';
+import { applyClue, computeOpHistory, computeScenario, opNumbersIn, scenariosFromValue } from './history.ts';
 import { computeRollup } from './rollup.ts';
 
 const SEGMENTS: SegmentState[] = [
@@ -86,6 +86,61 @@ test('computeScenario: forks from a known-good point', () => {
     assert.ok(forked.steps[2].podEff.c === 80);
     assert.equal(forked.steps[2].podEff.b, undefined);
     assert.ok(forked.final.poa.c < real.final.poa.c);
+});
+
+test('applyClue: uniform letters are informationless; E default is neutral', () => {
+    const clue = { opNumber: 0, description: 'x', authenticity: 1, letters: {} };
+    const same = applyClue({ a: 40, b: 30, c: 10 }, 20, clue);
+    assert.deepEqual(same.poa, { a: 40, b: 30, c: 10 });
+    assert.equal(same.rowPoa, 20);
+    const allA = applyClue({ a: 40, b: 30, c: 10 }, 20, {
+        ...clue, letters: { a: 'A', b: 'A', c: 'A', ROW: 'A' },
+    });
+    assert.deepEqual(allA.poa, { a: 40, b: 30, c: 10 });
+});
+
+test('applyClue: authentic clue shifts mass toward suggested segments', () => {
+    // Wallet in segment a: a=A(9), others G(3), ROW C(7)
+    const result = applyClue({ a: 40, b: 30, c: 10 }, 20, {
+        opNumber: 1, description: 'wallet', authenticity: 1,
+        letters: { a: 'A', b: 'G', c: 'G', ROW: 'C' },
+    });
+    // weights: 360, 90, 30, 140 → total 620
+    assert.equal(result.poa.a, 58.06);
+    assert.equal(result.poa.b, 14.52);
+    assert.equal(result.poa.c, 4.84);
+    assert.equal(result.rowPoa, 22.58);
+    const sum = result.poa.a + result.poa.b + result.poa.c + result.rowPoa;
+    assert.ok(Math.abs(sum - 100) < 0.05);
+});
+
+test('applyClue: authenticity blends toward the prior', () => {
+    const letters = { a: 'A', b: 'G', c: 'G', ROW: 'C' };
+    const zero = applyClue({ a: 40, b: 30, c: 10 }, 20, {
+        opNumber: 1, description: 'hoax', authenticity: 0, letters,
+    });
+    assert.deepEqual(zero.poa, { a: 40, b: 30, c: 10 });
+    const half = applyClue({ a: 40, b: 30, c: 10 }, 20, {
+        opNumber: 1, description: 'maybe', authenticity: 0.5, letters,
+    });
+    assert.ok(Math.abs(half.poa.a - 49.03) < 0.02, String(half.poa.a));
+});
+
+test('computeOpHistory: clue applies after its OP and shows in the step', () => {
+    const clue = {
+        opNumber: 1, description: 'wallet', authenticity: 1,
+        letters: { a: 'A', b: 'E', c: 'E', ROW: 'E' }, recordedAt: '2026-08-07T00:00:00Z',
+    };
+    const withClue = computeOpHistory(SEGMENTS, ROW, [rec(1, 'b', 50)], [clue]);
+    const noClue = computeOpHistory(SEGMENTS, ROW, [rec(1, 'b', 50)]);
+    // OPOS unaffected (clue doesn't find the subject)
+    assert.equal(withClue.steps[1].opos, noClue.steps[1].opos);
+    // POA for a is boosted relative to the no-clue replay
+    assert.ok(withClue.steps[1].poa.a > noClue.steps[1].poa.a);
+    // Clue-only OP still creates a step
+    const clueOnly = computeOpHistory(SEGMENTS, ROW, [], [clue]);
+    assert.equal(clueOnly.steps.length, 2);
+    assert.equal(clueOnly.steps[1].opos, 0);
 });
 
 test('scenariosFromValue: tolerant parse', () => {
