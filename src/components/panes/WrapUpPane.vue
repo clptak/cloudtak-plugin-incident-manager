@@ -47,6 +47,133 @@
             />
         </div>
 
+        <!-- ── Case file folder (File System Access) ──────────────── -->
+        <div class='cloudtak-accent border rounded-3 mt-3 p-3'>
+            <p class='text-uppercase text-white-50 small mb-1'>
+                Case File Folder
+            </p>
+            <template v-if='folderSupported'>
+                <p class='text-muted small mb-2'>
+                    Choose a folder once and generated documents (IAPs, demob packages)
+                    are written straight into it, in a sub-folder per incident.
+                    Otherwise they download normally.
+                </p>
+                <div class='d-flex flex-wrap align-items-center gap-2'>
+                    <span
+                        v-if='folderName'
+                        class='badge bg-success-lt text-success'
+                    >{{ folderName }}</span>
+                    <span
+                        v-else
+                        class='text-muted small'
+                    >No folder set — using downloads.</span>
+                    <button
+                        class='btn btn-outline-primary btn-sm'
+                        :disabled='choosingFolder'
+                        @click='onChooseFolder'
+                    >
+                        {{ folderName ? 'Change folder' : 'Choose folder' }}
+                    </button>
+                    <button
+                        v-if='folderName'
+                        class='btn btn-link btn-sm'
+                        @click='onClearFolder'
+                    >
+                        Use downloads
+                    </button>
+                    <span
+                        v-if='folderStatus'
+                        class='small'
+                        :class='folderError ? "text-danger" : "text-muted"'
+                    >{{ folderStatus }}</span>
+                </div>
+            </template>
+            <p
+                v-else
+                class='text-muted small mb-0'
+            >
+                This browser cannot write to a chosen folder — documents will download.
+                (Supported in Chrome/Edge and in CloudTAK Desktop once the
+                <code>fileSystem</code> permission is enabled.)
+            </p>
+        </div>
+
+        <!-- ── Demobilization package ─────────────────────────────── -->
+        <div class='cloudtak-accent border rounded-3 mt-3 p-3'>
+            <p class='text-uppercase text-white-50 small mb-1'>
+                Demobilization Package
+            </p>
+            <p class='text-muted small mb-2'>
+                Bundles the complete case file into one zip: a mission archive for every
+                DataSync (common map, MGMT, each OP), the incident schema, the WinCASIE
+                export, every operational-period IAP, and a manifest.
+            </p>
+
+            <div class='row g-2'>
+                <div class='col-md-5'>
+                    <label class='form-label'>Closeout</label>
+                    <select
+                        v-model='demob.variant'
+                        class='form-select form-select-sm'
+                    >
+                        <option value='closed'>
+                            Search closed — archive everything
+                        </option>
+                        <option value='limited-continuous'>
+                            Limited continuous search — keep common map live
+                        </option>
+                    </select>
+                </div>
+                <div class='col-md-7 d-flex flex-wrap align-items-end gap-3'>
+                    <label class='form-check mb-0'>
+                        <input
+                            v-model='demob.includeArchives'
+                            type='checkbox'
+                            class='form-check-input'
+                        >
+                        <span class='form-check-label small'>Mission archives</span>
+                    </label>
+                    <label class='form-check mb-0'>
+                        <input
+                            v-model='demob.includeIaps'
+                            type='checkbox'
+                            class='form-check-input'
+                        >
+                        <span class='form-check-label small'>IAPs</span>
+                    </label>
+                    <label class='form-check mb-0'>
+                        <input
+                            v-model='demob.includeCasieExport'
+                            type='checkbox'
+                            class='form-check-input'
+                        >
+                        <span class='form-check-label small'>CASIE export</span>
+                    </label>
+                    <label class='form-check mb-0'>
+                        <input
+                            v-model='demob.includeReport'
+                            type='checkbox'
+                            class='form-check-input'
+                        >
+                        <span class='form-check-label small'>Incident log</span>
+                    </label>
+                </div>
+            </div>
+
+            <button
+                class='btn btn-primary btn-sm mt-3'
+                :disabled='packaging || !activeMission'
+                @click='onBuildPackage'
+            >
+                {{ packaging ? 'Packaging…' : 'Build demobilization package' }}
+            </button>
+            <span
+                v-if='packageStatus'
+                class='ms-2 small'
+                :class='packageError ? "text-danger" : "text-muted"'
+            >{{ packageStatus }}</span>
+        </div>
+
         <div v-if='report'>
             <div class='d-flex align-items-center mb-2'>
                 <h4 class='mb-0 text-white'>
@@ -84,6 +211,15 @@ import {
     TablerInlineAlert,
 } from '@tak-ps/vue-tabler';
 import { useIncident } from '../../composables/useIncident.ts';
+import { defaultDemobOptions } from '../../domain/demob.ts';
+import { buildDemobPackage, saveDemobPackage } from '../../lib/demobPackage.ts';
+import {
+    chooseFileTarget,
+    clearFileTarget,
+    ensureWritable,
+    fileTargetSupported,
+    savedFileTarget,
+} from '../../lib/fileTarget.ts';
 import { listAllIncidentLogs, loadSchemaSubscription } from '../../lib/incidentSubscription.ts';
 import {
     assignmentDataFromSchema,
@@ -96,6 +232,74 @@ const { activeMission, requireActiveMission } = useIncident();
 
 const loading = ref(false);
 const error = ref('');
+const demob = ref(defaultDemobOptions());
+const folderSupported = fileTargetSupported();
+const folderName = ref('');
+const folderStatus = ref('');
+const folderError = ref(false);
+const choosingFolder = ref(false);
+
+async function refreshFolder(): Promise<void> {
+    const handle = await savedFileTarget();
+    folderName.value = handle?.name ?? '';
+    if (handle && !(await ensureWritable(handle, false))) {
+        folderStatus.value = 'Permission needed — you will be asked on the next save.';
+    }
+}
+
+async function onChooseFolder(): Promise<void> {
+    choosingFolder.value = true;
+    folderError.value = false;
+    folderStatus.value = '';
+    try {
+        const handle = await chooseFileTarget();
+        if (handle) {
+            folderName.value = handle.name;
+            folderStatus.value = 'Folder set.';
+        }
+    } catch (err) {
+        folderError.value = true;
+        folderStatus.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        choosingFolder.value = false;
+    }
+}
+
+async function onClearFolder(): Promise<void> {
+    await clearFileTarget();
+    folderName.value = '';
+    folderStatus.value = 'Reverted to downloads.';
+    folderError.value = false;
+}
+
+void refreshFolder();
+const packaging = ref(false);
+const packageStatus = ref('');
+const packageError = ref(false);
+
+async function onBuildPackage(): Promise<void> {
+    if (!requireActiveMission() || !activeMission.value) return;
+    packaging.value = true;
+    packageError.value = false;
+    packageStatus.value = 'Starting…';
+    try {
+        const result = await buildDemobPackage(
+            activeMission.value,
+            demob.value,
+            (message) => { packageStatus.value = message; },
+        );
+        const where = await saveDemobPackage(result, activeMission.value.name);
+        packageStatus.value = result.failures.length
+            ? `${where} Unavailable: ${result.failures.join(', ')} (see MANIFEST.txt).`
+            : where;
+        packageError.value = result.failures.length > 0;
+    } catch (err) {
+        packageError.value = true;
+        packageStatus.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        packaging.value = false;
+    }
+}
 const report = ref('');
 const copied = ref(false);
 

@@ -402,6 +402,7 @@ const incidentTypeOptions = [
     'Recovery',
     'Evidence',
     'Wildland Fire',
+    'Disaster',
     'Other',
 ];
 
@@ -412,6 +413,7 @@ const incidentTypeByLabel: Record<string, string> = {
     Recovery: 'recovery',
     Evidence: 'evidence',
     'Wildland Fire': 'wildland-fire',
+    Disaster: 'disaster',
     Other: 'other',
 };
 

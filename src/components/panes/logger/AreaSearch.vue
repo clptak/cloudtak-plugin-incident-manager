@@ -75,6 +75,14 @@
                             {{ op.closedAt ? `→ ${shortDt(op.closedAt)}` : '' }}
                         </span>
                         <button
+                            class='btn btn-link btn-sm p-0'
+                            :disabled='busy'
+                            title='Generate the Incident Action Plan PDF for this operational period'
+                            @click='onGenerateIap(op)'
+                        >
+                            IAP
+                        </button>
+                        <button
                             v-if='op.status !== "closed"'
                             class='btn btn-link btn-sm p-0'
                             :disabled='busy'
@@ -147,6 +155,28 @@
                         </div>
                     </div>
                 </template>
+            </TablerBorder>
+
+            <!-- ── IAP builder (editable, prefilled) ───────────────────── -->
+            <TablerBorder
+                v-if='iapOp'
+                class='cloudtak-accent text-white mb-3'
+                :fill-height='false'
+                :shadow='false'
+                gap='sm'
+            >
+                <template #label>
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Incident Action Plan
+                    </p>
+                </template>
+                <IapBuilder
+                    :key='iapOp.guid'
+                    :op='iapOp'
+                    :registry='registry'
+                    :category='iapCategory'
+                    @close='iapOp = null'
+                />
             </TablerBorder>
 
             <!-- ── Influence of Clue (ISM 8.17/8.18) — inline, map stays usable ── -->
@@ -707,6 +737,7 @@ import {
     recordDebrief,
 } from '../../../domain/usecases.ts';
 import { addClueToMission, CLUE_AUTHENTICITY_OPTIONS } from '../../../lib/cluePersistence.ts';
+import IapBuilder from './IapBuilder.vue';
 import { createDebriefStore } from '../../../lib/debriefPersistence.ts';
 import Subscription from '../../../../../../src/base/subscription.ts';
 import { flyToFeature } from '../../../lib/flyToFeature.ts';
@@ -925,6 +956,35 @@ async function makeMapActive(guid: string, label: string): Promise<void> {
     } catch (err) {
         error.value = `Could not activate ${label}: ${err instanceof Error ? err.message : String(err)}`;
     }
+}
+
+/** Incident category (search / wildland-fire / disaster) from mission keywords. */
+async function incidentCategory(): Promise<string> {
+    const mission = activeMission.value;
+    if (!mission) return 'search';
+    try {
+        const sub = await Subscription.load(mission.guid, {
+            missiontoken: mission.missionToken ?? '',
+            reload: false,
+        });
+        const keywords = (sub.meta as { keywords?: string[] }).keywords ?? [];
+        const tag = keywords.find((k) => k.startsWith('incidentType:'));
+        return tag ? tag.slice('incidentType:'.length) : 'search';
+    } catch {
+        return 'search';
+    }
+}
+
+/** Open the editable IAP builder for this operational period. */
+const iapOp = ref<OpPeriodRegistryEntry | null>(null);
+const iapCategory = ref('search');
+
+async function onGenerateIap(op: OpPeriodRegistryEntry): Promise<void> {
+    const mission = activeMission.value;
+    if (!mission?.mgmt) return;
+    error.value = ''; notice.value = '';
+    iapCategory.value = await incidentCategory();
+    iapOp.value = op;
 }
 
 /** Make sure the OP mission renders as a map overlay on this device. */
