@@ -112,6 +112,18 @@ function header(plan: IapPlan, ctx: IapContext, nameField: string): Record<strin
     };
 }
 
+/** Per-form preparer, falling back to the plan's author. */
+function preparerFor(plan: IapPlan, form: 'ics205' | 'ics206' | 'ics220'): string {
+    return plan.preparers?.[form]?.trim() || plan.preparedBy;
+}
+
+/** "Prepared by" date/time stamp printed on every form. */
+function preparedStamp(plan: IapPlan): string {
+    const d = plan.dateFrom || '';
+    const t = plan.timeFrom || '';
+    return [d, t].filter(Boolean).join(' ');
+}
+
 export interface IapContext {
     incidentName: string;
     incidentNumber: string;
@@ -132,8 +144,8 @@ function ics202(plan: IapPlan, ctx: IapContext, attachments: IapFormId[]): Fille
             '7 Prepared by Name': plan.preparedBy,
             PositionTitle_5: plan.preparedByPosition,
             '8 Approved by Incident Commander Name': plan.approvedBy,
-            DateTime_5: `${plan.dateFrom} ${plan.timeFrom}`,
-            'IAP Page': `OP${plan.opNumber}`,
+            DateTime_5: preparedStamp(plan),
+            ...(attachments.includes('ics220') ? { 'Other Attachments 1': 'ICS 220 (UAS)' } : {}),
         },
         check: [
             ...attachments
@@ -142,9 +154,12 @@ function ics202(plan: IapPlan, ctx: IapContext, attachments: IapFormId[]): Fille
                     ics206: 'ICS 206', ics207: 'ICS 207', ics208: 'ICS 208',
                 } as Record<string, string>)[id])
                 .filter((v): v is string => Boolean(v)),
+            // Forms with no dedicated checkbox go in "Other Attachments".
+            ...(attachments.includes('ics220') ? ['Check 1'] : []),
             ...(plan.siteSafetyRequired === 'yes' ? ['Yes'] : []),
             ...(plan.siteSafetyRequired === 'no' ? ['No'] : []),
         ],
+        pageField: 'IAP Page',
     };
 }
 
@@ -162,8 +177,7 @@ function ics203(plan: IapPlan, ctx: IapContext): FilledForm {
         'Operations Section Chief 1': plan.org.operationsChief,
         '9 Prepared by Name': plan.preparedBy,
         PositionTitle_6: plan.preparedByPosition,
-        'IAP Page_2': `OP${plan.opNumber}`,
-        DateTime_6: `${plan.dateFrom} ${plan.timeFrom}`,
+        DateTime_6: preparedStamp(plan),
     };
     // NB: official ICS-203 field names are inconsistent for rows 1-3
     // ('Division/Group Identifier 1', then double-spaced) — verified against
@@ -173,11 +187,12 @@ function ics203(plan: IapPlan, ctx: IapContext): FilledForm {
         if (n === 2 || n === 3) return `DivisionGroup  Identifier ${n}`;
         return `DivisionGroup Identifier ${n}`;
     };
-    plan.assignments.slice(0, 15).forEach((a, i) => {
-        text[identField(i + 1)] = a.label;
-        text[`DivisionGroup Name ${i + 1}`] = a.supervisor;
+    // §5 rows are DIVISIONS and their supervisors — not segments/resources.
+    plan.divisions.slice(0, 15).forEach((d, i) => {
+        text[identField(i + 1)] = d.name;
+        text[`DivisionGroup Name ${i + 1}`] = d.supervisor;
     });
-    return { text };
+    return { text, pageField: 'IAP Page_2' };
 }
 
 /** One ICS-204 per assignment (segment). */
@@ -187,19 +202,23 @@ function ics204(
     assignment: IapAssignmentPlan,
     page: number,
 ): FilledForm {
-    const primary = plan.comms[0]?.channelName ?? '';
+    const division = plan.divisions.find((d) => d.id === assignment.divisionId);
     const text: Record<string, string> = {
         ...header(plan, ctx, '1 Incident Name_7'),
-        '3 Division': assignment.label,
+        // §3 carries the DIVISION; the segment is named in §6 Work Assignments.
+        '3 Division': division?.name ?? '',
+        '3 Group': division ? '' : assignment.label,
         'Operations Section Chief_3': plan.org.operationsChief,
-        'DivisionGroup Supervisor': assignment.supervisor,
+        'DivisionGroup Supervisor': division?.supervisor || assignment.supervisor,
         '6 Work Assignments': assignment.workAssignment,
         '7 Special Instructions': assignment.specialInstructions,
-        'Primary Contact  indicate cell pager or radio frequencysystemchannel 1': primary,
+        // §8 Communications is people, not radio channels — the channel plan
+        // lives on ICS-205.
+        'Name/Function1': assignment.contactName,
+        'Primary Contact  indicate cell pager or radio frequencysystemchannel 1': assignment.contactPhone,
         '9 Prepared by Name_2': plan.preparedBy,
         PositionTitle_7: plan.preparedByPosition,
-        'IAP Page_3': `OP${plan.opNumber} - ${page}`,
-        DateTime_7: `${plan.dateFrom} ${plan.timeFrom}`,
+        DateTime_7: preparedStamp(plan),
     };
     assignment.resources.slice(0, 10).forEach((r, i) => {
         const n = i + 1;
@@ -208,18 +227,21 @@ function ics204(
         text[`Number of Persons, Row ${n}`] = r.persons;
         text[n <= 3
             ? `Contact eg phone pager radio frequency etc${n === 1 ? '' : `_${n}`}`
-            : `Contact eg phone pager radio frequency etcRow${n}`] = r.contact || primary;
+            : `Contact eg phone pager radio frequency etcRow${n}`] = r.contact;
         text[n <= 3
             ? `Reporting Location Special Equipment and Supplies Remarks Notes Information${n === 1 ? '' : `_${n}`}`
             : `Reporting Location Special Equipment and Supplies Remarks Notes InformationRow${n}`] = r.reporting;
     });
-    return { text };
+    return { text, pageField: 'IAP Page_3' };
 }
 
 function ics205(plan: IapPlan, ctx: IapContext): FilledForm {
     const text: Record<string, string> = {
         ...header(plan, ctx, '1 Incident Name_8'),
-        '2 Date/Time Prepared': `${plan.dateFrom} ${plan.timeFrom}`,
+        '2 Date/Time Prepared': preparedStamp(plan),
+        '5 Special Instructions': plan.commsSpecialInstructions,
+        '6 Prepared by Communications Unit Leader Name': preparerFor(plan, 'ics205'),
+        DateTime_8: preparedStamp(plan),
     };
     // The official ICS-205 exposes 8 channel rows.
     plan.comms.slice(0, 8).forEach((c, i) => {
@@ -236,7 +258,7 @@ function ics205(plan: IapPlan, ctx: IapContext): FilledForm {
         text[`Mode A D or MRow${n}`] = c.mode;
         text[`RemarksRow${n}`] = c.remarks;
     });
-    return { text };
+    return { text, pageField: 'IAP Page_4' };
 }
 
 function ics206(plan: IapPlan, ctx: IapContext): FilledForm {
@@ -248,9 +270,11 @@ function ics206(plan: IapPlan, ctx: IapContext): FilledForm {
             'Ambulance ServiceRow1': plan.medical.transportation,
             'Hospital NameRow1': plan.medical.hospitals,
             'Special Medical Emergency Procedures': plan.medical.emergencyProcedures,
-            '7 Prepared by Medical Unit Leader Name': plan.preparedBy,
+            '7 Prepared by Medical Unit Leader Name': preparerFor(plan, 'ics206'),
             '8 Approved by Safety Officer Name': plan.org.safetyOfficer,
+            DateTime_10: preparedStamp(plan),
         },
+        pageField: 'IAP Page_6',
     };
 }
 
@@ -268,8 +292,9 @@ function ics207(plan: IapPlan, ctx: IapContext): FilledForm {
             'FinanceAdmin Section Chief': plan.org.financeChief,
             '4 Prepared by Name_2': plan.preparedBy,
             PositionTitle_9: plan.preparedByPosition,
-            'IAP Page_6': `OP${plan.opNumber}`,
+            DateTime_11: preparedStamp(plan),
         },
+        pageField: 'IAP Page_6',
     };
 }
 
@@ -281,9 +306,9 @@ function ics208(plan: IapPlan, ctx: IapContext): FilledForm {
             '4 Site Safety Plan Required Yes No Approved Site Safety Plans Located At': plan.siteSafetyLocation,
             '5 Prepared by Name': plan.preparedBy,
             PositionTitle_10: plan.preparedByPosition,
-            'IAP Page_7': `OP${plan.opNumber}`,
-            DateTime_12: `${plan.dateFrom} ${plan.timeFrom}`,
+            DateTime_12: preparedStamp(plan),
         },
+        pageField: 'IAP Page_7',
         check: [
             ...(plan.siteSafetyRequired === 'yes' ? ['Site Safety Plan Required? Yes'] : []),
             ...(plan.siteSafetyRequired === 'no' ? ['Site Safety Plan Required? No'] : []),
@@ -291,7 +316,10 @@ function ics208(plan: IapPlan, ctx: IapContext): FilledForm {
     };
 }
 
-function ics220(plan: IapPlan, ctx: IapContext): FilledForm {
+/** ICS-220 §10 holds 5 aircraft rows; extra rows spill onto repeat pages. */
+export const UAS_ROWS_PER_PAGE = 5;
+
+function ics220(plan: IapPlan, ctx: IapContext, chunk = 0): FilledForm {
     const text: Record<string, string> = {
         '1 Incident Name': ctx.incidentName,
         '2 Operational Period Date From': plan.dateFrom,
@@ -304,13 +332,36 @@ function ics220(plan: IapPlan, ctx: IapContext): FilledForm {
         '6 TFR Center Point': plan.uas.tfrCenter,
         'Aviation Mission Briefing Time': plan.uas.briefingTime,
         Location: plan.uas.briefingLocation,
-        '11 Prepared by Name': plan.preparedBy,
+        '11 Prepared by Name': preparerFor(plan, 'ics220'),
+        DateTime: preparedStamp(plan),
     };
-    // Template exposes named role fields plus NameRow4/5 only.
+
+    // Personnel: the template exposes named role fields plus NameRow4/5.
     const uasFields = ['NameAir Ops Branch Dir', 'NameGroup Supervisor', 'NameGroup Supervisor_2', 'NameRow4', 'NameRow5'];
     plan.uas.personnel.slice(0, uasFields.length).forEach((p, i) => {
         text[uasFields[i]] = p;
     });
+
+    // §10 aircraft table for this page's slice (rows 1-5, 6-10, …).
+    const slice = plan.uas.aircraft.slice(
+        chunk * UAS_ROWS_PER_PAGE,
+        (chunk + 1) * UAS_ROWS_PER_PAGE,
+    );
+    slice.forEach((a, i) => {
+        const n = i + 1;
+        text[`FAA N Or other IDRow${n}`] = a.faaId;
+        text[`CategoryKindTypeRow${n}`] = a.category;
+        text[`MakeModelRow${n}`] = a.makeModel;
+        text[`Base  OwnerRow${n}`] = a.baseOwner;
+        text[`AvailableRow${n}`] = a.available;
+        text[`StartRow${n}`] = a.start;
+        text[`RemarksRow${n}`] = a.remarks;
+    });
+    if (chunk > 0) {
+        text['UAS Mission Remarks'] =
+            `Continuation page ${chunk + 1} — aircraft ${chunk * UAS_ROWS_PER_PAGE + 1}`
+            + `–${chunk * UAS_ROWS_PER_PAGE + slice.length}.`;
+    }
     return { text };
 }
 
@@ -323,12 +374,18 @@ export function hasMedicalContent(plan: IapPlan): boolean {
 
 /** Which forms make up the IAP for this plan (domain rule). */
 export function iapFormPlanFor(plan: IapPlan, ctx: IapContext, hasUas = false): IapFormId[] {
-    return planForms({
+    const base = planForms({
         category: ctx.category,
         // The saved plan's explicit switch wins; detection only seeds it.
         hasUas: plan.uas.include || hasUas,
         hasMedical: hasMedicalContent(plan),
     }) as IapFormId[];
+    const set = new Set(base);
+    // Explicit include toggles add forms the category rules left out.
+    if (plan.includeForms.ics207) set.add('ics207');
+    if (plan.includeForms.ics209) set.add('ics209');
+    const order: IapFormId[] = ['ics202', 'ics203', 'ics204', 'ics205', 'ics206', 'ics207', 'ics208', 'ics209', 'ics220'];
+    return order.filter((id) => set.has(id));
 }
 
 /** Build the ordered, filled section list for the merged IAP PDF. */
@@ -344,12 +401,18 @@ export function buildIapSections(
         { id: 'ics203', filled: ics203(plan, ctx) },
     ];
     plan.assignments.forEach((a, i) => {
-        sections.push({ id: 'ics204', filled: ics204(plan, ctx, a, i + 1) });
+        sections.push({ id: 'ics204', filled: ics204(plan, ctx, a, i + 1), pageField: 'IAP Page_3' });
     });
-    sections.push({ id: 'ics205', filled: ics205(plan, ctx) });
+    sections.push({ id: 'ics205', filled: ics205(plan, ctx), pageField: 'IAP Page_4' });
     if (forms.includes('ics206')) sections.push({ id: 'ics206', filled: ics206(plan, ctx) });
     if (forms.includes('ics207')) sections.push({ id: 'ics207', filled: ics207(plan, ctx) });
     sections.push({ id: 'ics208', filled: ics208(plan, ctx) });
-    if (forms.includes('ics220')) sections.push({ id: 'ics220', filled: ics220(plan, ctx) });
+    if (forms.includes('ics220')) {
+        // One page per 5 aircraft; always at least one page.
+        const pages = Math.max(1, Math.ceil(plan.uas.aircraft.length / UAS_ROWS_PER_PAGE));
+        for (let chunk = 0; chunk < pages; chunk++) {
+            sections.push({ id: 'ics220', filled: ics220(plan, ctx, chunk) });
+        }
+    }
     return sections;
 }

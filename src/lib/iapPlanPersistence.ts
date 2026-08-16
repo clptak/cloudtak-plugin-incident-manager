@@ -43,6 +43,41 @@ export interface IapAssignmentPlan {
     workAssignment: string;
     specialInstructions: string;
     resources: IapResourceRow[];
+    /** Division this assignment belongs to (ICS-203 rows / ICS-204 §3). */
+    divisionId: string;
+    /** ICS-204 §8 Communications — who to reach and how. */
+    contactName: string;
+    contactPhone: string;
+}
+
+/** A Division/Group and its supervisor (ICS-203 §5 rows, ICS-204 §3). */
+export interface IapDivision {
+    id: string;
+    name: string;
+    supervisor: string;
+}
+
+/** ICS-220 §10 aircraft table row. */
+export interface IapAircraftRow {
+    faaId: string;
+    category: string;
+    makeModel: string;
+    baseOwner: string;
+    available: string;
+    start: string;
+    remarks: string;
+}
+
+export function blankAircraftRow(): IapAircraftRow {
+    return { faaId: '', category: '', makeModel: '', baseOwner: '', available: '', start: '', remarks: '' };
+}
+
+export function blankDivision(index: number): IapDivision {
+    return {
+        id: `div-${Date.now()}-${index}`,
+        name: String.fromCharCode(65 + (index % 26)),
+        supervisor: '',
+    };
 }
 
 export interface IapOrg {
@@ -67,6 +102,8 @@ export interface IapMedical {
 export interface IapUas {
     /** Explicit include switch — defaults on when a UAS resource is assigned. */
     include: boolean;
+    /** §10 aircraft table; overflows onto duplicated pages beyond 5 rows. */
+    aircraft: IapAircraftRow[];
     sunrise: string;
     sunset: string;
     tfrAltitude: string;
@@ -91,8 +128,19 @@ export interface IapPlan {
     siteSafetyRequired: 'yes' | 'no' | '';
     siteSafetyLocation: string;
     org: IapOrg;
+    divisions: IapDivision[];
     assignments: IapAssignmentPlan[];
     comms: IapCommsRow[];
+    /** ICS-205 §5 Special Instructions. */
+    commsSpecialInstructions: string;
+    /** Optional forms the IMT chose to include (220 lives on `uas.include`). */
+    includeForms: { ics207: boolean; ics209: boolean; ics205a: boolean };
+    /**
+     * Per-form "Prepared by" overrides — several ICS forms are signed by a
+     * specific unit leader rather than the plan's author. Blank falls back to
+     * `preparedBy`.
+     */
+    preparers: { ics205: string; ics206: string; ics220: string };
     medical: IapMedical;
     safetyMessage: string;
     uas: IapUas;
@@ -128,6 +176,31 @@ function sanitizeComms(raw: unknown): IapCommsRow[] {
     });
 }
 
+function sanitizeDivisions(raw: unknown): IapDivision[] {
+    if (!Array.isArray(raw)) return [];
+    return raw.filter((d) => d && typeof d === 'object').map((d, i) => {
+        const rec = d as Record<string, unknown>;
+        return {
+            id: str(rec.id) || `div-${i}`,
+            name: str(rec.name),
+            supervisor: str(rec.supervisor),
+        };
+    });
+}
+
+function sanitizeAircraft(raw: unknown): IapAircraftRow[] {
+    if (!Array.isArray(raw)) return [];
+    return raw.filter((a) => a && typeof a === 'object').map((a) => {
+        const rec = a as Record<string, unknown>;
+        return {
+            faaId: str(rec.faaId), category: str(rec.category),
+            makeModel: str(rec.makeModel), baseOwner: str(rec.baseOwner),
+            available: str(rec.available), start: str(rec.start),
+            remarks: str(rec.remarks),
+        };
+    });
+}
+
 function sanitizeAssignments(raw: unknown): IapAssignmentPlan[] {
     if (!Array.isArray(raw)) return [];
     return raw.filter((a) => a && typeof a === 'object').map((a) => {
@@ -149,6 +222,9 @@ function sanitizeAssignments(raw: unknown): IapAssignmentPlan[] {
             workAssignment: str(rec.workAssignment),
             specialInstructions: str(rec.specialInstructions),
             resources,
+            divisionId: str(rec.divisionId),
+            contactName: str(rec.contactName),
+            contactPhone: str(rec.contactPhone),
         };
     });
 }
@@ -183,8 +259,20 @@ export function iapPlanFromValue(raw: unknown, opNumber: number): IapPlan | null
             logisticsChief: str(org.logisticsChief),
             financeChief: str(org.financeChief),
         },
+        divisions: sanitizeDivisions(rec.divisions),
         assignments: sanitizeAssignments(rec.assignments),
         comms: sanitizeComms(rec.comms),
+        commsSpecialInstructions: str(rec.commsSpecialInstructions),
+        includeForms: {
+            ics207: (rec.includeForms as Record<string, unknown> | undefined)?.ics207 === true,
+            ics209: (rec.includeForms as Record<string, unknown> | undefined)?.ics209 === true,
+            ics205a: (rec.includeForms as Record<string, unknown> | undefined)?.ics205a === true,
+        },
+        preparers: {
+            ics205: str((rec.preparers as Record<string, unknown> | undefined)?.ics205),
+            ics206: str((rec.preparers as Record<string, unknown> | undefined)?.ics206),
+            ics220: str((rec.preparers as Record<string, unknown> | undefined)?.ics220),
+        },
         medical: {
             aidStations: str(med.aidStations),
             transportation: str(med.transportation),
@@ -194,6 +282,7 @@ export function iapPlanFromValue(raw: unknown, opNumber: number): IapPlan | null
         safetyMessage: str(rec.safetyMessage),
         uas: {
             include: uas.include === true,
+            aircraft: sanitizeAircraft(uas.aircraft),
             sunrise: str(uas.sunrise), sunset: str(uas.sunset),
             tfrAltitude: str(uas.tfrAltitude), tfrCenter: str(uas.tfrCenter),
             briefingTime: str(uas.briefingTime), briefingLocation: str(uas.briefingLocation),
@@ -242,6 +331,18 @@ export function prefillIapPlan(input: IapInputs, previous?: IapPlan | null): Iap
             logisticsChief: f.logisticsSectionChief || previous?.org.logisticsChief || '',
             financeChief: f.financeSectionChief || previous?.org.financeChief || '',
         },
+        // Divisions carry forward; a default "A" appears so ICS-203 has a row
+        // to populate even before the IMT structures the incident.
+        divisions: previous?.divisions?.length
+            ? previous.divisions.map((d) => ({ ...d }))
+            : [blankDivision(0)],
+        commsSpecialInstructions: previous?.commsSpecialInstructions ?? '',
+        includeForms: previous?.includeForms
+            ? { ...previous.includeForms }
+            : { ics207: false, ics209: false, ics205a: false },
+        preparers: previous?.preparers
+            ? { ...previous.preparers }
+            : { ics205: '', ics206: '', ics220: '' },
         assignments: input.assignments.map((a) => {
             const prior = previous?.assignments.find((p) => p.segmentUid === a.segmentUid);
             const resources = input.resources
@@ -254,6 +355,9 @@ export function prefillIapPlan(input: IapInputs, previous?: IapPlan | null): Iap
                     reporting: '',
                 }));
             return {
+                divisionId: prior?.divisionId ?? '',
+                contactName: prior?.contactName ?? '',
+                contactPhone: prior?.contactPhone ?? '',
                 segmentUid: a.segmentUid,
                 label: a.label,
                 supervisor: a.team ?? prior?.supervisor ?? '',
@@ -279,8 +383,11 @@ export function prefillIapPlan(input: IapInputs, previous?: IapPlan | null): Iap
         uas: {
             ...(previous?.uas ?? {
                 sunrise: '', sunset: '', tfrAltitude: '', tfrCenter: '',
-                briefingTime: '', briefingLocation: '', personnel: [],
+                briefingTime: '', briefingLocation: '', personnel: [], aircraft: [],
             }),
+            aircraft: previous?.uas.aircraft?.length
+                ? previous.uas.aircraft.map((r) => ({ ...r }))
+                : [],
             // Auto-on when the OP has a drone/UAS resource; the builder lets
             // the IMT include it regardless (aviation planned before tasking).
             include: input.hasUas || previous?.uas.include === true,

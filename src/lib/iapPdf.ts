@@ -10,7 +10,7 @@
  */
 
 import { PDFDocument, StandardFonts } from '../vendor/pdf-lib.esm.min.js';
-import type { PDFForm } from '../vendor/pdf-lib.esm.min.js';
+import type { PDFFont, PDFForm } from '../vendor/pdf-lib.esm.min.js';
 import ics202Url from '../assets/iap/ics202.pdf?url';
 import ics203Url from '../assets/iap/ics203.pdf?url';
 import ics204Url from '../assets/iap/ics204.pdf?url';
@@ -45,6 +45,11 @@ export interface FilledForm {
     check?: string[];
     /** Pages to keep (0-based). ICS templates carry instruction pages we drop. */
     pages?: number[];
+    /**
+     * Field carrying "IAP Page x of y" on this template. Filled during
+     * assembly, once the final page count is known.
+     */
+    pageField?: string;
 }
 
 async function loadTemplate(id: IapFormId): Promise<PDFDocument> {
@@ -53,10 +58,70 @@ async function loadTemplate(id: IapFormId): Promise<PDFDocument> {
     return PDFDocument.load(await res.arrayBuffer());
 }
 
-function setText(form: PDFForm, name: string, value: string): void {
+const MAX_FONT = 10;
+const MIN_FONT = 4;
+
+/**
+ * Shrink the field's font until the text fits its box. The official ICS forms
+ * have small, fixed-size boxes and real SAR content (objectives, work
+ * assignments) overflows them at a fixed size — so measure and scale.
+ */
+function fitFontSize(
+    field: { acroField: { getWidgets(): { getRectangle(): { width: number; height: number } }[] };
+        isMultiline?(): boolean },
+    text: string,
+    font: PDFFont,
+): number {
+    let rect: { width: number; height: number };
+    try {
+        rect = field.acroField.getWidgets()[0].getRectangle();
+    } catch {
+        return MAX_FONT;
+    }
+    const usableW = Math.max(1, rect.width - 4);
+    const usableH = Math.max(1, rect.height - 4);
+    const multiline = (() => {
+        try { return field.isMultiline?.() === true; } catch { return false; }
+    })() || text.includes('\n') || rect.height > 24;
+
+    for (let size = MAX_FONT; size > MIN_FONT; size -= 0.5) {
+        if (!multiline) {
+            if (font.widthOfTextAtSize(text, size) <= usableW) return size;
+            continue;
+        }
+        // Wrap into lines at this size and check the stack height.
+        const lineHeight = size * 1.15;
+        let lines = 0;
+        for (const paragraph of text.split('\n')) {
+            let current = '';
+            let used = 1;
+            for (const word of paragraph.split(/\s+/)) {
+                const candidate = current ? `${current} ${word}` : word;
+                if (font.widthOfTextAtSize(candidate, size) <= usableW) {
+                    current = candidate;
+                } else {
+                    used += 1;
+                    current = word;
+                }
+            }
+            lines += used;
+        }
+        if (lines * lineHeight <= usableH) return size;
+    }
+    return MIN_FONT;
+}
+
+function setText(form: PDFForm, name: string, value: string, font?: PDFFont): void {
     if (!value) return;
     try {
-        form.getTextField(name).setText(value);
+        const field = form.getTextField(name);
+        field.setText(value);
+        if (font) {
+            if (value.includes('\n')) {
+                try { field.enableMultiline(); } catch { /* single-line field */ }
+            }
+            field.setFontSize(fitFontSize(field as never, value, font));
+        }
     } catch {
         // Field absent in this template revision — leave it blank.
     }
@@ -74,11 +139,11 @@ function setCheck(form: PDFForm, name: string): void {
 export async function fillIcsForm(id: IapFormId, filled: FilledForm): Promise<PDFDocument> {
     const doc = await loadTemplate(id);
     const form = doc.getForm();
+    const helvetica = await doc.embedFont(StandardFonts.Helvetica);
 
-    for (const [name, value] of Object.entries(filled.text)) setText(form, name, value);
+    for (const [name, value] of Object.entries(filled.text)) setText(form, name, value, helvetica);
     for (const name of filled.check ?? []) setCheck(form, name);
 
-    const helvetica = await doc.embedFont(StandardFonts.Helvetica);
     try {
         form.updateFieldAppearances(helvetica);
     } catch {
@@ -91,6 +156,11 @@ export async function fillIcsForm(id: IapFormId, filled: FilledForm): Promise<PD
 export interface IapSection {
     id: IapFormId;
     filled: FilledForm;
+    /**
+     * Field name carrying "IAP Page x of y" on this template. The builder
+     * fills it during assembly, when the final page count is known.
+     */
+    pageField?: string;
 }
 
 /**
@@ -101,7 +171,22 @@ export interface IapSection {
 export async function buildIapPdf(sections: IapSection[]): Promise<Uint8Array> {
     const out = await PDFDocument.create();
 
+    // Pages are numbered sequentially across the assembled IAP (1 of N),
+    // not per operational period.
+    const total = sections.reduce((n, s) => n + (s.filled.pages?.length || 1), 0);
+    let pageNo = 0;
+
     for (const section of sections) {
+        const count = section.filled.pages?.length || 1;
+        const pageField = section.filled.pageField ?? section.pageField;
+        if (pageField) {
+            const label = count === 1
+                ? `${pageNo + 1} of ${total}`
+                : `${pageNo + 1}-${pageNo + count} of ${total}`;
+            section.filled.text[pageField] = label;
+        }
+        pageNo += count;
+
         const filledDoc = await fillIcsForm(section.id, section.filled);
         const total = filledDoc.getPageCount();
         const wanted = (section.filled.pages ?? [0])

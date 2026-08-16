@@ -45,10 +45,20 @@ export interface PDFPage {
 export type PDFEmbeddedPage = object;
 
 /** AcroForm field types used by the IAP generator (official ICS templates). */
+export interface PDFWidgetAnnotation {
+    getRectangle(): { x: number; y: number; width: number; height: number };
+}
+
+export interface PDFAcroField {
+    getWidgets(): PDFWidgetAnnotation[];
+}
+
 export interface PDFTextField {
+    acroField: PDFAcroField;
     setText(text: string): void;
     setFontSize(size: number): void;
     enableMultiline(): void;
+    isMultiline(): boolean;
 }
 
 export interface PDFCheckBox {
