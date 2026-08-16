@@ -165,6 +165,56 @@
                 </div>
             </div>
 
+            <TablerBorder
+                v-if='trackedClues.length'
+                class='cloudtak-accent text-white mb-3'
+                :fill-height='false'
+                :shadow='false'
+                gap='sm'
+            >
+                <template #label>
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Clues ({{ trackedClues.length }})
+                    </p>
+                </template>
+                <div class='table-responsive'>
+                    <table class='table table-sm small mb-0 align-middle'>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Marker</th>
+                                <th>Validation</th>
+                                <th>Disposition</th>
+                                <th>Finder</th>
+                                <th>Sync</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for='clue in trackedClues'
+                                :key='clue.logId'
+                            >
+                                <td><strong>{{ clue.number }}</strong></td>
+                                <td>{{ clue.markerCallsign || '—' }}</td>
+                                <td>
+                                    <span
+                                        class='badge'
+                                        :class='clue.validation === "Yes" ? "bg-success-lt text-success"
+                                            : clue.validation === "No" ? "bg-danger-lt text-danger"
+                                                : "bg-warning-lt text-warning"'
+                                    >{{ clue.validation }}</span>
+                                </td>
+                                <td>{{ clue.disposition || '—' }}</td>
+                                <td>{{ clue.finder || '—' }}</td>
+                                <td class='text-muted'>{{ clue.sourceLabel }}</td>
+                                <td class='text-muted text-nowrap'>{{ clue.at ? clue.at.slice(0, 16).replace('T', ' ') : '' }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </TablerBorder>
+
             <template v-if='teams.length'>
                 <div
                     v-if='!teamsExpanded'
@@ -472,6 +522,8 @@ import { IconChevronDown } from '@tabler/icons-vue';
 import { TablerBorder, TablerInlineAlert } from '@tak-ps/vue-tabler';
 import type { DBSubscriptionLog } from '../../../../../src/database.ts';
 import { useIncident } from '../../composables/useIncident.ts';
+import { registryFromSchemaValue } from '../../domain/registry.ts';
+import { listTrackedClues, type TrackedClue } from '../../lib/clueLog.ts';
 import { listAllIncidentLogs, loadSchemaSubscription } from '../../lib/incidentSubscription.ts';
 import {
     exportDashboardCsv,
@@ -519,6 +571,7 @@ interface Row {
 const rows = ref<Row[]>([]);
 const subjects = ref<ParsedSubject[]>([]);
 const initialInfo = ref<IncidentInfoForm | null>(null);
+const trackedClues = ref<TrackedClue[]>([]);
 const teams = ref<DashboardTeamRoster[]>([]);
 const resourceAssignments = ref<ResourceAssignment[]>([]);
 const workAssignments = ref<WorkAssignment[]>([]);
@@ -740,6 +793,12 @@ async function refresh(): Promise<void> {
         const schemaSub = await loadSchemaSubscription(mission);
         const { schema } = await loadMissionSchema(schemaSub);
         const logs = await listAllIncidentLogs(mission);
+        try {
+            const opRegistry = mission.mgmt
+                ? registryFromSchemaValue(schema.tak_missions)
+                : [];
+            trackedClues.value = await listTrackedClues(mission, opRegistry);
+        } catch { trackedClues.value = []; }
         const [orgChartLoaded, resourceLoaded, workLoaded, roster] = await Promise.all([
             loadOrgChartFromMission(mission),
             loadResourceAssignmentsFromMission(mission),

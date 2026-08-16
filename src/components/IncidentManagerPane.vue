@@ -95,6 +95,7 @@
 
                     <DashboardTab v-if='activeHTab === "dashboard"' />
                     <TaskTab v-if='activeHTab === "task"' />
+                    <ClueLog v-if='activeHTab === "clues"' />
                     <CasiePane v-if='activeHTab === "casie"' />
                     <OrganizationTab
                         v-if='activeHTab === "organization"'
@@ -132,6 +133,7 @@ const CasiePane = defineAsyncComponent(() => import('./panes/CasiePane.vue'));
 const WrapUpPane = defineAsyncComponent(() => import('./panes/WrapUpPane.vue'));
 const DashboardTab = defineAsyncComponent(() => import('./panes/DashboardTab.vue'));
 const TaskTab = defineAsyncComponent(() => import('./panes/TaskTab.vue'));
+const ClueLog = defineAsyncComponent(() => import('./panes/logger/ClueLog.vue'));
 const AssignmentsTab = defineAsyncComponent(() => import('./panes/AssignmentsTab.vue'));
 const OrganizationTab = defineAsyncComponent(() => import('./panes/OrganizationTab.vue'));
 const ResourcesTab = defineAsyncComponent(() => import('./panes/ResourcesTab.vue'));
@@ -173,6 +175,7 @@ const hTabs = [
     { key: 'main', label: 'Main' },
     { key: 'dashboard', label: 'Dashboard' },
     { key: 'task', label: 'Tasks' },
+    { key: 'clues', label: 'Clues' },
     { key: 'casie', label: 'CASIE' },
     { key: 'organization', label: 'Organization' },
     { key: 'risk-assessment', label: 'Risk Assessment' },

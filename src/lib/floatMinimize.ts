@@ -8,6 +8,7 @@ export const BOTTOM_BAR_KEY = 'incident-manager';
 export const RESOURCES_BOTTOM_BAR_KEY = 'incident-manager-resources';
 export const ASSIGNMENTS_BOTTOM_BAR_KEY = 'incident-manager-assignments';
 export const SEGMENTS_BOTTOM_BAR_KEY = 'incident-manager-segments';
+const CLUES_BOTTOM_BAR_KEY = 'incident-manager-clues';
 
 type HostFloatComponent = Parameters<ReturnType<typeof useFloatStore>['add']>[0]['component'];
 type BottomBarComponent = Parameters<PluginAPI['bottomBar']['add']>[0]['component'];
@@ -32,6 +33,7 @@ let restoreChipComponent: BottomBarComponent | null = null;
 let resourcesChipComponent: BottomBarComponent | null = null;
 let assignmentsChipComponent: BottomBarComponent | null = null;
 let segmentsChipComponent: BottomBarComponent | null = null;
+let cluesChipComponent: BottomBarComponent | null = null;
 let savedGeometry: PaneGeometry | null = null;
 let minimized = false;
 
@@ -42,6 +44,7 @@ export function bindFloatMinimize(opts: {
     resourcesChip?: BottomBarComponent;
     assignmentsChip?: BottomBarComponent;
     segmentsChip?: BottomBarComponent;
+    cluesChip?: BottomBarComponent;
 }): void {
     api = opts.api;
     shellComponent = opts.shell;
@@ -49,6 +52,7 @@ export function bindFloatMinimize(opts: {
     resourcesChipComponent = opts.resourcesChip ?? null;
     assignmentsChipComponent = opts.assignmentsChip ?? null;
     segmentsChipComponent = opts.segmentsChip ?? null;
+    cluesChipComponent = opts.cluesChip ?? null;
     ensureBottomBarChip();
 }
 
@@ -116,6 +120,12 @@ function ensureBottomBarChip(): void {
                 component: segmentsChipComponent,
             });
         }
+        if (cluesChipComponent) {
+            api.bottomBar.add({
+                key: CLUES_BOTTOM_BAR_KEY,
+                component: cluesChipComponent,
+            });
+        }
     } catch {
         // Map / bottom bar may not be loaded yet — retry on open/minimize
     }
@@ -127,6 +137,7 @@ function clearBottomBarChip(): void {
         requireApi().bottomBar.remove(RESOURCES_BOTTOM_BAR_KEY);
         requireApi().bottomBar.remove(ASSIGNMENTS_BOTTOM_BAR_KEY);
         requireApi().bottomBar.remove(SEGMENTS_BOTTOM_BAR_KEY);
+        requireApi().bottomBar.remove(CLUES_BOTTOM_BAR_KEY);
     } catch {
         // Map / bottom bar may not be loaded during teardown
     }

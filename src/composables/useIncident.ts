@@ -57,7 +57,7 @@ const VALID_NAV_KEYS = new Set([
     'generate-report-template',
 ]);
 
-const VALID_HTAB_KEYS = new Set(['main', 'dashboard', 'task', 'casie', 'organization', 'risk-assessment']);
+const VALID_HTAB_KEYS = new Set(['main', 'dashboard', 'task', 'clues', 'casie', 'organization', 'risk-assessment']);
 
 function loadNavFromSession(): PaneNavState {
     try {
@@ -92,6 +92,11 @@ function loadNavFromSession(): PaneNavState {
         if (key === 'casie') {
             key = 'create-open';
             if (htab === 'main') htab = 'casie';
+        }
+        // Clue Log moved from the Area Search nav into its own horizontal tab.
+        if (key === 'clue-log') {
+            key = 'create-open';
+            if (htab === 'main') htab = 'clues';
         }
         return {
             activeKey: VALID_NAV_KEYS.has(key) ? key : 'create-open',
@@ -176,7 +181,7 @@ const noMissionModalOpen = ref(false);
 const casieExpandRequested = ref(false);
 
 export function isMissionRequiredView(key: string, htab: string): boolean {
-    if (htab === 'dashboard' || htab === 'organization' || htab === 'risk-assessment') return true;
+    if (htab === 'dashboard' || htab === 'organization' || htab === 'risk-assessment' || htab === 'clues') return true;
     if (htab !== 'main') return false;
     return !MISSION_EXEMPT_NAV_KEYS.has(key);
 }
