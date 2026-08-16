@@ -162,6 +162,21 @@ export function nextClueNumber(clues: TrackedClue[]): number {
     return clues.reduce((max, c) => Math.max(max, c.number), 0) + 1;
 }
 
+interface ClueLogBody {
+    dtg: string;
+    content: string;
+    keywords: string[];
+    /** First-class DataSync CoT association (fork log-entryuid support). */
+    entryUid?: string;
+}
+
+function clueLogWriter(sub: Subscription): {
+    create(body: ClueLogBody): Promise<{ id: string }>;
+    update(logid: string, body: ClueLogBody): Promise<{ id: string }>;
+} {
+    return sub.log as unknown as ReturnType<typeof clueLogWriter>;
+}
+
 export async function createClueLog(
     target: { guid: string; token?: string },
     entry: ClueLogEntry,
@@ -171,10 +186,11 @@ export async function createClueLog(
         subscribed: true,
         reload: false,
     });
-    await sub.log.create({
+    await clueLogWriter(sub).create({
         dtg: new Date().toISOString(),
         content: buildClueContent(entry),
         keywords: buildClueKeywords(entry),
+        entryUid: entry.markerUid,
     });
 }
 
@@ -192,9 +208,10 @@ export async function updateClueLog(clue: TrackedClue, patch: {
         missiontoken: clue.sourceToken ?? '',
         reload: false,
     });
-    await sub.log.update(clue.logId, {
+    await clueLogWriter(sub).update(clue.logId, {
         dtg: clue.at || new Date().toISOString(),
         content: buildClueContent(next),
         keywords: buildClueKeywords(next),
+        entryUid: next.markerUid,
     });
 }
