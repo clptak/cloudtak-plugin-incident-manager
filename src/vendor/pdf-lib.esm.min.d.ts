@@ -64,6 +64,13 @@ export interface PDFForm {
     getFields(): PDFField[];
     getTextField(name: string): PDFTextField;
     getCheckBox(name: string): PDFCheckBox;
+    getField(name: string): {
+        acroField: {
+            getWidgets(): Array<{
+                getRectangle(): { x: number; y: number; width: number; height: number };
+            }>;
+        };
+    };
     updateFieldAppearances(font?: PDFFont): void;
     flatten(): void;
 }

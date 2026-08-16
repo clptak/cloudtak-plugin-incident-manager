@@ -68,10 +68,7 @@ async function fetchMissionArchive(
             },
             headers: token ? { MissionAuthorization: token } : {},
             parseAs: 'arrayBuffer',
-        } as unknown as Record<string, unknown>) as unknown as {
-            data?: ArrayBuffer;
-            error?: { message?: string };
-        };
+        });
         if (!res.data) return null;
         return new Uint8Array(res.data);
     } catch {
