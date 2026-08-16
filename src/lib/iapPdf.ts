@@ -15,6 +15,7 @@ import ics202Url from '../assets/iap/ics202.pdf?url';
 import ics203Url from '../assets/iap/ics203.pdf?url';
 import ics204Url from '../assets/iap/ics204.pdf?url';
 import ics205Url from '../assets/iap/ics205.pdf?url';
+import ics205aUrl from '../assets/iap/ics205a.pdf?url';
 import ics206Url from '../assets/iap/ics206.pdf?url';
 import ics207Url from '../assets/iap/ics207.pdf?url';
 import ics208Url from '../assets/iap/ics208.pdf?url';
@@ -23,7 +24,7 @@ import ics220Url from '../assets/iap/ics220-uas.pdf?url';
 import { describeSave, saveGeneratedFile } from './fileTarget.ts';
 
 export type IapFormId =
-    | 'ics202' | 'ics203' | 'ics204' | 'ics205'
+    | 'ics202' | 'ics203' | 'ics204' | 'ics205' | 'ics205a'
     | 'ics206' | 'ics207' | 'ics208' | 'ics209' | 'ics220';
 
 const TEMPLATE_URLS: Record<IapFormId, string> = {
@@ -31,6 +32,7 @@ const TEMPLATE_URLS: Record<IapFormId, string> = {
     ics203: ics203Url,
     ics204: ics204Url,
     ics205: ics205Url,
+    ics205a: ics205aUrl,
     ics206: ics206Url,
     ics207: ics207Url,
     ics208: ics208Url,
@@ -188,9 +190,9 @@ export async function buildIapPdf(sections: IapSection[]): Promise<Uint8Array> {
         pageNo += count;
 
         const filledDoc = await fillIcsForm(section.id, section.filled);
-        const total = filledDoc.getPageCount();
+        const templatePages = filledDoc.getPageCount();
         const wanted = (section.filled.pages ?? [0])
-            .filter((i) => Number.isInteger(i) && i >= 0 && i < total);
+            .filter((i) => Number.isInteger(i) && i >= 0 && i < templatePages);
         const indices = wanted.length ? wanted : [0];
         const copied = await out.copyPages(filledDoc, indices);
         for (const page of copied) out.addPage(page as unknown as [number, number]);

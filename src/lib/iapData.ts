@@ -200,7 +200,6 @@ function ics204(
     plan: IapPlan,
     ctx: IapContext,
     assignment: IapAssignmentPlan,
-    page: number,
 ): FilledForm {
     const division = plan.divisions.find((d) => d.id === assignment.divisionId);
     const text: Record<string, string> = {
@@ -259,6 +258,23 @@ function ics205(plan: IapPlan, ctx: IapContext): FilledForm {
         text[`RemarksRow${n}`] = c.remarks;
     });
     return { text, pageField: 'IAP Page_4' };
+}
+
+/** ICS-205A Communications List — 34 rows on the official form. */
+function ics205a(plan: IapPlan, ctx: IapContext): FilledForm {
+    const text: Record<string, string> = {
+        ...header(plan, ctx, '1 Incident Name_9'),
+        '4 Prepared by Name': preparerFor(plan, 'ics205'),
+        PositionTitle_8: plan.preparedByPosition,
+        DateTime_9: preparedStamp(plan),
+    };
+    plan.commsList.slice(0, 34).forEach((row, i) => {
+        const n = i + 1;
+        text[`Incident Assigned PositionRow${n}`] = row.position;
+        text[`Name AlphabetizedRow${n}`] = row.name;
+        text[`Methods of Contact phone pager cell etcRow${n}`] = row.contact;
+    });
+    return { text, pageField: 'IAP Page_5' };
 }
 
 function ics206(plan: IapPlan, ctx: IapContext): FilledForm {
@@ -379,12 +395,13 @@ export function iapFormPlanFor(plan: IapPlan, ctx: IapContext, hasUas = false): 
         // The saved plan's explicit switch wins; detection only seeds it.
         hasUas: plan.uas.include || hasUas,
         hasMedical: hasMedicalContent(plan),
+        hasCommsList: plan.includeForms.ics205a && plan.commsList.some((r) => r.name.trim() || r.position.trim()),
     }) as IapFormId[];
     const set = new Set(base);
     // Explicit include toggles add forms the category rules left out.
     if (plan.includeForms.ics207) set.add('ics207');
     if (plan.includeForms.ics209) set.add('ics209');
-    const order: IapFormId[] = ['ics202', 'ics203', 'ics204', 'ics205', 'ics206', 'ics207', 'ics208', 'ics209', 'ics220'];
+    const order: IapFormId[] = ['ics202', 'ics203', 'ics204', 'ics205', 'ics205a', 'ics206', 'ics207', 'ics208', 'ics209', 'ics220'];
     return order.filter((id) => set.has(id));
 }
 
@@ -400,10 +417,11 @@ export function buildIapSections(
         { id: 'ics202', filled: ics202(plan, ctx, attachments) },
         { id: 'ics203', filled: ics203(plan, ctx) },
     ];
-    plan.assignments.forEach((a, i) => {
-        sections.push({ id: 'ics204', filled: ics204(plan, ctx, a, i + 1), pageField: 'IAP Page_3' });
+    plan.assignments.forEach((a) => {
+        sections.push({ id: 'ics204', filled: ics204(plan, ctx, a), pageField: 'IAP Page_3' });
     });
     sections.push({ id: 'ics205', filled: ics205(plan, ctx), pageField: 'IAP Page_4' });
+    if (forms.includes('ics205a')) sections.push({ id: 'ics205a', filled: ics205a(plan, ctx) });
     if (forms.includes('ics206')) sections.push({ id: 'ics206', filled: ics206(plan, ctx) });
     if (forms.includes('ics207')) sections.push({ id: 'ics207', filled: ics207(plan, ctx) });
     sections.push({ id: 'ics208', filled: ics208(plan, ctx) });

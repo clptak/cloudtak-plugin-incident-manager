@@ -50,6 +50,17 @@ export interface IapAssignmentPlan {
     contactPhone: string;
 }
 
+/** ICS-205A row: who is on the incident and how to reach them. */
+export interface IapCommsListRow {
+    position: string;
+    name: string;
+    contact: string;
+}
+
+export function blankCommsListRow(): IapCommsListRow {
+    return { position: '', name: '', contact: '' };
+}
+
 /** A Division/Group and its supervisor (ICS-203 §5 rows, ICS-204 §3). */
 export interface IapDivision {
     id: string;
@@ -133,6 +144,8 @@ export interface IapPlan {
     comms: IapCommsRow[];
     /** ICS-205 §5 Special Instructions. */
     commsSpecialInstructions: string;
+    /** ICS-205A communications list (34 rows on the official form). */
+    commsList: IapCommsListRow[];
     /** Optional forms the IMT chose to include (220 lives on `uas.include`). */
     includeForms: { ics207: boolean; ics209: boolean; ics205a: boolean };
     /**
@@ -173,6 +186,14 @@ function sanitizeComms(raw: unknown): IapCommsRow[] {
             txFreq: str(rec.txFreq), txTone: str(rec.txTone),
             mode: str(rec.mode), remarks: str(rec.remarks),
         };
+    });
+}
+
+function sanitizeCommsList(raw: unknown): IapCommsListRow[] {
+    if (!Array.isArray(raw)) return [];
+    return raw.filter((r) => r && typeof r === 'object').map((r) => {
+        const rec = r as Record<string, unknown>;
+        return { position: str(rec.position), name: str(rec.name), contact: str(rec.contact) };
     });
 }
 
@@ -263,6 +284,7 @@ export function iapPlanFromValue(raw: unknown, opNumber: number): IapPlan | null
         assignments: sanitizeAssignments(rec.assignments),
         comms: sanitizeComms(rec.comms),
         commsSpecialInstructions: str(rec.commsSpecialInstructions),
+        commsList: sanitizeCommsList(rec.commsList),
         includeForms: {
             ics207: (rec.includeForms as Record<string, unknown> | undefined)?.ics207 === true,
             ics209: (rec.includeForms as Record<string, unknown> | undefined)?.ics209 === true,
@@ -337,6 +359,15 @@ export function prefillIapPlan(input: IapInputs, previous?: IapPlan | null): Iap
             ? previous.divisions.map((d) => ({ ...d }))
             : [blankDivision(0)],
         commsSpecialInstructions: previous?.commsSpecialInstructions ?? '',
+        commsList: previous?.commsList?.length
+            ? previous.commsList.map((r) => ({ ...r }))
+            : [
+                { position: 'Incident Commander', name: f.incidentCommanders, contact: '' },
+                { position: 'Safety Officer', name: f.safetyOfficer, contact: '' },
+                { position: 'Operations Section Chief', name: f.operationsSectionChief, contact: '' },
+                { position: 'Planning Section Chief', name: f.planningSectionChief, contact: '' },
+                { position: 'Logistics Section Chief', name: f.logisticsSectionChief, contact: '' },
+            ].filter((r) => r.name.trim()),
         includeForms: previous?.includeForms
             ? { ...previous.includeForms }
             : { ics207: false, ics209: false, ics205a: false },

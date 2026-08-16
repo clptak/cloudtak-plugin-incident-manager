@@ -32,6 +32,13 @@ test('iapFormPlan: UAS resource appends the modified 220', () => {
     assert.ok(!iapFormPlan({ category: 'search', hasUas: false }).includes('ics220'));
 });
 
+test('iapFormPlan: 205A slots in after the radio plan when included', () => {
+    const plan = iapFormPlan({ category: 'search', hasUas: false, hasCommsList: true });
+    assert.ok(plan.includes('ics205a'));
+    assert.equal(plan.indexOf('ics205a'), plan.indexOf('ics205') + 1);
+    assert.ok(!iapFormPlan({ category: 'search', hasUas: false }).includes('ics205a'));
+});
+
 test('usesExtendedIcsSet / isUasLabel', () => {
     assert.equal(usesExtendedIcsSet('disaster'), true);
     assert.equal(usesExtendedIcsSet('search'), false);

@@ -454,6 +454,82 @@
                 </div>
             </TablerBorder>
 
+            <!-- 205A communications list -->
+            <TablerBorder
+                class='cloudtak-accent text-white mb-3'
+                :fill-height='false'
+                :shadow='false'
+                gap='sm'
+            >
+                <template #label>
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        ICS 205A — Communications List
+                    </p>
+                </template>
+                <label class='form-check d-flex align-items-center gap-2 mb-2'>
+                    <input
+                        v-model='plan.includeForms.ics205a'
+                        type='checkbox'
+                        class='form-check-input'
+                    >
+                    <span class='form-check-label'>Include ICS 205A in this IAP</span>
+                </label>
+                <template v-if='plan.includeForms.ics205a'>
+                    <p class='form-text mt-0'>
+                        Who is on the incident and how to reach them — seeded from the
+                        command staff, carried forward between operational periods.
+                        The official form holds 34 rows.
+                    </p>
+                    <div
+                        v-for='(row, i) in plan.commsList'
+                        :key='`cl-${i}`'
+                        class='row g-1 mb-1'
+                    >
+                        <div class='col-md-4'>
+                            <TablerInput
+                                v-model='row.position'
+                                :label='i === 0 ? "Incident Assigned Position" : undefined'
+                            />
+                        </div>
+                        <div class='col-md-4'>
+                            <TablerInput
+                                v-model='row.name'
+                                :label='i === 0 ? "Name" : undefined'
+                            />
+                        </div>
+                        <div class='col-md-3'>
+                            <TablerInput
+                                v-model='row.contact'
+                                :label='i === 0 ? "Method(s) of Contact" : undefined'
+                            />
+                        </div>
+                        <div class='col-md-1 d-flex align-items-end'>
+                            <button
+                                class='btn btn-outline-danger btn-sm'
+                                @click='plan.commsList.splice(i, 1)'
+                            >
+                                ×
+                            </button>
+                        </div>
+                    </div>
+                    <div class='d-flex gap-2 mt-2'>
+                        <button
+                            class='btn btn-outline-primary btn-sm'
+                            :disabled='plan.commsList.length >= 34'
+                            @click='plan.commsList.push(blankCommsListRow())'
+                        >
+                            + Contact
+                        </button>
+                        <button
+                            class='btn btn-outline-secondary btn-sm'
+                            @click='addAssignmentContacts'
+                        >
+                            Add assignment contacts
+                        </button>
+                    </div>
+                </template>
+            </TablerBorder>
+
             <!-- 206 medical + 208 safety -->
             <TablerBorder
                 class='cloudtak-accent text-white mb-3'
@@ -663,6 +739,7 @@ import {
 import { buildIapPdf, saveIapPdf } from '../../../lib/iapPdf.ts';
 import {
     blankAircraftRow,
+    blankCommsListRow,
     blankCommsRow,
     blankDivision,
     loadIapPlan,
@@ -771,6 +848,21 @@ async function load(prefer: 'saved' | 'prefill' = 'saved'): Promise<void> {
         error.value = err instanceof Error ? err.message : String(err);
     } finally {
         loading.value = false;
+    }
+}
+
+/** Pull each assignment's contact into the 205A list (skipping duplicates). */
+function addAssignmentContacts(): void {
+    if (!plan.value) return;
+    for (const a of plan.value.assignments) {
+        const name = a.contactName.trim();
+        if (!name) continue;
+        if (plan.value.commsList.some((r) => r.name.trim() === name)) continue;
+        plan.value.commsList.push({
+            position: a.supervisor ? `${a.label} — ${a.supervisor}` : a.label,
+            name,
+            contact: a.contactPhone,
+        });
     }
 }
 
