@@ -212,13 +212,17 @@ function ics204(
         '6 Work Assignments': assignment.workAssignment,
         '7 Special Instructions': assignment.specialInstructions,
         // §8 Communications is people, not radio channels — the channel plan
-        // lives on ICS-205.
-        'Name/Function1': assignment.contactName,
-        'Primary Contact  indicate cell pager or radio frequencysystemchannel 1': assignment.contactPhone,
+        // lives on ICS-205. The form holds four rows.
         '9 Prepared by Name_2': plan.preparedBy,
         PositionTitle_7: plan.preparedByPosition,
         DateTime_7: preparedStamp(plan),
     };
+    assignment.contacts.slice(0, 4).forEach((c, i) => {
+        const n = i + 1;
+        text[`Name/Function${n}`] = c.nameFunction;
+        text[`Primary Contact  indicate cell pager or radio frequencysystemchannel ${n}`] = c.contact;
+    });
+
     assignment.resources.slice(0, 10).forEach((r, i) => {
         const n = i + 1;
         text[`Resource IdentifierRow${n}_2`] = r.identifier;

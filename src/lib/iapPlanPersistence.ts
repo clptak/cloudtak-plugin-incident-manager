@@ -36,6 +36,16 @@ export interface IapResourceRow {
     reporting: string;
 }
 
+/** ICS-204 §8 Communications row: who to contact and how. */
+export interface IapContactRow {
+    nameFunction: string;
+    contact: string;
+}
+
+export function blankContactRow(): IapContactRow {
+    return { nameFunction: '', contact: '' };
+}
+
 export interface IapAssignmentPlan {
     segmentUid: string;
     label: string;
@@ -45,9 +55,8 @@ export interface IapAssignmentPlan {
     resources: IapResourceRow[];
     /** Division this assignment belongs to (ICS-203 rows / ICS-204 §3). */
     divisionId: string;
-    /** ICS-204 §8 Communications — who to reach and how. */
-    contactName: string;
-    contactPhone: string;
+    /** ICS-204 §8 Communications — the official form holds 4 rows. */
+    contacts: IapContactRow[];
 }
 
 /** ICS-205A row: who is on the incident and how to reach them. */
@@ -236,6 +245,16 @@ function sanitizeAssignments(raw: unknown): IapAssignmentPlan[] {
                 };
             })
             : [];
+        // Migrate the earlier single contactName/contactPhone pair into row 1.
+        const contacts: IapContactRow[] = Array.isArray(rec.contacts)
+            ? rec.contacts.filter((c) => c && typeof c === 'object').map((c) => {
+                const cc = c as Record<string, unknown>;
+                return { nameFunction: str(cc.nameFunction), contact: str(cc.contact) };
+            })
+            : (str(rec.contactName) || str(rec.contactPhone))
+                ? [{ nameFunction: str(rec.contactName), contact: str(rec.contactPhone) }]
+                : [];
+
         return {
             segmentUid: str(rec.segmentUid),
             label: str(rec.label),
@@ -244,8 +263,7 @@ function sanitizeAssignments(raw: unknown): IapAssignmentPlan[] {
             specialInstructions: str(rec.specialInstructions),
             resources,
             divisionId: str(rec.divisionId),
-            contactName: str(rec.contactName),
-            contactPhone: str(rec.contactPhone),
+            contacts,
         };
     });
 }
@@ -387,8 +405,10 @@ export function prefillIapPlan(input: IapInputs, previous?: IapPlan | null): Iap
                 }));
             return {
                 divisionId: prior?.divisionId ?? '',
-                contactName: prior?.contactName ?? '',
-                contactPhone: prior?.contactPhone ?? '',
+                // Seed §8 with the team/supervisor so there is a line to fill.
+                contacts: prior?.contacts?.length
+                    ? prior.contacts.map((c) => ({ ...c }))
+                    : (a.team ? [{ nameFunction: a.team, contact: '' }] : []),
                 segmentUid: a.segmentUid,
                 label: a.label,
                 supervisor: a.team ?? prior?.supervisor ?? '',

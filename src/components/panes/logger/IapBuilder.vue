@@ -308,18 +308,6 @@
                                 </option>
                             </select>
                         </div>
-                        <div class='col-md-4'>
-                            <TablerInput
-                                v-model='a.contactName'
-                                label='Contact Name (ICS-204 §8)'
-                            />
-                        </div>
-                        <div class='col-md-5'>
-                            <TablerInput
-                                v-model='a.contactPhone'
-                                label='Contact Phone / Radio'
-                            />
-                        </div>
                         <div class='col-12'>
                             <TablerInput
                                 v-model='a.specialInstructions'
@@ -327,6 +315,50 @@
                             />
                         </div>
                     </div>
+
+                    <p class='text-uppercase text-white-50 small mb-1 mt-2'>
+                        §8 Communications — Name / Function &amp; Contact
+                    </p>
+                    <div
+                        v-for='(c, ci) in a.contacts'
+                        :key='`ct-${ai}-${ci}`'
+                        class='row g-1 mb-1'
+                    >
+                        <div class='col-md-5'>
+                            <TablerInput
+                                v-model='c.nameFunction'
+                                :label='ci === 0 ? "Name / Function" : undefined'
+                                placeholder='e.g. Team 3 Leader — J. Smith'
+                            />
+                        </div>
+                        <div class='col-md-5'>
+                            <TablerInput
+                                v-model='c.contact'
+                                :label='ci === 0 ? "Primary Contact (cell / radio)" : undefined'
+                            />
+                        </div>
+                        <div class='col-md-2 d-flex align-items-end'>
+                            <button
+                                class='btn btn-outline-danger btn-sm'
+                                @click='a.contacts.splice(ci, 1)'
+                            >
+                                ×
+                            </button>
+                        </div>
+                    </div>
+                    <button
+                        class='btn btn-outline-primary btn-sm mb-2'
+                        :disabled='a.contacts.length >= 4'
+                        @click='a.contacts.push(blankContactRow())'
+                    >
+                        + Contact
+                    </button>
+                    <p
+                        v-if='a.contacts.length >= 4'
+                        class='form-text mt-0'
+                    >
+                        ICS-204 §8 holds four rows.
+                    </p>
 
                     <p class='text-uppercase text-white-50 small mb-1 mt-2'>
                         Resources
@@ -741,6 +773,7 @@ import {
     blankAircraftRow,
     blankCommsListRow,
     blankCommsRow,
+    blankContactRow,
     blankDivision,
     loadIapPlan,
     loadPreviousIapPlan,
@@ -855,14 +888,16 @@ async function load(prefer: 'saved' | 'prefill' = 'saved'): Promise<void> {
 function addAssignmentContacts(): void {
     if (!plan.value) return;
     for (const a of plan.value.assignments) {
-        const name = a.contactName.trim();
-        if (!name) continue;
-        if (plan.value.commsList.some((r) => r.name.trim() === name)) continue;
-        plan.value.commsList.push({
-            position: a.supervisor ? `${a.label} — ${a.supervisor}` : a.label,
-            name,
-            contact: a.contactPhone,
-        });
+        for (const c of a.contacts) {
+            const name = c.nameFunction.trim();
+            if (!name) continue;
+            if (plan.value.commsList.some((r) => r.name.trim() === name)) continue;
+            plan.value.commsList.push({
+                position: a.label,
+                name,
+                contact: c.contact,
+            });
+        }
     }
 }
 
