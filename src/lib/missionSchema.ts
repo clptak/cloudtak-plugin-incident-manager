@@ -107,6 +107,10 @@ export interface MissionSchema {
         incident_name: string;
         incident_id: string;
         incident_datetime: string;
+        /** IPP decimal degrees; empty object until Search Area sets it. */
+        ipp_coordinates?: { lat?: number; lng?: number; lon?: number } | Record<string, unknown>;
+        /** LKP or PLS. */
+        ipp_type?: string;
         [key: string]: unknown;
     };
     assignment: {
