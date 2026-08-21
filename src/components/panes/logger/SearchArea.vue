@@ -126,6 +126,31 @@
                     />
                 </div>
 
+                <div
+                    v-if='showIppPrompt'
+                    class='mt-3'
+                >
+                    <p class='form-text mb-2'>
+                        Add <strong>IPP-{{ ippType }}</strong> at
+                        {{ ipp?.lat?.toFixed(5) }}, {{ ipp?.lng?.toFixed(5) }}
+                        to this mission's map / DataSync?
+                    </p>
+                    <button
+                        class='btn btn-primary btn-sm me-2'
+                        :disabled='settingIpp'
+                        @click='onSetIpp'
+                    >
+                        {{ settingIpp ? 'Adding…' : 'Add' }}
+                    </button>
+                    <button
+                        class='btn btn-outline-secondary btn-sm'
+                        :disabled='settingIpp'
+                        @click='ippPromptDismissed = true'
+                    >
+                        Not now
+                    </button>
+                </div>
+
                 <button
                     class='btn btn-primary mt-3'
                     :disabled='!canSetIpp || settingIpp'
@@ -751,6 +776,10 @@ import { loadMissionSchema } from '../../../lib/missionSchema.ts';
 import { toDatetimeLocalValue } from '../../../lib/ics234Datetime.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import { loadIncidentSubscription, loadSchemaSubscription, missionAuthToken, schemaMission } from '../../../lib/incidentSubscription.ts';
+import { readIppFromSchema, writeIppToSchema } from '../../../lib/ippPersistence.ts';
+import { createRegistryStore } from '../../../lib/registryPersistence.ts';
+import { currentOpPeriod } from '../../../domain/registry.ts';
+import { publishIppToOp } from '../../../lib/opAssignmentPersistence.ts';
 import NavHelpButton from '../../NavHelpButton.vue';
 
 const SEARCH_AREA_KEYWORD = 'search-area';
@@ -841,6 +870,9 @@ const missionMarkers = ref<MissionFeatureRef[]>([]);
 const missionPolygons = ref<MissionFeatureRef[]>([]);
 const loadingFeatures = ref(false);
 const settingIpp = ref(false);
+const ippPromptDismissed = ref(false);
+/** Schema IPP [lng, lat] — fallback when the CoT list has not loaded yet. */
+const schemaIppCoords = ref<[number, number] | null>(null);
 
 const subjectiveUid = ref('');
 
@@ -1021,12 +1053,12 @@ async function loadAreas(sub?: LoadedSub): Promise<void> {
         sentAreas.value = [];
         timeReportedMissing.value = '';
         ippCoordsCache.value = null;
+        schemaIppCoords.value = null;
         return;
     }
     loadingAreas.value = true;
     try {
         const s = sub ?? await loadSub();
-        await loadTimeReportedMissing();
         const logs = await s.log.list({ refresh: true });
         const kw = (keywords: string[] | undefined, prefix: string): string => {
             const t = keywords?.find((k) => k.startsWith(prefix));
@@ -1059,6 +1091,7 @@ async function loadAreas(sub?: LoadedSub): Promise<void> {
             }
         }
         sentAreas.value = [...byKey.values()].sort((a, b) => rank(a.key) - rank(b.key) || a.key.localeCompare(b.key));
+        await loadSchemaPrefills();
         resumeToCurrentStep();
     } catch (err) {
         statusError.value = true;
@@ -1068,8 +1101,8 @@ async function loadAreas(sub?: LoadedSub): Promise<void> {
     }
 }
 
-/** Prefill Theoretical Time Reported Missing from CFS Created in mission_schema.json. */
-async function loadTimeReportedMissing(): Promise<void> {
+/** Prefill Theoretical Time Reported Missing and IPP from mission_schema.json. */
+async function loadSchemaPrefills(): Promise<void> {
     try {
         const schemaSub = await loadSchemaSubscription(activeMission.value!);
         const { schema } = await loadMissionSchema(schemaSub);
@@ -1078,8 +1111,18 @@ async function loadTimeReportedMissing(): Promise<void> {
             const local = toDatetimeLocalInput(created);
             if (local) timeReportedMissing.value = local;
         }
+        const stored = readIppFromSchema(schema);
+        if (stored) {
+            schemaIppCoords.value = [stored.lng, stored.lat];
+            ippType.value = stored.type;
+            if (!stepDone.value.ipp && !ippInput.value.trim() && !selectedObjectUid.value) {
+                ippInput.value = `${stored.lat.toFixed(5)}, ${stored.lng.toFixed(5)}`;
+            }
+        } else {
+            schemaIppCoords.value = null;
+        }
     } catch {
-        // Schema may be missing on new missions; leave the field as-is.
+        // Schema may be missing on new missions; leave the fields as-is.
     }
 }
 
@@ -1236,6 +1279,10 @@ function toFeatureRef(f: Feature): MissionFeatureRef {
 onMounted(() => { void loadAreas(); void loadFeatures(); });
 watch(() => activeMission.value?.guid, () => {
     ippCoordsCache.value = null;
+    schemaIppCoords.value = null;
+    ippInput.value = '';
+    selectedObjectUid.value = '';
+    ippPromptDismissed.value = false;
     void loadAreas();
     void loadFeatures();
 });
@@ -1279,6 +1326,12 @@ const canSetIpp = computed(
     () => !!ipp.value || !!selectedObjectUid.value,
 );
 
+const showIppPrompt = computed(() => {
+    if (ippPromptDismissed.value || stepDone.value.ipp || settingIpp.value) return false;
+    if (selectedObjectUid.value) return false;
+    return !!ipp.value;
+});
+
 /** Center for ring math: selected object, typed coordinates, or recalled IPP marker. */
 const ippCenter = computed<[number, number] | null>(() => {
     const asTuple = (coords: [number, number]): [number, number] => [coords[0], coords[1]];
@@ -1295,6 +1348,7 @@ const ippCenter = computed<[number, number] | null>(() => {
         const marker = missionMarkers.value.find((m) => m.uid === ippArea.uuid);
         if (marker?.coords) return asTuple(marker.coords);
     }
+    if (schemaIppCoords.value) return asTuple(schemaIppCoords.value);
     if (ipp.value) return [ipp.value.lng, ipp.value.lat];
     return null;
 });
@@ -1322,6 +1376,31 @@ async function writeAreaLog(
     };
     if (existing?.logId) await log.update(existing.logId, body);
     else await log.create(body);
+}
+
+/** Persist IPP coords to mission_schema.json and copy to the current OP when open. */
+async function persistIppToSchemaAndOp(coords: [number, number]): Promise<string> {
+    const mission = activeMission.value;
+    if (!mission) return '';
+    const record = { lat: coords[1], lng: coords[0], type: ippType.value };
+    let note = '';
+    try {
+        await writeIppToSchema(mission, record);
+        schemaIppCoords.value = coords;
+    } catch (err) {
+        note += ` Schema save failed: ${err instanceof Error ? err.message : String(err)}.`;
+    }
+    try {
+        const registry = await createRegistryStore(mission).load();
+        const op = currentOpPeriod(registry);
+        if (op) {
+            const uid = await publishIppToOp(mission, op);
+            note += uid ? ` Published to ${op.name}.` : '';
+        }
+    } catch (err) {
+        note += ` OP publish failed: ${err instanceof Error ? err.message : String(err)}.`;
+    }
+    return note;
 }
 
 async function onSetIpp(): Promise<void> {
@@ -1357,8 +1436,10 @@ async function setIpp(): Promise<void> {
 
         await writeAreaLog(sub, IPP_KEY, label, uuid, coords ? { coords } : undefined);
         if (coords) ippCoordsCache.value = coords;
+        const extra = coords ? await persistIppToSchemaAndOp(coords) : '';
+        ippPromptDismissed.value = true;
         await Promise.all([loadAreas(sub), loadFeatures()]);
-        status.value = `Set ${label} on ${activeMission.value.name}.`;
+        status.value = `Set ${label} on ${activeMission.value.name}.${extra}`;
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);
