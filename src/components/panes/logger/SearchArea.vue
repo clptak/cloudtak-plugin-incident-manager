@@ -234,11 +234,18 @@
                     class='form-text'
                 >
                     Radius: <strong>{{ theoreticalMiles.toFixed(2) }} mi</strong>
-                    ({{ elapsedHours.toFixed(1) }} h elapsed × {{ travelSpeed }} mph)
+                    ({{ elapsedHours.toFixed(1) }} h elapsed × {{ travelSpeedMph }} mph)
+                </div>
+                <div
+                    v-if='theoreticalBlockReason'
+                    class='form-text text-danger'
+                >
+                    {{ theoreticalBlockReason }}
                 </div>
                 <button
                     class='btn btn-primary btn-sm mt-2'
                     :disabled='!canPushTheoretical || pushing'
+                    :title='theoreticalBlockReason'
                     @click='onPushTheoretical'
                 >
                     Add to DataSync
@@ -741,6 +748,7 @@ import { flyToFeature } from '../../../lib/flyToFeature.ts';
 import FeatureCallsignCell from '../../FeatureCallsignCell.vue';
 import { areaSqMi, formatSqMi } from '../../../lib/geometryArea.ts';
 import { loadMissionSchema } from '../../../lib/missionSchema.ts';
+import { toDatetimeLocalValue } from '../../../lib/ics234Datetime.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import { loadIncidentSubscription, loadSchemaSubscription, missionAuthToken, schemaMission } from '../../../lib/incidentSubscription.ts';
 import NavHelpButton from '../../NavHelpButton.vue';
@@ -786,6 +794,7 @@ interface SentArea {
     logId: string;     // mission-log entry id
     created: string;
     folder?: string;   // LPB mission folder name from keywords folder:…
+    coords?: [number, number]; // IPP [lng, lat] from lat:/lng: keywords
 }
 
 type RecallRow =
@@ -913,14 +922,21 @@ const validCustomRanges = computed(() =>
 // Theoretical
 const timeMissing = ref('');
 const timeReportedMissing = ref('');
-const travelSpeed = ref<number>(0);
+const travelSpeed = ref(0);
+const travelSpeedMph = computed(() => {
+    const n = Number(travelSpeed.value);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+});
 const elapsedHours = computed(() => {
     if (!timeMissing.value || !timeReportedMissing.value) return 0;
-    const ms = new Date(timeReportedMissing.value).getTime() - new Date(timeMissing.value).getTime();
+    const reported = new Date(timeReportedMissing.value).getTime();
+    const missing = new Date(timeMissing.value).getTime();
+    if (!Number.isFinite(reported) || !Number.isFinite(missing)) return 0;
+    const ms = reported - missing;
     return ms > 0 ? ms / 3_600_000 : 0;
 });
 const theoreticalMiles = computed(() =>
-    elapsedHours.value > 0 && travelSpeed.value > 0 ? elapsedHours.value * travelSpeed.value : 0
+    elapsedHours.value > 0 && travelSpeedMph.value > 0 ? elapsedHours.value * travelSpeedMph.value : 0
 );
 
 const pushing = ref(false);
@@ -929,6 +945,8 @@ const statusError = ref(false);
 
 const sentAreas = ref<SentArea[]>([]);
 const loadingAreas = ref(false);
+/** IPP [lng, lat] captured when Set IPP succeeds — survives feature-list races. */
+const ippCoordsCache = ref<[number, number] | null>(null);
 
 type LoadedSub = Awaited<ReturnType<typeof loadIncidentSubscription>>;
 
@@ -1002,6 +1020,7 @@ async function loadAreas(sub?: LoadedSub): Promise<void> {
     if (!activeMission.value) {
         sentAreas.value = [];
         timeReportedMissing.value = '';
+        ippCoordsCache.value = null;
         return;
     }
     loadingAreas.value = true;
@@ -1019,6 +1038,10 @@ async function loadAreas(sub?: LoadedSub): Promise<void> {
             const key = kw(log.keywords, 'area:');
             const uuid = kw(log.keywords, 'uid:');
             const folder = kw(log.keywords, 'folder:') || undefined;
+            const lat = Number(kw(log.keywords, 'lat:'));
+            const lng = Number(kw(log.keywords, 'lng:'));
+            const coords: [number, number] | undefined =
+                Number.isFinite(lat) && Number.isFinite(lng) ? [lng, lat] : undefined;
             // Segments moved to mission_schema.json; skip legacy segment logs here.
             if (!key || !uuid || key.startsWith('segment:')) continue;
             const created = log.created || log.dtg || '';
@@ -1031,6 +1054,7 @@ async function loadAreas(sub?: LoadedSub): Promise<void> {
                     logId: String(log.id),
                     created,
                     folder,
+                    coords,
                 });
             }
         }
@@ -1051,11 +1075,24 @@ async function loadTimeReportedMissing(): Promise<void> {
         const { schema } = await loadMissionSchema(schemaSub);
         const created = schema.cad_data?.call_timestamps?.call_created?.trim() ?? '';
         if (created) {
-            timeReportedMissing.value = created;
+            const local = toDatetimeLocalInput(created);
+            if (local) timeReportedMissing.value = local;
         }
     } catch {
         // Schema may be missing on new missions; leave the field as-is.
     }
+}
+
+/** Normalize ISO / datetime-local strings for `<input type="datetime-local">`. */
+function toDatetimeLocalInput(value: string): string {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(trimmed) && !/Z|[+-]\d{2}:\d{2}$/.test(trimmed)) {
+        return trimmed.slice(0, 16);
+    }
+    const ms = Date.parse(trimmed);
+    if (Number.isNaN(ms)) return '';
+    return toDatetimeLocalValue(new Date(ms));
 }
 
 /** Logical ordering of recall-card rows. */
@@ -1113,8 +1150,8 @@ const recallRows = computed((): RecallRow[] => {
     return rows;
 });
 
-/** Load point markers and polygons from the active DataSync mission. */
-async function loadFeatures(sub?: LoadedSub): Promise<void> {
+/** Load point markers and polygons from the common map and MGMT planning sync. */
+async function loadFeatures(): Promise<void> {
     if (!activeMission.value) {
         missionMarkers.value = [];
         missionPolygons.value = [];
@@ -1122,25 +1159,14 @@ async function loadFeatures(sub?: LoadedSub): Promise<void> {
     }
     loadingFeatures.value = true;
     try {
-        const s = sub ?? await loadCommonSub();
-        const feats = await s.feature.list({ refresh: true });
-        const toRef = (f: { id: unknown; properties?: unknown; geometry?: unknown }): MissionFeatureRef => {
-            const props = (f.properties ?? {}) as { callsign?: string };
-            const geom = (f.geometry ?? {}) as { type?: string; coordinates?: number[] };
-            const ref: MissionFeatureRef = { uid: String(f.id), callsign: props.callsign || String(f.id) };
-            if (geom.type === 'Point' && Array.isArray(geom.coordinates)) {
-                ref.coords = [geom.coordinates[0], geom.coordinates[1]];
-            }
-            ref.areaSqMi = areaSqMi(f.geometry);
-            return ref;
-        };
-        missionMarkers.value = feats.filter((f: Feature) => (f.geometry as { type?: string })?.type === 'Point').map(toRef);
-        missionPolygons.value = feats
-            .filter((f: Feature) => {
-                const t = (f.geometry as { type?: string })?.type;
-                return t === 'Polygon' || t === 'MultiPolygon';
-            })
-            .map(toRef);
+        const commonFeats = await listMissionFeatures(loadCommonSub);
+        const planningFeats = activeMission.value.mgmt
+            ? await listMissionFeatures(loadSub)
+            : [];
+        const pointFeats = mergeFeaturesByUid(commonFeats, planningFeats);
+        const polygonFeats = mergeFeaturesByUid(planningFeats, commonFeats);
+        missionMarkers.value = pointFeats.filter(isPointFeature).map(toFeatureRef);
+        missionPolygons.value = polygonFeats.filter(isPolygonFeature).map(toFeatureRef);
     } catch {
         missionMarkers.value = [];
         missionPolygons.value = [];
@@ -1149,8 +1175,70 @@ async function loadFeatures(sub?: LoadedSub): Promise<void> {
     }
 }
 
+async function listMissionFeatures(loader: () => Promise<LoadedSub>): Promise<Feature[]> {
+    try {
+        const s = await loader();
+        return await s.feature.list({ refresh: true }) as Feature[];
+    } catch {
+        return [];
+    }
+}
+
+function mergeFeaturesByUid(...lists: Feature[][]): Feature[] {
+    const seen = new Set<string>();
+    const out: Feature[] = [];
+    for (const list of lists) {
+        for (const f of list) {
+            const id = String(f.id);
+            if (seen.has(id)) continue;
+            seen.add(id);
+            out.push(f);
+        }
+    }
+    return out;
+}
+
+function isPointFeature(f: Feature): boolean {
+    return (f.geometry as { type?: string } | undefined)?.type === 'Point';
+}
+
+function isPolygonFeature(f: Feature): boolean {
+    const t = (f.geometry as { type?: string } | undefined)?.type;
+    return t === 'Polygon' || t === 'MultiPolygon';
+}
+
+function pointCoordsFromFeature(f: { geometry?: unknown; properties?: unknown }): [number, number] | undefined {
+    const geom = (f.geometry ?? {}) as { type?: string; coordinates?: unknown };
+    if (geom.type === 'Point' && Array.isArray(geom.coordinates) && geom.coordinates.length >= 2) {
+        const lng = Number(geom.coordinates[0]);
+        const lat = Number(geom.coordinates[1]);
+        if (Number.isFinite(lng) && Number.isFinite(lat)) return [lng, lat];
+    }
+    const center = (f.properties as { center?: unknown } | undefined)?.center;
+    if (Array.isArray(center) && center.length >= 2) {
+        const lng = Number(center[0]);
+        const lat = Number(center[1]);
+        if (Number.isFinite(lng) && Number.isFinite(lat)) return [lng, lat];
+    }
+    return undefined;
+}
+
+function toFeatureRef(f: Feature): MissionFeatureRef {
+    const props = (f.properties ?? {}) as { callsign?: string };
+    return {
+        uid: String(f.id),
+        callsign: props.callsign || String(f.id),
+        coords: pointCoordsFromFeature(f),
+        areaSqMi: areaSqMi(f.geometry),
+    };
+}
+
 onMounted(() => { void loadAreas(); void loadFeatures(); });
-watch(() => activeMission.value?.guid, () => { void loadAreas(); void loadFeatures(); });
+watch(() => activeMission.value?.guid, () => {
+    ippCoordsCache.value = null;
+    void loadAreas();
+    void loadFeatures();
+});
 
 async function onRefreshFeatures(): Promise<void> {
     if (!requireActiveMission()) return;
@@ -1201,6 +1289,8 @@ const ippCenter = computed<[number, number] | null>(() => {
     }
     if (ipp.value && !selectedObjectUid.value) return [ipp.value.lng, ipp.value.lat];
     const ippArea = sentAreas.value.find((a) => a.key === IPP_KEY);
+    if (ippArea?.coords) return asTuple(ippArea.coords);
+    if (ippCoordsCache.value) return asTuple(ippCoordsCache.value);
     if (ippArea) {
         const marker = missionMarkers.value.find((m) => m.uid === ippArea.uuid);
         if (marker?.coords) return asTuple(marker.coords);
@@ -1215,12 +1305,15 @@ async function writeAreaLog(
     key: string,
     content: string,
     uuid: string,
-    opts?: { folder?: string },
+    opts?: { folder?: string; coords?: [number, number] },
 ): Promise<void> {
     const existing = sentAreas.value.find((a) => a.key === key);
     const log = sub.log as unknown as LogApi;
     const keywords = [SEARCH_AREA_KEYWORD, `area:${key}`, `uid:${uuid}`];
     if (opts?.folder) keywords.push(`folder:${opts.folder}`);
+    if (opts?.coords) {
+        keywords.push(`lng:${opts.coords[0]}`, `lat:${opts.coords[1]}`);
+    }
     const body: LogWriteBody = {
         dtg: new Date().toISOString(),
         content,
@@ -1245,22 +1338,26 @@ async function setIpp(): Promise<void> {
         const existing = sentAreas.value.find((a) => a.key === IPP_KEY);
 
         let uuid: string;
+        let coords: [number, number] | undefined;
         if (selectedObjectUid.value) {
             uuid = selectedObjectUid.value;
+            coords = missionMarkers.value.find((m) => m.uid === uuid)?.coords;
         } else {
+            coords = [ipp.value!.lng, ipp.value!.lat];
             uuid = await pushPointToMission({
                 missionGuid: activeMission.value.guid,
                 missionToken: missionAuthToken(activeMission.value),
                 callsign: label,
-                point: [ipp.value!.lng, ipp.value!.lat],
+                point: coords,
                 type: 'a-f-G',
                 icon: IPP_ICON,
                 id: existing?.uuid,
             });
         }
 
-        await writeAreaLog(sub, IPP_KEY, label, uuid);
-        await Promise.all([loadAreas(sub), loadFeatures(sub)]);
+        await writeAreaLog(sub, IPP_KEY, label, uuid, coords ? { coords } : undefined);
+        if (coords) ippCoordsCache.value = coords;
+        await Promise.all([loadAreas(sub), loadFeatures()]);
         status.value = `Set ${label} on ${activeMission.value.name}.`;
     } catch (err) {
         statusError.value = true;
@@ -1282,6 +1379,16 @@ const canPushCustomLpb = computed(() => {
     return validCustomRanges.value.length > 0;
 });
 const canPushTheoretical = computed(() => !!ippCenter.value && theoreticalMiles.value > 0);
+const theoreticalBlockReason = computed(() => {
+    if (canPushTheoretical.value) return '';
+    if (!ippCenter.value && stepDone.value.ipp) {
+        return 'IPP is set but its coordinates are not on the map yet — re-set the IPP or Refresh map objects.';
+    }
+    if (timeMissing.value && timeReportedMissing.value && elapsedHours.value <= 0) {
+        return 'Time Missing must be before Time Reported Missing.';
+    }
+    return '';
+});
 
 /** Push (or update) a ring feature AND its referencing log entry. */
 async function upsertRing(
