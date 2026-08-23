@@ -30,6 +30,7 @@ export function createOpPeriodGateway(): OpPeriodGateway {
                     group: op.channels,
                     description: op.description ?? '',
                     defaultRole: 'MISSION_SUBSCRIBER',
+                    keywords: op.keywords ?? [],
                 },
             });
             if (res.error) throw new Error(res.error.message);

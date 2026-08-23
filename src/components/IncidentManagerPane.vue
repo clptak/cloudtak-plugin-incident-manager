@@ -125,6 +125,7 @@ import {
     NAV_SECTIONS,
     sectionKeyForNavItem,
 } from '../lib/incidentNav.ts';
+import { SEARCH_ONLY_HTAB_KEYS } from '../lib/incidentType.ts';
 import { useIncident } from '../composables/useIncident.ts';
 
 const CreateOpenPane = defineAsyncComponent(() => import('./panes/CreateOpenPane.vue'));
@@ -181,20 +182,23 @@ const hTabs = [
     { key: 'risk-assessment', label: 'Risk Assessment' },
 ] as const;
 
-const hTabOptions = hTabs.map((tab) => ({
-    value: tab.key,
-    label: tab.label,
-}));
-
 const {
     activeKey,
     activeHTab,
     activeMission,
+    isSearchIncident,
     selectHTabGuarded,
     openNoMissionModal,
     isMissionRequiredView,
     restoreActiveMissionOnMap,
 } = useIncident();
+
+const hTabOptions = computed(() => hTabs
+    .filter((tab) => isSearchIncident.value || !SEARCH_ONLY_HTAB_KEYS.has(tab.key))
+    .map((tab) => ({
+        value: tab.key,
+        label: tab.label,
+    })));
 
 const sectionExpanded = ref(loadSectionExpandedFromSession());
 

@@ -743,6 +743,7 @@ import Subscription from '../../../../../../src/base/subscription.ts';
 import { flyToFeature } from '../../../lib/flyToFeature.ts';
 import { areaSqMi, formatSqMi } from '../../../lib/geometryArea.ts';
 import { loadSchemaSubscription, schemaMission } from '../../../lib/incidentSubscription.ts';
+import { incidentTypeKeyword, parseIncidentTypeFromRecord } from '../../../lib/incidentType.ts';
 import { deletePolygonFromMission, pushPolygonToMission } from '../../../lib/missionFeatures.ts';
 import { carveSegmentRemainder } from '../../../lib/segmentSplit.ts';
 import {
@@ -895,7 +896,13 @@ async function onOpenOp(): Promise<void> {
     try {
         const entry = await openOperationalPeriod(
             { registry: createRegistryStore(mission), gateway },
-            { incidentName: mission.name, channels: opChannels.value },
+            {
+                incidentName: mission.name,
+                channels: opChannels.value,
+                keywords: mission.incidentType
+                    ? [incidentTypeKeyword(mission.incidentType)]
+                    : undefined,
+            },
         );
         await ensureOpOverlay(entry);
         // The new OP becomes the working mission: clues/logs land there by default.
@@ -962,14 +969,13 @@ async function makeMapActive(guid: string, label: string): Promise<void> {
 async function incidentCategory(): Promise<string> {
     const mission = activeMission.value;
     if (!mission) return 'search';
+    if (mission.incidentType) return mission.incidentType;
     try {
         const sub = await Subscription.load(mission.guid, {
             missiontoken: mission.missionToken ?? '',
             reload: false,
         });
-        const keywords = (sub.meta as { keywords?: string[] }).keywords ?? [];
-        const tag = keywords.find((k) => k.startsWith('incidentType:'));
-        return tag ? tag.slice('incidentType:'.length) : 'search';
+        return parseIncidentTypeFromRecord(sub) || 'search';
     } catch {
         return 'search';
     }

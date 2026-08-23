@@ -47,12 +47,12 @@
 </template>
 
 <script setup lang='ts'>
+import { computed } from 'vue';
 import NavSectionHeader from './NavSectionHeader.vue';
 import NavHelpButton from './NavHelpButton.vue';
 import {
     CREATE_OPEN_NAV,
-    NAV_SECTIONS,
-    type NavSection,
+    visibleNavSections,
 } from '../lib/incidentNav.ts';
 import { useIncident } from '../composables/useIncident.ts';
 
@@ -68,9 +68,8 @@ const emit = defineEmits<{
 }>();
 
 const createOpenNav = CREATE_OPEN_NAV;
-const navSections: NavSection[] = NAV_SECTIONS;
-
-const { selectKeyGuarded } = useIncident();
+const { selectKeyGuarded, isSearchIncident } = useIncident();
+const navSections = computed(() => visibleNavSections(isSearchIncident.value));
 
 function onSelect(key: string): void {
     selectKeyGuarded(key);

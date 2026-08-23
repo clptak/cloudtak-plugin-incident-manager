@@ -32,6 +32,7 @@ export async function openOperationalPeriod(
         /** Channels for the OP sync — field + management (decision 3). */
         channels: string[];
         description?: string;
+        keywords?: string[];
     },
 ): Promise<OpPeriodRegistryEntry> {
     const incidentName = input.incidentName.trim();
@@ -46,6 +47,7 @@ export async function openOperationalPeriod(
         opNumber,
         channels: input.channels,
         description: input.description,
+        keywords: input.keywords,
     });
 
     const registered: OpPeriodRegistryEntry = {

@@ -1,6 +1,14 @@
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useMapStore } from '../../../../src/stores/map.ts';
 import OverlayManager from '../../../../src/base/overlay.ts';
+import Subscription from '../../../../src/base/subscription.ts';
+import {
+    isSearchIncidentType,
+    parseIncidentTypeFromRecord,
+    SEARCH_ONLY_HTAB_KEYS,
+    SEARCH_ONLY_NAV_KEYS,
+} from '../lib/incidentType.ts';
+import { resolveIncidentTypeFromFamily } from '../lib/incidentTypeResolve.ts';
 
 /**
  * Shared, app-wide state for the Incident Manager plugin.
@@ -29,6 +37,8 @@ export interface ActiveMission {
      * before the dual-sync model — schema I/O then falls back to the main sync.
      */
     mgmt?: MissionRef;
+    /** Canonical incident type slug from mission keywords (e.g. `search`, `rescue`). */
+    incidentType?: string;
 }
 
 export interface PaneNavState {
@@ -148,6 +158,7 @@ function loadMissionFromSession(): ActiveMission | null {
                     : (typeof m.token === 'string' ? m.token : undefined),
                 token: typeof m.token === 'string' ? m.token : undefined,
                 mgmt,
+                incidentType: typeof m.incidentType === 'string' ? m.incidentType : undefined,
             };
         }
     } catch {
@@ -172,6 +183,14 @@ const activeMission = ref<ActiveMission | null>(loadMissionFromSession());
 const savedNav = loadNavFromSession();
 const activeKey = ref(savedNav.activeKey);
 const activeHTab = ref(savedNav.activeHTab);
+/** Create Mission dropdown while no mission is active. */
+const draftIncidentType = ref('');
+
+const effectiveIncidentType = computed(() => {
+    if (activeMission.value) return activeMission.value.incidentType ?? '';
+    return draftIncidentType.value;
+});
+const isSearchIncident = computed(() => isSearchIncidentType(effectiveIncidentType.value));
 
 const MISSION_EXEMPT_NAV_KEYS = new Set(['create-open']);
 
@@ -205,7 +224,24 @@ function requireActiveMission(): boolean {
     return false;
 }
 
+function bounceHiddenSearchViews(): void {
+    if (isSearchIncident.value) return;
+    let key = activeKey.value;
+    let htab = activeHTab.value;
+    if (SEARCH_ONLY_HTAB_KEYS.has(htab)) htab = 'main';
+    if (SEARCH_ONLY_NAV_KEYS.has(key)) {
+        key = 'create-open';
+        htab = 'main';
+    }
+    if (key !== activeKey.value) activeKey.value = key;
+    if (htab !== activeHTab.value) activeHTab.value = htab;
+}
+
 function selectKeyGuarded(key: string): void {
+    if (!isSearchIncident.value && SEARCH_ONLY_NAV_KEYS.has(key)) {
+        selectKey('create-open');
+        return;
+    }
     if (activeMission.value || !isMissionRequiredView(key, 'main')) {
         selectKey(key);
         return;
@@ -214,6 +250,10 @@ function selectKeyGuarded(key: string): void {
 }
 
 function selectHTabGuarded(htab: string): void {
+    if (!isSearchIncident.value && SEARCH_ONLY_HTAB_KEYS.has(htab)) {
+        activeHTab.value = 'main';
+        return;
+    }
     if (activeMission.value || !isMissionRequiredView(activeKey.value, htab)) {
         activeHTab.value = htab;
         return;
@@ -234,10 +274,19 @@ watch(activeMission, (m) => {
     if (m) closeNoMissionModal();
 });
 
+watch(isSearchIncident, () => {
+    bounceHiddenSearchViews();
+}, { immediate: true });
+
 export function useIncident() {
     function setActiveMission(m: ActiveMission | null): void {
         activeMission.value = m;
         saveMissionToSession(m);
+        bounceHiddenSearchViews();
+    }
+
+    function setDraftIncidentType(type: string): void {
+        draftIncidentType.value = type;
     }
 
     /** Re-attach map overlay + active mission after pane reopen or page reload. */
@@ -260,8 +309,33 @@ export function useIncident() {
         const sub = await mapStore.loadMission(m.guid);
         if (sub) await mapStore.makeActiveMission(sub);
 
-        if (sub?.missiontoken && sub.missiontoken !== m.missionToken) {
-            setActiveMission({ ...m, missionToken: sub.missiontoken });
+        const nextToken = sub?.missiontoken && sub.missiontoken !== m.missionToken
+            ? sub.missiontoken
+            : m.missionToken;
+        let parsedType = m.incidentType;
+        if (!parsedType) {
+            parsedType = parseIncidentTypeFromRecord(sub);
+            if (!parsedType) {
+                try {
+                    const loaded = await Subscription.load(m.guid, {
+                        missiontoken: nextToken ?? m.token ?? '',
+                        reload: false,
+                    });
+                    parsedType = parseIncidentTypeFromRecord(loaded);
+                } catch {
+                    parsedType = '';
+                }
+            }
+            if (!parsedType) {
+                parsedType = await resolveIncidentTypeFromFamily(m.name);
+            }
+        }
+        if (nextToken !== m.missionToken || parsedType !== m.incidentType) {
+            setActiveMission({
+                ...m,
+                missionToken: nextToken,
+                incidentType: parsedType,
+            });
         }
     }
 
@@ -271,7 +345,10 @@ export function useIncident() {
         activeHTab,
         casieExpandRequested,
         noMissionModalOpen,
+        isSearchIncident,
+        effectiveIncidentType,
         setActiveMission,
+        setDraftIncidentType,
         selectKey,
         selectKeyGuarded,
         selectHTabGuarded,

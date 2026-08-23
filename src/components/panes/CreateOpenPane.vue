@@ -381,7 +381,7 @@ import { createCaltopoMap, caltopoAvailable } from '../../lib/caltopo.ts';
 import { useIncident } from '../../composables/useIncident.ts';
 
 const mapStore = useMapStore();
-const { setActiveMission } = useIncident();
+const { setActiveMission, setDraftIncidentType, activeMission } = useIncident();
 
 type CreateOpenCard = 'create' | 'open';
 const expandedCard = ref<CreateOpenCard | null>(null);
@@ -483,6 +483,10 @@ const form = reactive({
     createCaltopo: false,
 });
 
+if (!form.incidentType && activeMission.value?.incidentType) {
+    form.incidentType = activeMission.value.incidentType;
+}
+
 const loading = ref(false);
 const status = ref('');
 const statusError = ref(false);
@@ -498,15 +502,19 @@ const templateCardEls = ref<(HTMLElement | null)[]>([]);
 const caltopoReady = computed(() => caltopoAvailable());
 
 const showSubjectType = computed(() =>
-    ['search', 'rescue', 'recovery', 'other'].includes(form.incidentType)
+    ['search', 'rescue', 'recovery', 'other'].includes(resolvedIncidentType())
 );
+
+function resolvedIncidentType(): string {
+    return form.incidentType || activeMission.value?.incidentType || '';
+}
 
 const parsedCoords = computed(() => parseCoordinates(form.coords));
 
 const derivedName = computed(() => buildMissionName({
     activityNumber: form.activityNumber,
     date: form.date,
-    incidentType: form.incidentType,
+    incidentType: resolvedIncidentType(),
     subjectType: showSubjectType.value ? form.subjectType : '',
     locationInfo: form.locationInfo,
 }));
@@ -519,7 +527,8 @@ const finalName = computed(() => {
 function buildKeywords(): string[] {
     const kw: string[] = [];
     if (form.activityNumber) kw.push(`activityNumber:${form.activityNumber}`);
-    if (form.incidentType) kw.push(`incidentType:${form.incidentType}`);
+    const type = resolvedIncidentType();
+    if (type) kw.push(`incidentType:${type}`);
     if (showSubjectType.value && form.subjectType) kw.push(`subjectType:${form.subjectType}`);
     if (form.operationalPeriod) kw.push(`operationalPeriod:${form.operationalPeriod}`);
     if (parsedCoords.value) kw.push(`coords:${parsedCoords.value.lat},${parsedCoords.value.lng}`);
@@ -536,6 +545,10 @@ watch(selectedTemplate, (newId) => {
     const template = templates.value.find((t) => t.id === newId);
     templateKeywords.value = template?.keywords ? [...template.keywords] : [];
 });
+
+watch(() => form.incidentType, (type) => {
+    setDraftIncidentType(type);
+}, { immediate: true });
 
 watch(templates, () => {
     templateCardEls.value = [];
@@ -709,6 +722,7 @@ async function createMission(): Promise<void> {
             name: res.data.name,
             missionToken: res.data.token,
             mgmt,
+            incidentType: resolvedIncidentType() || undefined,
         });
 
         status.value = mgmt

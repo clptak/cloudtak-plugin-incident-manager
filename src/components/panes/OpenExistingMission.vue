@@ -114,6 +114,11 @@ import { useMapStore } from '../../../../../src/stores/map.ts';
 import OverlayManager from '../../../../../src/base/overlay.ts';
 import Subscription from '../../../../../src/base/subscription.ts';
 import { useIncident } from '../../composables/useIncident.ts';
+import {
+    isSameIncidentFamily,
+    parseIncidentTypeFromRecord,
+} from '../../lib/incidentType.ts';
+import { resolveIncidentTypeFromFamily } from '../../lib/incidentTypeResolve.ts';
 
 const mapStore = useMapStore();
 const { activeMission, setActiveMission } = useIncident();
@@ -162,6 +167,7 @@ async function openMission(mission: Mission, usePassword = false): Promise<void>
     openingGuid.value = mission.guid;
     try {
         let fetchedToken: string | undefined;
+        let incidentType = parseIncidentTypeFromRecord(mission);
         passwordErrors.value[mission.guid] = undefined;
 
         // Always fetch a fresh server token on open. Local/overlay tokens can be
@@ -172,6 +178,7 @@ async function openMission(mission: Mission, usePassword = false): Promise<void>
                 : undefined;
             const getMission = await fetchMission(mission, password);
             fetchedToken = getMission.token || undefined;
+            incidentType = parseIncidentTypeFromRecord(getMission) || incidentType;
         } catch (err) {
             if (mission.passwordProtected) {
                 passwordErrors.value[mission.guid] = err instanceof Error && err.message.includes('Illegal attempt to access mission')
@@ -198,15 +205,27 @@ async function openMission(mission: Mission, usePassword = false): Promise<void>
         // Persist the fresh token into the local subscription DB without a full
         // layer refresh (reload:true was failing open for stale tokens).
         if (fetchedToken) {
-            await Subscription.load(mission.guid, {
+            const loaded = await Subscription.load(mission.guid, {
                 missiontoken: fetchedToken,
                 subscribed: true,
                 reload: false,
             });
+            if (!incidentType) incidentType = parseIncidentTypeFromRecord(loaded);
         }
 
         const sub = await mapStore.loadMission(mission.guid);
         if (sub) await mapStore.makeActiveMission(sub);
+        if (!incidentType) incidentType = parseIncidentTypeFromRecord(sub);
+        if (
+            !incidentType
+            && activeMission.value?.incidentType
+            && isSameIncidentFamily(activeMission.value.name, mission.name)
+        ) {
+            incidentType = activeMission.value.incidentType;
+        }
+        if (!incidentType) {
+            incidentType = await resolveIncidentTypeFromFamily(mission.name);
+        }
 
         const finalToken = fetchedToken || sub?.missiontoken || undefined;
 
@@ -257,6 +276,7 @@ async function openMission(mission: Mission, usePassword = false): Promise<void>
             missionToken: finalToken,
             token: finalToken,
             mgmt,
+            incidentType,
         });
 
         delete missionPasswords.value[mission.guid];
