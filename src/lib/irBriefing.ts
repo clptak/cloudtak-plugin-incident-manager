@@ -1,7 +1,7 @@
 /** IR Briefing form model and mission data loading. */
 
 import Subscription from '../../../../src/base/subscription.ts';
-import { formatCoordPair } from '../../../../src/base/utils/coordinateFormat.ts';
+import { formatCoordPair } from '../../../../src/utils/coordinateFormat.ts';
 import type { ActiveMission } from '../composables/useIncident.ts';
 import { parseCoordinates } from './coords.ts';
 import { loadSchemaSubscription } from './incidentSubscription.ts';
