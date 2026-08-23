@@ -1,5 +1,6 @@
 <template>
     <TaskbarChipButton
+        v-if='isSearchIncident'
         :icon='IconSearch'
         label='Clues'
         title='Open Clue Log'
@@ -13,7 +14,7 @@ import TaskbarChipButton from './TaskbarChipButton.vue';
 import { openDesktopPane } from '../lib/floatMinimize.ts';
 import { useIncident } from '../composables/useIncident.ts';
 
-const { selectHTabGuarded } = useIncident();
+const { selectHTabGuarded, isSearchIncident } = useIncident();
 
 function openClueLog(): void {
     openDesktopPane();

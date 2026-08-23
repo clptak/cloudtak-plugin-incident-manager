@@ -65,6 +65,23 @@ test('openOperationalPeriod: numbers, names, registers, keeps owner token', asyn
     assert.equal(registry.entries[1].guid, 'guid-2');
 });
 
+test('openOperationalPeriod: forwards incident type keywords', async () => {
+    const registry = fakeRegistry();
+    const gateway = fakeGateway();
+    await openOperationalPeriod({ registry, gateway, now: NOW }, {
+        incidentName: 'X',
+        channels: ['a'],
+        keywords: ['incidentType:search'],
+    });
+    assert.deepEqual(gateway.calls[0].args[0], {
+        name: 'X - OP1',
+        opNumber: 1,
+        channels: ['a'],
+        description: undefined,
+        keywords: ['incidentType:search'],
+    });
+});
+
 test('openOperationalPeriod: validates inputs', async () => {
     const deps = { registry: fakeRegistry(), gateway: fakeGateway() };
     await assert.rejects(() => openOperationalPeriod(deps, { incidentName: ' ', channels: ['a'] }));

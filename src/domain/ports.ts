@@ -20,6 +20,8 @@ export interface OpPeriodGateway {
         opNumber: number;
         channels: string[];
         description?: string;
+        /** Copied from the parent incident so OP syncs keep the same chrome. */
+        keywords?: string[];
     }): Promise<OpPeriodRegistryEntry>;
     /** Promote/demote one subscriber (check-in / OP close). */
     setSubscriberRole(op: OpPeriodRegistryEntry, subscriber: {

@@ -54,6 +54,7 @@
                 @click='openSection("work-assignments")'
             />
             <TaskbarChipButton
+                v-if='isSearchIncident'
                 :icon='IconPolygon'
                 label='Segments'
                 title='Open Segmentation'
@@ -77,7 +78,7 @@ import IncidentManagerPane from '../IncidentManagerPane.vue';
 import TaskbarChipButton from '../TaskbarChipButton.vue';
 import { useIncident } from '../../composables/useIncident.ts';
 
-const { selectKeyGuarded } = useIncident();
+const { selectKeyGuarded, isSearchIncident } = useIncident();
 
 /**
  * Popout-local minimize state: independent of the main window's floatMinimize

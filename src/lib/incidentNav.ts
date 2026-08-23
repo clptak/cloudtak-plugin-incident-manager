@@ -1,9 +1,12 @@
 import type { NavSectionHelpKey } from './navSectionHelp.ts';
+import { SEARCH_ONLY_NAV_KEYS } from './incidentType.ts';
 
 export interface NavSectionItem {
     key: string;
     label: string;
     helpKey?: NavSectionHelpKey;
+    /** Hide unless the active incident type is `search`. */
+    searchOnly?: boolean;
 }
 
 export interface NavSection {
@@ -26,8 +29,8 @@ export const NAV_SECTIONS: NavSection[] = [
         items: [
             { key: 'initial-information', label: 'Initial Information' },
             { key: 'subject-info', label: 'Subject Information' },
-            { key: 'search-urgency', label: 'Search Urgency' },
-            { key: 'search-scenarios', label: 'Search Scenarios' },
+            { key: 'search-urgency', label: 'Search Urgency', searchOnly: true },
+            { key: 'search-scenarios', label: 'Search Scenarios', searchOnly: true },
             { key: 'ir-briefing', label: 'IR Briefing' },
             { key: 'incident-post', label: 'Incident POST' },
             { key: 'resources', label: 'Resources' },
@@ -39,9 +42,9 @@ export const NAV_SECTIONS: NavSection[] = [
         key: 'h-search-transition',
         label: 'Search Transition',
         items: [
-            { key: 'search-area', label: 'Search Area', helpKey: 'establishing-search-area' },
-            { key: 'segmentation', label: 'Segmentation', helpKey: 'segmenting-search-area' },
-            { key: 'initial-consensus', label: 'Initial Consensus', helpKey: 'initial-consensus' },
+            { key: 'search-area', label: 'Search Area', helpKey: 'establishing-search-area', searchOnly: true },
+            { key: 'segmentation', label: 'Segmentation', helpKey: 'segmenting-search-area', searchOnly: true },
+            { key: 'initial-consensus', label: 'Initial Consensus', helpKey: 'initial-consensus', searchOnly: true },
         ],
     },
     {
@@ -49,7 +52,7 @@ export const NAV_SECTIONS: NavSection[] = [
         label: 'Area Search',
         helpKey: 'area-search',
         items: [
-            { key: 'operational-periods', label: 'Operational Periods' },
+            { key: 'operational-periods', label: 'Operational Periods', searchOnly: true },
         ],
     },
     {
@@ -73,4 +76,15 @@ export function sectionKeyForNavItem(key: string): string | null {
         }
     }
     return null;
+}
+
+/** Drop search-only items (and empty section headers) when the incident is not Search. */
+export function visibleNavSections(isSearch: boolean): NavSection[] {
+    if (isSearch) return NAV_SECTIONS;
+    return NAV_SECTIONS
+        .map((section) => ({
+            ...section,
+            items: section.items.filter((item) => !item.searchOnly && !SEARCH_ONLY_NAV_KEYS.has(item.key)),
+        }))
+        .filter((section) => section.items.length > 0);
 }
