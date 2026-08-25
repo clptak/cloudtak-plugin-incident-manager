@@ -10,7 +10,7 @@
  * Support:
  * - Chrome / Edge: works.
  * - CloudTAK Desktop (Electron 40): the API exists, but the app's permission
- *   handler must allow the `fileSystem` permission (see docs/case-file-folder.md).
+ *   handler must allow the `fileSystem` permission (see docs-archive/case-file-folder.md).
  * - Firefox / Safari / mobile: unsupported — callers fall back to download.
  */
 

@@ -1,5 +1,5 @@
 /**
- * DataSync mission-folder helpers (see docs/mission-folders.md).
+ * DataSync mission-folder helpers (see docs-archive/mission-folders.md).
  *
  * Mission "folders" are UID-typed MissionLayers (CloudTAK Mission → Layers).
  *

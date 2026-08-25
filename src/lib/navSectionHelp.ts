@@ -1,12 +1,12 @@
-import areaSearchMd from '../../docs/area_search.md?raw';
-import routeAndLocationSearchMd from '../../docs/route_and_location_search.md?raw';
-import establishingSearchAreaMd from '../../docs/establishing_search_area_0_main.md?raw';
-import theoreticalSearchAreaMd from '../../docs/establishing_search_area_1_theoretical.md?raw';
-import statisticalSearchAreaMd from '../../docs/establishing_search_area_2_statistical.md?raw';
-import subjectiveSearchAreaMd from '../../docs/establishing_search_area_3_subjective.md?raw';
-import segmentingSearchAreaMd from '../../docs/segmenting.md?raw';
-import initialConsensusMd from '../../docs/consensus_summary.md?raw';
-import resourceSummaryMd from '../../docs/resource_summary.md?raw';
+import areaSearchMd from '../content/help/area_search.md?raw';
+import routeAndLocationSearchMd from '../content/help/route_and_location_search.md?raw';
+import establishingSearchAreaMd from '../content/help/establishing_search_area_0_main.md?raw';
+import theoreticalSearchAreaMd from '../content/help/establishing_search_area_1_theoretical.md?raw';
+import statisticalSearchAreaMd from '../content/help/establishing_search_area_2_statistical.md?raw';
+import subjectiveSearchAreaMd from '../content/help/establishing_search_area_3_subjective.md?raw';
+import segmentingSearchAreaMd from '../content/help/segmenting.md?raw';
+import initialConsensusMd from '../content/help/consensus_summary.md?raw';
+import resourceSummaryMd from '../content/help/resource_summary.md?raw';
 
 export type NavSectionHelpKey =
     | 'area-search'

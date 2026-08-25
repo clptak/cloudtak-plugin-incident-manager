@@ -1,8 +1,8 @@
 /**
  * Shared tactic risk assessments: GAR + Complacency + SPE Model respondents
  * keyed by assignment CoT uid (or `tactic:<uuid>`).
- * See docs/GARModelWorksheet_v20230103.pdf, docs/risk-assessment_complancy-model.md,
- * and docs/risk-assessment_spe-model.md.
+ * See docs-archive/GARModelWorksheet_v20230103.pdf, docs-archive/risk-assessment_complancy-model.md,
+ * and docs-archive/risk-assessment_spe-model.md.
  */
 
 import {
