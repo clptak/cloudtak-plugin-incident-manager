@@ -235,9 +235,9 @@ async function openMission(mission: Mission, usePassword = false): Promise<void>
         let mgmt: { guid: string; name: string; missionToken?: string } | undefined;
         try {
             const mgmtName = `${mission.name} - MGMT`;
-            const { data: mgmtData } = await server.GET('/api/marti/missions/{:name}', {
+            const { data: mgmtData } = await server.GET('/api/marti/missions/{:guid}', {
                 params: {
-                    path: { ':name': mgmtName },
+                    path: { ':guid': mgmtName },
                     query: { changes: false, logs: false },
                 },
             });
@@ -289,10 +289,10 @@ async function openMission(mission: Mission, usePassword = false): Promise<void>
 }
 
 async function fetchMission(mission: Mission, password?: string): Promise<Mission> {
-    const { data, error } = await server.GET('/api/marti/missions/{:name}', {
+    const { data, error } = await server.GET('/api/marti/missions/{:guid}', {
         params: {
             path: {
-                ':name': mission.guid
+                ':guid': mission.guid
             },
             query: {
                 password,

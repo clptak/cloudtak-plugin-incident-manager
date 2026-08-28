@@ -1,7 +1,7 @@
 /**
  * Complacency Model risk assessment (Craig E. Geis, California Training Institute).
  * Risk = Repetition (1-5) x Confidence (1-5) x Experience (1-4), max 100.
- * See docs/risk-assessment_complancy-model.md.
+ * See docs-archive/risk-assessment_complancy-model.md.
  */
 
 export interface FactorOption {

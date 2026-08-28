@@ -1,7 +1,7 @@
 /**
  * SPE Model risk assessment (Severity × Probability × Exposure).
  * Severity (1-5) × Probability (1-5) × Exposure (1-4), max 100.
- * See docs/risk-assessment_spe-model.md and Table 18.1 SPE Guidance Table.
+ * See docs-archive/risk-assessment_spe-model.md and Table 18.1 SPE Guidance Table.
  */
 
 import type { FactorOption, RiskBand, RiskLevel } from './complacencyRisk.ts';

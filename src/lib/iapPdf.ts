@@ -1,5 +1,5 @@
 /**
- * IAP generator: fills the official ICS AcroForm templates (docs/ → assets)
+ * IAP generator: fills the official ICS AcroForm templates (docs-archive/ → assets)
  * and merges them into one per-operational-period Incident Action Plan PDF.
  *
  * Each form is filled, flattened (values baked into page content so the

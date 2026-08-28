@@ -1,7 +1,7 @@
 /**
  * Application use cases for the OP lifecycle (Phase 3).
  * Pure orchestration over ports — no I/O, no framework imports.
- * Naming per docs/multi-op-datasync-architecture.md §4.3.
+ * Naming per docs-archive/multi-op-datasync-architecture.md §4.3.
  */
 
 import type { DebriefRecord, OpAssignment, OpPeriodRegistryEntry } from './entities.ts';

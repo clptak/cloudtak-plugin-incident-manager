@@ -1,6 +1,6 @@
 /**
  * Assemble per-operational-period IAP content from incident data and map it
- * onto the official ICS AcroForm field names (see docs/iap-template-fields.json).
+ * onto the official ICS AcroForm field names (see docs-archive/iap-template-fields.json).
  *
  * Sources: ICS-201 autofill (header, org roles, comms — already merges schema
  * + logs), Incident POST objectives, the OP assignment registry, the Resources

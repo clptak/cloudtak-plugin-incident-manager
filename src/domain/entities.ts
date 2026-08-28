@@ -14,7 +14,7 @@ export type OpStatus = 'open' | 'debriefing' | 'closed';
 
 /**
  * One entry of the incident registry persisted in the management sync's
- * mission_schema.json `tak_missions[]` (see docs/multi-op-datasync-architecture.md §3).
+ * mission_schema.json `tak_missions[]` (see docs-archive/multi-op-datasync-architecture.md §3).
  */
 export interface OpPeriodRegistryEntry {
     /** 1-based operational period number (0 = initial response / common map). */

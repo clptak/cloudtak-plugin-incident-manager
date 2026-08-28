@@ -3,40 +3,9 @@ skills/*
 node_modules/
 cloudtak-plugin-incident-manager
 .DS_Store
-docs/build-plan.md
-docs/ICS-234-CG-Work-Analysis-Matrix.pdf
-docs/Subject_form.html
-docs/Search Urgency Info Boxes.md
-docs/label-info-popup-pattern.md
-docs/incident-post-limits.md
-docs/WC4_Establishing_Search_Area.md
-docs/ics form 201_incident briefing_v3.pdf
-docs/Lost Person Form CCSO Fillable.pdf
-docs/Sign In Roster Form 062818 2.pdf
-docs/*.pdf
-docs/*.md
-!docs/area_search.md
-!docs/route_and_location_search.md
-!docs/establishing_search_area_0_main.md
-!docs/establishing_search_area_1_theoretical.md
-!docs/establishing_search_area_2_statistical.md
-!docs/establishing_search_area_3_subjective.md
-!docs/segmenting.md
-!docs/resource_summary.md
-!docs/consensus_summary.md
-docs/*.txt
+docs-archive/
 node sar-publications-scraper.js
-docs/attribution_example.html
-docs/publications.json
 skills/cloudtak-infra-analysis/SKILLS.md
-docs/CASIE_01.png
-docs/CASIE_02.png
-docs/CASIE_03.png
-docs/CASIE_04.png
-docs/GARModelWorksheet_v20230103.pdf
-docs/Sign In Roster Form 062818.pdf
-docs/Urgency Rating Chart.pdf
-docs/example_callnotes_one-period.txt
 CASIE_support/*
 FindEm-compressed.pdf
 ISMManual-Unlocked-unlocked-compressed.pdf
