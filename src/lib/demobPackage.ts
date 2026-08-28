@@ -61,9 +61,9 @@ async function fetchMissionArchive(
     token?: string,
 ): Promise<Uint8Array | null> {
     try {
-        const res = await server.GET('/api/marti/missions/{:name}/archive', {
+        const res = await server.GET('/api/marti/missions/{:guid}/archive', {
             params: {
-                path: { ':name': name },
+                path: { ':guid': name },
                 query: { format: 'zip', download: false },
             },
             headers: token ? { MissionAuthorization: token } : {},

@@ -830,8 +830,8 @@ function segmentLabel(uid: string): string {
 
 async function missionChannels(guid: string): Promise<string[]> {
     try {
-        const { data } = await server.GET('/api/marti/missions/{:name}', {
-            params: { path: { ':name': guid }, query: { changes: false, logs: false } },
+        const { data } = await server.GET('/api/marti/missions/{:guid}', {
+            params: { path: { ':guid': guid }, query: { changes: false, logs: false } },
         });
         const groups = (data as { groups?: string | string[] } | undefined)?.groups;
         if (Array.isArray(groups)) return groups;

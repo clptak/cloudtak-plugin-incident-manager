@@ -7,9 +7,9 @@ import {
 /** Load `incidentType:` from a named DataSync, or '' if missing / unreachable. */
 export async function fetchIncidentTypeByName(name: string): Promise<string> {
     try {
-        const { data } = await server.GET('/api/marti/missions/{:name}', {
+        const { data } = await server.GET('/api/marti/missions/{:guid}', {
             params: {
-                path: { ':name': name },
+                path: { ':guid': name },
                 query: { changes: false, logs: false },
             },
         });

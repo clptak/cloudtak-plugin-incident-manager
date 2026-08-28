@@ -114,9 +114,9 @@ export async function ensureMissionFolder(
         // continue — create via POST without a post-create refresh
     }
 
-    const { data, error } = await server.POST('/api/marti/missions/{:name}/layer', {
+    const { data, error } = await server.POST('/api/marti/missions/{:guid}/layer', {
         params: {
-            path: { ':name': sub.guid },
+            path: { ':guid': sub.guid },
         },
         headers: missionLayerHeaders(sub),
         body: {

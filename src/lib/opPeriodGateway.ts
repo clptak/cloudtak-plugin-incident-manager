@@ -47,8 +47,8 @@ export function createOpPeriodGateway(): OpPeriodGateway {
         },
 
         async setSubscriberRole(op, subscriber) {
-            const res = await server.PUT('/api/marti/missions/{:name}/role', {
-                params: { path: { ':name': op.name } },
+            const res = await server.PUT('/api/marti/missions/{:guid}/role', {
+                params: { path: { ':guid': op.name } },
                 headers: authHeaders(op),
                 body: {
                     clientUid: subscriber.clientUid,
@@ -60,8 +60,8 @@ export function createOpPeriodGateway(): OpPeriodGateway {
         },
 
         async listSubscribers(op) {
-            const res = await server.GET('/api/marti/missions/{:name}/subscriptions/roles', {
-                params: { path: { ':name': op.name } },
+            const res = await server.GET('/api/marti/missions/{:guid}/subscriptions/roles', {
+                params: { path: { ':guid': op.name } },
                 headers: authHeaders(op),
             });
             if (res.error) throw new Error(res.error.message);
@@ -82,8 +82,8 @@ export function createOpPeriodGateway(): OpPeriodGateway {
         },
 
         async setChannels(op, channels) {
-            const res = await server.PATCH('/api/marti/missions/{:name}', {
-                params: { path: { ':name': op.name } },
+            const res = await server.PATCH('/api/marti/missions/{:guid}', {
+                params: { path: { ':guid': op.name } },
                 headers: authHeaders(op),
                 body: { groups: channels },
             });
