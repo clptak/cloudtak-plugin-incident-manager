@@ -4,7 +4,12 @@
  * Adapters in src/lib implement them over the existing DataSync plumbing.
  */
 
-import type { DebriefRecord, OpAssignment, OpPeriodRegistryEntry } from './entities.ts';
+import type {
+    DebriefRecord,
+    OpAssignment,
+    OpPeriodRegistryEntry,
+    TrackLogRef,
+} from './entities.ts';
 
 /** Registry persistence on the management sync (tak_missions[] in schema). */
 export interface RegistryStore {
@@ -37,12 +42,42 @@ export interface OpPeriodGateway {
     }[]>;
     /** Strip field channels at OP close (volunteers lose visibility). */
     setChannels(op: OpPeriodRegistryEntry, channels: string[]): Promise<void>;
+    /**
+     * Ensure a named mission folder (UID-typed MissionLayer) exists on the OP
+     * sync; returns its layer uid. Idempotent — reuses a folder of that name.
+     */
+    ensureFolder(op: OpPeriodRegistryEntry, name: string): Promise<string>;
 }
 
 /** Debrief (POD) records for rollup — stored on the management sync. */
 export interface DebriefStore {
     load(): Promise<DebriefRecord[]>;
     append(record: DebriefRecord): Promise<void>;
+    /**
+     * Replace the track list on the record identified by `key`
+     * (see domain/trackLog.ts `debriefKey`). Throws when no record matches —
+     * silently dropping an attached track would strand a published CoT.
+     */
+    setTracks(key: string, tracks: TrackLogRef[]): Promise<void>;
+}
+
+/** A track ready to publish into an OP sync. */
+export interface TrackLogPayload {
+    callsign: string;
+    /** [lng, lat] pairs, already thinned. */
+    coords: [number, number][];
+    /** Existing CoT uid when re-filing a line already on the map. */
+    uid?: string;
+    remarks?: string;
+}
+
+/** Publish a GPS track into an OP sync's Track Logs folder; returns the uid. */
+export interface TrackLogPublisher {
+    publishTrack(
+        op: OpPeriodRegistryEntry,
+        folderUid: string,
+        track: TrackLogPayload,
+    ): Promise<string>;
 }
 
 /** Style carried from the source polygon so OP copies render identically. */

@@ -295,18 +295,48 @@ export function useIncident() {
         if (!m) return;
 
         if (!OverlayManager.loadedByMode('mission', m.guid)) {
-            await OverlayManager.createLoaded({
-                name: m.name,
-                url: `/mission/${encodeURIComponent(m.name)}`,
-                type: 'geojson',
-                mode: 'mission',
-                mode_id: m.guid,
-                token: m.missionToken ?? m.token,
-            });
+            try {
+                await OverlayManager.createLoaded({
+                    name: m.name,
+                    url: `/mission/${encodeURIComponent(m.name)}`,
+                    type: 'geojson',
+                    mode: 'mission',
+                    mode_id: m.guid,
+                    token: m.missionToken ?? m.token,
+                });
+            } catch (err) {
+                // `POST /api/profile/overlay` proxies a TAK mission subscribe,
+                // so it fails two quite different ways and the distinction
+                // matters when reading the console:
+                //  - timeout (core aborts every request at 20s, std.ts): the
+                //    API reached TAK but the subscribe was too slow. Usually
+                //    means the API is far from the TAK server (e.g. running
+                //    locally against a remote TAK) or the mission is large.
+                //  - 404: the remembered incident is genuinely gone.
+                // Either way this must NOT abort the restore — letting it throw
+                // leaves the pane mounted with no active mission and no
+                // explanation ("no missions get pulled up"). The overlay may
+                // also already exist server-side, in which case the mission
+                // load below still succeeds.
+                const detail = String(err instanceof Error ? err.message : err);
+                const cause = /timed out/i.test(detail)
+                    ? 'the request timed out — the API took too long to subscribe to the mission on TAK Server'
+                    : 'the remembered incident may no longer exist on this server';
+                console.warn(
+                    `Incident Manager: could not add the map overlay for "${m.name}" — ${cause}. `
+                    + 'Continuing to restore it.',
+                    err,
+                );
+            }
         }
 
         const mapStore = useMapStore();
-        const sub = await mapStore.loadMission(m.guid);
+        let sub;
+        try {
+            sub = await mapStore.loadMission(m.guid);
+        } catch (err) {
+            console.warn(`Incident Manager: could not load mission "${m.name}".`, err);
+        }
         if (sub) await mapStore.makeActiveMission(sub);
 
         const nextToken = sub?.missiontoken && sub.missiontoken !== m.missionToken
@@ -318,7 +348,7 @@ export function useIncident() {
             if (!parsedType) {
                 try {
                     const loaded = await Subscription.load(m.guid, {
-                        missiontoken: nextToken ?? m.token ?? '',
+                        missiontoken: (nextToken ?? m.token) || undefined,
                         reload: false,
                     });
                     parsedType = parseIncidentTypeFromRecord(loaded);

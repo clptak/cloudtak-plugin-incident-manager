@@ -256,7 +256,7 @@ async function openMission(mission: Mission, usePassword = false): Promise<void>
                     });
                 }
                 const mgmtSub = await Subscription.load(mgmtData.guid, {
-                    missiontoken: mgmtToken ?? '',
+                    missiontoken: mgmtToken || undefined,
                     subscribed: true,
                     reload: false,
                 });

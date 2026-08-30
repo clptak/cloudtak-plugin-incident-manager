@@ -46,6 +46,36 @@ export interface SegmentState {
     poa: number;
 }
 
+/**
+ * A GPS track log filed under an OP sync's "Track Logs" folder and bound to the
+ * completed search assignment it evidences.
+ *
+ * Reference + summary only (Paul, 2026-08-30): the polyline itself stays a CoT
+ * in the OP DataSync — a real shift track is thousands of fixes and would bloat
+ * the mission schema — but the numbers a reader needs (how far, how long, how
+ * many fixes) are carried here so the schema, and anything reading it
+ * standalone, can report coverage without resolving the mission archive.
+ */
+export interface TrackLogRef {
+    /** CoT uid of the LineString in the OP sync's Track Logs folder. */
+    uid: string;
+    /** Callsign shown on the map. */
+    name: string;
+    /** Source filename, or 'map' when picked from an existing line. */
+    source: string;
+    /** Vertices in the published line (after thinning). */
+    points: number;
+    /** Vertices in the original file, when thinning reduced it. */
+    sourcePoints?: number;
+    /** Track length in statute miles. */
+    lengthMi: number;
+    /** ISO timestamps of the first and last fix, when the source had them. */
+    startedAt?: string;
+    endedAt?: string;
+    /** ISO timestamp of attachment. */
+    attachedAt?: string;
+}
+
 /** POD reported at debrief for (a completed portion of) a segment in one OP. */
 export interface DebriefRecord {
     opNumber: number;
@@ -60,6 +90,8 @@ export interface DebriefRecord {
     coverage?: number;
     resource?: string;
     notes?: string;
+    /** GPS track logs evidencing this search. */
+    tracks?: TrackLogRef[];
     /** ISO timestamp. */
     recordedAt?: string;
 }

@@ -885,7 +885,7 @@ export async function loadIcs201FromMission(
         missionToken,
     };
 
-    const sub = await Subscription.load(missionGuid, { missiontoken: missionToken ?? '', reload: false });
+    const sub = await Subscription.load(missionGuid, { missiontoken: missionToken || undefined, reload: false });
     // Dual-sync incidents keep planning logs (objectives, ICS-201, org) on the
     // mgmt sync and field logs on the main sync — merge for the full picture.
     const logs = schemaTarget.mgmt
@@ -1108,7 +1108,7 @@ export async function saveIcs201ToMission(
     missionToken?: string,
 ): Promise<string> {
     syncObjectivesSnapshot(form);
-    const sub = await Subscription.load(missionGuid, { missiontoken: missionToken ?? '', reload: false });
+    const sub = await Subscription.load(missionGuid, { missiontoken: missionToken || undefined, reload: false });
     const body = {
         dtg: new Date().toISOString(),
         content: serializeIcs201Form(form),

@@ -139,6 +139,60 @@ export async function pushPolygonToMission(opts: {
 }
 
 /**
+ * Send a LineString (GPS track log, route) to a mission. `line` is an ordered
+ * array of [lng, lat]. Returns the feature id sent.
+ *
+ * `u-d-f` with a LineString geometry is the same CoT type CloudTAK's own line
+ * draw tool emits, so the track renders and edits like any drawn line.
+ */
+export async function pushLineToMission(opts: {
+    missionGuid: string;
+    missionToken?: string;
+    callsign: string;
+    line: [number, number][];
+    remarks?: string;
+    stroke?: string;
+    strokeWidth?: number;
+    id?: string;
+    /** Mission layer (folder) UID to file the CoT under on ingest. */
+    folderUid?: string;
+}): Promise<string> {
+    if (opts.line.length < 2) throw new Error('A track needs at least two points');
+
+    const now = new Date().toISOString();
+    const id = opts.id ?? uuid();
+    const line = opts.line.map(([lng, lat]) => [lng, lat] as [number, number]);
+    const mid = line[Math.floor(line.length / 2)];
+
+    const feat: Feature = {
+        id,
+        type: 'Feature',
+        path: '/',
+        properties: {
+            id,
+            type: 'u-d-f',
+            how: 'h-g-i-g-o',
+            callsign: opts.callsign,
+            center: plainCenter(mid),
+            time: now,
+            start: now,
+            stale: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365).toISOString(),
+            remarks: opts.remarks,
+            stroke: opts.stroke ?? '#00d1ff',
+            'stroke-opacity': 1,
+            'stroke-width': opts.strokeWidth ?? 3,
+            'stroke-style': 'solid',
+        },
+        geometry: {
+            type: 'LineString',
+            coordinates: line,
+        },
+    } as unknown as Feature;
+
+    return pushFeatureToMission(opts.missionGuid, feat, opts.missionToken, opts.folderUid);
+}
+
+/**
  * Send a single point marker to a mission. `point` is [lng, lat]. Returns the
  * feature id sent. Pass `id` to update an existing marker in place.
  */
