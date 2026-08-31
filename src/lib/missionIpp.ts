@@ -31,7 +31,7 @@ export async function resolveMissionIppLocation(
     missionToken?: string,
 ): Promise<string> {
     const sub = await Subscription.load(missionGuid, {
-        missiontoken: missionToken ?? '',
+        missiontoken: missionToken || undefined,
         reload: false,
     });
 

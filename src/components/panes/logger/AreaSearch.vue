@@ -704,14 +704,206 @@
                     <div
                         v-for='(d, i) in debriefs'
                         :key='i'
-                        class='small border-bottom py-1'
+                        class='border-bottom py-1'
                     >
-                        OP{{ d.opNumber }} · {{ segmentLabel(d.segmentUid) }} ·
-                        POD {{ d.pod }}%<span v-if='d.coverage !== undefined'> ({{ Math.round(d.coverage * 100) }}% completed)</span>
-                        <span
-                            v-if='d.resource'
-                            class='text-muted'
-                        > · {{ d.resource }}</span>
+                        <div class='small d-flex align-items-center gap-2'>
+                            <span>
+                                OP{{ d.opNumber }} · {{ segmentLabel(d.segmentUid) }} ·
+                                POD {{ d.pod }}%<span v-if='d.coverage !== undefined'> ({{ Math.round(d.coverage * 100) }}% completed)</span>
+                                <span
+                                    v-if='d.resource'
+                                    class='text-muted'
+                                > · {{ d.resource }}</span>
+                            </span>
+                            <button
+                                class='btn btn-link btn-sm p-0 ms-auto d-flex align-items-center gap-1'
+                                :disabled='trackBusy'
+                                title='Attach a GPS track log to this completed assignment'
+                                @click='toggleTrackPanel(d)'
+                            >
+                                <IconRoute
+                                    :size='16'
+                                    :stroke-width='2'
+                                />
+                                <span class='d-none d-md-inline'>Attach GPS Track Log</span>
+                            </button>
+                        </div>
+
+                        <!-- Attached tracks -->
+                        <div
+                            v-for='t in (d.tracks || [])'
+                            :key='t.uid'
+                            class='small text-muted d-flex align-items-center gap-2 ps-3'
+                        >
+                            <IconRoute
+                                :size='14'
+                                :stroke-width='2'
+                            />
+                            <span>
+                                {{ t.name }} · {{ t.lengthMi }} mi · {{ t.points }} pts<span
+                                    v-if='t.sourcePoints'
+                                > of {{ t.sourcePoints }}</span>
+                                <span v-if='t.startedAt'> · {{ shortDt(t.startedAt) }}</span>
+                            </span>
+                            <button
+                                class='btn btn-link btn-sm p-0 ms-auto'
+                                title='Center the map on this track'
+                                @click='flyToCandidate(t.uid)'
+                            >
+                                locate
+                            </button>
+                            <button
+                                class='btn btn-link btn-sm p-0 text-danger'
+                                :disabled='trackBusy'
+                                title='Remove the reference — the line stays in the OP sync'
+                                @click='onDetachTrack(d, t.uid)'
+                            >
+                                detach
+                            </button>
+                        </div>
+
+                        <!-- ── Attach panel — inline, map stays usable ──────── -->
+                        <div
+                            v-if='trackPanel && trackPanel.key === debriefKeyOf(d)'
+                            class='cloudtak-accent border border-info rounded-3 mt-2 mb-2 p-3'
+                        >
+                            <p class='text-uppercase text-info small mb-1'>
+                                Attach GPS Track Log — {{ trackPanel.label }}
+                            </p>
+                            <p
+                                v-if='!trackPanel.op'
+                                class='form-text mt-0 mb-0 text-warning'
+                            >
+                                OP{{ d.opNumber }} is not in the registry, so there is no
+                                DataSync to file a track into.
+                            </p>
+                            <template v-else>
+                                <p class='form-text mt-0 mb-2'>
+                                    Filed under the <strong>Track Logs</strong> folder in
+                                    {{ trackPanel.op.name }}.
+                                </p>
+
+                                <div class='row g-3'>
+                                    <div class='col-md-6'>
+                                        <label class='form-label'>Upload a file</label>
+                                        <input
+                                            type='file'
+                                            class='form-control form-control-sm'
+                                            :accept='TRACK_FILE_ACCEPT'
+                                            :disabled='trackBusy'
+                                            @change='onTrackFile'
+                                        >
+                                        <div class='form-text'>
+                                            GPX, KML, or GeoJSON. Multi-track files attach every
+                                            track; long tracks are thinned for the map and the
+                                            original fix count is kept.
+                                        </div>
+
+                                        <!-- Single-track file: name it before filing.
+                                             Handheld exports carry generic track names, and
+                                             one assignment often has several units out. -->
+                                        <div
+                                            v-if='pendingTrack'
+                                            class='mt-2'
+                                        >
+                                            <TablerInput
+                                                v-model='pendingTrack.callsign'
+                                                label='Track name'
+                                                :disabled='trackBusy'
+                                                @keyup.enter='onConfirmPendingTrack'
+                                            />
+                                            <div class='form-text'>
+                                                {{ pendingTrack.source }} ·
+                                                {{ pendingTrack.lengthMi }} mi ·
+                                                {{ pendingTrack.track.coords.length }} fixes<span
+                                                    v-if='pendingTrack.sourceName'
+                                                > · named "{{ pendingTrack.sourceName }}" in the file</span>
+                                            </div>
+                                            <div class='d-flex gap-2 mt-2'>
+                                                <button
+                                                    class='btn btn-primary btn-sm'
+                                                    :disabled='trackBusy || !pendingTrack.callsign.trim()'
+                                                    @click='onConfirmPendingTrack'
+                                                >
+                                                    {{ trackBusy ? 'Attaching…' : 'Attach track' }}
+                                                </button>
+                                                <button
+                                                    class='btn btn-link btn-sm'
+                                                    :disabled='trackBusy'
+                                                    @click='pendingTrack = null'
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class='col-md-6'>
+                                        <label class='form-label d-flex align-items-center'>
+                                            Or pick a line from the map
+                                            <button
+                                                class='btn btn-link btn-sm p-0 ms-auto'
+                                                :disabled='loadingTracks'
+                                                @click='loadTrackCandidates'
+                                            >
+                                                {{ loadingTracks ? 'Loading…' : 'Refresh' }}
+                                            </button>
+                                        </label>
+                                        <div
+                                            v-if='loadingTracks'
+                                            class='text-muted small'
+                                        >
+                                            Looking for lines…
+                                        </div>
+                                        <div
+                                            v-else-if='!trackCandidates.length'
+                                            class='text-muted small'
+                                        >
+                                            No unfiled lines found. Draw the track on the map,
+                                            then hit Refresh.
+                                        </div>
+                                        <div
+                                            v-for='c in trackCandidates'
+                                            :key='c.uid'
+                                            class='d-flex align-items-center gap-2 mb-1'
+                                        >
+                                            <button
+                                                class='btn btn-outline-primary btn-sm py-0'
+                                                :disabled='trackBusy'
+                                                @click='onAttachCandidate(c)'
+                                            >
+                                                Attach
+                                            </button>
+                                            <span class='small'>
+                                                {{ c.callsign }}
+                                                <span class='text-muted'>· {{ c.lengthMi }} mi · {{ c.source }}</span>
+                                            </span>
+                                            <button
+                                                class='btn btn-link btn-sm p-0 ms-auto'
+                                                title='Center map on this line'
+                                                @click.prevent='flyToCandidate(c.uid)'
+                                            >
+                                                locate
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <div class='d-flex align-items-center gap-2 mt-2'>
+                                <span
+                                    v-if='trackBusy'
+                                    class='text-muted small'
+                                >Publishing to the OP sync…</span>
+                                <button
+                                    class='btn btn-link btn-sm ms-auto'
+                                    :disabled='trackBusy'
+                                    @click='trackPanel = null'
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </TablerBorder>
@@ -721,6 +913,7 @@
 
 <script setup lang='ts'>
 import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { IconRoute } from '@tabler/icons-vue';
 import { TablerBorder, TablerInlineAlert, TablerInput } from '@tak-ps/vue-tabler';
 import OverlayManager from '../../../../../../src/base/overlay.ts';
 import { useMapStore } from '../../../../../../src/stores/map.ts';
@@ -730,12 +923,28 @@ import { useIncident } from '../../../composables/useIncident.ts';
 import type { DebriefRecord, OpAssignment, OpPeriodRegistryEntry } from '../../../domain/entities.ts';
 import { currentOpPeriod, nextOpNumber } from '../../../domain/registry.ts';
 import {
+    attachTrackLog,
     checkInSubscriber,
     closeOperationalPeriod,
+    detachTrackLog,
     openOperationalPeriod,
     publishAssignments,
     recordDebrief,
 } from '../../../domain/usecases.ts';
+import {
+    debriefKey,
+    trackLengthMiles,
+    trackLogCallsign,
+    type ParsedTrack,
+} from '../../../domain/trackLog.ts';
+import {
+    candidateToTrack,
+    createTrackLogPublisher,
+    listTrackCandidates,
+    readTrackFile,
+    TRACK_FILE_ACCEPT,
+    type TrackCandidate,
+} from '../../../lib/trackLogPersistence.ts';
 import { addClueToMission, CLUE_AUTHENTICITY_OPTIONS } from '../../../lib/cluePersistence.ts';
 import IapBuilder from './IapBuilder.vue';
 import { createDebriefStore } from '../../../lib/debriefPersistence.ts';
@@ -972,7 +1181,7 @@ async function incidentCategory(): Promise<string> {
     if (mission.incidentType) return mission.incidentType;
     try {
         const sub = await Subscription.load(mission.guid, {
-            missiontoken: mission.missionToken ?? '',
+            missiontoken: mission.missionToken || undefined,
             reload: false,
         });
         return parseIncidentTypeFromRecord(sub) || 'search';
@@ -1129,7 +1338,7 @@ async function loadCluePoints(): Promise<void> {
     if (!op) return;
     try {
         const sub = await Subscription.load(op.guid, {
-            missiontoken: op.ownerToken ?? '',
+            missiontoken: op.ownerToken || undefined,
             reload: false,
         });
         const feats = await sub.feature.list({ refresh: true }) as unknown as {
@@ -1264,7 +1473,7 @@ async function loadRemainderCandidates(): Promise<void> {
         for (const source of sources) {
             try {
                 const sub = await Subscription.load(source.guid, {
-                    missiontoken: source.token ?? '',
+                    missiontoken: source.token || undefined,
                     reload: false,
                 });
                 const feats = await sub.feature.list({ refresh: true }) as unknown as {
@@ -1442,6 +1651,202 @@ async function onSplitNo(): Promise<void> {
         error.value = err instanceof Error ? err.message : String(err);
     } finally {
         busy.value = false;
+    }
+}
+
+// ── GPS track logs ──────────────────────────────────────────────────────────
+// A track log is the breadcrumb trail behind a reported POD, so it hangs off
+// the completed assignment rather than floating on the map. Tracks are filed
+// into the OP sync's "Track Logs" folder (created with the OP), which means the
+// field sees their own coverage and the tracks travel with that OP's mission
+// archive in the demob package.
+
+const trackPublisher = createTrackLogPublisher();
+const trackPanel = ref<{
+    key: string;
+    label: string;
+    record: DebriefRecord;
+    op: OpPeriodRegistryEntry | undefined;
+} | null>(null);
+const trackCandidates = ref<TrackCandidate[]>([]);
+const loadingTracks = ref(false);
+const trackBusy = ref(false);
+/**
+ * A single-track file waiting on a name. Files with several tracks skip this
+ * and auto-name each one — naming five lines in a row is worse than the
+ * generic names it would fix.
+ */
+const pendingTrack = ref<{
+    track: ParsedTrack;
+    source: string;
+    sourceName: string;
+    lengthMi: number;
+    callsign: string;
+} | null>(null);
+
+/** Exposed to the template — records have no id, so identity is derived. */
+function debriefKeyOf(record: DebriefRecord): string {
+    return debriefKey(record);
+}
+
+function toggleTrackPanel(record: DebriefRecord): void {
+    const key = debriefKey(record);
+    if (trackPanel.value?.key === key) {
+        trackPanel.value = null;
+        return;
+    }
+    trackCandidates.value = [];
+    pendingTrack.value = null;
+    trackPanel.value = {
+        key,
+        label: `OP${record.opNumber} · ${segmentLabel(record.segmentUid)}`
+            + (record.resource ? ` · ${record.resource}` : ''),
+        record,
+        op: registry.value.find((o) => o.opNumber === record.opNumber),
+    };
+    void loadTrackCandidates();
+}
+
+async function loadTrackCandidates(): Promise<void> {
+    const mission = activeMission.value;
+    const panel = trackPanel.value;
+    if (!mission || !panel?.op) return;
+    loadingTracks.value = true;
+    try {
+        trackCandidates.value = await listTrackCandidates(mission, panel.op, debriefs.value);
+    } catch (err) {
+        error.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        loadingTracks.value = false;
+    }
+}
+
+/**
+ * Attach one or more parsed tracks to the panel's record, then reload the
+ * debrief list so the new references render. Each track is published and
+ * recorded in turn — a partial success leaves the earlier tracks attached,
+ * which is better than rolling back CoTs that already reached the field.
+ */
+async function attachTracks(
+    tracks: { track: ParsedTrack; existingUid?: string; callsign?: string }[],
+    source: string,
+): Promise<void> {
+    const mission = activeMission.value;
+    const panel = trackPanel.value;
+    if (!mission || !panel?.op) return;
+
+    trackBusy.value = true;
+    error.value = ''; notice.value = '';
+    try {
+        const deps = {
+            gateway,
+            publisher: trackPublisher,
+            debriefs: createDebriefStore(mission),
+        };
+        // Re-read the record: the panel captured it when it opened, and
+        // attaching a second track must build on the first, not replace it.
+        let record = panel.record;
+        const fresh = (await deps.debriefs.load()).find((r) => debriefKey(r) === panel.key);
+        if (fresh) record = fresh;
+
+        let attached = 0;
+        for (const [index, entry] of tracks.entries()) {
+            const trackRef = await attachTrackLog(deps, panel.op, record, {
+                track: entry.track,
+                source,
+                segmentLabel: segmentLabel(record.segmentUid),
+                callsign: entry.callsign,
+                existingUid: entry.existingUid,
+                index: index + 1,
+                total: tracks.length,
+            });
+            record = { ...record, tracks: [...(record.tracks ?? []), trackRef] };
+            attached += 1;
+        }
+
+        await refresh();
+        trackCandidates.value = [];
+        void loadTrackCandidates();
+        notice.value = `Attached ${attached} track${attached === 1 ? '' : 's'} to ${panel.label}.`;
+    } catch (err) {
+        error.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        trackBusy.value = false;
+    }
+}
+
+/**
+ * Parse the chosen file. A file holding exactly ONE track pauses for a name —
+ * handheld GPS units export generic names ("Track 001", "ACTIVE LOG 003"), and
+ * an assignment commonly has several tracks (one per unit carried) that have to
+ * be told apart on the map. Multi-track files attach straight through with
+ * derived names; naming each of five lines is worse than the problem.
+ */
+async function onTrackFile(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    const panel = trackPanel.value;
+    if (!file || !panel?.op) return;
+    pendingTrack.value = null;
+    error.value = '';
+    try {
+        const parsed = await readTrackFile(file);
+        if (parsed.length === 1) {
+            const track = parsed[0];
+            const record = debriefs.value.find((r) => debriefKey(r) === panel.key) ?? panel.record;
+            pendingTrack.value = {
+                track,
+                source: file.name,
+                sourceName: track.name,
+                lengthMi: Math.round(trackLengthMiles(track.coords) * 100) / 100,
+                // Seed with what we would have published anyway, then let it
+                // be rewritten however the manager wants.
+                callsign: trackLogCallsign({
+                    opNumber: panel.op.opNumber,
+                    segmentLabel: segmentLabel(record.segmentUid),
+                    resource: record.resource,
+                    sourceName: track.name,
+                }),
+            };
+            return;
+        }
+        await attachTracks(parsed.map((track) => ({ track })), file.name);
+    } catch (err) {
+        error.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        // Clear so re-selecting the same file fires `change` again.
+        input.value = '';
+    }
+}
+
+async function onConfirmPendingTrack(): Promise<void> {
+    const pending = pendingTrack.value;
+    if (!pending || !pending.callsign.trim()) return;
+    await attachTracks(
+        [{ track: pending.track, callsign: pending.callsign }],
+        pending.source,
+    );
+    pendingTrack.value = null;
+}
+
+async function onAttachCandidate(candidate: TrackCandidate): Promise<void> {
+    await attachTracks([candidateToTrack(candidate)], 'map');
+}
+
+async function onDetachTrack(record: DebriefRecord, uid: string): Promise<void> {
+    const mission = activeMission.value;
+    if (!mission) return;
+    trackBusy.value = true;
+    error.value = ''; notice.value = '';
+    try {
+        await detachTrackLog(createDebriefStore(mission), record, uid);
+        await refresh();
+        if (trackPanel.value) void loadTrackCandidates();
+        notice.value = 'Track detached. The line is still in the OP sync\'s Track Logs folder.';
+    } catch (err) {
+        error.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        trackBusy.value = false;
     }
 }
 

@@ -242,7 +242,11 @@ watch([activeKey, activeHTab], () => {
 });
 
 onMounted(() => {
-    void restoreActiveMissionOnMap();
+    // Floating promise: a restore failure must never stop the pane mounting,
+    // but it also must not vanish silently — surface it in the console.
+    restoreActiveMissionOnMap().catch((err) => {
+        console.warn('Incident Manager: restoring the last incident failed.', err);
+    });
 });
 </script>
 

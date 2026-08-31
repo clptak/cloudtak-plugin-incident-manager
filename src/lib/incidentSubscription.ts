@@ -118,7 +118,7 @@ export async function listAllIncidentLogs(mission: ActiveMission): Promise<Incid
     for (const op of registryGuids) {
         try {
             const opSub = await Subscription.load(op.guid, {
-                missiontoken: op.ownerToken ?? '',
+                missiontoken: op.ownerToken || undefined,
                 reload: false,
             });
             add(await opSub.log.list({ refresh: true }));

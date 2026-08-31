@@ -135,7 +135,7 @@ export async function listTrackedClues(
     for (const source of clueSources(mission, registry)) {
         try {
             const sub = await Subscription.load(source.guid, {
-                missiontoken: source.token ?? '',
+                missiontoken: source.token || undefined,
                 reload: false,
             });
             const logs = await sub.log.list({ refresh: true }) as LogLike[];
@@ -182,7 +182,7 @@ export async function createClueLog(
     entry: ClueLogEntry,
 ): Promise<void> {
     const sub = await Subscription.load(target.guid, {
-        missiontoken: target.token ?? '',
+        missiontoken: target.token || undefined,
         subscribed: true,
         reload: false,
     });
@@ -205,7 +205,7 @@ export async function updateClueLog(clue: TrackedClue, patch: {
         disposition: patch.disposition !== undefined ? patch.disposition : clue.disposition,
     };
     const sub = await Subscription.load(clue.sourceGuid, {
-        missiontoken: clue.sourceToken ?? '',
+        missiontoken: clue.sourceToken || undefined,
         reload: false,
     });
     await clueLogWriter(sub).update(clue.logId, {

@@ -8,9 +8,11 @@
  * - the owner token from create MUST be persisted (registry, Sworn-side).
  */
 
+import Subscription from '../../../../src/base/subscription.ts';
 import { server } from '../../../../src/std.ts';
 import type { OpPeriodRegistryEntry } from '../domain/entities.ts';
 import type { OpPeriodGateway } from '../domain/ports.ts';
+import { ensureMissionFolder } from './folder.ts';
 
 function authHeaders(op: OpPeriodRegistryEntry): Record<string, string> {
     return op.ownerToken ? { MissionAuthorization: op.ownerToken } : {};
@@ -88,6 +90,20 @@ export function createOpPeriodGateway(): OpPeriodGateway {
                 body: { groups: channels },
             });
             if (res.error) throw new Error(res.error.message);
+        },
+
+        async ensureFolder(op, name) {
+            // Mission folders are UID-typed MissionLayers. ensureMissionFolder
+            // needs a Subscription for its local layer cache, so load one with
+            // the OP owner token — the manager is not necessarily subscribed
+            // to the OP sync, and without the token the request rides the
+            // mission defaultRole (Phase 0 finding).
+            const sub = await Subscription.load(op.guid, {
+                missiontoken: op.ownerToken || undefined,
+                reload: false,
+            });
+            const layer = await ensureMissionFolder(sub, name);
+            return layer.uid;
         },
     };
 }

@@ -237,7 +237,7 @@ export async function publishIppToOp(
     let uid = '';
     try {
         const opSub = await Subscription.load(op.guid, {
-            missiontoken: op.ownerToken ?? '',
+            missiontoken: op.ownerToken || undefined,
             reload: false,
         });
         const opFeats = await opSub.feature.list({ refresh: true }) as unknown as PointFeatureLike[];
@@ -270,7 +270,7 @@ export async function publishIppToOp(
 async function verifyInMission(op: OpPeriodRegistryEntry, uid: string): Promise<boolean> {
     try {
         const sub = await Subscription.load(op.guid, {
-            missiontoken: op.ownerToken ?? '',
+            missiontoken: op.ownerToken || undefined,
             reload: false,
         });
         const feats = await sub.feature.list({ refresh: true }) as unknown as PolygonFeatureLike[];

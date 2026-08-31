@@ -4,7 +4,12 @@
  * Naming per docs-archive/multi-op-datasync-architecture.md §4.3.
  */
 
-import type { DebriefRecord, OpAssignment, OpPeriodRegistryEntry } from './entities.ts';
+import type {
+    DebriefRecord,
+    OpAssignment,
+    OpPeriodRegistryEntry,
+    TrackLogRef,
+} from './entities.ts';
 import type {
     AssignmentStore,
     DebriefStore,
@@ -12,8 +17,25 @@ import type {
     OpPeriodGateway,
     RegistryStore,
     SegmentGeometrySource,
+    TrackLogPublisher,
 } from './ports.ts';
 import { closeRegistryEntry, nextOpNumber, upsertRegistryEntry } from './registry.ts';
+import {
+    debriefKey,
+    MAX_TRACK_POINTS,
+    simplifyTrack,
+    trackLogCallsign,
+    trackMetrics,
+    withoutTrack,
+    withTrack,
+    type ParsedTrack,
+} from './trackLog.ts';
+
+/**
+ * Mission folder every OP sync carries for GPS breadcrumb trails. Created with
+ * the OP so it is already there when the first team debriefs.
+ */
+export const TRACK_LOG_FOLDER = 'Track Logs';
 
 export interface OpLifecycleDeps {
     registry: RegistryStore;
@@ -55,8 +77,30 @@ export async function openOperationalPeriod(
         status: 'open',
         openedAt: (deps.now?.() ?? new Date()).toISOString(),
     };
+
+    // Stand the Track Logs folder up now, while we hold the fresh owner token,
+    // so attaching a track at debrief time is one click rather than a create.
+    // A folder failure must not lose the OP: the sync exists and is registered
+    // either way, and ensureTrackLogFolder() re-tries on demand.
+    try {
+        await deps.gateway.ensureFolder(registered, TRACK_LOG_FOLDER);
+    } catch {
+        // Non-fatal — created lazily on first attach.
+    }
+
     await deps.registry.save(upsertRegistryEntry(entries, registered));
     return registered;
+}
+
+/**
+ * Get the OP's Track Logs folder, creating it if the OP predates this feature
+ * or the create-time attempt failed.
+ */
+export async function ensureTrackLogFolder(
+    gateway: OpPeriodGateway,
+    op: OpPeriodRegistryEntry,
+): Promise<string> {
+    return gateway.ensureFolder(op, TRACK_LOG_FOLDER);
 }
 
 /**
@@ -135,6 +179,113 @@ export async function recordDebrief(
         throw new Error('recordDebrief: coverage must be in (0, 1]');
     }
     await store.append(record);
+}
+
+export interface TrackLogDeps {
+    gateway: OpPeriodGateway;
+    publisher: TrackLogPublisher;
+    debriefs: DebriefStore;
+    now?: () => Date;
+}
+
+/**
+ * Attach a GPS track log to a completed search assignment.
+ *
+ * Order matters: publish into the OP sync FIRST, record in the schema SECOND.
+ * The reverse would let a schema write succeed against a CoT that never landed,
+ * leaving the case file claiming evidence that does not exist. A published CoT
+ * with no schema reference is the recoverable failure — it is visible on the
+ * map and can be re-attached from the picker.
+ */
+export async function attachTrackLog(
+    deps: TrackLogDeps,
+    op: OpPeriodRegistryEntry,
+    record: DebriefRecord,
+    input: {
+        track: ParsedTrack;
+        /** Filename, or 'map' when the line was picked off the map. */
+        source: string;
+        segmentLabel?: string;
+        /**
+         * Map callsign, used verbatim. Omit to derive one from OP, segment and
+         * resource. Handheld GPS exports carry generic track names ("Track
+         * 001"), so a single-track file is worth naming by hand — and one
+         * assignment often has several tracks (one per person carrying a unit)
+         * that need telling apart.
+         */
+        callsign?: string;
+        /** Reuse this CoT uid — set when re-filing a line already on the map. */
+        existingUid?: string;
+        /** 1-based position when one file yielded several tracks. */
+        index?: number;
+        total?: number;
+    },
+): Promise<TrackLogRef> {
+    if (input.track.coords.length < 2) {
+        throw new Error('attachTrackLog: a track needs at least two points');
+    }
+
+    const folderUid = await ensureTrackLogFolder(deps.gateway, op);
+    const metrics = trackMetrics(input.track);
+    const coords = simplifyTrack(input.track.coords, MAX_TRACK_POINTS);
+    const callsign = input.callsign?.trim() || trackLogCallsign({
+        opNumber: op.opNumber,
+        segmentLabel: input.segmentLabel,
+        resource: record.resource,
+        sourceName: input.track.name,
+        index: input.index,
+        total: input.total,
+    });
+
+    const remarks = [
+        `Track log · OP${op.opNumber}`,
+        input.segmentLabel ? `Segment ${input.segmentLabel}` : '',
+        record.resource ? `Resource ${record.resource}` : '',
+        `${metrics.lengthMi} mi · ${metrics.points} fixes`,
+        metrics.startedAt ? `${metrics.startedAt} → ${metrics.endedAt}` : '',
+        `Source: ${input.source}`,
+    ].filter(Boolean).join('\n');
+
+    const uid = await deps.publisher.publishTrack(op, folderUid, {
+        callsign,
+        coords,
+        uid: input.existingUid,
+        remarks,
+    });
+
+    const ref: TrackLogRef = {
+        uid,
+        name: callsign,
+        source: input.source,
+        points: coords.length,
+        lengthMi: metrics.lengthMi,
+        attachedAt: (deps.now?.() ?? new Date()).toISOString(),
+    };
+    if (coords.length !== metrics.points) ref.sourcePoints = metrics.points;
+    if (metrics.startedAt) ref.startedAt = metrics.startedAt;
+    if (metrics.endedAt) ref.endedAt = metrics.endedAt;
+
+    const updated = withTrack(record, ref);
+    await deps.debriefs.setTracks(debriefKey(record), updated.tracks ?? []);
+    return ref;
+}
+
+/**
+ * Drop a track reference from a completed assignment.
+ *
+ * The CoT is left in the OP sync's Track Logs folder on purpose: a track is a
+ * record of where people actually went, and deleting it from a live mission on
+ * a mis-click is not recoverable. Detaching returns it to the picker so it can
+ * be filed against the right assignment.
+ */
+export async function detachTrackLog(
+    store: DebriefStore,
+    record: DebriefRecord,
+    uid: string,
+): Promise<DebriefRecord> {
+    const updated = withoutTrack(record, uid);
+    await store.setTracks(debriefKey(record), updated.tracks ?? []);
+    return updated;
 }
 
 /**

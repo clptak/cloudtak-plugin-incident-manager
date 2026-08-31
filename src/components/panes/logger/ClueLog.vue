@@ -328,7 +328,7 @@ async function loadMarkers(): Promise<void> {
         for (const source of clueSources(mission, registry.value)) {
             try {
                 const sub = await Subscription.load(source.guid, {
-                    missiontoken: source.token ?? '',
+                    missiontoken: source.token || undefined,
                     reload: false,
                 });
                 const feats = await sub.feature.list({ refresh: true }) as unknown as {
