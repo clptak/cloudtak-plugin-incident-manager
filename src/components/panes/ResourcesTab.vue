@@ -561,8 +561,9 @@ const formEtaString = computed({
     get(): string {
         return form.value.eta == null ? '' : String(form.value.eta);
     },
-    set(raw: string): void {
-        form.value.eta = raw.trim() === '' || Number.isNaN(Number(raw)) ? null : Number(raw);
+    set(raw: string | number): void {
+        const s = String(raw);
+        form.value.eta = s.trim() === '' || Number.isNaN(Number(s)) ? null : Number(s);
     },
 });
 
@@ -692,9 +693,10 @@ async function onFieldChange(
     await updateAssignment(activeMission.value, id, { [field]: value });
 }
 
-async function onEtaChange(id: string, raw: string): Promise<void> {
+async function onEtaChange(id: string, raw: string | number): Promise<void> {
     if (!activeMission.value) return;
-    const eta = raw.trim() === '' || Number.isNaN(Number(raw)) ? null : Number(raw);
+    const s = String(raw);
+    const eta = s.trim() === '' || Number.isNaN(Number(s)) ? null : Number(s);
     await updateAssignment(activeMission.value, id, { eta });
 }
 
