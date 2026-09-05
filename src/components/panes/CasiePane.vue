@@ -650,9 +650,14 @@ const auditTrail = computed(() => {
         .map((e) => ({ text: e.text, when: trailWhen(e.at) }));
 });
 
-const canCompute = computed(() => draft.hypotheticals.some(
-    (h) => h.segmentUid && Number.isFinite(h.pod) && h.pod > 0,
-));
+// `DebriefRecord.pod` is optional incident-wide (non-search assignments report
+// no probability of detection), but a what-if hypothetical is CASIE-only and
+// meaningless without one — so it is required here specifically.
+function hasUsablePod(h: DebriefRecord): boolean {
+    return Boolean(h.segmentUid) && h.pod !== undefined && Number.isFinite(h.pod) && h.pod > 0;
+}
+
+const canCompute = computed(() => draft.hypotheticals.some(hasUsablePod));
 
 function fmt(value: number | undefined): string {
     return value === undefined ? '—' : value.toFixed(1);
@@ -669,8 +674,8 @@ function addHypothetical(): void {
 
 function validHypotheticals(): DebriefRecord[] {
     return draft.hypotheticals
-        .filter((h) => h.segmentUid && Number.isFinite(h.pod) && h.pod > 0)
-        .map((h) => ({ ...h, pod: Math.min(100, Math.max(0, h.pod)) }));
+        .filter(hasUsablePod)
+        .map((h) => ({ ...h, pod: Math.min(100, Math.max(0, h.pod ?? 0)) }));
 }
 
 function computeDraft(): void {

@@ -7,7 +7,9 @@ export const SEARCH_ONLY_NAV_KEYS = new Set<string>([
     'search-area',
     'segmentation',
     'initial-consensus',
-    'operational-periods',
+    // 'operational-periods' is deliberately NOT here: every incident type runs
+    // operational periods. POD and the CASIE rollup are the only search-specific
+    // parts, and they are gated inside the pane (Paul, 2026-08-30).
 ]);
 
 export const SEARCH_ONLY_HTAB_KEYS = new Set<string>([

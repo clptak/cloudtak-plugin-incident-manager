@@ -12,6 +12,8 @@ export interface NavSectionItem {
 export interface NavSection {
     key: string;
     label: string;
+    /** Heading used when the incident is not a search (defaults to `label`). */
+    nonSearchLabel?: string;
     helpKey?: NavSectionHelpKey;
     items: NavSectionItem[];
 }
@@ -50,9 +52,14 @@ export const NAV_SECTIONS: NavSection[] = [
     {
         key: 'h-area',
         label: 'Area Search',
+        // Every incident type runs operational periods — the OP DataSync
+        // lifecycle, assignments, rosters, track logs, IAPs and demob are all
+        // type-agnostic. Only POD and the CASIE rollup are search-specific, and
+        // those are gated inside the pane rather than by hiding it.
+        nonSearchLabel: 'Operations',
         helpKey: 'area-search',
         items: [
-            { key: 'operational-periods', label: 'Operational Periods', searchOnly: true },
+            { key: 'operational-periods', label: 'Operational Periods' },
         ],
     },
     {
@@ -84,6 +91,7 @@ export function visibleNavSections(isSearch: boolean): NavSection[] {
     return NAV_SECTIONS
         .map((section) => ({
             ...section,
+            label: section.nonSearchLabel ?? section.label,
             items: section.items.filter((item) => !item.searchOnly && !SEARCH_ONLY_NAV_KEYS.has(item.key)),
         }))
         .filter((section) => section.items.length > 0);

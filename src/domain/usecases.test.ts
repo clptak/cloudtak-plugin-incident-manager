@@ -142,9 +142,10 @@ test('publishAssignments: republishes polygons into the OP sync and records the 
     const published: { callsign: string; existingUid?: string }[] = [];
     const deps = {
         geometry: {
-            async getPolygon(uid: string) {
+            async getFeature(uid: string) {
                 if (uid === 'missing') return null;
                 return {
+                    kind: 'polygon' as const,
                     callsign: `Seg ${uid}`,
                     ring: [[0, 0], [0, 1], [1, 1], [0, 0]] as [number, number][],
                     center: [0.33, 0.66] as [number, number],
@@ -153,8 +154,8 @@ test('publishAssignments: republishes polygons into the OP sync and records the 
             },
         },
         publisher: {
-            async publishPolygon(_op: OpPeriodRegistryEntry, polygon: { callsign: string }, existingUid?: string) {
-                published.push({ callsign: polygon.callsign, existingUid });
+            async publishFeature(_op: OpPeriodRegistryEntry, feature: { callsign: string }, existingUid?: string) {
+                published.push({ callsign: feature.callsign, existingUid });
                 return existingUid ?? `op-feat-${published.length}`;
             },
         },
@@ -188,6 +189,85 @@ test('publishAssignments: republishes polygons into the OP sync and records the 
     await assert.rejects(() => publishAssignments(deps, op, { segmentUids: [] }));
     await assert.rejects(() => publishAssignments(deps, op, { segmentUids: ['missing'] }));
     await assert.rejects(() => publishAssignments(deps, { ...op, status: 'closed' }, { segmentUids: ['s1'] }));
+});
+
+test('recordDebrief: POD is optional (non-search incidents) but validated when given', async () => {
+    const store = fakeDebriefStore();
+    // No POD at all — a rescue/fire/disaster assignment reports what was
+    // worked, not how thoroughly.
+    await recordDebrief(store, { opNumber: 1, segmentUid: 'structure-7', label: '400 Main' });
+    assert.equal(store.records[0].pod, undefined);
+    assert.equal(store.records[0].label, '400 Main');
+    // Explicit 0 is still meaningful on a search and must survive.
+    await recordDebrief(store, { opNumber: 1, segmentUid: 's1', pod: 0 });
+    assert.equal(store.records[1].pod, 0);
+    // Nonsense is still rejected.
+    await assert.rejects(() => recordDebrief(store, { opNumber: 1, segmentUid: 's1', pod: 120 }));
+    await assert.rejects(() => recordDebrief(store, { opNumber: 1, segmentUid: 's1', pod: -1 }));
+});
+
+test('publishAssignments: tasks a point or a line, not just a polygon', async () => {
+    const op: OpPeriodRegistryEntry = {
+        opNumber: 1, name: 'Fire - OP1', guid: 'g1', status: 'open', channels: [],
+    };
+    const stored: OpAssignment[] = [];
+    const kinds: string[] = [];
+    const deps = {
+        geometry: {
+            async getFeature(uid: string) {
+                if (uid === 'structure-7') {
+                    return {
+                        kind: 'point' as const,
+                        callsign: '400 Main',
+                        point: [-105, 39] as [number, number],
+                        cotType: 'a-f-G-I',
+                        icon: 'structure.png',
+                    };
+                }
+                return {
+                    kind: 'line' as const,
+                    callsign: 'Hoseline A',
+                    line: [[-105, 39], [-105, 39.01]] as [number, number][],
+                    center: [-105, 39.005] as [number, number],
+                };
+            },
+        },
+        publisher: {
+            async publishFeature(
+                _op: OpPeriodRegistryEntry,
+                feature: { kind: string; callsign: string },
+                existingUid?: string,
+            ) {
+                kinds.push(feature.kind);
+                return existingUid ?? `op-feat-${kinds.length}`;
+            },
+        },
+        assignments: {
+            async load() { return [...stored]; },
+            async upsert(a: OpAssignment) { stored.push(a); },
+        },
+        now: NOW,
+    };
+
+    const result = await publishAssignments(deps, op, {
+        segmentUids: ['structure-7', 'hoseline-a'],
+        team: 'Engine 3',
+    });
+    assert.deepEqual(kinds, ['point', 'line']);
+    assert.equal(result[0].label, '400 Main');
+    assert.equal(result[1].label, 'Hoseline A');
+    assert.equal(result[0].team, 'Engine 3');
+});
+
+test('cumulativePod: a record with no POD contributes no detection credit', async () => {
+    const { cumulativePod } = await import('./rollup.ts');
+    // Non-search records should never reach the rollup, but if one does it must
+    // not poison the arithmetic with NaN.
+    assert.equal(cumulativePod([{ opNumber: 1, segmentUid: 's1' }]), 0);
+    assert.equal(
+        cumulativePod([{ opNumber: 1, segmentUid: 's1' }, { opNumber: 2, segmentUid: 's1', pod: 50 }]),
+        50,
+    );
 });
 
 test('openOperationalPeriod: stands up the Track Logs folder, but a folder failure does not lose the OP', async () => {

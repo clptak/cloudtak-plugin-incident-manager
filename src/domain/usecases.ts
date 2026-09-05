@@ -130,21 +130,21 @@ export async function publishAssignments(
     const existing = await deps.assignments.load();
     const published: OpAssignment[] = [];
     for (const segmentUid of input.segmentUids) {
-        const polygon = await deps.geometry.getPolygon(segmentUid);
-        if (!polygon) {
-            throw new Error(`publishAssignments: no polygon found for segment ${segmentUid}`);
+        const feature = await deps.geometry.getFeature(segmentUid);
+        if (!feature) {
+            throw new Error(`publishAssignments: no feature found for ${segmentUid}`);
         }
         // Republish reuses the prior feature uid — TAK updates in place instead
-        // of duplicating polygons on subscriber maps.
+        // of duplicating features on subscriber maps.
         const prior = existing.find(
             (a) => a.opNumber === op.opNumber && a.segmentUid === segmentUid,
         );
-        const opFeatureUid = await deps.publisher.publishPolygon(op, polygon, prior?.opFeatureUid);
+        const opFeatureUid = await deps.publisher.publishFeature(op, feature, prior?.opFeatureUid);
         const assignment: OpAssignment = {
             opNumber: op.opNumber,
             segmentUid,
             opFeatureUid,
-            label: polygon.callsign || segmentUid,
+            label: feature.callsign || segmentUid,
             createdAt: prior?.createdAt ?? (deps.now?.() ?? new Date()).toISOString(),
         };
         if (input.team?.trim()) assignment.team = input.team.trim();
@@ -171,7 +171,10 @@ export async function recordDebrief(
     record: DebriefRecord,
 ): Promise<void> {
     if (!record.segmentUid.trim()) throw new Error('recordDebrief: segmentUid required');
-    if (!Number.isFinite(record.pod) || record.pod < 0 || record.pod > 100) {
+    // POD is search-only. Absent is legal (non-search incidents report what was
+    // worked, not how thoroughly); present-but-nonsense is not.
+    if (record.pod !== undefined
+        && (!Number.isFinite(record.pod) || record.pod < 0 || record.pod > 100)) {
         throw new Error('recordDebrief: POD must be 0–100');
     }
     if (record.coverage !== undefined

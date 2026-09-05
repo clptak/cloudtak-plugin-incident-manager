@@ -342,36 +342,67 @@
                     </p>
                 </template>
 
-                <p class='text-muted small mb-2'>
-                    Publishing copies each segment polygon into {{ currentOp.name }} so
-                    volunteers receive it on their channel, and adds it to the running
-                    assignment list (the basis for this OP's IAP).
+                <p class='text-muted small mb-2 d-flex align-items-center gap-2'>
+                    <span>
+                        Publishing copies each {{ isSearchIncident ? 'segment polygon' : 'feature' }}
+                        into {{ currentOp.name }} so field personnel receive it on their
+                        channel, and adds it to the running assignment list (the basis
+                        for this OP's IAP).
+                    </span>
+                    <button
+                        v-if='!isSearchIncident'
+                        class='btn btn-link btn-sm p-0 ms-auto text-nowrap'
+                        :disabled='loadingTargets'
+                        @click='loadFeatureTargets'
+                    >
+                        {{ loadingTargets ? 'Loading…' : 'Refresh features' }}
+                    </button>
                 </p>
 
                 <div
-                    v-if='!segmentUids.length'
+                    v-if='!targets.length'
                     class='text-muted small'
                 >
-                    No segments registered. Draw and register segments in
-                    Search Transition → Segmentation first.
+                    <template v-if='isSearchIncident'>
+                        No segments registered. Draw and register segments in
+                        Search Transition → Segmentation first.
+                    </template>
+                    <template v-else>
+                        Nothing on the map to task yet. Draw or drop what this period is
+                        working — a structure marker, a division polygon, a road line —
+                        then hit Refresh features.
+                    </template>
                 </div>
                 <template v-else>
                     <label
-                        v-for='uid in segmentUids'
-                        :key='uid'
+                        v-for='t in targets'
+                        :key='t.uid'
                         class='form-check d-flex align-items-center gap-2 mb-1'
                     >
                         <input
                             v-model='selectedSegments'
                             type='checkbox'
                             class='form-check-input'
-                            :value='uid'
+                            :value='t.uid'
                         >
-                        <span class='form-check-label'>{{ segmentLabel(uid) }}</span>
+                        <span class='form-check-label'>
+                            {{ t.label }}
+                            <span
+                                v-if='t.detail'
+                                class='text-muted small'
+                            >· {{ t.detail }}</span>
+                        </span>
                         <span
-                            v-if='assignedThisOp.has(uid)'
+                            v-if='assignedThisOp.has(t.uid)'
                             class='badge bg-success-lt text-success'
                         >published OP{{ currentOp.opNumber }}</span>
+                        <button
+                            class='btn btn-link btn-sm p-0 ms-auto'
+                            title='Center the map on this'
+                            @click.prevent='flyToCandidate(t.uid)'
+                        >
+                            locate
+                        </button>
                     </label>
                     <div class='row g-2 mt-1'>
                         <div class='col-md-6'>
@@ -499,35 +530,48 @@
             >
                 <template #label>
                     <p class='text-uppercase text-white-50 small mb-0'>
-                        Add Complete Search Assignment
+                        {{ isSearchIncident ? 'Add Complete Search Assignment' : 'Add Completed Assignment' }}
                     </p>
                 </template>
 
                 <div class='row g-2'>
                     <div class='col-md-6'>
-                        <label class='form-label'>Segment</label>
+                        <label class='form-label d-flex align-items-center'>
+                            {{ targetNoun }}
+                            <button
+                                v-if='!isSearchIncident'
+                                class='btn btn-link btn-sm p-0 ms-auto'
+                                :disabled='loadingTargets'
+                                @click='loadFeatureTargets'
+                            >
+                                {{ loadingTargets ? 'Loading…' : 'Refresh' }}
+                            </button>
+                        </label>
                         <select
                             v-model='debriefForm.segmentUid'
                             class='form-select form-select-sm'
                         >
-                            <option value=''>— select segment —</option>
+                            <option value=''>— select {{ targetNoun.toLowerCase() }} —</option>
                             <option
-                                v-for='(seg, uid) in segments'
-                                :key='uid'
-                                :value='uid'
+                                v-for='t in targets'
+                                :key='t.uid'
+                                :value='t.uid'
                             >
-                                {{ seg.callsign || uid }}
+                                {{ t.label }}{{ t.detail ? ` · ${t.detail}` : '' }}
                             </option>
                         </select>
                     </div>
-                    <div class='col-md-2'>
+                    <div
+                        v-if='isSearchIncident'
+                        class='col-md-2'
+                    >
                         <TablerInput
                             v-model='debriefForm.pod'
                             label='POD %'
                             placeholder='0–100'
                         />
                     </div>
-                    <div class='col-md-2'>
+                    <div :class='isSearchIncident ? "col-md-2" : "col-md-4"'>
                         <TablerInput
                             v-model='debriefForm.coverage'
                             label='Completed %'
@@ -708,8 +752,11 @@
                     >
                         <div class='small d-flex align-items-center gap-2'>
                             <span>
-                                OP{{ d.opNumber }} · {{ segmentLabel(d.segmentUid) }} ·
-                                POD {{ d.pod }}%<span v-if='d.coverage !== undefined'> ({{ Math.round(d.coverage * 100) }}% completed)</span>
+                                OP{{ d.opNumber }} · {{ d.label || segmentLabel(d.segmentUid) }}<span
+                                    v-if='d.pod !== undefined'
+                                > · POD {{ d.pod }}%</span><span
+                                    v-if='d.coverage !== undefined'
+                                > ({{ Math.round(d.coverage * 100) }}% completed)</span>
                                 <span
                                     v-if='d.resource'
                                     class='text-muted'
@@ -959,7 +1006,9 @@ import {
     createAssignmentStore,
     createOpFeaturePublisher,
     createSegmentGeometrySource,
+    listAssignableFeatures,
     publishIppToOp,
+    type AssignableFeature,
 } from '../../../lib/opAssignmentPersistence.ts';
 import { loadResourceAssignmentsFromMission } from '../../../lib/resourceAssignmentPersistence.ts';
 import { isActiveResource, type ResourceAssignment } from '../../../lib/resourceAssignments.ts';
@@ -968,7 +1017,43 @@ import { createOpPeriodGateway } from '../../../lib/opPeriodGateway.ts';
 import { createRegistryStore } from '../../../lib/registryPersistence.ts';
 import { segmentsFromSchema, type SegmentMap } from '../../../lib/segmentsPersistence.ts';
 
-const { activeMission } = useIncident();
+const { activeMission, isSearchIncident } = useIncident();
+
+// ── Search vs. non-search ───────────────────────────────────────────────────
+// Everything in this pane is type-agnostic except POD and the CASIE rollup.
+// Search incidents task registered segments and report a probability of
+// detection; every other type tasks any CoT on the map and just reports what
+// was worked (Paul, 2026-08-30). One code path, one data shape.
+
+/** Assignable targets: registered segments on a search, live CoTs otherwise. */
+const featureTargets = ref<AssignableFeature[]>([]);
+const loadingTargets = ref(false);
+
+const targets = computed<{ uid: string; label: string; detail?: string }[]>(() => {
+    if (isSearchIncident.value) {
+        return segmentUids.value.map((uid) => ({ uid, label: segmentLabel(uid) }));
+    }
+    return featureTargets.value.map((f) => ({
+        uid: f.uid,
+        label: f.callsign,
+        detail: `${f.kind} · ${f.source}`,
+    }));
+});
+
+const targetNoun = computed(() => (isSearchIncident.value ? 'Segment' : 'Map feature'));
+
+async function loadFeatureTargets(): Promise<void> {
+    const mission = activeMission.value;
+    if (!mission || isSearchIncident.value) return;
+    loadingTargets.value = true;
+    try {
+        featureTargets.value = await listAssignableFeatures(mission, currentOp.value ?? undefined);
+    } catch (err) {
+        error.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        loadingTargets.value = false;
+    }
+}
 
 const registry = ref<OpPeriodRegistryEntry[]>([]);
 const segments = ref<SegmentMap>({});
@@ -1033,8 +1118,20 @@ function roleLabel(role: string): string {
     return role || 'unknown';
 }
 
+/**
+ * Human label for an assignment target. Segments first (search), then live map
+ * features, then any label snapshotted on a past record — a non-search target
+ * has no registry behind it, so the CoT may have been renamed or deleted since.
+ */
 function segmentLabel(uid: string): string {
-    return segments.value[uid]?.callsign || uid;
+    const segment = segments.value[uid]?.callsign;
+    if (segment) return segment;
+    const feature = featureTargets.value.find((f) => f.uid === uid);
+    if (feature?.callsign) return feature.callsign;
+    const recorded = debriefs.value.find((d) => d.segmentUid === uid && d.label);
+    if (recorded?.label) return recorded.label;
+    const assigned = assignments.value.find((a) => a.segmentUid === uid && a.label);
+    return assigned?.label || uid;
 }
 
 async function missionChannels(guid: string): Promise<string[]> {
@@ -1070,6 +1167,8 @@ async function refresh(): Promise<void> {
         if (!opChannels.value.length) {
             opChannels.value = await missionChannels(mission.guid);
         }
+        if (!isSearchIncident.value) await loadFeatureTargets();
+
         if (currentOp.value) {
             debriefForm.opNumber = currentOp.value.opNumber;
             await ensureOpOverlay(currentOp.value);
@@ -1246,7 +1345,9 @@ async function onPublishAssignments(): Promise<void> {
     error.value = ''; notice.value = '';
     try {
         const published = await publishAssignments({
-            geometry: createSegmentGeometrySource(mission),
+            // Pass the registry so a target drawn on an OP sync (common on
+            // non-search incidents) is still resolvable.
+            geometry: createSegmentGeometrySource(mission, registry.value),
             publisher: createOpFeaturePublisher(),
             assignments: createAssignmentStore(mission),
         }, op, {
@@ -1560,8 +1661,13 @@ function buildDebriefRecord(): DebriefRecord {
     const record: DebriefRecord = {
         opNumber: debriefForm.opNumber,
         segmentUid: debriefForm.segmentUid,
-        pod: Number(debriefForm.pod),
+        // Snapshot the label: non-search targets have no registry, so the CoT
+        // can be renamed or deleted and the case file must still read.
+        label: segmentLabel(debriefForm.segmentUid),
     };
+    // POD is search-only — left absent rather than 0 so a reader can tell
+    // "not applicable" from "searched and found nothing".
+    if (isSearchIncident.value) record.pod = Number(debriefForm.pod);
     const coveragePct = debriefForm.coverage.trim();
     if (coveragePct) record.coverage = Number(coveragePct) / 100;
     if (debriefForm.resource.trim()) record.resource = debriefForm.resource.trim();
@@ -1584,9 +1690,12 @@ async function onRecordDebrief(): Promise<void> {
     const mission = activeMission.value;
     if (!mission?.mgmt) return;
 
-    // Incomplete segment → ISM split prompt before recording.
+    // Incomplete segment → ISM split prompt before recording. Search only:
+    // splitting redistributes POA between parent and remainder, which is a
+    // CASIE concept with no meaning on a fire or a disaster.
     const coveragePct = Number(debriefForm.coverage.trim() || '100');
-    if (Number.isFinite(coveragePct) && coveragePct > 0 && coveragePct < 100) {
+    if (isSearchIncident.value
+        && Number.isFinite(coveragePct) && coveragePct > 0 && coveragePct < 100) {
         const label = segmentLabel(debriefForm.segmentUid);
         splitRetainedPct.value = String(coveragePct);
         splitNewName.value = nextSegmentName();
@@ -1600,7 +1709,9 @@ async function onRecordDebrief(): Promise<void> {
     error.value = ''; notice.value = '';
     try {
         const record = buildDebriefRecord();
-        await saveDebriefRecord(record, `Recorded POD ${record.pod}% for ${segmentLabel(record.segmentUid)}.`);
+        await saveDebriefRecord(record, record.pod !== undefined
+            ? `Recorded POD ${record.pod}% for ${segmentLabel(record.segmentUid)}.`
+            : `Recorded completed assignment for ${segmentLabel(record.segmentUid)}.`);
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
     } finally {
