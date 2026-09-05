@@ -394,7 +394,9 @@
                         v-model='h.segmentUid'
                         class='form-select form-select-sm w-auto'
                     >
-                        <option value=''>— segment —</option>
+                        <option value=''>
+                            — segment —
+                        </option>
                         <option
                             v-for='seg in inputs.segments'
                             :key='seg.uid'
@@ -468,7 +470,13 @@
                     <div class='table-responsive mt-1'>
                         <table class='table table-sm small mb-0'>
                             <thead>
-                                <tr><th>Segment</th><th class='text-end'>POA now (real)</th><th class='text-end'>POA (scenario)</th></tr>
+                                <tr>
+                                    <th>Segment</th><th class='text-end'>
+                                        POA now (real)
+                                    </th><th class='text-end'>
+                                        POA (scenario)
+                                    </th>
+                                </tr>
                             </thead>
                             <tbody>
                                 <tr
@@ -476,13 +484,21 @@
                                     :key='seg.uid'
                                 >
                                     <td>{{ inputs.segmentLabels[seg.uid] }}</td>
-                                    <td class='text-end'>{{ fmt(history.final.poa[seg.uid]) }}</td>
-                                    <td class='text-end'>{{ fmt(scenarioHistory.final.poa[seg.uid]) }}</td>
+                                    <td class='text-end'>
+                                        {{ fmt(history.final.poa[seg.uid]) }}
+                                    </td>
+                                    <td class='text-end'>
+                                        {{ fmt(scenarioHistory.final.poa[seg.uid]) }}
+                                    </td>
                                 </tr>
                                 <tr class='text-muted'>
                                     <td>R.O.W.</td>
-                                    <td class='text-end'>{{ fmt(history.final.rowPoa) }}</td>
-                                    <td class='text-end'>{{ fmt(scenarioHistory.final.rowPoa) }}</td>
+                                    <td class='text-end'>
+                                        {{ fmt(history.final.rowPoa) }}
+                                    </td>
+                                    <td class='text-end'>
+                                        {{ fmt(scenarioHistory.final.rowPoa) }}
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>

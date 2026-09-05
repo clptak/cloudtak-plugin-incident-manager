@@ -412,7 +412,9 @@
                                     v-model='assignTeam'
                                     class='form-select form-select-sm'
                                 >
-                                    <option value=''>— unassigned —</option>
+                                    <option value=''>
+                                        — unassigned —
+                                    </option>
                                     <option
                                         v-for='r in opResourceOptions'
                                         :key='r'
@@ -551,7 +553,9 @@
                             v-model='debriefForm.segmentUid'
                             class='form-select form-select-sm'
                         >
-                            <option value=''>— select {{ targetNoun.toLowerCase() }} —</option>
+                            <option value=''>
+                                — select {{ targetNoun.toLowerCase() }} —
+                            </option>
                             <option
                                 v-for='t in targets'
                                 :key='t.uid'
@@ -600,7 +604,9 @@
                                 v-model='debriefForm.resource'
                                 class='form-select form-select-sm'
                             >
-                                <option value=''>— select resource —</option>
+                                <option value=''>
+                                    — select resource —
+                                </option>
                                 <option
                                     v-for='r in debriefResourceOptions'
                                     :key='r'
