@@ -394,7 +394,9 @@
                         v-model='h.segmentUid'
                         class='form-select form-select-sm w-auto'
                     >
-                        <option value=''>— segment —</option>
+                        <option value=''>
+                            — segment —
+                        </option>
                         <option
                             v-for='seg in inputs.segments'
                             :key='seg.uid'
@@ -468,7 +470,13 @@
                     <div class='table-responsive mt-1'>
                         <table class='table table-sm small mb-0'>
                             <thead>
-                                <tr><th>Segment</th><th class='text-end'>POA now (real)</th><th class='text-end'>POA (scenario)</th></tr>
+                                <tr>
+                                    <th>Segment</th><th class='text-end'>
+                                        POA now (real)
+                                    </th><th class='text-end'>
+                                        POA (scenario)
+                                    </th>
+                                </tr>
                             </thead>
                             <tbody>
                                 <tr
@@ -476,13 +484,21 @@
                                     :key='seg.uid'
                                 >
                                     <td>{{ inputs.segmentLabels[seg.uid] }}</td>
-                                    <td class='text-end'>{{ fmt(history.final.poa[seg.uid]) }}</td>
-                                    <td class='text-end'>{{ fmt(scenarioHistory.final.poa[seg.uid]) }}</td>
+                                    <td class='text-end'>
+                                        {{ fmt(history.final.poa[seg.uid]) }}
+                                    </td>
+                                    <td class='text-end'>
+                                        {{ fmt(scenarioHistory.final.poa[seg.uid]) }}
+                                    </td>
                                 </tr>
                                 <tr class='text-muted'>
                                     <td>R.O.W.</td>
-                                    <td class='text-end'>{{ fmt(history.final.rowPoa) }}</td>
-                                    <td class='text-end'>{{ fmt(scenarioHistory.final.rowPoa) }}</td>
+                                    <td class='text-end'>
+                                        {{ fmt(history.final.rowPoa) }}
+                                    </td>
+                                    <td class='text-end'>
+                                        {{ fmt(scenarioHistory.final.rowPoa) }}
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
@@ -650,9 +666,14 @@ const auditTrail = computed(() => {
         .map((e) => ({ text: e.text, when: trailWhen(e.at) }));
 });
 
-const canCompute = computed(() => draft.hypotheticals.some(
-    (h) => h.segmentUid && Number.isFinite(h.pod) && h.pod > 0,
-));
+// `DebriefRecord.pod` is optional incident-wide (non-search assignments report
+// no probability of detection), but a what-if hypothetical is CASIE-only and
+// meaningless without one — so it is required here specifically.
+function hasUsablePod(h: DebriefRecord): boolean {
+    return Boolean(h.segmentUid) && h.pod !== undefined && Number.isFinite(h.pod) && h.pod > 0;
+}
+
+const canCompute = computed(() => draft.hypotheticals.some(hasUsablePod));
 
 function fmt(value: number | undefined): string {
     return value === undefined ? '—' : value.toFixed(1);
@@ -669,8 +690,8 @@ function addHypothetical(): void {
 
 function validHypotheticals(): DebriefRecord[] {
     return draft.hypotheticals
-        .filter((h) => h.segmentUid && Number.isFinite(h.pod) && h.pod > 0)
-        .map((h) => ({ ...h, pod: Math.min(100, Math.max(0, h.pod)) }));
+        .filter(hasUsablePod)
+        .map((h) => ({ ...h, pod: Math.min(100, Math.max(0, h.pod ?? 0)) }));
 }
 
 function computeDraft(): void {

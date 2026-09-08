@@ -233,8 +233,12 @@
                                     </select>
                                 </td>
                                 <td>{{ clue.finder || '—' }}</td>
-                                <td class='text-muted'>{{ clue.sourceLabel }}</td>
-                                <td class='text-muted text-nowrap'>{{ shortDt(clue.at) }}</td>
+                                <td class='text-muted'>
+                                    {{ clue.sourceLabel }}
+                                </td>
+                                <td class='text-muted text-nowrap'>
+                                    {{ shortDt(clue.at) }}
+                                </td>
                             </tr>
                         </tbody>
                     </table>

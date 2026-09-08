@@ -1,22 +1,27 @@
 /**
  * Adapters for OP assignment publishing (Phase 3):
  * - AssignmentStore: running list in mgmt schema `incident_response.op_assignments`;
- * - SegmentGeometrySource: polygon geometry from the incident common map's features;
- * - OpFeaturePublisher: re-publish the polygon into the OP sync.
+ * - SegmentGeometrySource: geometry of an assignable feature — a registered
+ *   segment on a search, any CoT on the incident map otherwise;
+ * - OpFeaturePublisher: re-publish that feature into the OP sync.
  */
 
 import Subscription from '../../../../src/base/subscription.ts';
-import { pushPointToMission } from './missionFeatures.ts';
 import type { ActiveMission } from '../composables/useIncident.ts';
 import type { OpAssignment, OpPeriodRegistryEntry } from '../domain/entities.ts';
 import type {
+    AssignmentPayload,
     AssignmentStore,
     OpFeaturePublisher,
     PolygonStyle,
     SegmentGeometrySource,
 } from '../domain/ports.ts';
 import { loadIncidentSubscription, loadSchemaSubscription, schemaMissionToken } from './incidentSubscription.ts';
-import { pushPolygonToMission } from './missionFeatures.ts';
+import {
+    pushLineToMission,
+    pushPointToMission,
+    pushPolygonToMission,
+} from './missionFeatures.ts';
 import { loadMissionSchema, saveMissionSchema, type MissionSchema } from './missionSchema.ts';
 
 export function opAssignmentsFromSchema(schema: MissionSchema): OpAssignment[] {
@@ -119,14 +124,82 @@ function centroid(ring: [number, number][]): [number, number] {
     return [lon / ring.length, lat / ring.length];
 }
 
+function lineFromFeature(feat: PolygonFeatureLike): [number, number][] | null {
+    if (feat.geometry?.type !== 'LineString') return null;
+    const coords = feat.geometry.coordinates;
+    if (!Array.isArray(coords)) return null;
+    const points: [number, number][] = [];
+    for (const point of coords as unknown[]) {
+        if (!Array.isArray(point) || point.length < 2) continue;
+        points.push([Number(point[0]), Number(point[1])]);
+    }
+    return points.length >= 2 ? points : null;
+}
+
+function pointFromFeature(feat: PolygonFeatureLike): [number, number] | null {
+    if (feat.geometry?.type !== 'Point') return null;
+    const coords = feat.geometry.coordinates;
+    if (!Array.isArray(coords) || coords.length < 2) return null;
+    const lng = Number(coords[0]);
+    const lat = Number(coords[1]);
+    return Number.isFinite(lng) && Number.isFinite(lat) ? [lng, lat] : null;
+}
+
+/** Turn a raw mission feature into the payload the publisher understands. */
+function payloadFromFeature(
+    feat: PolygonFeatureLike,
+    uid: string,
+): AssignmentPayload | null {
+    const callsign = feat.properties?.callsign || uid;
+
+    const ring = ringFromFeature(feat);
+    if (ring) {
+        const center = feat.properties?.center
+            && Array.isArray(feat.properties.center) && feat.properties.center.length === 2
+            ? feat.properties.center
+            : centroid(ring);
+        return { kind: 'polygon', callsign, ring, center, style: styleFromFeature(feat) };
+    }
+
+    const line = lineFromFeature(feat);
+    if (line) {
+        return {
+            kind: 'line',
+            callsign,
+            line,
+            center: line[Math.floor(line.length / 2)],
+            style: styleFromFeature(feat),
+        };
+    }
+
+    const point = pointFromFeature(feat);
+    if (point) {
+        const payload: AssignmentPayload = { kind: 'point', callsign, point };
+        const props = feat.properties as { type?: string; icon?: string } | undefined;
+        if (props?.type) payload.cotType = props.type;
+        if (props?.icon) payload.icon = props.icon;
+        return payload;
+    }
+
+    return null;
+}
+
 /**
- * Reads segment polygons — MGMT sync first (segments are moved there at
- * registration), falling back to the common map for pre-move segments.
+ * Reads the geometry of an assignable feature.
+ *
+ * MGMT sync first (search segments are moved there at registration), then the
+ * common map, then the OP syncs. Non-search incidents task arbitrary CoTs
+ * (Paul, 2026-08-30), and managers draw wherever their active overlay points —
+ * the same "look everywhere" problem the IPP finder and track picker have.
  */
-export function createSegmentGeometrySource(mission: ActiveMission): SegmentGeometrySource {
+export function createSegmentGeometrySource(
+    mission: ActiveMission,
+    registry: OpPeriodRegistryEntry[] = [],
+): SegmentGeometrySource {
     return {
-        async getPolygon(uid: string) {
+        async getFeature(uid: string) {
             let feat: PolygonFeatureLike | undefined;
+
             if (mission.mgmt) {
                 try {
                     const mgmtSub = await loadSchemaSubscription(mission);
@@ -135,25 +208,89 @@ export function createSegmentGeometrySource(mission: ActiveMission): SegmentGeom
                 } catch { /* fall through to the common map */ }
             }
             if (!feat) {
-                const sub = await loadIncidentSubscription(mission);
-                const feats = await sub.feature.list({ refresh: true }) as unknown as PolygonFeatureLike[];
-                feat = feats.find((f) => String(f.id ?? '') === uid);
+                try {
+                    const sub = await loadIncidentSubscription(mission);
+                    const feats = await sub.feature.list({ refresh: true }) as unknown as PolygonFeatureLike[];
+                    feat = feats.find((f) => String(f.id ?? '') === uid);
+                } catch { /* fall through to the OP syncs */ }
             }
-            if (!feat) return null;
-            const ring = ringFromFeature(feat);
-            if (!ring) return null;
-            const center = feat.properties?.center
-                && Array.isArray(feat.properties.center) && feat.properties.center.length === 2
-                ? feat.properties.center
-                : centroid(ring);
-            return {
-                callsign: feat.properties?.callsign || uid,
-                ring,
-                center,
-                style: styleFromFeature(feat),
-            };
+            for (const op of feat ? [] : registry) {
+                try {
+                    const opSub = await Subscription.load(op.guid, {
+                        missiontoken: op.ownerToken || undefined,
+                        reload: false,
+                    });
+                    const opFeats = await opSub.feature.list({ refresh: true }) as unknown as PolygonFeatureLike[];
+                    const match = opFeats.find((f) => String(f.id ?? '') === uid);
+                    if (match) { feat = match; break; }
+                } catch { /* try the next OP */ }
+            }
+
+            return feat ? payloadFromFeature(feat, uid) : null;
         },
     };
+}
+
+/** An assignable CoT offered in the non-search target picker. */
+export interface AssignableFeature {
+    uid: string;
+    callsign: string;
+    kind: 'polygon' | 'line' | 'point';
+    /** Which DataSync it currently lives on — shown to disambiguate. */
+    source: string;
+}
+
+/**
+ * Every CoT on the incident that could be tasked as an assignment.
+ *
+ * Search incidents pick from the registered segment list instead; this is the
+ * non-search path (Paul, 2026-08-30), where there is no registry and the
+ * manager tasks whatever is on the map — a structure marker, a division
+ * polygon, a road line. Scans the same three sources as the track picker.
+ */
+export async function listAssignableFeatures(
+    mission: ActiveMission,
+    op?: OpPeriodRegistryEntry,
+): Promise<AssignableFeature[]> {
+    const sources: { label: string; load: () => Promise<unknown> }[] = [];
+    if (mission.mgmt) {
+        sources.push({ label: 'MGMT', load: () => loadSchemaSubscription(mission) });
+    }
+    sources.push({ label: 'common map', load: () => loadIncidentSubscription(mission) });
+    if (op) {
+        sources.push({
+            label: `OP${op.opNumber}`,
+            load: () => Subscription.load(op.guid, {
+                missiontoken: op.ownerToken || undefined,
+                reload: false,
+            }),
+        });
+    }
+
+    const seen = new Set<string>();
+    const out: AssignableFeature[] = [];
+    for (const source of sources) {
+        try {
+            const sub = await source.load() as {
+                feature: { list(opts: { refresh: boolean }): Promise<unknown> };
+            };
+            const feats = await sub.feature.list({ refresh: true }) as unknown as PolygonFeatureLike[];
+            for (const feat of feats) {
+                const uid = String(feat.id ?? '');
+                if (!uid || seen.has(uid)) continue;
+                const payload = payloadFromFeature(feat, uid);
+                if (!payload) continue;
+                seen.add(uid);
+                out.push({
+                    uid,
+                    callsign: payload.callsign,
+                    kind: payload.kind,
+                    source: source.label,
+                });
+            }
+        } catch { /* source unreachable — skip */ }
+    }
+    return out.sort((a, b) => a.callsign.localeCompare(b.callsign));
 }
 
 interface PointFeatureLike {
@@ -289,26 +426,51 @@ async function verifyInMission(op: OpPeriodRegistryEntry, uid: string): Promise<
  */
 export function createOpFeaturePublisher(): OpFeaturePublisher {
     return {
-        async publishPolygon(op: OpPeriodRegistryEntry, polygon, existingUid?: string) {
-            const push = () => pushPolygonToMission({
-                missionGuid: op.guid,
-                missionToken: op.ownerToken,
-                callsign: polygon.callsign,
-                ring: polygon.ring,
-                center: polygon.center,
-                style: polygon.style,
-                id: existingUid,
-            });
+        async publishFeature(op: OpPeriodRegistryEntry, feature, existingUid?: string) {
+            // One push helper per geometry, so a non-search incident can task a
+            // structure marker or a hoseline and the field still receives it.
+            const push = (id?: string): Promise<string> => {
+                if (feature.kind === 'polygon') {
+                    return pushPolygonToMission({
+                        missionGuid: op.guid,
+                        missionToken: op.ownerToken,
+                        callsign: feature.callsign,
+                        ring: feature.ring,
+                        center: feature.center,
+                        style: feature.style,
+                        id,
+                    });
+                }
+                if (feature.kind === 'line') {
+                    return pushLineToMission({
+                        missionGuid: op.guid,
+                        missionToken: op.ownerToken,
+                        callsign: feature.callsign,
+                        line: feature.line,
+                        stroke: feature.style?.stroke,
+                        strokeWidth: feature.style?.strokeWidth,
+                        id,
+                    });
+                }
+                return pushPointToMission({
+                    missionGuid: op.guid,
+                    missionToken: op.ownerToken,
+                    callsign: feature.callsign,
+                    point: feature.point,
+                    type: feature.cotType,
+                    icon: feature.icon,
+                    id,
+                });
+            };
 
-            let uid = await push();
-            existingUid = uid;
+            let uid = await push(existingUid);
             for (let attempt = 0; attempt < 4; attempt++) {
                 await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
                 if (await verifyInMission(op, uid)) return uid;
-                if (attempt < 3) uid = await push();
+                if (attempt < 3) uid = await push(uid);
             }
             throw new Error(
-                `Assignment "${polygon.callsign}" did not appear in ${op.name} after retries — check the OP sync and republish.`,
+                `Assignment "${feature.callsign}" did not appear in ${op.name} after retries — check the OP sync and republish.`,
             );
         },
     };

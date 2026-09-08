@@ -51,10 +51,19 @@ test('incident stem treats OP DataSyncs as the same incident', () => {
 });
 
 test('search-only key sets cover the planned chrome', () => {
-    for (const key of ['search-urgency', 'search-scenarios', 'search-area', 'segmentation', 'initial-consensus', 'operational-periods']) {
+    for (const key of ['search-urgency', 'search-scenarios', 'search-area', 'segmentation', 'initial-consensus']) {
         assert.ok(SEARCH_ONLY_NAV_KEYS.has(key), key);
     }
     for (const key of ['task', 'clues', 'casie']) {
         assert.ok(SEARCH_ONLY_HTAB_KEYS.has(key), key);
     }
+});
+
+test('operational periods are available to every incident type', () => {
+    // Non-search incidents (rescue, wildland fire, disaster) run operational
+    // periods too — OP DataSyncs, assignments, rosters, track logs, IAPs and
+    // demob are all type-agnostic. Only POD and CASIE are search-specific, and
+    // they are gated inside the pane, not by hiding it.
+    assert.ok(!SEARCH_ONLY_NAV_KEYS.has('operational-periods'));
+    assert.ok(SEARCH_ONLY_HTAB_KEYS.has('casie'), 'the rollup itself stays search-only');
 });

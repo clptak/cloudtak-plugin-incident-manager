@@ -76,12 +76,35 @@ export interface TrackLogRef {
     attachedAt?: string;
 }
 
-/** POD reported at debrief for (a completed portion of) a segment in one OP. */
+/**
+ * A completed assignment in one OP: what was worked, by whom, and — on a
+ * search — how thoroughly.
+ *
+ * Used by every incident type. On non-search incidents (rescue, wildland fire,
+ * disaster) there is no probability of detection to report, so `pod` is absent
+ * and the CASIE rollup is not reachable in the UI at all. It is left ABSENT
+ * rather than stored as 0, so a standalone reader of the schema can tell "not
+ * applicable" from "searched and found nothing".
+ */
 export interface DebriefRecord {
     opNumber: number;
+    /**
+     * The uid of what was worked. On a search this is a registered segment
+     * polygon; on other incident types it is any CoT on the incident map
+     * (Paul, 2026-08-30) — a structure marker, a division polygon, a road line.
+     */
     segmentUid: string;
-    /** Probability of detection percent (0–100) for the searched portion. */
-    pod: number;
+    /**
+     * Callsign captured when the record was written. Non-search targets have
+     * no registry behind them, so the CoT can be renamed or deleted later —
+     * without this the case file loses what was actually worked.
+     */
+    label?: string;
+    /**
+     * Probability of detection percent (0–100) for the searched portion.
+     * Search incidents only; absent everywhere else.
+     */
+    pod?: number;
     /**
      * Fraction of the segment actually completed, 0–1. Defaults to 1.
      * Incomplete segments should normally be split per ISM instead of

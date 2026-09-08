@@ -392,7 +392,12 @@ function toggleCard(card: CreateOpenCard): void {
 
 const subjectTypes = [
     'Hiker', 'Hunter', 'Climber', 'Canyoneering', 'Camper',
-    'Vehicle', 'Child', 'Dementia', 'Alzheimers', 'other',
+    'Child', 'Mountain Biker', 'Autistic', 'Mental Health','Boater',
+    'Vehicle', 'Fisherman', 'Dementia', 'Alzheimers', 'Base Jumper',
+    'Crime Victim', 'Despondent', 'Elderly', 'Intoxicated', 'Kayaker',
+    'Paddle Boarder', 'Skier', 'Snowshoer', 'Snowboarder', 'Water',
+    'Aircraft', 'Christmas Tree Cutter', 'Cross Country Skier', 'Downhill Skier', 'Equestrian',
+    'Mushroom Gatherer', 'Pinon Nut Picker', 'Woodcutter', 'Other',
 ];
 
 const incidentTypeOptions = [

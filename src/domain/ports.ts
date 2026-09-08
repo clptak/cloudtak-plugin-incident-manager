@@ -80,7 +80,7 @@ export interface TrackLogPublisher {
     ): Promise<string>;
 }
 
-/** Style carried from the source polygon so OP copies render identically. */
+/** Style carried from the source feature so OP copies render identically. */
 export interface PolygonStyle {
     stroke?: string;
     fill?: string;
@@ -89,27 +89,59 @@ export interface PolygonStyle {
     strokeStyle?: 'solid' | 'dashed' | 'dotted' | 'outlined';
 }
 
-export interface PolygonPayload {
-    callsign: string;
-    ring: [number, number][];
-    center: [number, number];
-    style?: PolygonStyle;
-}
+/**
+ * A feature tasked as an assignment, in the three shapes TAK draws.
+ *
+ * Search incidents always task a `polygon` (a registered segment). Other
+ * incident types task any CoT on the incident map (Paul, 2026-08-30) — a
+ * structure or staging `point`, a road or hoseline `line`, a division
+ * `polygon` — so the payload is a discriminated union rather than a ring.
+ */
+export type AssignmentPayload =
+    | {
+        kind: 'polygon';
+        callsign: string;
+        /** Closed ring of [lng, lat] (first == last). */
+        ring: [number, number][];
+        center: [number, number];
+        style?: PolygonStyle;
+    }
+    | {
+        kind: 'line';
+        callsign: string;
+        line: [number, number][];
+        center: [number, number];
+        style?: PolygonStyle;
+    }
+    | {
+        kind: 'point';
+        callsign: string;
+        point: [number, number];
+        /** CoT type and icon, carried so the OP copy renders identically. */
+        cotType?: string;
+        icon?: string;
+    };
 
-/** Read segment polygon geometry (from wherever the segment features live). */
+/** Backwards-compatible alias — search code still speaks in polygons. */
+export type PolygonPayload = Extract<AssignmentPayload, { kind: 'polygon' }>;
+
+/**
+ * Read the geometry of an assignable feature, from wherever it lives (the
+ * segment registry on a search, or any incident sync otherwise).
+ */
 export interface SegmentGeometrySource {
-    getPolygon(uid: string): Promise<PolygonPayload | null>;
+    getFeature(uid: string): Promise<AssignmentPayload | null>;
 }
 
 /**
- * Publish a polygon feature into an OP sync; returns the feature uid.
+ * Publish an assignment feature into an OP sync; returns the feature uid.
  * Pass `existingUid` on republish — TAK treats a repeated uid as an update,
- * which prevents duplicate polygons on subscriber maps.
+ * which prevents duplicate features on subscriber maps.
  */
 export interface OpFeaturePublisher {
-    publishPolygon(
+    publishFeature(
         op: OpPeriodRegistryEntry,
-        polygon: PolygonPayload,
+        feature: AssignmentPayload,
         existingUid?: string,
     ): Promise<string>;
 }

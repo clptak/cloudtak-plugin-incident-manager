@@ -30,7 +30,10 @@ function clampFraction(value: number | undefined, fallback = 1): number {
 
 /** Effective single-search miss probability (0–1) given POD% and coverage 0–1. */
 function missProbability(record: DebriefRecord): number {
-    const pod = clampPct(record.pod) / 100;
+    // A record with no POD (non-search incident) contributes no detection
+    // credit rather than a miss — clampPct already maps undefined to 0, but
+    // being explicit keeps the intent readable.
+    const pod = clampPct(record.pod ?? 0) / 100;
     const coverage = clampFraction(record.coverage);
     return 1 - pod * coverage;
 }

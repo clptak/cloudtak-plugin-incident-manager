@@ -207,8 +207,12 @@
                                 </td>
                                 <td>{{ clue.disposition || '—' }}</td>
                                 <td>{{ clue.finder || '—' }}</td>
-                                <td class='text-muted'>{{ clue.sourceLabel }}</td>
-                                <td class='text-muted text-nowrap'>{{ clue.at ? clue.at.slice(0, 16).replace('T', ' ') : '' }}</td>
+                                <td class='text-muted'>
+                                    {{ clue.sourceLabel }}
+                                </td>
+                                <td class='text-muted text-nowrap'>
+                                    {{ clue.at ? clue.at.slice(0, 16).replace('T', ' ') : '' }}
+                                </td>
                             </tr>
                         </tbody>
                     </table>
