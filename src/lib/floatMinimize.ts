@@ -127,7 +127,7 @@ function ensureBottomBarChip(): void {
             });
         }
     } catch {
-        // Map / bottom bar may not be loaded yet — retry on open/minimize
+        // Map / plugin chip bar may not be loaded yet — retry on open/minimize
     }
 }
 
@@ -139,7 +139,7 @@ function clearBottomBarChip(): void {
         requireApi().bottomBar.remove(SEGMENTS_BOTTOM_BAR_KEY);
         requireApi().bottomBar.remove(CLUES_BOTTOM_BAR_KEY);
     } catch {
-        // Map / bottom bar may not be loaded during teardown
+        // Map / plugin chip bar may not be loaded during teardown
     }
 }
 
