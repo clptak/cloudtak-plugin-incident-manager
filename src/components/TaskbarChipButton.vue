@@ -1,7 +1,7 @@
 <template>
     <button
         type='button'
-        class='btn btn-sm btn-outline-light d-flex align-items-center gap-2 text-nowrap'
+        class='btn btn-sm btn-outline-secondary d-flex align-items-center gap-2 text-nowrap'
         :title='title'
         @click='emit("click")'
     >
