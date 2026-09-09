@@ -1,7 +1,10 @@
-import { markRaw } from 'vue';
+import { createApp, markRaw, type App } from 'vue';
 import type { PluginAPI } from '../../../../plugin.ts';
 import { useFloatStore } from '../../../../src/stores/float.ts';
+import { useAppStore } from '../../../../src/stores/app.ts';
 import { isPopoutOpen, focusPopout } from './popout.ts';
+import { CHIP_BAR_ROOT_ID } from './chipBarPosition.ts';
+import IncidentManagerChipBar from '../components/IncidentManagerChipBar.vue';
 
 export const PANE_UID = 'incident-manager';
 export const BOTTOM_BAR_KEY = 'incident-manager';
@@ -11,7 +14,6 @@ export const SEGMENTS_BOTTOM_BAR_KEY = 'incident-manager-segments';
 const CLUES_BOTTOM_BAR_KEY = 'incident-manager-clues';
 
 type HostFloatComponent = Parameters<ReturnType<typeof useFloatStore>['add']>[0]['component'];
-type BottomBarComponent = Parameters<PluginAPI['bottomBar']['add']>[0]['component'];
 
 export type PaneGeometry = {
     x: number;
@@ -29,31 +31,19 @@ export const DEFAULT_GEOMETRY: PaneGeometry = {
 
 let api: PluginAPI | null = null;
 let shellComponent: HostFloatComponent | null = null;
-let restoreChipComponent: BottomBarComponent | null = null;
-let resourcesChipComponent: BottomBarComponent | null = null;
-let assignmentsChipComponent: BottomBarComponent | null = null;
-let segmentsChipComponent: BottomBarComponent | null = null;
-let cluesChipComponent: BottomBarComponent | null = null;
 let savedGeometry: PaneGeometry | null = null;
 let minimized = false;
+let chipApp: App | null = null;
+let chipEl: HTMLElement | null = null;
+let chipRetry: ReturnType<typeof setInterval> | null = null;
 
 export function bindFloatMinimize(opts: {
     api: PluginAPI;
     shell: HostFloatComponent;
-    restoreChip: BottomBarComponent;
-    resourcesChip?: BottomBarComponent;
-    assignmentsChip?: BottomBarComponent;
-    segmentsChip?: BottomBarComponent;
-    cluesChip?: BottomBarComponent;
 }): void {
     api = opts.api;
     shellComponent = opts.shell;
-    restoreChipComponent = opts.restoreChip;
-    resourcesChipComponent = opts.resourcesChip ?? null;
-    assignmentsChipComponent = opts.assignmentsChip ?? null;
-    segmentsChipComponent = opts.segmentsChip ?? null;
-    cluesChipComponent = opts.cluesChip ?? null;
-    ensureBottomBarChip();
+    ensureChipBar();
 }
 
 export function isMinimized(): boolean {
@@ -63,6 +53,14 @@ export function isMinimized(): boolean {
 function requireApi(): PluginAPI {
     if (!api) throw new Error('floatMinimize not bound');
     return api;
+}
+
+function isMobile(): boolean {
+    try {
+        return Boolean(useAppStore(requireApi().pinia).isMobileDetected);
+    } catch {
+        return false;
+    }
 }
 
 function readGeometry(): PaneGeometry {
@@ -95,43 +93,51 @@ function showFloat(geometry: PaneGeometry): void {
     });
 }
 
-function ensureBottomBarChip(): void {
-    if (!restoreChipComponent || !api) return;
-    try {
-        api.bottomBar.add({
-            key: BOTTOM_BAR_KEY,
-            component: restoreChipComponent,
-        });
-        if (resourcesChipComponent) {
-            api.bottomBar.add({
-                key: RESOURCES_BOTTOM_BAR_KEY,
-                component: resourcesChipComponent,
-            });
+function mountChipBar(shell: Element): void {
+    if (chipApp && chipEl && shell.contains(chipEl)) return;
+    unmountChipBar();
+    chipEl = document.createElement('div');
+    chipEl.id = CHIP_BAR_ROOT_ID;
+    shell.appendChild(chipEl);
+    chipApp = createApp(IncidentManagerChipBar);
+    chipApp.use(requireApi().pinia);
+    chipApp.mount(chipEl);
+}
+
+function unmountChipBar(): void {
+    if (chipApp) {
+        chipApp.unmount();
+        chipApp = null;
+    }
+    chipEl?.remove();
+    chipEl = null;
+}
+
+function ensureChipBar(): void {
+    if (!api || isMobile()) return;
+    const shell = document.querySelector('.map-shell');
+    if (shell) {
+        mountChipBar(shell);
+        if (chipRetry) {
+            clearInterval(chipRetry);
+            chipRetry = null;
         }
-        if (assignmentsChipComponent) {
-            api.bottomBar.add({
-                key: ASSIGNMENTS_BOTTOM_BAR_KEY,
-                component: assignmentsChipComponent,
-            });
-        }
-        if (segmentsChipComponent) {
-            api.bottomBar.add({
-                key: SEGMENTS_BOTTOM_BAR_KEY,
-                component: segmentsChipComponent,
-            });
-        }
-        if (cluesChipComponent) {
-            api.bottomBar.add({
-                key: CLUES_BOTTOM_BAR_KEY,
-                component: cluesChipComponent,
-            });
-        }
-    } catch {
-        // Map / plugin chip bar may not be loaded yet — retry on open/minimize
+        return;
+    }
+    if (!chipRetry) {
+        chipRetry = setInterval(() => {
+            ensureChipBar();
+        }, 500);
     }
 }
 
-function clearBottomBarChip(): void {
+function clearChipBar(): void {
+    if (chipRetry) {
+        clearInterval(chipRetry);
+        chipRetry = null;
+    }
+    unmountChipBar();
+    // Leave no leftover host bottom-bar chips if an older build registered them.
     try {
         requireApi().bottomBar.remove(BOTTOM_BAR_KEY);
         requireApi().bottomBar.remove(RESOURCES_BOTTOM_BAR_KEY);
@@ -139,7 +145,7 @@ function clearBottomBarChip(): void {
         requireApi().bottomBar.remove(SEGMENTS_BOTTOM_BAR_KEY);
         requireApi().bottomBar.remove(CLUES_BOTTOM_BAR_KEY);
     } catch {
-        // Map / plugin chip bar may not be loaded during teardown
+        // Map may not be loaded during teardown
     }
 }
 
@@ -151,7 +157,7 @@ function clearBottomBarChip(): void {
  */
 export function openDesktopPane(): void {
     const pluginApi = requireApi();
-    ensureBottomBarChip();
+    ensureChipBar();
     if (isPopoutOpen()) {
         focusPopout();
         return;
@@ -169,7 +175,7 @@ export function openDesktopPane(): void {
 
 export function minimizeDesktopPane(): void {
     const pluginApi = requireApi();
-    ensureBottomBarChip();
+    ensureChipBar();
     if (!pluginApi.float.has(PANE_UID) || minimized) return;
 
     savedGeometry = readGeometry();
@@ -182,7 +188,7 @@ export function restoreDesktopPane(): void {
 }
 
 export function cleanupFloatMinimize(): void {
-    clearBottomBarChip();
+    clearChipBar();
     minimized = false;
     if (api?.float.has(PANE_UID)) {
         api.float.remove(PANE_UID);

@@ -17,21 +17,6 @@ const IncidentManagerFloatShell = defineAsyncComponent(
 const IncidentManagerPane = defineAsyncComponent(
     () => import('./components/IncidentManagerPane.vue')
 );
-const IncidentManagerTaskbarChip = defineAsyncComponent(
-    () => import('./components/IncidentManagerTaskbarChip.vue')
-);
-const ResourcesTaskbarChip = defineAsyncComponent(
-    () => import('./components/ResourcesTaskbarChip.vue')
-);
-const AssignmentsTaskbarChip = defineAsyncComponent(
-    () => import('./components/AssignmentsTaskbarChip.vue')
-);
-const SegmentsTaskbarChip = defineAsyncComponent(
-    () => import('./components/SegmentsTaskbarChip.vue')
-);
-const ClueTaskbarChip = defineAsyncComponent(
-    () => import('./components/ClueTaskbarChip.vue')
-);
 
 const ROUTE_NAME = 'home-menu-incident-manager';
 
@@ -50,11 +35,6 @@ export default class IncidentManagerPlugin implements PluginInstance {
         bindFloatMinimize({
             api,
             shell: IncidentManagerFloatShell as unknown as HostFloatComponent,
-            restoreChip: IncidentManagerTaskbarChip as unknown as HostBottomBarComponent,
-            resourcesChip: ResourcesTaskbarChip as unknown as HostBottomBarComponent,
-            assignmentsChip: AssignmentsTaskbarChip as unknown as HostBottomBarComponent,
-            segmentsChip: SegmentsTaskbarChip as unknown as HostBottomBarComponent,
-            cluesChip: ClueTaskbarChip as unknown as HostBottomBarComponent,
         });
 
         this.api.routes.add({
@@ -109,6 +89,5 @@ export default class IncidentManagerPlugin implements PluginInstance {
 type MenuItemIconType = NonNullable<Parameters<PluginAPI['menu']['add']>[0]['icon']>;
 type MenuItemConfig = Parameters<PluginAPI['menu']['add']>[0];
 type HostFloatComponent = Parameters<PluginAPI['float']['add']>[0]['component'];
-type HostBottomBarComponent = Parameters<PluginAPI['bottomBar']['add']>[0]['component'];
 
 export const _typecheck = IncidentManagerPlugin as unknown as PluginStatic;

@@ -15,11 +15,11 @@ Plugin-only pattern (no CloudTAK core changes) for:
 
 ## Shared chip bar (multiple plugins)
 
-CloudTAK renders plugin-registered Vue components in a chip strip at the **top of the map**, docked to the right of the DataSync (`ActiveMission`) control. When navigation is active on desktop, the host drops the strip below the nav banner. Users can drag it over the map; double-click the grip to re-dock. Registration is still `api.bottomBar` (the API name did not change):
+CloudTAK’s host `api.bottomBar` still exists, but **this plugin does not use it**. On enable it mounts its own chip strip on `.map-shell` at the **top of the map**, docked to the right of DataSync. That way a VPS on stock CloudTAK (chips would otherwise stay bottom-center) matches local. When navigation is active on desktop, the strip drops below the nav banner. Drag the grip to park it on the map; double-click the grip to re-dock.
 
 ```ts
+// Host API (other plugins). Incident Manager mounts IncidentManagerChipBar.vue itself.
 api.bottomBar.add({ key: 'my-unique-key', component: MyChip });
-api.bottomBar.remove('my-unique-key');
 ```
 
 Each enabled plugin can add **one (or more) chips**. They sit side-by-side. Keys must be unique across plugins; duplicates are skipped with a console warning.
