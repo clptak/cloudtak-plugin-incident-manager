@@ -35,7 +35,7 @@ horizontal **Main / Task / Dashboard** tabs.
 - Mission map features: `mapStore.worker.conn.sendCOT(feature)` with
   `properties.dest = [{ 'mission-guid': guid }]`.
 - Caltopo: `window.__cloudtakCaltopo.createMap(...)` runtime contract.
-- **Minimize float → plugin chip bar** (plugin-only pattern for other float plugins): see [float-minimize-to-bottom-bar.md](./float-minimize-to-bottom-bar.md). The host renders those chips at the **top** of the map, beside DataSync.
+- **Minimize float → plugin chip bar** (plugin-owned overlay beside DataSync; works on stock CloudTAK without a host PluginPane patch): see [float-minimize-to-bottom-bar.md](./float-minimize-to-bottom-bar.md).
 
 ## Installation (VPS / Docker Compose)
 
