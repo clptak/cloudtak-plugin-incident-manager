@@ -1,7 +1,7 @@
 <template>
     <div
         ref='pane'
-        class='position-absolute cloudtak-panel d-flex align-items-center gap-2 px-2 text-white incident-chip-bar'
+        class='position-absolute cloudtak-panel d-flex align-items-center gap-2 px-2 incident-chip-bar'
         :class='{ "incident-chip-bar--dragging": dragging, "incident-chip-bar--ready": laidOut }'
         :style='paneStyle'
     >
