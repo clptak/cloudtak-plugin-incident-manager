@@ -116,6 +116,31 @@
                             Field + management channels (defaults from the incident common map).
                             Subscribed volunteers can add markers and logs immediately.
                         </div>
+                        <TablerEnum
+                            v-if='!isSearchIncident'
+                            v-model='opTemplateLabel'
+                            class='mt-3'
+                            label='Template'
+                            :options='opTemplateOptions'
+                            :disabled='templatesLoading'
+                        />
+                        <div
+                            v-else
+                            class='form-text mt-2'
+                        >
+                            <template v-if='templatesLoading'>
+                                Loading the search OP template…
+                            </template>
+                            <template v-else-if='searchOpTemplateName'>
+                                New OP DataSync uses the
+                                <strong>{{ searchOpTemplateName }}</strong>
+                                template from Settings.
+                            </template>
+                            <template v-else>
+                                No SAR template found — OP will be created without a template.
+                                Set one in Settings.
+                            </template>
+                        </div>
                         <button
                             class='btn btn-primary mt-2'
                             :disabled='busy || !opChannels.length'
@@ -967,12 +992,13 @@
 <script setup lang='ts'>
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { IconRoute } from '@tabler/icons-vue';
-import { TablerBorder, TablerInlineAlert, TablerInput } from '@tak-ps/vue-tabler';
+import { TablerBorder, TablerEnum, TablerInlineAlert, TablerInput } from '@tak-ps/vue-tabler';
 import OverlayManager from '../../../../../../src/base/overlay.ts';
 import { useMapStore } from '../../../../../../src/stores/map.ts';
 import { server } from '../../../../../../src/std.ts';
 import GroupSelect from '../../../../../../src/components/CloudTAK/util/GroupSelect.vue';
 import { useIncident } from '../../../composables/useIncident.ts';
+import { usePluginSettings } from '../../../composables/usePluginSettings.ts';
 import type { DebriefRecord, OpAssignment, OpPeriodRegistryEntry } from '../../../domain/entities.ts';
 import { currentOpPeriod, nextOpNumber } from '../../../domain/registry.ts';
 import {
@@ -1019,11 +1045,21 @@ import {
 import { loadResourceAssignmentsFromMission } from '../../../lib/resourceAssignmentPersistence.ts';
 import { isActiveResource, type ResourceAssignment } from '../../../lib/resourceAssignments.ts';
 import { loadMissionSchema } from '../../../lib/missionSchema.ts';
+import {
+    buildTemplateKeywords,
+    DEFAULT_TEMPLATE_ID,
+    DEFAULT_TEMPLATE_NAME,
+    listMissionTemplates,
+    resolveSearchOpTemplate,
+    withDefaultTemplate,
+    type MissionTemplateItem,
+} from '../../../lib/missionTemplates.ts';
 import { createOpPeriodGateway } from '../../../lib/opPeriodGateway.ts';
 import { createRegistryStore } from '../../../lib/registryPersistence.ts';
 import { segmentsFromSchema, type SegmentMap } from '../../../lib/segmentsPersistence.ts';
 
 const { activeMission, isSearchIncident } = useIncident();
+const { searchOpTemplateId } = usePluginSettings();
 
 // ── Search vs. non-search ───────────────────────────────────────────────────
 // Everything in this pane is type-agnostic except POD and the CASIE rollup.
@@ -1078,6 +1114,50 @@ const error = ref('');
 const notice = ref('');
 
 const gateway = createOpPeriodGateway();
+
+const missionTemplates = ref<MissionTemplateItem[]>([]);
+const templatesLoading = ref(false);
+const selectedOpTemplateId = ref(DEFAULT_TEMPLATE_ID);
+
+const pickerTemplates = computed(() => withDefaultTemplate(missionTemplates.value));
+const searchOpTemplateName = computed(() =>
+    resolveSearchOpTemplate(missionTemplates.value, searchOpTemplateId.value)?.name ?? '',
+);
+const opTemplateOptions = computed(() =>
+    pickerTemplates.value.map((item) => item.name),
+);
+const opTemplateLabel = computed({
+    get: () => pickerTemplates.value.find((item) => item.id === selectedOpTemplateId.value)?.name
+        ?? DEFAULT_TEMPLATE_NAME,
+    set: (name: string) => {
+        const found = pickerTemplates.value.find((item) => item.name === name);
+        selectedOpTemplateId.value = found?.id ?? DEFAULT_TEMPLATE_ID;
+    },
+});
+
+async function loadMissionTemplates(): Promise<void> {
+    templatesLoading.value = true;
+    try {
+        missionTemplates.value = await listMissionTemplates();
+    } catch {
+        missionTemplates.value = [];
+    } finally {
+        templatesLoading.value = false;
+    }
+}
+
+function opCreateKeywords(): string[] {
+    const keywords: string[] = [];
+    const type = activeMission.value?.incidentType;
+    if (type) keywords.push(incidentTypeKeyword(type));
+    const template = isSearchIncident.value
+        ? resolveSearchOpTemplate(missionTemplates.value, searchOpTemplateId.value)
+        : pickerTemplates.value.find((item) => item.id === selectedOpTemplateId.value);
+    for (const keyword of buildTemplateKeywords(template)) {
+        if (!keywords.includes(keyword)) keywords.push(keyword);
+    }
+    return keywords;
+}
 
 const currentOp = computed(() => currentOpPeriod(registry.value));
 const nextOp = computed(() => nextOpNumber(registry.value));
@@ -1174,6 +1254,7 @@ async function refresh(): Promise<void> {
             opChannels.value = await missionChannels(mission.guid);
         }
         if (!isSearchIncident.value) await loadFeatureTargets();
+        if (!currentOp.value) await loadMissionTemplates();
 
         if (currentOp.value) {
             debriefForm.opNumber = currentOp.value.opNumber;
@@ -1208,14 +1289,14 @@ async function onOpenOp(): Promise<void> {
     busy.value = true;
     error.value = ''; notice.value = '';
     try {
+        if (!missionTemplates.value.length) await loadMissionTemplates();
+        const keywords = opCreateKeywords();
         const entry = await openOperationalPeriod(
             { registry: createRegistryStore(mission), gateway },
             {
                 incidentName: mission.name,
                 channels: opChannels.value,
-                keywords: mission.incidentType
-                    ? [incidentTypeKeyword(mission.incidentType)]
-                    : undefined,
+                keywords: keywords.length ? keywords : undefined,
             },
         );
         await ensureOpOverlay(entry);

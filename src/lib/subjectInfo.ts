@@ -22,6 +22,7 @@ export interface SubjectForm {
     subjectAge: string;
     subjectGender: string;
     subjectCategory: string;
+    subjectType: string;
     subjectDescription: string;
     subjectHeight: string;
     subjectWeight: string;
@@ -126,6 +127,7 @@ export function blankSubjectForm(subjectCaseID = '01'): SubjectForm {
         subjectAge: '',
         subjectGender: '',
         subjectCategory: '',
+        subjectType: '',
         subjectDescription: '',
         subjectHeight: '',
         subjectWeight: '',
@@ -170,6 +172,7 @@ export function fieldsFromLog(keywords?: string[]): SubjectForm {
         subjectAge: kwValue(keywords, 'age:'),
         subjectGender: kwValue(keywords, 'gender:'),
         subjectCategory: kwValue(keywords, 'category:'),
+        subjectType: kwValue(keywords, 'subjectType:'),
         subjectDescription: kwValue(keywords, 'description:'),
         subjectHeight: kwValue(keywords, 'height:'),
         subjectWeight: kwValue(keywords, 'weight:'),
@@ -200,6 +203,7 @@ export function hasFilledSubjectFields(f: SubjectForm): boolean {
         f.subjectAge,
         f.subjectGender,
         f.subjectCategory,
+        f.subjectType,
         f.subjectDescription,
         f.subjectHeight,
         f.subjectWeight,
@@ -232,6 +236,7 @@ function buildParts(f: SubjectForm): string[] {
     if (age) parts.push(`Age: ${age}`);
     if (hasValue(f.subjectGender)) parts.push(`Gender: ${f.subjectGender}`);
     if (hasValue(f.subjectCategory)) parts.push(`Category: ${categoryLabel(f.subjectCategory)}`);
+    if (hasValue(f.subjectType)) parts.push(`Subject Type: ${f.subjectType}`);
     if (hasValue(f.subjectDescription)) parts.push(`Description: ${f.subjectDescription.trim()}`);
     if (hasValue(f.subjectHeight)) parts.push(`Height: ${f.subjectHeight.trim()}`);
     if (hasValue(f.subjectWeight)) parts.push(`Weight: ${f.subjectWeight.trim()}`);
@@ -269,6 +274,7 @@ export function buildSubjectKeywords(f: SubjectForm): string[] {
     if (age) kws.push(`age:${age}`);
     if (hasValue(f.subjectGender)) kws.push(`gender:${f.subjectGender}`);
     if (hasValue(f.subjectCategory)) kws.push(`category:${f.subjectCategory}`);
+    if (hasValue(f.subjectType)) kws.push(`subjectType:${f.subjectType}`);
     if (hasValue(f.subjectDescription)) kws.push(`description:${f.subjectDescription.trim()}`);
     if (hasValue(f.subjectHeight)) kws.push(`height:${f.subjectHeight.trim()}`);
     if (hasValue(f.subjectWeight)) kws.push(`weight:${f.subjectWeight.trim()}`);
@@ -340,6 +346,7 @@ export function subjectDetailRows(s: SubjectForm): SubjectDetailRow[] {
     if (hasValue(s.subjectCategory)) {
         rows.push({ label: 'Category', value: categoryLabel(s.subjectCategory) });
     }
+    if (hasValue(s.subjectType)) rows.push({ label: 'Subject Type', value: s.subjectType });
     if (hasValue(s.subjectDescription)) rows.push({ label: 'Description', value: s.subjectDescription.trim() });
     if (hasValue(s.subjectHeight)) rows.push({ label: 'Height', value: s.subjectHeight.trim() });
     if (hasValue(s.subjectWeight)) rows.push({ label: 'Weight', value: s.subjectWeight.trim() });

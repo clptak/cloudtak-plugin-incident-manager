@@ -1,4 +1,5 @@
 export const CHIP_BAR_POS_KEY = 'incident-manager:chip-bar-pos';
+export const CHIP_BAR_HIDDEN_KEY = 'incident-manager:chip-bar-hidden';
 export const DOCK_GAP = 8;
 export const PANE_HEIGHT = 60;
 export const ZOOM_STACK_WIDTH = 40;
@@ -61,6 +62,27 @@ export function clearSavedPos(): void {
         localStorage.removeItem(CHIP_BAR_POS_KEY);
     } catch {
         // Ignore
+    }
+}
+
+export function parseHidden(raw: string | null): boolean {
+    return raw === '1' || raw === 'true';
+}
+
+export function loadHidden(): boolean {
+    try {
+        return parseHidden(localStorage.getItem(CHIP_BAR_HIDDEN_KEY));
+    } catch {
+        return false;
+    }
+}
+
+export function saveHidden(hidden: boolean): void {
+    try {
+        if (hidden) localStorage.setItem(CHIP_BAR_HIDDEN_KEY, '1');
+        else localStorage.removeItem(CHIP_BAR_HIDDEN_KEY);
+    } catch {
+        // Quota / private mode
     }
 }
 

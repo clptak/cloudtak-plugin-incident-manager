@@ -10,6 +10,7 @@ import {
     dockedMaxWidth,
     dockedPosition,
     isDesktopWidth,
+    parseHidden,
     parseSavedPos,
     rectsIntersect,
     type Rect,
@@ -24,6 +25,14 @@ test('parseSavedPos accepts a point and rejects junk', () => {
     assert.equal(parseSavedPos('{'), null);
     assert.equal(parseSavedPos('{"x":1}'), null);
     assert.deepEqual(parseSavedPos('{"x":40,"y":80}'), { x: 40, y: 80 });
+});
+
+test('parseHidden treats 1/true as hidden', () => {
+    assert.equal(parseHidden(null), false);
+    assert.equal(parseHidden('0'), false);
+    assert.equal(parseHidden('no'), false);
+    assert.equal(parseHidden('1'), true);
+    assert.equal(parseHidden('true'), true);
 });
 
 test('docks to the right of DataSync when navigation is off', () => {

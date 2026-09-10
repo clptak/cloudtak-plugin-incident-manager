@@ -32,6 +32,7 @@ const STRING_INFO_KEYS = [
     'subjectAge',
     'subjectGender',
     'subjectCategory',
+    'subjectType',
     'subjectDescription',
     'subjectHeight',
     'subjectWeight',

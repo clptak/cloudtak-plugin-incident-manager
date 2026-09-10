@@ -393,6 +393,7 @@ import {
     TablerInlineAlert,
 } from '@tak-ps/vue-tabler';
 import { useIncident } from '../../composables/useIncident.ts';
+import { usePluginSettings } from '../../composables/usePluginSettings.ts';
 import { useResourceAssignments } from '../../composables/useResourceAssignments.ts';
 import { formatD4hSyncTime, loadD4hMeta, loadD4hRoster } from '../../lib/d4hRoster.ts';
 import type { D4HRosterMeta } from '../../lib/d4hTypes.ts';
@@ -425,6 +426,12 @@ const {
     updateAssignment,
     updateDefaultAgency,
 } = useResourceAssignments();
+
+const {
+    yourAgency,
+    useD4hAidingAgencies,
+    aidingAgencies,
+} = usePluginSettings();
 
 const RESOURCES_INFO_DISMISSED_KEY = 'incident-manager:resources-info-dismissed';
 const RESOURCE_PLACEHOLDER = '— Select resource —';
@@ -570,22 +577,34 @@ const formEtaString = computed({
 const d4hContextName = computed(() => (meta.value?.contextName ?? '').trim());
 
 const effectiveDefaultAgency = computed(() =>
-    resolveEffectiveDefaultAgency(defaultAgency.value, d4hContextName.value),
+    resolveEffectiveDefaultAgency(
+        defaultAgency.value,
+        d4hContextName.value,
+        yourAgency.value,
+    ),
+);
+
+const pluginDefaultAgency = computed(() =>
+    resolveEffectiveDefaultAgency('', d4hContextName.value, yourAgency.value),
 );
 
 const defaultAgencyHint = computed(() => {
     const override = defaultAgency.value.trim();
+    const settingsHome = yourAgency.value.trim();
     const d4h = d4hContextName.value;
-    if (override && d4h && override !== d4h) {
-        return `Override active. D4H team: ${d4h}.`;
-    }
     if (override) {
+        if (settingsHome && override !== settingsHome) {
+            return `Override active. Settings Your Agency: ${settingsHome}.`;
+        }
         return 'Saved on this mission as default_agency in mission_schema.json.';
     }
-    if (d4h) {
-        return `Using D4H team: ${d4h}. Enter a value above to override.`;
+    if (settingsHome) {
+        return 'Using Your Agency from Settings. Enter a different value to override on this mission.';
     }
-    return 'Enter your agency name, or sync D4H to pull it automatically.';
+    if (d4h) {
+        return `Using D4H team: ${d4h}. Set Your Agency in Settings, or enter a value above to override.`;
+    }
+    return 'Set Your Agency in Settings, or enter a name here to override on this mission.';
 });
 
 const canCreate = computed(() =>
@@ -599,7 +618,10 @@ function statusLabelFor(status: ResourceAssignmentStatus): string {
 }
 
 function rebuildAgencyOptions(): void {
-    agencyOptions.value = buildAgencyOptions(d4hExternalResources.value, effectiveDefaultAgency.value);
+    const aidingNames = useD4hAidingAgencies.value
+        ? d4hExternalResources.value.map((r) => r.name)
+        : aidingAgencies.value;
+    agencyOptions.value = buildAgencyOptions(aidingNames, effectiveDefaultAgency.value);
 }
 
 function applyEffectiveDefaultToForm(force = false): void {
@@ -635,7 +657,9 @@ async function refreshAgencies(): Promise<void> {
 async function onDefaultAgencyBlur(): Promise<void> {
     if (!activeMission.value) return;
     const next = defaultAgencyInput.value.trim();
-    if (next === defaultAgency.value.trim()) return;
+    const schema = defaultAgency.value.trim();
+    if (next === schema) return;
+    if (!schema && next === pluginDefaultAgency.value) return;
 
     savingDefaultAgency.value = true;
     try {
@@ -713,20 +737,25 @@ async function onStatusLabelChange(id: string, label: string): Promise<void> {
 
 watch(() => activeMission.value?.guid, async (guid) => {
     await loadForMission(guid ? activeMission.value : null);
-    defaultAgencyInput.value = defaultAgency.value;
+    defaultAgencyInput.value = effectiveDefaultAgency.value;
     applyEffectiveDefaultToForm(true);
     await loadOpRegistry();
 }, { immediate: true });
 
-watch(defaultAgency, (value) => {
+watch(defaultAgency, () => {
+    defaultAgencyInput.value = effectiveDefaultAgency.value;
+    rebuildAgencyOptions();
+    applyEffectiveDefaultToForm();
+});
+
+watch(effectiveDefaultAgency, (value) => {
     defaultAgencyInput.value = value;
     rebuildAgencyOptions();
     applyEffectiveDefaultToForm();
 });
 
-watch(effectiveDefaultAgency, () => {
+watch([useD4hAidingAgencies, aidingAgencies], () => {
     rebuildAgencyOptions();
-    applyEffectiveDefaultToForm();
 });
 
 onMounted(() => {

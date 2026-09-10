@@ -84,6 +84,7 @@
                     <!-- Main: shows the active vertical pane -->
                     <div v-if='activeHTab === "main"'>
                         <CreateOpenPane v-if='activeKey === "create-open"' />
+                        <SettingsPane v-else-if='activeKey === "settings"' />
                         <ResourcesTab v-else-if='activeKey === "resources"' />
                         <AssignmentsTab v-else-if='activeKey === "work-assignments"' />
                         <WrapUpPane v-else-if='activeKey === "generate-report-template"' />
@@ -129,6 +130,7 @@ import { SEARCH_ONLY_HTAB_KEYS } from '../lib/incidentType.ts';
 import { useIncident } from '../composables/useIncident.ts';
 
 const CreateOpenPane = defineAsyncComponent(() => import('./panes/CreateOpenPane.vue'));
+const SettingsPane = defineAsyncComponent(() => import('./panes/SettingsPane.vue'));
 const LoggerPane = defineAsyncComponent(() => import('./panes/LoggerPane.vue'));
 const CasiePane = defineAsyncComponent(() => import('./panes/CasiePane.vue'));
 const WrapUpPane = defineAsyncComponent(() => import('./panes/WrapUpPane.vue'));

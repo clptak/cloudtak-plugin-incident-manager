@@ -179,6 +179,14 @@
                         </div>
                         <div class='col-md-4'>
                             <TablerEnum
+                                :model-value='subjectTypeLabelFor(draft.form.subjectType)'
+                                label='Subject Type'
+                                :options='subjectTypeOptionsFor(draft.form.subjectType)'
+                                @update:model-value='onSubjectTypeLabelChange(draft, $event)'
+                            />
+                        </div>
+                        <div class='col-md-4'>
+                            <TablerEnum
                                 :model-value='categoryLabelFor(draft.form.subjectCategory)'
                                 label='Category'
                                 :options='CATEGORY_OPTIONS'
@@ -418,6 +426,7 @@ import {
 } from '@tak-ps/vue-tabler';
 import type { Feature } from '../../../../../../src/types.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
+import { usePluginSettings } from '../../../composables/usePluginSettings.ts';
 import {
     SUBJECT_NUMBERS,
     SUBJECT_CATEGORIES as CATEGORIES,
@@ -433,6 +442,7 @@ import {
     subjectNumberFromLog,
     type SubjectForm,
 } from '../../../lib/subjectInfo.ts';
+import { SUBJECT_TYPE_PLACEHOLDER } from '../../../lib/subjectTypes.ts';
 import {
     resolveSubjects,
     saveSubjectsToMission,
@@ -441,6 +451,7 @@ import { loadMissionSchema } from '../../../lib/missionSchema.ts';
 import { loadIncidentSubscription, loadSchemaSubscription } from '../../../lib/incidentSubscription.ts';
 
 const { activeMission, requireActiveMission } = useIncident();
+const { enumOptions: subjectTypeEnumOptions } = usePluginSettings();
 
 const MAX_SUBJECTS = SUBJECT_NUMBERS.length;
 
@@ -566,6 +577,18 @@ function onGenderLabelChange(draft: SubjectDraft, label: string): void {
     else draft.form.subjectGender = '';
 }
 
+function subjectTypeOptionsFor(current: string): string[] {
+    return subjectTypeEnumOptions(current);
+}
+
+function subjectTypeLabelFor(value: string): string {
+    return value || SUBJECT_TYPE_PLACEHOLDER;
+}
+
+function onSubjectTypeLabelChange(draft: SubjectDraft, label: string): void {
+    draft.form.subjectType = label === SUBJECT_TYPE_PLACEHOLDER ? '' : label;
+}
+
 function categoryLabelFor(value: string): string {
     if (!value) return 'Select Category';
     return CATEGORIES.find((c) => c.value === value)?.label ?? 'Select Category';
@@ -607,6 +630,7 @@ function draftSummary(f: SubjectForm): string {
     if (hasValue(f.subjectName)) return f.subjectName.trim();
     const age = effectiveAge(f);
     if (age) return `Age ${age}`;
+    if (hasValue(f.subjectType)) return f.subjectType;
     if (hasValue(f.subjectCategory)) {
         return CATEGORIES.find((c) => c.value === f.subjectCategory)?.label ?? f.subjectCategory;
     }

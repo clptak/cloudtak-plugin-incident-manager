@@ -9,6 +9,16 @@
     >
         {{ createOpenNav.label }}
     </button>
+    <button
+        type='button'
+        class='incident-nav-item'
+        :class='{ active: activeKey === settingsNav.key && activeHTab === "main" }'
+        :data-bs-dismiss='mobile ? "offcanvas" : undefined'
+        :data-bs-target='mobile ? "#incident-manager-nav" : undefined'
+        @click='onSelect(settingsNav.key)'
+    >
+        {{ settingsNav.label }}
+    </button>
 
     <template
         v-for='section in navSections'
@@ -52,6 +62,7 @@ import NavSectionHeader from './NavSectionHeader.vue';
 import NavHelpButton from './NavHelpButton.vue';
 import {
     CREATE_OPEN_NAV,
+    SETTINGS_NAV,
     visibleNavSections,
 } from '../lib/incidentNav.ts';
 import { useIncident } from '../composables/useIncident.ts';
@@ -68,6 +79,7 @@ const emit = defineEmits<{
 }>();
 
 const createOpenNav = CREATE_OPEN_NAV;
+const settingsNav = SETTINGS_NAV;
 const { selectKeyGuarded, isSearchIncident } = useIncident();
 const navSections = computed(() => visibleNavSections(isSearchIncident.value));
 

@@ -2,7 +2,11 @@
     <div
         ref='pane'
         class='position-absolute cloudtak-panel d-flex align-items-center gap-2 px-2 incident-chip-bar'
-        :class='{ "incident-chip-bar--dragging": dragging, "incident-chip-bar--ready": laidOut }'
+        :class='{
+            "incident-chip-bar--dragging": dragging,
+            "incident-chip-bar--ready": laidOut,
+            "incident-chip-bar--collapsed": hidden,
+        }'
         :style='paneStyle'
     >
         <div
@@ -19,25 +23,98 @@
                 stroke='1.5'
             />
         </div>
-        <div class='incident-chip-bar-chips d-flex align-items-center gap-2'>
-            <IncidentManagerTaskbarChip />
-            <ResourcesTaskbarChip />
-            <AssignmentsTaskbarChip />
-            <SegmentsTaskbarChip />
-            <ClueTaskbarChip />
+        <div
+            v-if='hidden'
+            class='incident-chip-bar-chips d-flex align-items-center gap-2'
+        >
+            <TaskbarChipButton
+                :icon='IconTarget'
+                label='IM'
+                title='Show Incident Manager chip bar'
+                @click='showBar'
+            />
         </div>
+        <template v-else>
+            <div class='incident-chip-bar-chips d-flex align-items-center gap-2'>
+                <IncidentManagerTaskbarChip />
+                <ResourcesTaskbarChip />
+                <AssignmentsTaskbarChip />
+                <SegmentsTaskbarChip />
+                <ClueTaskbarChip />
+            </div>
+            <TablerDropdown>
+                <TaskbarChipButton
+                    :icon='IconFileText'
+                    label='Add DataSync Log'
+                    title='Submit a log to DataSync'
+                />
+                <template #dropdown>
+                    <div
+                        class='py-1'
+                        style='min-width: 180px;'
+                    >
+                        <div
+                            v-if='logTemplatesLoading'
+                            class='px-3 py-1 text-secondary small'
+                        >
+                            Loading…
+                        </div>
+                        <div
+                            v-else-if='logTemplatesError'
+                            class='px-3 py-1 text-secondary small'
+                        >
+                            {{ logTemplatesError }}
+                        </div>
+                        <div
+                            v-else-if='logTemplatesHint'
+                            class='px-3 py-1 text-secondary small'
+                        >
+                            {{ logTemplatesHint }}
+                        </div>
+                        <button
+                            v-for='log in logTemplates'
+                            :key='log.id'
+                            type='button'
+                            class='dropdown-item'
+                            @click='onOpenLogTemplate(log.id)'
+                        >
+                            {{ log.name }}
+                        </button>
+                    </div>
+                </template>
+            </TablerDropdown>
+            <TaskbarChipButton
+                :icon='IconChevronRight'
+                label='Hide'
+                title='Hide chip bar'
+                @click='hideBar'
+            />
+        </template>
     </div>
 </template>
 
 <script setup lang='ts'>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import { IconGripVertical } from '@tabler/icons-vue';
+import {
+    IconChevronRight,
+    IconFileText,
+    IconGripVertical,
+    IconTarget,
+} from '@tabler/icons-vue';
+import { TablerDropdown } from '@tak-ps/vue-tabler';
 import { useMapStore } from '../../../../src/stores/map.ts';
 import IncidentManagerTaskbarChip from './IncidentManagerTaskbarChip.vue';
 import ResourcesTaskbarChip from './ResourcesTaskbarChip.vue';
 import AssignmentsTaskbarChip from './AssignmentsTaskbarChip.vue';
 import SegmentsTaskbarChip from './SegmentsTaskbarChip.vue';
 import ClueTaskbarChip from './ClueTaskbarChip.vue';
+import TaskbarChipButton from './TaskbarChipButton.vue';
+import { useIncident } from '../composables/useIncident.ts';
+import { loadIncidentSubscription } from '../lib/incidentSubscription.ts';
+import {
+    listMissionTemplateLogs,
+    type MissionTemplateLogItem,
+} from '../lib/missionTemplates.ts';
 import {
     CHIP_BAR_ROOT_ID,
     DOCK_GAP,
@@ -48,16 +125,25 @@ import {
     dockedMaxWidth,
     dockedPosition,
     isDesktopWidth,
+    loadHidden,
     loadSavedPos,
     queryActiveMission,
     queryLeftControls,
     queryNavBanner,
+    saveHidden,
     savePos,
     toRect,
     type Point,
 } from '../lib/chipBarPosition.ts';
 
 const mapStore = useMapStore();
+const { activeMission } = useIncident();
+
+const logTemplates = ref<MissionTemplateLogItem[]>([]);
+const logTemplatesLoading = ref(false);
+const logTemplatesError = ref('');
+const logTemplatesHint = ref('');
+let logLoadSeq = 0;
 
 const navActive = computed(() => {
     try {
@@ -70,6 +156,7 @@ const navActive = computed(() => {
 const pane = ref<HTMLElement | null>(null);
 const saved = loadSavedPos();
 const isUndocked = ref(saved !== null);
+const hidden = ref(loadHidden());
 const pos = ref<Point>(saved ?? { x: DOCK_GAP, y: DOCK_GAP });
 const maxWidth = ref(480);
 const dragging = ref(false);
@@ -103,7 +190,7 @@ function layout(): void {
     const leftControls = toRect(queryLeftControls(shellEl));
     const nav = toRect(queryNavBanner());
     const paneSize = {
-        width: pane.value?.offsetWidth || 200,
+        width: pane.value?.offsetWidth || (hidden.value ? 80 : 200),
         height: pane.value?.offsetHeight || PANE_HEIGHT,
     };
     const desktop = isDesktopWidth(window.innerWidth);
@@ -114,7 +201,9 @@ function layout(): void {
             paneSize,
             { width: shell.width, height: shell.height },
         );
-        maxWidth.value = Math.max(120, shell.width - pos.value.x - DOCK_GAP);
+        maxWidth.value = hidden.value
+            ? Math.max(80, Math.min(160, shell.width - pos.value.x - DOCK_GAP))
+            : Math.max(120, shell.width - pos.value.x - DOCK_GAP);
         laidOut.value = true;
         return;
     }
@@ -126,11 +215,13 @@ function layout(): void {
         navActive: navActive.value,
         isDesktop: desktop,
     });
-    maxWidth.value = dockedMaxWidth(
-        pos.value,
-        shell.width,
-        !(navActive.value && desktop),
-    );
+    maxWidth.value = hidden.value
+        ? Math.max(80, Math.min(160, shell.width - pos.value.x - DOCK_GAP))
+        : dockedMaxWidth(
+            pos.value,
+            shell.width,
+            !(navActive.value && desktop),
+        );
     laidOut.value = true;
 }
 
@@ -210,6 +301,71 @@ function reDock(): void {
     layout();
 }
 
+function hideBar(): void {
+    hidden.value = true;
+    saveHidden(true);
+}
+
+function showBar(): void {
+    hidden.value = false;
+    saveHidden(false);
+}
+
+function onOpenLogTemplate(id: string): void {
+    if (!id) return;
+    // TODO: open DataSync log form for this template
+}
+
+async function loadLogTemplates(): Promise<void> {
+    const seq = ++logLoadSeq;
+    const mission = activeMission.value;
+    logTemplates.value = [];
+    logTemplatesError.value = '';
+    if (!mission) {
+        logTemplatesLoading.value = false;
+        logTemplatesHint.value = 'Open a mission first';
+        return;
+    }
+
+    logTemplatesLoading.value = true;
+    logTemplatesHint.value = '';
+    try {
+        const sub = await loadIncidentSubscription(mission);
+        if (seq !== logLoadSeq) return;
+        if (!sub.templateid) {
+            logTemplatesHint.value = 'No log templates';
+            return;
+        }
+        const items = await listMissionTemplateLogs(sub.templateid);
+        if (seq !== logLoadSeq) return;
+        logTemplates.value = items;
+        if (!items.length) {
+            logTemplatesHint.value = 'No log templates';
+        }
+    } catch (err) {
+        if (seq !== logLoadSeq) return;
+        logTemplatesError.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        if (seq === logLoadSeq) {
+            logTemplatesLoading.value = false;
+        }
+    }
+}
+
+watch(
+    () => activeMission.value?.guid,
+    () => {
+        void loadLogTemplates();
+    },
+    { immediate: true },
+);
+
+watch(hidden, () => {
+    void nextTick(() => {
+        layout();
+    });
+});
+
 watch(navActive, () => {
     void nextTick(() => {
         attachObservers();
@@ -277,5 +433,9 @@ onUnmounted(() => {
     overflow-x: auto;
     overflow-y: hidden;
     height: 100%;
+}
+
+.incident-chip-bar--collapsed {
+    width: max-content;
 }
 </style>
