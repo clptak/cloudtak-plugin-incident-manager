@@ -51,21 +51,34 @@
                 <template #dropdown>
                     <div
                         class='py-1'
-                        style='min-width: 160px;'
+                        style='min-width: 180px;'
                     >
+                        <div
+                            v-if='logTemplatesLoading'
+                            class='px-3 py-1 text-secondary small'
+                        >
+                            Loading…
+                        </div>
+                        <div
+                            v-else-if='logTemplatesError'
+                            class='px-3 py-1 text-secondary small'
+                        >
+                            {{ logTemplatesError }}
+                        </div>
+                        <div
+                            v-else-if='logTemplatesHint'
+                            class='px-3 py-1 text-secondary small'
+                        >
+                            {{ logTemplatesHint }}
+                        </div>
                         <button
+                            v-for='log in logTemplates'
+                            :key='log.id'
                             type='button'
                             class='dropdown-item'
-                            @click='onOpenLogTemplate("template1")'
+                            @click='onOpenLogTemplate(log.id)'
                         >
-                            Template 1
-                        </button>
-                        <button
-                            type='button'
-                            class='dropdown-item'
-                            @click='onOpenLogTemplate("template2")'
-                        >
-                            Template 2
+                            {{ log.name }}
                         </button>
                     </div>
                 </template>
@@ -96,6 +109,12 @@ import AssignmentsTaskbarChip from './AssignmentsTaskbarChip.vue';
 import SegmentsTaskbarChip from './SegmentsTaskbarChip.vue';
 import ClueTaskbarChip from './ClueTaskbarChip.vue';
 import TaskbarChipButton from './TaskbarChipButton.vue';
+import { useIncident } from '../composables/useIncident.ts';
+import { loadIncidentSubscription } from '../lib/incidentSubscription.ts';
+import {
+    listMissionTemplateLogs,
+    type MissionTemplateLogItem,
+} from '../lib/missionTemplates.ts';
 import {
     CHIP_BAR_ROOT_ID,
     DOCK_GAP,
@@ -118,6 +137,13 @@ import {
 } from '../lib/chipBarPosition.ts';
 
 const mapStore = useMapStore();
+const { activeMission } = useIncident();
+
+const logTemplates = ref<MissionTemplateLogItem[]>([]);
+const logTemplatesLoading = ref(false);
+const logTemplatesError = ref('');
+const logTemplatesHint = ref('');
+let logLoadSeq = 0;
 
 const navActive = computed(() => {
     try {
@@ -285,9 +311,54 @@ function showBar(): void {
     saveHidden(false);
 }
 
-function onOpenLogTemplate(_id: 'template1' | 'template2'): void {
+function onOpenLogTemplate(id: string): void {
+    if (!id) return;
     // TODO: open DataSync log form for this template
 }
+
+async function loadLogTemplates(): Promise<void> {
+    const seq = ++logLoadSeq;
+    const mission = activeMission.value;
+    logTemplates.value = [];
+    logTemplatesError.value = '';
+    if (!mission) {
+        logTemplatesLoading.value = false;
+        logTemplatesHint.value = 'Open a mission first';
+        return;
+    }
+
+    logTemplatesLoading.value = true;
+    logTemplatesHint.value = '';
+    try {
+        const sub = await loadIncidentSubscription(mission);
+        if (seq !== logLoadSeq) return;
+        if (!sub.templateid) {
+            logTemplatesHint.value = 'No log templates';
+            return;
+        }
+        const items = await listMissionTemplateLogs(sub.templateid);
+        if (seq !== logLoadSeq) return;
+        logTemplates.value = items;
+        if (!items.length) {
+            logTemplatesHint.value = 'No log templates';
+        }
+    } catch (err) {
+        if (seq !== logLoadSeq) return;
+        logTemplatesError.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        if (seq === logLoadSeq) {
+            logTemplatesLoading.value = false;
+        }
+    }
+}
+
+watch(
+    () => activeMission.value?.guid,
+    () => {
+        void loadLogTemplates();
+    },
+    { immediate: true },
+);
 
 watch(hidden, () => {
     void nextTick(() => {

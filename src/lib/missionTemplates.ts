@@ -15,6 +15,11 @@ export interface MissionTemplateItem {
     description?: string;
 }
 
+export interface MissionTemplateLogItem {
+    id: string;
+    name: string;
+}
+
 export function defaultMissionTemplate(): MissionTemplateItem {
     return {
         id: DEFAULT_TEMPLATE_ID,
@@ -91,4 +96,18 @@ export async function listMissionTemplates(
         icon: item.icon,
         description: item.description,
     }));
+}
+
+/** Log types on a Mission Template (same list CloudTAK Mission Logs uses). */
+export async function listMissionTemplateLogs(
+    templateId: string,
+): Promise<MissionTemplateLogItem[]> {
+    const { default: MissionTemplateLogs } = await import(
+        '../../../../src/base/mission-template-logs.ts'
+    );
+    const logs = new MissionTemplateLogs(templateId);
+    const items = await logs.list({ refresh: true });
+    return items
+        .map((item) => ({ id: item.id, name: item.name }))
+        .sort((a, b) => a.name.localeCompare(b.name));
 }
