@@ -7,7 +7,7 @@
     >
         <template #label>
             <p class='text-uppercase text-white-50 small mb-0 d-flex align-items-center gap-2 w-100'>
-                <span>Generate Report Template</span>
+                <span>Create Close Out Package</span>
                 <span class='badge bg-blue-lt ms-auto'>Patrol Report</span>
             </p>
         </template>
