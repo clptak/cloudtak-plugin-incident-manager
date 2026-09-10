@@ -45,7 +45,7 @@
             <TablerDropdown>
                 <TaskbarChipButton
                     :icon='IconFileText'
-                    label='Logs'
+                    label='Add DataSync Log'
                     title='Submit a log to DataSync'
                 />
                 <template #dropdown>
