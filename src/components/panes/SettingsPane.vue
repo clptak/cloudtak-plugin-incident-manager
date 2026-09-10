@@ -4,16 +4,148 @@
             Settings
         </h3>
 
+        <!-- ══ Case File Folder ══ -->
+        <div
+            v-if='expandedCard !== "folder"'
+            class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+            role='button'
+            tabindex='0'
+            :aria-expanded='false'
+            @click='toggleCard("folder")'
+            @keydown.enter.prevent='toggleCard("folder")'
+            @keydown.space.prevent='toggleCard("folder")'
+        >
+            <p class='text-uppercase text-white-50 small mb-0'>
+                Case File Folder
+            </p>
+            <IconChevronDown
+                class='ms-auto transition-transform text-white-50 rotate-180'
+                :size='20'
+                stroke='1.5'
+            />
+        </div>
         <TablerBorder
+            v-else
             class='cloudtak-accent text-white mb-3'
             :fill-height='false'
             :shadow='false'
             gap='sm'
         >
             <template #label>
-                <p class='text-uppercase text-white-50 small mb-0'>
-                    Subject Types
+                <div
+                    class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='true'
+                    @click='toggleCard("folder")'
+                    @keydown.enter.prevent='toggleCard("folder")'
+                    @keydown.space.prevent='toggleCard("folder")'
+                >
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Case File Folder
+                    </p>
+                    <IconChevronDown
+                        class='ms-auto transition-transform text-white-50'
+                        :size='20'
+                        stroke='1.5'
+                    />
+                </div>
+            </template>
+
+            <template v-if='folderSupported'>
+                <p class='text-muted small mb-2'>
+                    Choose a folder once and generated documents (IAPs, demob packages)
+                    are written straight into it, in a sub-folder per incident.
+                    Otherwise they download normally.
                 </p>
+                <div class='d-flex flex-wrap align-items-center gap-2'>
+                    <span
+                        v-if='folderName'
+                        class='badge bg-success-lt text-success'
+                    >{{ folderName }}</span>
+                    <span
+                        v-else
+                        class='text-muted small'
+                    >No folder set — using downloads.</span>
+                    <button
+                        type='button'
+                        class='btn btn-outline-primary btn-sm'
+                        :disabled='choosingFolder'
+                        @click='onChooseFolder'
+                    >
+                        {{ folderName ? 'Change folder' : 'Choose folder' }}
+                    </button>
+                    <button
+                        v-if='folderName'
+                        type='button'
+                        class='btn btn-link btn-sm'
+                        @click='onClearFolder'
+                    >
+                        Use downloads
+                    </button>
+                    <span
+                        v-if='folderStatus'
+                        class='small'
+                        :class='folderError ? "text-danger" : "text-muted"'
+                    >{{ folderStatus }}</span>
+                </div>
+            </template>
+            <p
+                v-else
+                class='text-muted small mb-0'
+            >
+                This browser cannot write to a chosen folder — documents will download.
+                (Supported in Chrome/Edge and in CloudTAK Desktop once the
+                <code>fileSystem</code> permission is enabled.)
+            </p>
+        </TablerBorder>
+
+        <!-- ══ Subject Types ══ -->
+        <div
+            v-if='expandedCard !== "subject-types"'
+            class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+            role='button'
+            tabindex='0'
+            :aria-expanded='false'
+            @click='toggleCard("subject-types")'
+            @keydown.enter.prevent='toggleCard("subject-types")'
+            @keydown.space.prevent='toggleCard("subject-types")'
+        >
+            <p class='text-uppercase text-white-50 small mb-0'>
+                Subject Types
+            </p>
+            <IconChevronDown
+                class='ms-auto transition-transform text-white-50 rotate-180'
+                :size='20'
+                stroke='1.5'
+            />
+        </div>
+        <TablerBorder
+            v-else
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <div
+                    class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='true'
+                    @click='toggleCard("subject-types")'
+                    @keydown.enter.prevent='toggleCard("subject-types")'
+                    @keydown.space.prevent='toggleCard("subject-types")'
+                >
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Subject Types
+                    </p>
+                    <IconChevronDown
+                        class='ms-auto transition-transform text-white-50'
+                        :size='20'
+                        stroke='1.5'
+                    />
+                </div>
             </template>
 
             <p class='text-muted small mb-3'>
@@ -102,16 +234,52 @@
             />
         </TablerBorder>
 
+        <!-- ══ Statistical Distance (LPB) ══ -->
+        <div
+            v-if='expandedCard !== "lpb"'
+            class='cloudtak-accent border rounded-3 text-white px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+            role='button'
+            tabindex='0'
+            :aria-expanded='false'
+            @click='toggleCard("lpb")'
+            @keydown.enter.prevent='toggleCard("lpb")'
+            @keydown.space.prevent='toggleCard("lpb")'
+        >
+            <p class='text-uppercase text-white-50 small mb-0'>
+                Statistical Distance (LPB)
+            </p>
+            <IconChevronDown
+                class='ms-auto transition-transform text-white-50 rotate-180'
+                :size='20'
+                stroke='1.5'
+            />
+        </div>
         <TablerBorder
+            v-else
             class='cloudtak-accent text-white'
             :fill-height='false'
             :shadow='false'
             gap='sm'
         >
             <template #label>
-                <p class='text-uppercase text-white-50 small mb-0'>
-                    Statistical Distance (LPB)
-                </p>
+                <div
+                    class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='true'
+                    @click='toggleCard("lpb")'
+                    @keydown.enter.prevent='toggleCard("lpb")'
+                    @keydown.space.prevent='toggleCard("lpb")'
+                >
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Statistical Distance (LPB)
+                    </p>
+                    <IconChevronDown
+                        class='ms-auto transition-transform text-white-50'
+                        :size='20'
+                        stroke='1.5'
+                    />
+                </div>
             </template>
 
             <p class='text-muted small mb-3'>
@@ -173,6 +341,7 @@
 
 <script setup lang='ts'>
 import { computed, ref, watch } from 'vue';
+import { IconChevronDown } from '@tabler/icons-vue';
 import { TablerBorder, TablerInlineAlert } from '@tak-ps/vue-tabler';
 import NumberedTextList from '../NumberedTextList.vue';
 import { usePluginSettings } from '../../composables/usePluginSettings.ts';
@@ -182,6 +351,20 @@ import {
     mergeSubjectTypes,
     parseSubjectTypesText,
 } from '../../lib/subjectTypes.ts';
+import {
+    chooseFileTarget,
+    clearFileTarget,
+    ensureWritable,
+    fileTargetSupported,
+    savedFileTarget,
+} from '../../lib/fileTarget.ts';
+
+type SettingsCard = 'folder' | 'subject-types' | 'lpb';
+const expandedCard = ref<SettingsCard | null>('folder');
+
+function toggleCard(card: SettingsCard): void {
+    expandedCard.value = expandedCard.value === card ? null : card;
+}
 
 const {
     subjectTypes,
@@ -201,6 +384,47 @@ const pendingSubjectFileName = ref('');
 const subjectUploadError = ref('');
 const lpbUploadError = ref('');
 const lpbUploadOk = ref('');
+
+const folderSupported = fileTargetSupported();
+const folderName = ref('');
+const folderStatus = ref('');
+const folderError = ref(false);
+const choosingFolder = ref(false);
+
+async function refreshFolder(): Promise<void> {
+    const handle = await savedFileTarget();
+    folderName.value = handle?.name ?? '';
+    if (handle && !(await ensureWritable(handle, false))) {
+        folderStatus.value = 'Permission needed — you will be asked on the next save.';
+    }
+}
+
+async function onChooseFolder(): Promise<void> {
+    choosingFolder.value = true;
+    folderError.value = false;
+    folderStatus.value = '';
+    try {
+        const handle = await chooseFileTarget();
+        if (handle) {
+            folderName.value = handle.name;
+            folderStatus.value = 'Folder set.';
+        }
+    } catch (err) {
+        folderError.value = true;
+        folderStatus.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        choosingFolder.value = false;
+    }
+}
+
+async function onClearFolder(): Promise<void> {
+    await clearFileTarget();
+    folderName.value = '';
+    folderStatus.value = 'Reverted to downloads.';
+    folderError.value = false;
+}
+
+void refreshFolder();
 
 watch(subjectTypes, (types) => {
     draftTypes.value = [...types];
@@ -298,3 +522,13 @@ function resetLpb(): void {
     lpbUploadOk.value = 'Restored the bundled Arizona LPB table.';
 }
 </script>
+
+<style scoped>
+.rotate-180 {
+    transform: rotate(-90deg);
+}
+
+.transition-transform {
+    transition: transform 0.2s ease-out;
+}
+</style>

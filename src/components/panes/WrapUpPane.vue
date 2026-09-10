@@ -47,57 +47,6 @@
             />
         </div>
 
-        <!-- ── Case file folder (File System Access) ──────────────── -->
-        <div class='cloudtak-accent border rounded-3 mt-3 p-3'>
-            <p class='text-uppercase text-white-50 small mb-1'>
-                Case File Folder
-            </p>
-            <template v-if='folderSupported'>
-                <p class='text-muted small mb-2'>
-                    Choose a folder once and generated documents (IAPs, demob packages)
-                    are written straight into it, in a sub-folder per incident.
-                    Otherwise they download normally.
-                </p>
-                <div class='d-flex flex-wrap align-items-center gap-2'>
-                    <span
-                        v-if='folderName'
-                        class='badge bg-success-lt text-success'
-                    >{{ folderName }}</span>
-                    <span
-                        v-else
-                        class='text-muted small'
-                    >No folder set — using downloads.</span>
-                    <button
-                        class='btn btn-outline-primary btn-sm'
-                        :disabled='choosingFolder'
-                        @click='onChooseFolder'
-                    >
-                        {{ folderName ? 'Change folder' : 'Choose folder' }}
-                    </button>
-                    <button
-                        v-if='folderName'
-                        class='btn btn-link btn-sm'
-                        @click='onClearFolder'
-                    >
-                        Use downloads
-                    </button>
-                    <span
-                        v-if='folderStatus'
-                        class='small'
-                        :class='folderError ? "text-danger" : "text-muted"'
-                    >{{ folderStatus }}</span>
-                </div>
-            </template>
-            <p
-                v-else
-                class='text-muted small mb-0'
-            >
-                This browser cannot write to a chosen folder — documents will download.
-                (Supported in Chrome/Edge and in CloudTAK Desktop once the
-                <code>fileSystem</code> permission is enabled.)
-            </p>
-        </div>
-
         <!-- ── Demobilization package ─────────────────────────────── -->
         <div class='cloudtak-accent border rounded-3 mt-3 p-3'>
             <p class='text-uppercase text-white-50 small mb-1'>
@@ -213,13 +162,6 @@ import {
 import { useIncident } from '../../composables/useIncident.ts';
 import { defaultDemobOptions } from '../../domain/demob.ts';
 import { buildDemobPackage, saveDemobPackage } from '../../lib/demobPackage.ts';
-import {
-    chooseFileTarget,
-    clearFileTarget,
-    ensureWritable,
-    fileTargetSupported,
-    savedFileTarget,
-} from '../../lib/fileTarget.ts';
 import { listAllIncidentLogs, loadSchemaSubscription } from '../../lib/incidentSubscription.ts';
 import {
     assignmentDataFromSchema,
@@ -233,46 +175,6 @@ const { activeMission, requireActiveMission } = useIncident();
 const loading = ref(false);
 const error = ref('');
 const demob = ref(defaultDemobOptions());
-const folderSupported = fileTargetSupported();
-const folderName = ref('');
-const folderStatus = ref('');
-const folderError = ref(false);
-const choosingFolder = ref(false);
-
-async function refreshFolder(): Promise<void> {
-    const handle = await savedFileTarget();
-    folderName.value = handle?.name ?? '';
-    if (handle && !(await ensureWritable(handle, false))) {
-        folderStatus.value = 'Permission needed — you will be asked on the next save.';
-    }
-}
-
-async function onChooseFolder(): Promise<void> {
-    choosingFolder.value = true;
-    folderError.value = false;
-    folderStatus.value = '';
-    try {
-        const handle = await chooseFileTarget();
-        if (handle) {
-            folderName.value = handle.name;
-            folderStatus.value = 'Folder set.';
-        }
-    } catch (err) {
-        folderError.value = true;
-        folderStatus.value = err instanceof Error ? err.message : String(err);
-    } finally {
-        choosingFolder.value = false;
-    }
-}
-
-async function onClearFolder(): Promise<void> {
-    await clearFileTarget();
-    folderName.value = '';
-    folderStatus.value = 'Reverted to downloads.';
-    folderError.value = false;
-}
-
-void refreshFolder();
 const packaging = ref(false);
 const packageStatus = ref('');
 const packageError = ref(false);
