@@ -175,4 +175,12 @@ test('parseStoredPluginSettings defaults D4H aiding agencies on', () => {
     assert.equal(missing.yourAgency, '');
     assert.equal(missing.useD4hAidingAgencies, true);
     assert.deepEqual(missing.aidingAgencies, []);
+    assert.equal(missing.searchOpTemplateId, '');
+});
+
+test('parseStoredPluginSettings reads searchOpTemplateId', () => {
+    const parsed = parseStoredPluginSettings({
+        searchOpTemplateId: '  tmpl-sar-1  ',
+    });
+    assert.equal(parsed.searchOpTemplateId, 'tmpl-sar-1');
 });

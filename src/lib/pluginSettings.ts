@@ -26,6 +26,8 @@ export interface PluginSettings {
     /** When true, Resources Agency options come from D4H External Resources. */
     useD4hAidingAgencies: boolean;
     aidingAgencies: string[];
+    /** DataSync mission template id for search OPs. Empty = auto-pick SAR by name. */
+    searchOpTemplateId: string;
 }
 
 export function defaultPluginSettings(): PluginSettings {
@@ -35,6 +37,7 @@ export function defaultPluginSettings(): PluginSettings {
         yourAgency: '',
         useD4hAidingAgencies: true,
         aidingAgencies: [],
+        searchOpTemplateId: '',
     };
 }
 
@@ -145,6 +148,10 @@ export function parseStoredPluginSettings(raw: unknown): PluginSettings {
         defaults.aidingAgencies = normalizeSubjectTypes(strings);
     }
 
+    if (typeof rec.searchOpTemplateId === 'string') {
+        defaults.searchOpTemplateId = rec.searchOpTemplateId.trim();
+    }
+
     return defaults;
 }
 
@@ -179,6 +186,7 @@ export function savePluginSettings(settings: PluginSettings): void {
             yourAgency: settings.yourAgency.trim(),
             useD4hAidingAgencies: settings.useD4hAidingAgencies,
             aidingAgencies: normalizeSubjectTypes(settings.aidingAgencies),
+            searchOpTemplateId: settings.searchOpTemplateId.trim(),
         } satisfies PluginSettings));
     } catch {
         // quota / private mode

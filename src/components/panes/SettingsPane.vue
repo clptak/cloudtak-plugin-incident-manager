@@ -309,6 +309,97 @@
             </template>
         </TablerBorder>
 
+        <!-- ══ Search OP Template ══ -->
+        <div
+            v-if='expandedCard !== "search-op-template"'
+            class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+            role='button'
+            tabindex='0'
+            :aria-expanded='false'
+            @click='toggleCard("search-op-template")'
+            @keydown.enter.prevent='toggleCard("search-op-template")'
+            @keydown.space.prevent='toggleCard("search-op-template")'
+        >
+            <p class='text-uppercase text-white-50 small mb-0'>
+                Search OP Template
+            </p>
+            <span
+                v-if='searchOpTemplateSubtitle'
+                class='text-muted small ms-2 text-truncate'
+            >{{ searchOpTemplateSubtitle }}</span>
+            <IconChevronDown
+                class='ms-auto transition-transform text-white-50 rotate-180'
+                :size='20'
+                stroke='1.5'
+            />
+        </div>
+        <TablerBorder
+            v-else
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <div
+                    class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='true'
+                    @click='toggleCard("search-op-template")'
+                    @keydown.enter.prevent='toggleCard("search-op-template")'
+                    @keydown.space.prevent='toggleCard("search-op-template")'
+                >
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Search OP Template
+                    </p>
+                    <IconChevronDown
+                        class='ms-auto transition-transform text-white-50'
+                        :size='20'
+                        stroke='1.5'
+                    />
+                </div>
+            </template>
+
+            <p class='text-muted small mb-3'>
+                Used when opening a DataSync for a search operational period.
+                Ensure a default template named SAR exists; you can override it here.
+            </p>
+            <TablerInlineAlert
+                v-if='sarTemplateMissing'
+                class='mb-3'
+                severity='warning'
+                title='SAR template missing'
+                description='No DataSync template named SAR was found. Create one, or pick another template below. Search operational periods can still be opened.'
+            />
+            <TablerInlineAlert
+                v-if='templatesError'
+                class='mb-3'
+                severity='danger'
+                title='Could not load templates'
+                :description='templatesError'
+            />
+            <div
+                v-if='templatesLoading'
+                class='text-muted small'
+            >
+                <span class='spinner-border spinner-border-sm me-1' />
+                Loading templates…
+            </div>
+            <TablerEnum
+                v-else-if='searchOpTemplateOptions.length'
+                v-model='searchOpTemplateLabel'
+                label='Template'
+                :options='searchOpTemplateOptions'
+            />
+            <p
+                v-else
+                class='text-muted small mb-0'
+            >
+                No DataSync templates are available.
+            </p>
+        </TablerBorder>
+
         <!-- ══ Subject Types ══ -->
         <div
             v-if='expandedCard !== "subject-types"'
@@ -553,6 +644,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { IconChevronDown } from '@tabler/icons-vue';
 import {
     TablerBorder,
+    TablerEnum,
     TablerInlineAlert,
     TablerInput,
     TablerToggle,
@@ -560,6 +652,12 @@ import {
 import NumberedTextList from '../NumberedTextList.vue';
 import { usePluginSettings } from '../../composables/usePluginSettings.ts';
 import { loadD4hRoster } from '../../lib/d4hRoster.ts';
+import {
+    findSarTemplate,
+    listMissionTemplates,
+    resolveSearchOpTemplate,
+    type MissionTemplateItem,
+} from '../../lib/missionTemplates.ts';
 import { parseLpbTableJson } from '../../lib/pluginSettings.ts';
 import {
     MAX_AIDING_AGENCIES,
@@ -576,7 +674,7 @@ import {
     savedFileTarget,
 } from '../../lib/fileTarget.ts';
 
-type SettingsCard = 'folder' | 'your-agency' | 'aiding-agencies' | 'subject-types' | 'lpb';
+type SettingsCard = 'folder' | 'your-agency' | 'aiding-agencies' | 'search-op-template' | 'subject-types' | 'lpb';
 const expandedCard = ref<SettingsCard | null>('folder');
 
 function toggleCard(card: SettingsCard): void {
@@ -590,6 +688,7 @@ const {
     yourAgency,
     useD4hAidingAgencies,
     aidingAgencies,
+    searchOpTemplateId,
     setSubjectTypes,
     resetSubjectTypes,
     setLpbTable,
@@ -597,6 +696,7 @@ const {
     setYourAgency,
     setUseD4hAidingAgencies,
     setAidingAgencies,
+    setSearchOpTemplateId,
 } = usePluginSettings();
 
 const draftTypes = ref<string[]>([...subjectTypes.value]);
@@ -614,6 +714,9 @@ const agencyUploadError = ref('');
 const lpbUploadError = ref('');
 const lpbUploadOk = ref('');
 const d4hAgencyCount = ref(0);
+const missionTemplates = ref<MissionTemplateItem[]>([]);
+const templatesLoading = ref(false);
+const templatesError = ref('');
 
 const folderSupported = fileTargetSupported();
 const folderName = ref('');
@@ -748,8 +851,47 @@ async function refreshD4hAgencyCount(): Promise<void> {
     }
 }
 
+const sarTemplateMissing = computed(() =>
+    !templatesLoading.value && !templatesError.value && !findSarTemplate(missionTemplates.value),
+);
+
+const resolvedSearchOpTemplate = computed(() =>
+    resolveSearchOpTemplate(missionTemplates.value, searchOpTemplateId.value),
+);
+
+const searchOpTemplateSubtitle = computed(() => {
+    if (templatesLoading.value) return '';
+    return resolvedSearchOpTemplate.value?.name ?? '';
+});
+
+const searchOpTemplateOptions = computed(() =>
+    missionTemplates.value.map((item) => item.name),
+);
+
+const searchOpTemplateLabel = computed({
+    get: () => resolvedSearchOpTemplate.value?.name ?? '',
+    set: (name: string) => {
+        const found = missionTemplates.value.find((item) => item.name === name);
+        setSearchOpTemplateId(found?.id ?? '');
+    },
+});
+
+async function refreshMissionTemplates(): Promise<void> {
+    templatesLoading.value = true;
+    templatesError.value = '';
+    try {
+        missionTemplates.value = await listMissionTemplates();
+    } catch (err) {
+        missionTemplates.value = [];
+        templatesError.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        templatesLoading.value = false;
+    }
+}
+
 onMounted(() => {
     void refreshD4hAgencyCount();
+    void refreshMissionTemplates();
 });
 
 function saveSubjectTypes(): void {

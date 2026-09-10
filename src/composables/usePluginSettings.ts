@@ -23,6 +23,7 @@ function persist(next: PluginSettings): void {
         yourAgency: next.yourAgency.trim(),
         useD4hAidingAgencies: next.useD4hAidingAgencies,
         aidingAgencies: normalizeSubjectTypes(next.aidingAgencies),
+        searchOpTemplateId: next.searchOpTemplateId.trim(),
     };
     savePluginSettings(state.value);
 }
@@ -35,6 +36,7 @@ export function usePluginSettings() {
     const yourAgency = computed(() => state.value.yourAgency);
     const useD4hAidingAgencies = computed(() => state.value.useD4hAidingAgencies);
     const aidingAgencies = computed(() => state.value.aidingAgencies);
+    const searchOpTemplateId = computed(() => state.value.searchOpTemplateId);
 
     function setSubjectTypes(types: string[]): void {
         persist({ ...state.value, subjectTypes: types });
@@ -64,6 +66,10 @@ export function usePluginSettings() {
         persist({ ...state.value, aidingAgencies: agencies });
     }
 
+    function setSearchOpTemplateId(id: string): void {
+        persist({ ...state.value, searchOpTemplateId: id });
+    }
+
     function enumOptions(current = ''): string[] {
         return subjectTypeEnumOptions(subjectTypes.value, current);
     }
@@ -76,6 +82,7 @@ export function usePluginSettings() {
         yourAgency,
         useD4hAidingAgencies,
         aidingAgencies,
+        searchOpTemplateId,
         setSubjectTypes,
         resetSubjectTypes,
         setLpbTable,
@@ -83,6 +90,7 @@ export function usePluginSettings() {
         setYourAgency,
         setUseD4hAidingAgencies,
         setAidingAgencies,
+        setSearchOpTemplateId,
         enumOptions,
     };
 }
