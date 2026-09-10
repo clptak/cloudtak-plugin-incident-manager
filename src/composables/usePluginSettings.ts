@@ -20,6 +20,9 @@ function persist(next: PluginSettings): void {
     state.value = {
         subjectTypes: normalizeSubjectTypes(next.subjectTypes),
         lpbTable: next.lpbTable,
+        yourAgency: next.yourAgency.trim(),
+        useD4hAidingAgencies: next.useD4hAidingAgencies,
+        aidingAgencies: normalizeSubjectTypes(next.aidingAgencies),
     };
     savePluginSettings(state.value);
 }
@@ -29,6 +32,9 @@ export function usePluginSettings() {
     const lpbTable = computed(() => state.value.lpbTable ?? BUNDLED_LPB_TABLE);
     const lpbIsCustom = computed(() => state.value.lpbTable !== null);
     const lpbCategoryCount = computed(() => lpbTable.value.length);
+    const yourAgency = computed(() => state.value.yourAgency);
+    const useD4hAidingAgencies = computed(() => state.value.useD4hAidingAgencies);
+    const aidingAgencies = computed(() => state.value.aidingAgencies);
 
     function setSubjectTypes(types: string[]): void {
         persist({ ...state.value, subjectTypes: types });
@@ -46,6 +52,18 @@ export function usePluginSettings() {
         setLpbTable(null);
     }
 
+    function setYourAgency(name: string): void {
+        persist({ ...state.value, yourAgency: name });
+    }
+
+    function setUseD4hAidingAgencies(enabled: boolean): void {
+        persist({ ...state.value, useD4hAidingAgencies: enabled });
+    }
+
+    function setAidingAgencies(agencies: string[]): void {
+        persist({ ...state.value, aidingAgencies: agencies });
+    }
+
     function enumOptions(current = ''): string[] {
         return subjectTypeEnumOptions(subjectTypes.value, current);
     }
@@ -55,10 +73,16 @@ export function usePluginSettings() {
         lpbTable,
         lpbIsCustom,
         lpbCategoryCount,
+        yourAgency,
+        useD4hAidingAgencies,
+        aidingAgencies,
         setSubjectTypes,
         resetSubjectTypes,
         setLpbTable,
         resetLpbTable,
+        setYourAgency,
+        setUseD4hAidingAgencies,
+        setAidingAgencies,
         enumOptions,
     };
 }

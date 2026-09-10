@@ -1,7 +1,6 @@
 /** Mission resource team / assignment records (Resources tab → Assignments palette). */
 
 import { ASSIGNMENT_RESOURCES } from '../data/assignmentResources.ts';
-import type { D4HExternalResource } from './d4hTypes.ts';
 
 export type ResourceAssignmentStatus = 'requested' | 'have' | 'need' | 'demobilized' | 'cancelled';
 
@@ -42,18 +41,21 @@ export const DEFAULT_AGENCY = '';
 
 export const RESOURCE_TYPE_OPTIONS = [...ASSIGNMENT_RESOURCES] as string[];
 
-/** Mission override wins; D4H team/org name is the fallback when override is empty. */
+/** Mission override wins; then Settings Your Agency; D4H team/org name is last fallback. */
 export function resolveEffectiveDefaultAgency(
     schemaDefaultAgency: string,
     d4hContextName?: string,
+    yourAgency?: string,
 ): string {
     const override = schemaDefaultAgency.trim();
     if (override) return override;
+    const home = (yourAgency ?? '').trim();
+    if (home) return home;
     return (d4hContextName ?? '').trim();
 }
 
 export function buildAgencyOptions(
-    d4hExternalResources: D4HExternalResource[],
+    aidingNames: string[],
     effectiveDefaultAgency = '',
 ): string[] {
     const seen = new Set<string>();
@@ -65,12 +67,12 @@ export function buildAgencyOptions(
         out.push(home);
     }
 
-    const d4hNames = [...d4hExternalResources]
-        .map((r) => r.name.trim())
+    const names = [...aidingNames]
+        .map((name) => name.trim())
         .filter(Boolean)
         .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 
-    for (const name of d4hNames) {
+    for (const name of names) {
         if (!seen.has(name)) {
             seen.add(name);
             out.push(name);

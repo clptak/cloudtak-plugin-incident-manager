@@ -22,12 +22,19 @@ export interface PluginSettings {
     subjectTypes: string[];
     /** `null` means use the bundled Arizona LPB table. */
     lpbTable: AzlpbEntry[] | null;
+    yourAgency: string;
+    /** When true, Resources Agency options come from D4H External Resources. */
+    useD4hAidingAgencies: boolean;
+    aidingAgencies: string[];
 }
 
 export function defaultPluginSettings(): PluginSettings {
     return {
         subjectTypes: [...DEFAULT_SUBJECT_TYPES],
         lpbTable: null,
+        yourAgency: '',
+        useD4hAidingAgencies: true,
+        aidingAgencies: [],
     };
 }
 
@@ -125,6 +132,19 @@ export function parseStoredPluginSettings(raw: unknown): PluginSettings {
         defaults.lpbTable = parsed.ok ? parsed.value : null;
     }
 
+    if (typeof rec.yourAgency === 'string') {
+        defaults.yourAgency = rec.yourAgency.trim();
+    }
+
+    if (typeof rec.useD4hAidingAgencies === 'boolean') {
+        defaults.useD4hAidingAgencies = rec.useD4hAidingAgencies;
+    }
+
+    if (Array.isArray(rec.aidingAgencies)) {
+        const strings = rec.aidingAgencies.filter((item): item is string => typeof item === 'string');
+        defaults.aidingAgencies = normalizeSubjectTypes(strings);
+    }
+
     return defaults;
 }
 
@@ -156,6 +176,9 @@ export function savePluginSettings(settings: PluginSettings): void {
         storage.setItem(PLUGIN_SETTINGS_KEY, JSON.stringify({
             subjectTypes: normalizeSubjectTypes(settings.subjectTypes),
             lpbTable: settings.lpbTable,
+            yourAgency: settings.yourAgency.trim(),
+            useD4hAidingAgencies: settings.useD4hAidingAgencies,
+            aidingAgencies: normalizeSubjectTypes(settings.aidingAgencies),
         } satisfies PluginSettings));
     } catch {
         // quota / private mode

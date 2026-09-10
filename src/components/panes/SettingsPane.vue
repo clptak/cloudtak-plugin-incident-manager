@@ -100,6 +100,215 @@
             </p>
         </TablerBorder>
 
+        <!-- ══ Your Agency ══ -->
+        <div
+            v-if='expandedCard !== "your-agency"'
+            class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+            role='button'
+            tabindex='0'
+            :aria-expanded='false'
+            @click='toggleCard("your-agency")'
+            @keydown.enter.prevent='toggleCard("your-agency")'
+            @keydown.space.prevent='toggleCard("your-agency")'
+        >
+            <p class='text-uppercase text-white-50 small mb-0'>
+                Your Agency
+            </p>
+            <IconChevronDown
+                class='ms-auto transition-transform text-white-50 rotate-180'
+                :size='20'
+                stroke='1.5'
+            />
+        </div>
+        <TablerBorder
+            v-else
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <div
+                    class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='true'
+                    @click='toggleCard("your-agency")'
+                    @keydown.enter.prevent='toggleCard("your-agency")'
+                    @keydown.space.prevent='toggleCard("your-agency")'
+                >
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Your Agency
+                    </p>
+                    <IconChevronDown
+                        class='ms-auto transition-transform text-white-50'
+                        :size='20'
+                        stroke='1.5'
+                    />
+                </div>
+            </template>
+
+            <p class='text-muted small mb-3'>
+                Used as the default for Resources → Default Agency when the mission
+                has not saved an override. Applies in this browser only.
+            </p>
+            <TablerInput
+                v-model='draftYourAgency'
+                label='Your Agency'
+                placeholder='e.g. County Sheriff Search and Rescue'
+                autocomplete='organization'
+            />
+            <button
+                type='button'
+                class='btn btn-primary mt-3'
+                :disabled='!yourAgencyDirty'
+                @click='saveYourAgency'
+            >
+                Save
+            </button>
+        </TablerBorder>
+
+        <!-- ══ Aiding Agencies ══ -->
+        <div
+            v-if='expandedCard !== "aiding-agencies"'
+            class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+            role='button'
+            tabindex='0'
+            :aria-expanded='false'
+            @click='toggleCard("aiding-agencies")'
+            @keydown.enter.prevent='toggleCard("aiding-agencies")'
+            @keydown.space.prevent='toggleCard("aiding-agencies")'
+        >
+            <p class='text-uppercase text-white-50 small mb-0'>
+                Aiding Agencies
+            </p>
+            <IconChevronDown
+                class='ms-auto transition-transform text-white-50 rotate-180'
+                :size='20'
+                stroke='1.5'
+            />
+        </div>
+        <TablerBorder
+            v-else
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <div
+                    class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='true'
+                    @click='toggleCard("aiding-agencies")'
+                    @keydown.enter.prevent='toggleCard("aiding-agencies")'
+                    @keydown.space.prevent='toggleCard("aiding-agencies")'
+                >
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Aiding Agencies
+                    </p>
+                    <IconChevronDown
+                        class='ms-auto transition-transform text-white-50'
+                        :size='20'
+                        stroke='1.5'
+                    />
+                </div>
+            </template>
+
+            <p class='text-muted small mb-3'>
+                Agencies listed on Resources when creating a resource assignment.
+                Only an agency chosen on a resource is stored on the mission.
+            </p>
+            <TablerToggle
+                :model-value='useD4hAidingAgencies'
+                label='D4H'
+                description='On: use D4H External Resources. Off: maintain your own list.'
+                @update:model-value='onD4hToggle'
+            />
+
+            <template v-if='useD4hAidingAgencies'>
+                <p class='text-muted small mt-3 mb-0'>
+                    Resources Agency dropdown uses D4H External Resources
+                    ({{ d4hAgencyCount }} agenc{{ d4hAgencyCount === 1 ? 'y' : 'ies' }}).
+                </p>
+            </template>
+            <template v-else>
+                <NumberedTextList
+                    v-model='draftAidingAgencies'
+                    class='mt-3'
+                    :max='MAX_AIDING_AGENCIES'
+                    item-label='Agency'
+                    max-hint='Maximum of 80 agencies.'
+                />
+                <div class='d-flex flex-wrap gap-2 mt-3'>
+                    <button
+                        type='button'
+                        class='btn btn-primary'
+                        :disabled='!aidingAgenciesDirty'
+                        @click='saveAidingAgencies'
+                    >
+                        Save
+                    </button>
+                </div>
+
+                <hr class='my-3'>
+
+                <p class='small text-uppercase text-white-50 mb-2'>
+                    Upload list
+                </p>
+                <p class='text-muted small mb-2'>
+                    JSON array, <code>{ "agencies": [...] }</code>, or CSV / one name per line.
+                </p>
+                <input
+                    ref='agencyFileInput'
+                    type='file'
+                    class='d-none'
+                    accept='.json,.csv,.txt,application/json,text/csv,text/plain'
+                    @change='onAgencyFileChange'
+                >
+                <div class='d-flex flex-wrap gap-2'>
+                    <button
+                        type='button'
+                        class='btn btn-outline-secondary'
+                        @click='pickAgencyFile'
+                    >
+                        Choose file…
+                    </button>
+                    <button
+                        type='button'
+                        class='btn btn-outline-primary'
+                        :disabled='!pendingAidingAgencies.length'
+                        @click='mergeUploadedAgencies'
+                    >
+                        Merge
+                    </button>
+                    <button
+                        type='button'
+                        class='btn btn-outline-primary'
+                        :disabled='!pendingAidingAgencies.length'
+                        @click='replaceUploadedAgencies'
+                    >
+                        Replace
+                    </button>
+                </div>
+                <p
+                    v-if='pendingAidingAgencies.length'
+                    class='form-text mb-0 mt-2'
+                >
+                    Parsed {{ pendingAidingAgencies.length }} agenc{{ pendingAidingAgencies.length === 1 ? 'y' : 'ies' }}
+                    from {{ pendingAgencyFileName }}.
+                </p>
+                <TablerInlineAlert
+                    v-if='agencyUploadError'
+                    class='mt-3'
+                    severity='danger'
+                    title='Upload error'
+                    :description='agencyUploadError'
+                />
+            </template>
+        </TablerBorder>
+
         <!-- ══ Subject Types ══ -->
         <div
             v-if='expandedCard !== "subject-types"'
@@ -340,15 +549,23 @@
 </template>
 
 <script setup lang='ts'>
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { IconChevronDown } from '@tabler/icons-vue';
-import { TablerBorder, TablerInlineAlert } from '@tak-ps/vue-tabler';
+import {
+    TablerBorder,
+    TablerInlineAlert,
+    TablerInput,
+    TablerToggle,
+} from '@tak-ps/vue-tabler';
 import NumberedTextList from '../NumberedTextList.vue';
 import { usePluginSettings } from '../../composables/usePluginSettings.ts';
+import { loadD4hRoster } from '../../lib/d4hRoster.ts';
 import { parseLpbTableJson } from '../../lib/pluginSettings.ts';
 import {
+    MAX_AIDING_AGENCIES,
     MAX_SUBJECT_TYPES,
     mergeSubjectTypes,
+    parseAidingAgenciesText,
     parseSubjectTypesText,
 } from '../../lib/subjectTypes.ts';
 import {
@@ -359,7 +576,7 @@ import {
     savedFileTarget,
 } from '../../lib/fileTarget.ts';
 
-type SettingsCard = 'folder' | 'subject-types' | 'lpb';
+type SettingsCard = 'folder' | 'your-agency' | 'aiding-agencies' | 'subject-types' | 'lpb';
 const expandedCard = ref<SettingsCard | null>('folder');
 
 function toggleCard(card: SettingsCard): void {
@@ -370,20 +587,33 @@ const {
     subjectTypes,
     lpbIsCustom,
     lpbCategoryCount,
+    yourAgency,
+    useD4hAidingAgencies,
+    aidingAgencies,
     setSubjectTypes,
     resetSubjectTypes,
     setLpbTable,
     resetLpbTable,
+    setYourAgency,
+    setUseD4hAidingAgencies,
+    setAidingAgencies,
 } = usePluginSettings();
 
 const draftTypes = ref<string[]>([...subjectTypes.value]);
+const draftYourAgency = ref(yourAgency.value);
+const draftAidingAgencies = ref<string[]>([...aidingAgencies.value]);
 const subjectFileInput = ref<HTMLInputElement | null>(null);
+const agencyFileInput = ref<HTMLInputElement | null>(null);
 const lpbFileInput = ref<HTMLInputElement | null>(null);
 const pendingSubjectTypes = ref<string[]>([]);
 const pendingSubjectFileName = ref('');
 const subjectUploadError = ref('');
+const pendingAidingAgencies = ref<string[]>([]);
+const pendingAgencyFileName = ref('');
+const agencyUploadError = ref('');
 const lpbUploadError = ref('');
 const lpbUploadOk = ref('');
+const d4hAgencyCount = ref(0);
 
 const folderSupported = fileTargetSupported();
 const folderName = ref('');
@@ -430,10 +660,97 @@ watch(subjectTypes, (types) => {
     draftTypes.value = [...types];
 });
 
+watch(yourAgency, (name) => {
+    draftYourAgency.value = name;
+});
+
+watch(aidingAgencies, (names) => {
+    draftAidingAgencies.value = [...names];
+});
+
 const subjectTypesDirty = computed(() =>
     JSON.stringify(draftTypes.value.map((t) => t.trim()).filter(Boolean))
         !== JSON.stringify(subjectTypes.value),
 );
+
+const yourAgencyDirty = computed(() =>
+    draftYourAgency.value.trim() !== yourAgency.value,
+);
+
+const aidingAgenciesDirty = computed(() =>
+    JSON.stringify(draftAidingAgencies.value.map((t) => t.trim()).filter(Boolean))
+        !== JSON.stringify(aidingAgencies.value),
+);
+
+function saveYourAgency(): void {
+    setYourAgency(draftYourAgency.value);
+    draftYourAgency.value = yourAgency.value;
+}
+
+function onD4hToggle(enabled: boolean): void {
+    setUseD4hAidingAgencies(enabled);
+}
+
+function saveAidingAgencies(): void {
+    setAidingAgencies(draftAidingAgencies.value);
+    draftAidingAgencies.value = [...aidingAgencies.value];
+}
+
+function pickAgencyFile(): void {
+    agencyFileInput.value?.click();
+}
+
+async function onAgencyFileChange(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    pendingAidingAgencies.value = [];
+    pendingAgencyFileName.value = '';
+    agencyUploadError.value = '';
+    if (!file) return;
+
+    try {
+        const text = await file.text();
+        const parsed = parseAidingAgenciesText(text);
+        if (!parsed.ok) {
+            agencyUploadError.value = parsed.error;
+            return;
+        }
+        pendingAidingAgencies.value = parsed.value;
+        pendingAgencyFileName.value = file.name;
+    } catch (err) {
+        agencyUploadError.value = err instanceof Error ? err.message : String(err);
+    }
+}
+
+function mergeUploadedAgencies(): void {
+    if (!pendingAidingAgencies.value.length) return;
+    setAidingAgencies(mergeSubjectTypes(draftAidingAgencies.value, pendingAidingAgencies.value));
+    pendingAidingAgencies.value = [];
+    pendingAgencyFileName.value = '';
+    agencyUploadError.value = '';
+}
+
+function replaceUploadedAgencies(): void {
+    if (!pendingAidingAgencies.value.length) return;
+    setAidingAgencies(pendingAidingAgencies.value);
+    pendingAidingAgencies.value = [];
+    pendingAgencyFileName.value = '';
+    agencyUploadError.value = '';
+}
+
+async function refreshD4hAgencyCount(): Promise<void> {
+    try {
+        const roster = await loadD4hRoster();
+        d4hAgencyCount.value = roster?.externalResources?.length ?? 0;
+    } catch {
+        d4hAgencyCount.value = 0;
+    }
+}
+
+onMounted(() => {
+    void refreshD4hAgencyCount();
+});
 
 function saveSubjectTypes(): void {
     setSubjectTypes(draftTypes.value);

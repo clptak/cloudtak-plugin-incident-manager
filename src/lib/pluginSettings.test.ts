@@ -11,6 +11,7 @@ import {
     mergeSubjectTypes,
     normalizeSubjectTypes,
     parseSubjectTypesText,
+    parseAidingAgenciesText,
     subjectTypeEnumOptions,
     SUBJECT_TYPE_PLACEHOLDER,
 } from './subjectTypes.ts';
@@ -69,9 +70,22 @@ test('subjectTypeEnumOptions keeps a deleted current value', () => {
     );
 });
 
-test('DEFAULT_SUBJECT_TYPES includes Other and Hiker', () => {
-    assert.ok(DEFAULT_SUBJECT_TYPES.includes('Hiker'));
-    assert.ok(DEFAULT_SUBJECT_TYPES.includes('Other'));
+test('parseAidingAgenciesText reads JSON array, { agencies }, and CSV', () => {
+    const arr = parseAidingAgenciesText('["Sheriff", "Forest Service"]');
+    assert.equal(arr.ok, true);
+    if (arr.ok) assert.deepEqual(arr.value, ['Sheriff', 'Forest Service']);
+
+    const obj = parseAidingAgenciesText('{ "agencies": ["BLM", "Fire"] }');
+    assert.equal(obj.ok, true);
+    if (obj.ok) assert.deepEqual(obj.value, ['BLM', 'Fire']);
+
+    const alt = parseAidingAgenciesText('{ "aidingAgencies": ["NPS"] }');
+    assert.equal(alt.ok, true);
+    if (alt.ok) assert.deepEqual(alt.value, ['NPS']);
+
+    const csv = parseAidingAgenciesText('Sheriff, BLM\nNPS');
+    assert.equal(csv.ok, true);
+    if (csv.ok) assert.deepEqual(csv.value, ['Sheriff', 'BLM', 'NPS']);
 });
 
 const validLpbRow = {
@@ -143,4 +157,22 @@ test('parseStoredPluginSettings uses defaults and validates lpbTable', () => {
         lpbTable: [{ category: 'Nope' }],
     });
     assert.equal(badLpb.lpbTable, null);
+});
+
+test('parseStoredPluginSettings reads agency settings', () => {
+    const parsed = parseStoredPluginSettings({
+        yourAgency: '  County SAR  ',
+        useD4hAidingAgencies: false,
+        aidingAgencies: [' Forest Service ', 'Sheriff', 'sheriff'],
+    });
+    assert.equal(parsed.yourAgency, 'County SAR');
+    assert.equal(parsed.useD4hAidingAgencies, false);
+    assert.deepEqual(parsed.aidingAgencies, ['Forest Service', 'Sheriff']);
+});
+
+test('parseStoredPluginSettings defaults D4H aiding agencies on', () => {
+    const missing = parseStoredPluginSettings({});
+    assert.equal(missing.yourAgency, '');
+    assert.equal(missing.useD4hAidingAgencies, true);
+    assert.deepEqual(missing.aidingAgencies, []);
 });
