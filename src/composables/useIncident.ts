@@ -51,6 +51,7 @@ export const SESSION_NAV_KEY = 'incident-manager:pane-nav';
 
 const VALID_NAV_KEYS = new Set([
     'create-open',
+    'settings',
     'initial-information',
     'subject-info',
     'search-urgency',
@@ -192,7 +193,7 @@ const effectiveIncidentType = computed(() => {
 });
 const isSearchIncident = computed(() => isSearchIncidentType(effectiveIncidentType.value));
 
-const MISSION_EXEMPT_NAV_KEYS = new Set(['create-open']);
+const MISSION_EXEMPT_NAV_KEYS = new Set(['create-open', 'settings']);
 
 const noMissionModalOpen = ref(false);
 

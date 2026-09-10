@@ -23,6 +23,11 @@ export const CREATE_OPEN_NAV: NavSectionItem = {
     label: 'Create | Open',
 };
 
+export const SETTINGS_NAV: NavSectionItem = {
+    key: 'settings',
+    label: 'Settings',
+};
+
 export const NAV_SECTIONS: NavSection[] = [
     {
         key: 'h-initial',
@@ -73,6 +78,7 @@ export const NAV_SECTIONS: NavSection[] = [
 
 export const ALL_NAV_ITEMS: NavSectionItem[] = [
     CREATE_OPEN_NAV,
+    SETTINGS_NAV,
     ...NAV_SECTIONS.flatMap((section) => section.items),
 ];
 

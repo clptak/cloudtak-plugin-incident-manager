@@ -357,7 +357,7 @@
             <div>
                 <TablerEnum
                     v-model='category'
-                    label='Arizona Subject LPB Category'
+                    :label='lpbIsCustom ? "LPB Category" : "Arizona Subject LPB Category"'
                     :options='categories'
                 />
 
@@ -763,7 +763,6 @@ import { ref, computed, reactive, watch, onMounted } from 'vue';
 import { IconPlus, IconX, IconChevronDown, IconLock } from '@tabler/icons-vue';
 import { TablerBorder, TablerInput, TablerEnum, TablerInlineAlert } from '@tak-ps/vue-tabler';
 import type { Feature } from '../../../../../../src/types.ts';
-import azlpb from '../../../data/azlpb_table.json';
 import { parseCoordinates } from '../../../lib/coords.ts';
 import { circleRing, milesToMeters, MILES_TO_METERS } from '../../../lib/rings.ts';
 import { pushPolygonToMission, pushPointToMission, deletePolygonFromMission } from '../../../lib/missionFeatures.ts';
@@ -775,6 +774,7 @@ import { areaSqMi, formatSqMi } from '../../../lib/geometryArea.ts';
 import { loadMissionSchema } from '../../../lib/missionSchema.ts';
 import { toDatetimeLocalValue } from '../../../lib/ics234Datetime.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
+import { usePluginSettings } from '../../../composables/usePluginSettings.ts';
 import { loadIncidentSubscription, loadSchemaSubscription, missionAuthToken, schemaMission } from '../../../lib/incidentSubscription.ts';
 import { readIppFromSchema, writeIppToSchema } from '../../../lib/ippPersistence.ts';
 import { createRegistryStore } from '../../../lib/registryPersistence.ts';
@@ -844,14 +844,8 @@ interface LogApi {
     delete(logid: string): Promise<void>;
 }
 
-interface AzlpbEntry {
-    category: string;
-    cases: number;
-    qAmi: number; qBmi: number; qCmi: number; qDmi: number;
-}
-
 const { activeMission, requireActiveMission } = useIncident();
-const table = azlpb as AzlpbEntry[];
+const { lpbTable, lpbIsCustom } = usePluginSettings();
 
 const ippInput = ref('');
 const ipp = computed(() => parseCoordinates(ippInput.value));
@@ -876,8 +870,18 @@ const schemaIppCoords = ref<[number, number] | null>(null);
 
 const subjectiveUid = ref('');
 
-const categories = table.map((t) => t.category);
-const category = ref<string>(categories[0]);
+const categories = computed(() => lpbTable.value.map((t) => t.category));
+const category = ref('');
+
+watch(categories, (cats) => {
+    if (!cats.length) {
+        category.value = '';
+        return;
+    }
+    if (!cats.includes(category.value)) {
+        category.value = cats[0];
+    }
+}, { immediate: true });
 
 const showCustomSource = ref(false);
 const customSource = ref('');
@@ -894,16 +898,17 @@ const quartiles = reactive([
 ]);
 
 function refreshQuartiles(): void {
-    const entry = table.find((t) => t.category === category.value);
+    const entry = lpbTable.value.find((t) => t.category === category.value);
     if (!entry) return;
     for (const q of quartiles) {
         q.miles = (entry as unknown as Record<string, number>)[q.miField] ?? 0;
     }
 }
 watch(category, refreshQuartiles, { immediate: true });
+watch(lpbTable, refreshQuartiles);
 
 const selectedAzlpb = computed(() =>
-    table.find((t) => t.category === category.value),
+    lpbTable.value.find((t) => t.category === category.value),
 );
 const selectedCases = computed(() => selectedAzlpb.value?.cases ?? 0);
 const casesPillClass = computed(() => {

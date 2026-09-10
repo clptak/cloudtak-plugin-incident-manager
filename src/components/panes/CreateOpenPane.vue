@@ -379,9 +379,12 @@ import OpenExistingMission from './OpenExistingMission.vue';
 import { buildMissionName, parseCoordinates } from '../../lib/coords.ts';
 import { createCaltopoMap, caltopoAvailable } from '../../lib/caltopo.ts';
 import { useIncident } from '../../composables/useIncident.ts';
+import { usePluginSettings } from '../../composables/usePluginSettings.ts';
+import { SUBJECT_TYPE_PLACEHOLDER } from '../../lib/subjectTypes.ts';
 
 const mapStore = useMapStore();
 const { setActiveMission, setDraftIncidentType, activeMission } = useIncident();
+const { enumOptions: subjectTypeEnumOptions } = usePluginSettings();
 
 type CreateOpenCard = 'create' | 'open';
 const expandedCard = ref<CreateOpenCard | null>(null);
@@ -389,16 +392,6 @@ const expandedCard = ref<CreateOpenCard | null>(null);
 function toggleCard(card: CreateOpenCard): void {
     expandedCard.value = expandedCard.value === card ? null : card;
 }
-
-const subjectTypes = [
-    'Hiker', 'Hunter', 'Climber', 'Canyoneering', 'Camper',
-    'Child', 'Mountain Biker', 'Autistic', 'Mental Health','Boater',
-    'Vehicle', 'Fisherman', 'Dementia', 'Alzheimers', 'Base Jumper',
-    'Crime Victim', 'Despondent', 'Elderly', 'Intoxicated', 'Kayaker',
-    'Paddle Boarder', 'Skier', 'Snowshoer', 'Snowboarder', 'Water',
-    'Aircraft', 'Christmas Tree Cutter', 'Cross Country Skier', 'Downhill Skier', 'Equestrian',
-    'Mushroom Gatherer', 'Pinon Nut Picker', 'Woodcutter', 'Other',
-];
 
 const incidentTypeOptions = [
     '— Select —',
@@ -432,14 +425,14 @@ const incidentTypeLabel = computed({
     },
 });
 
-const subjectTypeOptions = ['— Select —', ...subjectTypes];
+const subjectTypeOptions = computed(() => subjectTypeEnumOptions(form.subjectType));
 
 const subjectTypeLabel = computed({
     get(): string {
-        return form.subjectType || '— Select —';
+        return form.subjectType || SUBJECT_TYPE_PLACEHOLDER;
     },
     set(label: string): void {
-        form.subjectType = label === '— Select —' ? '' : label;
+        form.subjectType = label === SUBJECT_TYPE_PLACEHOLDER ? '' : label;
     },
 });
 
