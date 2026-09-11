@@ -65,7 +65,7 @@ const VALID_NAV_KEYS = new Set([
     'initial-consensus',
     'operational-periods',
     'incident-post',
-    'generate-report-template',
+    'generate-closing-package',
 ]);
 
 const VALID_HTAB_KEYS = new Set(['main', 'dashboard', 'task', 'clues', 'casie', 'organization', 'risk-assessment']);
@@ -92,8 +92,8 @@ function loadNavFromSession(): PaneNavState {
             htab = 'main';
             key = 'work-assignments';
         }
-        // Wrap Up split into section header + Generate Report Template sub-pane.
-        if (key === 'wrapup') key = 'generate-report-template';
+        // Wrap Up split into section header + Generate Closing Package sub-pane.
+        if (key === 'wrapup') key = 'generate-closing-package';
         // Risk Assessment moved from Main vertical nav into a horizontal tab.
         if (key === 'risk-assessment') {
             key = 'create-open';

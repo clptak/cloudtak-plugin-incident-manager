@@ -71,7 +71,7 @@ export const NAV_SECTIONS: NavSection[] = [
         key: 'h-wrapup',
         label: 'Wrap Up',
         items: [
-            { key: 'generate-report-template', label: 'Generate Report Template' },
+            { key: 'generate-closing-package', label: 'Generate Closing Package' },
         ],
     },
 ];
