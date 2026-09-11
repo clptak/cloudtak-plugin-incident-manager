@@ -309,6 +309,152 @@
             </template>
         </TablerBorder>
 
+        <!-- ══ Personnel ══ -->
+        <div
+            v-if='expandedCard !== "personnel"'
+            class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+            role='button'
+            tabindex='0'
+            :aria-expanded='false'
+            @click='toggleCard("personnel")'
+            @keydown.enter.prevent='toggleCard("personnel")'
+            @keydown.space.prevent='toggleCard("personnel")'
+        >
+            <p class='text-uppercase text-white-50 small mb-0'>
+                Personnel
+            </p>
+            <span class='text-muted small ms-2 text-truncate'>{{ personnelSubtitle }}</span>
+            <IconChevronDown
+                class='ms-auto transition-transform text-white-50 rotate-180'
+                :size='20'
+                stroke='1.5'
+            />
+        </div>
+        <TablerBorder
+            v-else
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <div
+                    class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='true'
+                    @click='toggleCard("personnel")'
+                    @keydown.enter.prevent='toggleCard("personnel")'
+                    @keydown.space.prevent='toggleCard("personnel")'
+                >
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Personnel
+                    </p>
+                    <IconChevronDown
+                        class='ms-auto transition-transform text-white-50'
+                        :size='20'
+                        stroke='1.5'
+                    />
+                </div>
+            </template>
+
+            <p class='text-muted small mb-3'>
+                People listed on Organization and Dashboard.
+                Only a person assigned to a role or team is stored on the mission.
+            </p>
+            <TablerToggle
+                :model-value='useD4hPersonnel'
+                label='D4H'
+                description='On: use D4H members. Off: upload your own roster.'
+                @update:model-value='onD4hPersonnelToggle'
+            />
+
+            <template v-if='useD4hPersonnel'>
+                <p class='text-muted small mt-3 mb-0'>
+                    Organization and Dashboard use D4H members
+                    ({{ d4hMemberCount }} {{ d4hMemberCount === 1 ? 'person' : 'people' }}).
+                </p>
+            </template>
+            <template v-else>
+                <p class='text-muted small mt-3 mb-2'>
+                    {{ personnel.length
+                        ? `${personnel.length} ${personnel.length === 1 ? 'person' : 'people'} in this browser.`
+                        : 'No custom roster yet — upload a file.' }}
+                    Maximum of {{ MAX_PERSONNEL }}.
+                </p>
+                <p
+                    v-if='personnelPreview'
+                    class='form-text mb-3'
+                >
+                    {{ personnelPreview }}
+                </p>
+                <p class='small text-uppercase text-white-50 mb-2'>
+                    Upload roster
+                </p>
+                <p class='text-muted small mb-2'>
+                    D4H JSON (<code>{ "members": [...] }</code>), a member array,
+                    or CSV with <code>id,name</code> and optional
+                    <code>ref,position,callsign,email</code>.
+                </p>
+                <input
+                    ref='personnelFileInput'
+                    type='file'
+                    class='d-none'
+                    accept='.json,.csv,.txt,application/json,text/csv,text/plain'
+                    @change='onPersonnelFileChange'
+                >
+                <div class='d-flex flex-wrap gap-2'>
+                    <button
+                        type='button'
+                        class='btn btn-outline-secondary'
+                        @click='pickPersonnelFile'
+                    >
+                        Choose file…
+                    </button>
+                    <button
+                        type='button'
+                        class='btn btn-outline-primary'
+                        :disabled='!pendingPersonnel.length'
+                        @click='mergeUploadedPersonnel'
+                    >
+                        Merge
+                    </button>
+                    <button
+                        type='button'
+                        class='btn btn-outline-primary'
+                        :disabled='!pendingPersonnel.length'
+                        @click='replaceUploadedPersonnel'
+                    >
+                        Replace
+                    </button>
+                    <button
+                        type='button'
+                        class='btn btn-outline-danger'
+                        :disabled='!personnel.length'
+                        @click='clearPersonnel'
+                    >
+                        Clear
+                    </button>
+                </div>
+                <p
+                    v-if='pendingPersonnel.length'
+                    class='form-text mb-0 mt-2'
+                >
+                    Parsed {{ pendingPersonnel.length }}
+                    {{ pendingPersonnel.length === 1 ? 'person' : 'people' }}
+                    from {{ pendingPersonnelFileName }}.
+                    <span v-if='pendingPersonnelPreview'> {{ pendingPersonnelPreview }}</span>
+                </p>
+                <TablerInlineAlert
+                    v-if='personnelUploadError'
+                    class='mt-3'
+                    severity='danger'
+                    title='Upload error'
+                    :description='personnelUploadError'
+                />
+            </template>
+        </TablerBorder>
+
         <!-- ══ Search OP Template ══ -->
         <div
             v-if='expandedCard !== "search-op-template"'
@@ -652,6 +798,12 @@ import {
 import NumberedTextList from '../NumberedTextList.vue';
 import { usePluginSettings } from '../../composables/usePluginSettings.ts';
 import { loadD4hRoster } from '../../lib/d4hRoster.ts';
+import type { D4HMember } from '../../lib/d4hTypes.ts';
+import {
+    MAX_PERSONNEL,
+    mergePersonnelById,
+    parsePersonnelText,
+} from '../../lib/personnel.ts';
 import {
     findSarTemplate,
     listMissionTemplates,
@@ -674,7 +826,7 @@ import {
     savedFileTarget,
 } from '../../lib/fileTarget.ts';
 
-type SettingsCard = 'folder' | 'your-agency' | 'aiding-agencies' | 'search-op-template' | 'subject-types' | 'lpb';
+type SettingsCard = 'folder' | 'your-agency' | 'aiding-agencies' | 'personnel' | 'search-op-template' | 'subject-types' | 'lpb';
 const expandedCard = ref<SettingsCard | null>('folder');
 
 function toggleCard(card: SettingsCard): void {
@@ -688,6 +840,8 @@ const {
     yourAgency,
     useD4hAidingAgencies,
     aidingAgencies,
+    useD4hPersonnel,
+    personnel,
     searchOpTemplateId,
     setSubjectTypes,
     resetSubjectTypes,
@@ -696,6 +850,8 @@ const {
     setYourAgency,
     setUseD4hAidingAgencies,
     setAidingAgencies,
+    setUseD4hPersonnel,
+    setPersonnel,
     setSearchOpTemplateId,
 } = usePluginSettings();
 
@@ -704,6 +860,7 @@ const draftYourAgency = ref(yourAgency.value);
 const draftAidingAgencies = ref<string[]>([...aidingAgencies.value]);
 const subjectFileInput = ref<HTMLInputElement | null>(null);
 const agencyFileInput = ref<HTMLInputElement | null>(null);
+const personnelFileInput = ref<HTMLInputElement | null>(null);
 const lpbFileInput = ref<HTMLInputElement | null>(null);
 const pendingSubjectTypes = ref<string[]>([]);
 const pendingSubjectFileName = ref('');
@@ -711,9 +868,13 @@ const subjectUploadError = ref('');
 const pendingAidingAgencies = ref<string[]>([]);
 const pendingAgencyFileName = ref('');
 const agencyUploadError = ref('');
+const pendingPersonnel = ref<D4HMember[]>([]);
+const pendingPersonnelFileName = ref('');
+const personnelUploadError = ref('');
 const lpbUploadError = ref('');
 const lpbUploadOk = ref('');
 const d4hAgencyCount = ref(0);
+const d4hMemberCount = ref(0);
 const missionTemplates = ref<MissionTemplateItem[]>([]);
 const templatesLoading = ref(false);
 const templatesError = ref('');
@@ -794,6 +955,10 @@ function onD4hToggle(enabled: boolean): void {
     setUseD4hAidingAgencies(enabled);
 }
 
+function onD4hPersonnelToggle(enabled: boolean): void {
+    setUseD4hPersonnel(enabled);
+}
+
 function saveAidingAgencies(): void {
     setAidingAgencies(draftAidingAgencies.value);
     draftAidingAgencies.value = [...aidingAgencies.value];
@@ -842,12 +1007,80 @@ function replaceUploadedAgencies(): void {
     agencyUploadError.value = '';
 }
 
+function personnelNamesPreview(members: D4HMember[]): string {
+    if (!members.length) return '';
+    const shown = members.slice(0, 8).map((m) => m.name);
+    const extra = members.length - shown.length;
+    return extra > 0
+        ? `${shown.join(', ')}, and ${extra} more`
+        : shown.join(', ');
+}
+
+const personnelSubtitle = computed(() =>
+    useD4hPersonnel.value ? 'D4H' : `Custom (${personnel.value.length})`,
+);
+
+const personnelPreview = computed(() => personnelNamesPreview(personnel.value));
+const pendingPersonnelPreview = computed(() => personnelNamesPreview(pendingPersonnel.value));
+
+function pickPersonnelFile(): void {
+    personnelFileInput.value?.click();
+}
+
+async function onPersonnelFileChange(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    pendingPersonnel.value = [];
+    pendingPersonnelFileName.value = '';
+    personnelUploadError.value = '';
+    if (!file) return;
+
+    try {
+        const text = await file.text();
+        const parsed = parsePersonnelText(text);
+        if (!parsed.ok) {
+            personnelUploadError.value = parsed.error;
+            return;
+        }
+        pendingPersonnel.value = parsed.value;
+        pendingPersonnelFileName.value = file.name;
+    } catch (err) {
+        personnelUploadError.value = err instanceof Error ? err.message : String(err);
+    }
+}
+
+function mergeUploadedPersonnel(): void {
+    if (!pendingPersonnel.value.length) return;
+    setPersonnel(mergePersonnelById(personnel.value, pendingPersonnel.value));
+    pendingPersonnel.value = [];
+    pendingPersonnelFileName.value = '';
+    personnelUploadError.value = '';
+}
+
+function replaceUploadedPersonnel(): void {
+    if (!pendingPersonnel.value.length) return;
+    setPersonnel(pendingPersonnel.value);
+    pendingPersonnel.value = [];
+    pendingPersonnelFileName.value = '';
+    personnelUploadError.value = '';
+}
+
+function clearPersonnel(): void {
+    setPersonnel([]);
+    pendingPersonnel.value = [];
+    pendingPersonnelFileName.value = '';
+    personnelUploadError.value = '';
+}
+
 async function refreshD4hAgencyCount(): Promise<void> {
     try {
         const roster = await loadD4hRoster();
         d4hAgencyCount.value = roster?.externalResources?.length ?? 0;
+        d4hMemberCount.value = roster?.members?.length ?? 0;
     } catch {
         d4hAgencyCount.value = 0;
+        d4hMemberCount.value = 0;
     }
 }
 

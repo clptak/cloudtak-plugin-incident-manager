@@ -6,6 +6,8 @@ import {
     type AzlpbEntry,
     type PluginSettings,
 } from '../lib/pluginSettings.ts';
+import type { D4HMember } from '../lib/d4hTypes.ts';
+import { normalizePersonnel } from '../lib/personnel.ts';
 import {
     DEFAULT_SUBJECT_TYPES,
     normalizeSubjectTypes,
@@ -23,6 +25,8 @@ function persist(next: PluginSettings): void {
         yourAgency: next.yourAgency.trim(),
         useD4hAidingAgencies: next.useD4hAidingAgencies,
         aidingAgencies: normalizeSubjectTypes(next.aidingAgencies),
+        useD4hPersonnel: next.useD4hPersonnel,
+        personnel: normalizePersonnel(next.personnel),
         searchOpTemplateId: next.searchOpTemplateId.trim(),
     };
     savePluginSettings(state.value);
@@ -36,6 +40,8 @@ export function usePluginSettings() {
     const yourAgency = computed(() => state.value.yourAgency);
     const useD4hAidingAgencies = computed(() => state.value.useD4hAidingAgencies);
     const aidingAgencies = computed(() => state.value.aidingAgencies);
+    const useD4hPersonnel = computed(() => state.value.useD4hPersonnel);
+    const personnel = computed(() => state.value.personnel);
     const searchOpTemplateId = computed(() => state.value.searchOpTemplateId);
 
     function setSubjectTypes(types: string[]): void {
@@ -66,6 +72,14 @@ export function usePluginSettings() {
         persist({ ...state.value, aidingAgencies: agencies });
     }
 
+    function setUseD4hPersonnel(enabled: boolean): void {
+        persist({ ...state.value, useD4hPersonnel: enabled });
+    }
+
+    function setPersonnel(members: D4HMember[]): void {
+        persist({ ...state.value, personnel: members });
+    }
+
     function setSearchOpTemplateId(id: string): void {
         persist({ ...state.value, searchOpTemplateId: id });
     }
@@ -82,6 +96,8 @@ export function usePluginSettings() {
         yourAgency,
         useD4hAidingAgencies,
         aidingAgencies,
+        useD4hPersonnel,
+        personnel,
         searchOpTemplateId,
         setSubjectTypes,
         resetSubjectTypes,
@@ -90,6 +106,8 @@ export function usePluginSettings() {
         setYourAgency,
         setUseD4hAidingAgencies,
         setAidingAgencies,
+        setUseD4hPersonnel,
+        setPersonnel,
         setSearchOpTemplateId,
         enumOptions,
     };

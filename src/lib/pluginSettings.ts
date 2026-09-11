@@ -1,5 +1,10 @@
 /** Browser-local plugin preferences (subject types, custom LPB table). */
 
+import type { D4HMember } from './d4hTypes.ts';
+import {
+    normalizePersonnel,
+    parsePersonnelMember,
+} from './personnel.ts';
 import {
     DEFAULT_SUBJECT_TYPES,
     normalizeSubjectTypes,
@@ -26,6 +31,9 @@ export interface PluginSettings {
     /** When true, Resources Agency options come from D4H External Resources. */
     useD4hAidingAgencies: boolean;
     aidingAgencies: string[];
+    /** When true, Organization/Dashboard personnel come from D4H KV. */
+    useD4hPersonnel: boolean;
+    personnel: D4HMember[];
     /** DataSync mission template id for search OPs. Empty = auto-pick SAR by name. */
     searchOpTemplateId: string;
 }
@@ -37,6 +45,8 @@ export function defaultPluginSettings(): PluginSettings {
         yourAgency: '',
         useD4hAidingAgencies: true,
         aidingAgencies: [],
+        useD4hPersonnel: true,
+        personnel: [],
         searchOpTemplateId: '',
     };
 }
@@ -148,6 +158,19 @@ export function parseStoredPluginSettings(raw: unknown): PluginSettings {
         defaults.aidingAgencies = normalizeSubjectTypes(strings);
     }
 
+    if (typeof rec.useD4hPersonnel === 'boolean') {
+        defaults.useD4hPersonnel = rec.useD4hPersonnel;
+    }
+
+    if (Array.isArray(rec.personnel)) {
+        const members: D4HMember[] = [];
+        for (let i = 0; i < rec.personnel.length; i++) {
+            const parsed = parsePersonnelMember(rec.personnel[i], i);
+            if (parsed.ok) members.push(parsed.value);
+        }
+        defaults.personnel = normalizePersonnel(members);
+    }
+
     if (typeof rec.searchOpTemplateId === 'string') {
         defaults.searchOpTemplateId = rec.searchOpTemplateId.trim();
     }
@@ -186,6 +209,8 @@ export function savePluginSettings(settings: PluginSettings): void {
             yourAgency: settings.yourAgency.trim(),
             useD4hAidingAgencies: settings.useD4hAidingAgencies,
             aidingAgencies: normalizeSubjectTypes(settings.aidingAgencies),
+            useD4hPersonnel: settings.useD4hPersonnel,
+            personnel: normalizePersonnel(settings.personnel),
             searchOpTemplateId: settings.searchOpTemplateId.trim(),
         } satisfies PluginSettings));
     } catch {
