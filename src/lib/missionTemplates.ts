@@ -18,6 +18,8 @@ export interface MissionTemplateItem {
 export interface MissionTemplateLogItem {
     id: string;
     name: string;
+    schema: unknown;
+    keywords: string[];
 }
 
 export function defaultMissionTemplate(): MissionTemplateItem {
@@ -108,6 +110,11 @@ export async function listMissionTemplateLogs(
     const logs = new MissionTemplateLogs(templateId);
     const items = await logs.list({ refresh: true });
     return items
-        .map((item) => ({ id: item.id, name: item.name }))
+        .map((item) => ({
+            id: item.id,
+            name: item.name,
+            schema: item.schema,
+            keywords: item.keywords ?? [],
+        }))
         .sort((a, b) => a.name.localeCompare(b.name));
 }

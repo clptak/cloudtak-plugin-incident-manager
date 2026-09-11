@@ -91,6 +91,12 @@
             />
         </template>
     </div>
+    <MissionTemplateLogModal
+        v-if='openLog && activeMission'
+        :log='openLog'
+        :mission='activeMission'
+        @close='closeLogForm'
+    />
 </template>
 
 <script setup lang='ts'>
@@ -109,6 +115,7 @@ import AssignmentsTaskbarChip from './AssignmentsTaskbarChip.vue';
 import SegmentsTaskbarChip from './SegmentsTaskbarChip.vue';
 import ClueTaskbarChip from './ClueTaskbarChip.vue';
 import TaskbarChipButton from './TaskbarChipButton.vue';
+import MissionTemplateLogModal from './MissionTemplateLogModal.vue';
 import { useIncident } from '../composables/useIncident.ts';
 import { loadIncidentSubscription } from '../lib/incidentSubscription.ts';
 import {
@@ -143,6 +150,7 @@ const logTemplates = ref<MissionTemplateLogItem[]>([]);
 const logTemplatesLoading = ref(false);
 const logTemplatesError = ref('');
 const logTemplatesHint = ref('');
+const openLog = ref<MissionTemplateLogItem | null>(null);
 let logLoadSeq = 0;
 
 const navActive = computed(() => {
@@ -312,8 +320,14 @@ function showBar(): void {
 }
 
 function onOpenLogTemplate(id: string): void {
-    if (!id) return;
-    // TODO: open DataSync log form for this template
+    if (!id || !activeMission.value) return;
+    const log = logTemplates.value.find((item) => item.id === id);
+    if (!log) return;
+    openLog.value = log;
+}
+
+function closeLogForm(): void {
+    openLog.value = null;
 }
 
 async function loadLogTemplates(): Promise<void> {
@@ -355,6 +369,7 @@ async function loadLogTemplates(): Promise<void> {
 watch(
     () => activeMission.value?.guid,
     () => {
+        openLog.value = null;
         void loadLogTemplates();
     },
     { immediate: true },
