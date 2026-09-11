@@ -7,7 +7,7 @@
     >
         <template #label>
             <p class='text-uppercase text-white-50 small mb-0 d-flex align-items-center gap-2 w-100'>
-                <span>Create Close Out Package</span>
+                <span>Create Patrol Report Template</span>
                 <span class='badge bg-blue-lt ms-auto'>Patrol Report</span>
             </p>
         </template>
@@ -230,8 +230,8 @@ function reportHeaderLines(
     generatedAt: number,
 ): string[] {
     return [
-        `Report # ${reportNumber}`,
-        `Coordinator ${icCoordinator}`,
+        `PATROL DR #${reportNumber}`,
+        `DEP ${icCoordinator} #`,
         `C: ${formatGenerationDate(generatedAt)}`,
         '',
     ];
@@ -295,7 +295,7 @@ function assignmentLines(data: { text: string; datetime: string } | null): strin
                 : txt;
 
     return [
-        '## ASSIGNMENT:',
+        'ASSIGNMENT:',
         '',
         sentence,
         '',
@@ -327,7 +327,7 @@ async function generate(): Promise<void> {
         lines.push(...reportHeaderLines(reportNumber, icCoordinator, generatedAt));
         const assignment = assignmentLines(assignmentData);
         if (assignment) lines.push(...assignment);
-        lines.push('## INVESTIGATION:');
+        lines.push('INVESTIGATION:');
         lines.push('');
         if (!sortedLogs.length) {
             lines.push('_No log entries found._');
