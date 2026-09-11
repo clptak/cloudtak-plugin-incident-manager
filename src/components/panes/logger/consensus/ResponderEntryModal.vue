@@ -74,7 +74,7 @@
                                                     :key='l'
                                                     type='button'
                                                     class='btn px-2'
-                                                    :class='letters[seg.uid] === l ? "btn-primary" : "btn-outline-secondary"'
+                                                    :class='letterScaleClass(l, letters[seg.uid] === l)'
                                                     :title='OCONNOR_SCALE[l] || `Between ${String.fromCharCode(l.charCodeAt(0) - 1)} and ${String.fromCharCode(l.charCodeAt(0) + 1)}`'
                                                     @click='letters[seg.uid] = l'
                                                 >
@@ -115,7 +115,10 @@
                                             :key='l'
                                             class='d-flex gap-2'
                                         >
-                                            <strong style='min-width: 1rem;'>{{ l }}</strong>
+                                            <strong
+                                                :class='letterScaleLegendClass(l)'
+                                                style='min-width: 1rem;'
+                                            >{{ l }}</strong>
                                             <span :class='OCONNOR_SCALE[l] ? "" : "text-muted"'>
                                                 {{ OCONNOR_SCALE[l] || '—' }}
                                             </span>
@@ -202,6 +205,8 @@ import {
     type OconnorLetter,
 } from '../../../../lib/consensus.ts';
 import { flyToFeature } from '../../../../lib/flyToFeature.ts';
+import { letterScaleClass, letterScaleLegendClass } from '../../../../lib/letterScale.ts';
+import '../../../letterScale.css';
 
 export interface SegmentRef {
     uid: string;

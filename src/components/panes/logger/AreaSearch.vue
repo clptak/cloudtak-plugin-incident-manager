@@ -301,9 +301,7 @@
                                                     :key='l'
                                                     type='button'
                                                     class='btn px-2'
-                                                    :class='clueForm.letters[row.key] === l
-                                                        ? (l === "E" ? "btn-secondary" : "btn-primary")
-                                                        : "btn-outline-secondary"'
+                                                    :class='letterScaleClass(l, clueForm.letters[row.key] === l, "secondary")'
                                                     :title='clueLetterHint(l)'
                                                     @click='clueForm.letters[row.key] = l'
                                                 >
@@ -326,7 +324,10 @@
                                 :key='l'
                                 class='small d-flex gap-2'
                             >
-                                <strong style='min-width: 1rem;'>{{ l }}</strong>
+                                <strong
+                                    :class='letterScaleLegendClass(l)'
+                                    style='min-width: 1rem;'
+                                >{{ l }}</strong>
                                 <span :class='CLUE_SCALE[l] ? "" : "text-muted"'>
                                     {{ CLUE_SCALE[l] || '—' }}
                                 </span>
@@ -1057,6 +1058,8 @@ import {
 import { createOpPeriodGateway } from '../../../lib/opPeriodGateway.ts';
 import { createRegistryStore } from '../../../lib/registryPersistence.ts';
 import { segmentsFromSchema, type SegmentMap } from '../../../lib/segmentsPersistence.ts';
+import { letterScaleClass, letterScaleLegendClass } from '../../../lib/letterScale.ts';
+import '../../letterScale.css';
 
 const { activeMission, isSearchIncident } = useIncident();
 const { searchOpTemplateId } = usePluginSettings();

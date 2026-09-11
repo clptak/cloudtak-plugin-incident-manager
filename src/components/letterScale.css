@@ -1,0 +1,33 @@
+/* A–I letter scale: one green / one red with stepped opacity. E is unstyled. */
+
+.letter-scale-A { --letter-scale-fill: rgba(var(--tblr-success-rgb, 47, 179, 68), 1); }
+.letter-scale-B { --letter-scale-fill: rgba(var(--tblr-success-rgb, 47, 179, 68), 0.75); }
+.letter-scale-C { --letter-scale-fill: rgba(var(--tblr-success-rgb, 47, 179, 68), 0.5); }
+.letter-scale-D { --letter-scale-fill: rgba(var(--tblr-success-rgb, 47, 179, 68), 0.25); }
+.letter-scale-F { --letter-scale-fill: rgba(var(--tblr-danger-rgb, 214, 57, 57), 0.25); }
+.letter-scale-G { --letter-scale-fill: rgba(var(--tblr-danger-rgb, 214, 57, 57), 0.5); }
+.letter-scale-H { --letter-scale-fill: rgba(var(--tblr-danger-rgb, 214, 57, 57), 0.75); }
+.letter-scale-I { --letter-scale-fill: rgba(var(--tblr-danger-rgb, 214, 57, 57), 1); }
+
+.letter-scale-btn {
+    background-color: var(--letter-scale-fill) !important;
+    border-color: var(--letter-scale-fill) !important;
+    color: #fff !important;
+}
+
+.letter-scale-btn:hover,
+.letter-scale-btn:focus,
+.letter-scale-btn:active {
+    background-color: var(--letter-scale-fill) !important;
+    border-color: var(--letter-scale-fill) !important;
+    color: #fff !important;
+}
+
+.letter-scale-btn.is-selected {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+    z-index: 1;
+}
+
+.letter-scale-legend {
+    color: var(--letter-scale-fill);
+}
