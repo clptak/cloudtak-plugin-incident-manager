@@ -264,7 +264,7 @@ function formatReportDateTimeParts(epoch: number): { date: string; time: string 
 function formatReportTime(epoch: number, raw?: string): string {
     if (epoch <= 0) return raw || '';
     const { date, time } = formatReportDateTimeParts(epoch);
-    return `${date} at ${time}`;
+    return `On ${date} at approximately ${time} hours, `;
 }
 
 function parseTime(raw?: string): { rawTime: string; epoch: number } {
