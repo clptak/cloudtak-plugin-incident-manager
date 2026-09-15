@@ -859,7 +859,8 @@
                             <template v-else>
                                 <p class='form-text mt-0 mb-2'>
                                     Filed under the <strong>Track Logs</strong> folder in
-                                    {{ trackPanel.op.name }}.
+                                    {{ trackPanel.op.name }}. GPX/KML uploads are converted
+                                    to GeoJSON and stored as a mission file on that DataSync.
                                 </p>
 
                                 <div class='row g-3'>
@@ -873,9 +874,11 @@
                                             @change='onTrackFile'
                                         >
                                         <div class='form-text'>
-                                            GPX, KML, or GeoJSON. Multi-track files attach every
-                                            track; long tracks are thinned for the map and the
-                                            original fix count is kept.
+                                            GPX and KML are converted to GeoJSON and imported
+                                            into this OP DataSync — CloudTAK cannot overlay GPX.
+                                            Multi-track files attach every track. Long tracks
+                                            are thinned on the map; the GeoJSON file keeps every
+                                            fix.
                                         </div>
 
                                         <!-- Single-track file: name it before filing.
@@ -1003,6 +1006,7 @@ import { usePluginSettings } from '../../../composables/usePluginSettings.ts';
 import type { DebriefRecord, OpAssignment, OpPeriodRegistryEntry } from '../../../domain/entities.ts';
 import { currentOpPeriod, nextOpNumber } from '../../../domain/registry.ts';
 import {
+    attachTrackFile,
     attachTrackLog,
     checkInSubscriber,
     closeOperationalPeriod,
@@ -1019,6 +1023,7 @@ import {
 } from '../../../domain/trackLog.ts';
 import {
     candidateToTrack,
+    createTrackContentsUploader,
     createTrackLogPublisher,
     listTrackCandidates,
     readTrackFile,
@@ -1857,12 +1862,14 @@ async function onSplitNo(): Promise<void> {
 
 // ── GPS track logs ──────────────────────────────────────────────────────────
 // A track log is the breadcrumb trail behind a reported POD, so it hangs off
-// the completed assignment rather than floating on the map. Tracks are filed
-// into the OP sync's "Track Logs" folder (created with the OP), which means the
-// field sees their own coverage and the tracks travel with that OP's mission
-// archive in the demob package.
+// the completed assignment rather than floating on the map. Uploaded GPX/KML
+// is converted to GeoJSON and stored as a mission file on the OP DataSync
+// (CloudTAK cannot overlay GPX). Thinned LineString CoTs are filed into the
+// OP sync's "Track Logs" folder so the field sees coverage and the tracks
+// travel with that OP's mission archive.
 
 const trackPublisher = createTrackLogPublisher();
+const trackContents = createTrackContentsUploader();
 const trackPanel = ref<{
     key: string;
     label: string;
@@ -1977,6 +1984,48 @@ async function attachTracks(
 }
 
 /**
+ * Convert an uploaded GPS file to GeoJSON, store it on the OP DataSync, then
+ * publish each line as a CoT into Track Logs.
+ */
+async function attachFileTracks(
+    tracks: { track: ParsedTrack; callsign?: string }[],
+    source: string,
+): Promise<void> {
+    const mission = activeMission.value;
+    const panel = trackPanel.value;
+    if (!mission || !panel?.op) return;
+
+    trackBusy.value = true;
+    error.value = ''; notice.value = '';
+    try {
+        const debriefStore = createDebriefStore(mission);
+        let record = panel.record;
+        const fresh = (await debriefStore.load()).find((r) => debriefKey(r) === panel.key);
+        if (fresh) record = fresh;
+
+        const refs = await attachTrackFile({
+            gateway,
+            publisher: trackPublisher,
+            debriefs: debriefStore,
+            contents: trackContents,
+        }, panel.op, record, {
+            tracks,
+            source,
+            segmentLabel: segmentLabel(record.segmentUid),
+        });
+
+        await refresh();
+        trackCandidates.value = [];
+        void loadTrackCandidates();
+        notice.value = `Attached ${refs.length} track${refs.length === 1 ? '' : 's'} to ${panel.label}.`;
+    } catch (err) {
+        error.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        trackBusy.value = false;
+    }
+}
+
+/**
  * Parse the chosen file. A file holding exactly ONE track pauses for a name —
  * handheld GPS units export generic names ("Track 001", "ACTIVE LOG 003"), and
  * an assignment commonly has several tracks (one per unit carried) that have to
@@ -2011,7 +2060,7 @@ async function onTrackFile(event: Event): Promise<void> {
             };
             return;
         }
-        await attachTracks(parsed.map((track) => ({ track })), file.name);
+        await attachFileTracks(parsed.map((track) => ({ track })), file.name);
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
     } finally {
@@ -2023,7 +2072,7 @@ async function onTrackFile(event: Event): Promise<void> {
 async function onConfirmPendingTrack(): Promise<void> {
     const pending = pendingTrack.value;
     if (!pending || !pending.callsign.trim()) return;
-    await attachTracks(
+    await attachFileTracks(
         [{ track: pending.track, callsign: pending.callsign }],
         pending.source,
     );

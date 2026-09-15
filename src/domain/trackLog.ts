@@ -418,6 +418,49 @@ export function parseTrackFile(source: string, filename = ''): ParsedTrack[] {
     throw new Error('Unrecognized track file — expected GPX, KML, or GeoJSON');
 }
 
+// ── GeoJSON export (CloudTAK overlays GeoJSON, not GPX) ──────────────────────
+
+export interface TrackGeoJsonFeature {
+    type: 'Feature';
+    properties: { name: string; coordTimes?: string[] };
+    geometry: { type: 'LineString'; coordinates: [number, number][] };
+}
+
+export interface TrackGeoJsonCollection {
+    type: 'FeatureCollection';
+    features: TrackGeoJsonFeature[];
+}
+
+/**
+ * Full-resolution FeatureCollection of the parsed lines. Thinning is CoT-only;
+ * this is the file CloudTAK can overlay on the DataSync.
+ */
+export function tracksToGeoJSON(tracks: ParsedTrack[]): TrackGeoJsonCollection {
+    const features: TrackGeoJsonFeature[] = [];
+    for (const track of tracks) {
+        if (track.coords.length < 2) continue;
+        const properties: TrackGeoJsonFeature['properties'] = { name: track.name };
+        if (track.times?.length) properties.coordTimes = track.times;
+        features.push({
+            type: 'Feature',
+            properties,
+            geometry: { type: 'LineString', coordinates: track.coords },
+        });
+    }
+    return { type: 'FeatureCollection', features };
+}
+
+/**
+ * Mission-contents name for a converted track file.
+ * `team3.gpx` on OP 2 → `team3_OP2.geojson`.
+ */
+export function trackGeoJsonFilename(source: string, opNumber: number): string {
+    const base = source.replace(/^.*[/\\]/, '').trim();
+    const stem = base.replace(/\.[^.]+$/, '') || 'track';
+    const safe = stem.replace(/[^\w.-]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '').slice(0, 80) || 'track';
+    return `${safe}_OP${opNumber}.geojson`;
+}
+
 // ── Naming and identity ──────────────────────────────────────────────────────
 
 /**
@@ -465,6 +508,43 @@ export function debriefKey(record: DebriefRecord): string {
 export function withTrack(record: DebriefRecord, track: TrackLogRef): DebriefRecord {
     const existing = (record.tracks ?? []).filter((t) => t.uid !== track.uid);
     return { ...record, tracks: [...existing, track] };
+}
+
+/** Parse one schema track object; returns null when `uid` is missing. */
+export function trackLogRefFromValue(value: unknown): TrackLogRef | null {
+    if (!value || typeof value !== 'object') return null;
+    const rec = value as Record<string, unknown>;
+    const uid = typeof rec.uid === 'string' ? rec.uid.trim() : '';
+    if (!uid) return null;
+    const track: TrackLogRef = {
+        uid,
+        name: typeof rec.name === 'string' ? rec.name : uid,
+        source: typeof rec.source === 'string' ? rec.source : '',
+        points: Number.isFinite(Number(rec.points)) ? Number(rec.points) : 0,
+        lengthMi: Number.isFinite(Number(rec.lengthMi)) ? Number(rec.lengthMi) : 0,
+    };
+    if (Number.isFinite(Number(rec.sourcePoints))) track.sourcePoints = Number(rec.sourcePoints);
+    if (typeof rec.startedAt === 'string' && rec.startedAt) track.startedAt = rec.startedAt;
+    if (typeof rec.endedAt === 'string' && rec.endedAt) track.endedAt = rec.endedAt;
+    if (typeof rec.attachedAt === 'string' && rec.attachedAt) track.attachedAt = rec.attachedAt;
+    if (typeof rec.contentHash === 'string' && rec.contentHash.trim()) {
+        track.contentHash = rec.contentHash.trim();
+    }
+    if (typeof rec.geojsonName === 'string' && rec.geojsonName.trim()) {
+        track.geojsonName = rec.geojsonName.trim();
+    }
+    return track;
+}
+
+/** GPS track references stored on a debrief in mission_schema.json. */
+export function trackLogRefsFromValue(raw: unknown): TrackLogRef[] {
+    if (!Array.isArray(raw)) return [];
+    const tracks: TrackLogRef[] = [];
+    for (const value of raw) {
+        const track = trackLogRefFromValue(value);
+        if (track) tracks.push(track);
+    }
+    return tracks;
 }
 
 /** Remove a track by uid. Drops the key entirely when none remain. */

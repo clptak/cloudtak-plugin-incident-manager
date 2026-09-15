@@ -11,10 +11,13 @@ import {
     parseTrackFile,
     referencedTrackUids,
     simplifyTrack,
+    trackGeoJsonFilename,
     trackLengthMiles,
     trackLogCallsign,
     trackMetrics,
     trackMilesForOp,
+    trackLogRefsFromValue,
+    tracksToGeoJSON,
     withoutTrack,
     withTrack,
 } from './trackLog.ts';
@@ -241,6 +244,65 @@ describe('parseTrackFile dispatch', () => {
     });
 });
 
+describe('tracksToGeoJSON', () => {
+    const gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Garmin" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>Team 3 Track</name>
+    <trkseg>
+      <trkpt lat="39.0000" lon="-105.0000"><time>2026-08-30T14:00:00Z</time></trkpt>
+      <trkpt lat="39.0100" lon="-105.0000"><time>2026-08-30T14:20:00Z</time></trkpt>
+      <trkpt lat="39.0200" lon="-105.0000"><time>2026-08-30T14:40:00Z</time></trkpt>
+    </trkseg>
+  </trk>
+</gpx>`;
+
+    it('round-trips a GPX track through GeoJSON including coordTimes', () => {
+        const parsed = parseGpxTracks(gpx);
+        const fc = tracksToGeoJSON(parsed);
+        assert.equal(fc.type, 'FeatureCollection');
+        assert.equal(fc.features.length, 1);
+        assert.equal(fc.features[0].properties.name, 'Team 3 Track');
+        assert.equal(fc.features[0].properties.coordTimes?.length, 3);
+        assert.equal(fc.features[0].geometry.coordinates.length, 3);
+
+        const back = parseGeoJsonTracks(JSON.stringify(fc));
+        assert.equal(back.length, 1);
+        assert.equal(back[0].name, 'Team 3 Track');
+        assert.deepEqual(back[0].coords, parsed[0].coords);
+        assert.equal(back[0].times?.[0], '2026-08-30T14:00:00.000Z');
+    });
+
+    it('round-trips a KML LineString', () => {
+        const parsed = parseKmlTracks(`<kml><Placemark>
+            <name>K9-1</name>
+            <LineString><coordinates>-105.0,39.0 -105.0,39.01 -105.0,39.02</coordinates></LineString>
+        </Placemark></kml>`);
+        const back = parseGeoJsonTracks(JSON.stringify(tracksToGeoJSON(parsed)));
+        assert.equal(back.length, 1);
+        assert.equal(back[0].name, 'K9-1');
+        assert.deepEqual(back[0].coords, parsed[0].coords);
+        assert.equal(back[0].times, undefined);
+    });
+
+    it('drops degenerate lines and omits coordTimes when the source had none', () => {
+        const fc = tracksToGeoJSON([
+            { name: 'short', coords: [[-105, 39]] },
+            { name: 'ok', coords: [[-105, 39], [-105, 39.01]] },
+        ]);
+        assert.equal(fc.features.length, 1);
+        assert.equal(fc.features[0].properties.name, 'ok');
+        assert.equal(fc.features[0].properties.coordTimes, undefined);
+    });
+
+    it('names the mission file from the source stem and OP number', () => {
+        assert.equal(trackGeoJsonFilename('team3.gpx', 2), 'team3_OP2.geojson');
+        assert.equal(trackGeoJsonFilename('/tmp/Team 3 Track.kml', 1), 'Team_3_Track_OP1.geojson');
+        assert.equal(trackGeoJsonFilename('already.geojson', 4), 'already_OP4.geojson');
+        assert.equal(trackGeoJsonFilename('', 2), 'track_OP2.geojson');
+    });
+});
+
 describe('naming and record binding', () => {
     it('builds a map callsign from OP, segment and resource', () => {
         assert.equal(
@@ -304,5 +366,23 @@ describe('naming and record binding', () => {
         assert.deepEqual([...referencedTrackUids(records)].sort(), ['t1', 't2']);
         assert.equal(trackMilesForOp(records, 2), 3.75);
         assert.equal(trackMilesForOp(records, 3), 0);
+    });
+
+    it('round-trips GeoJSON contentHash and filename from schema JSON', () => {
+        const tracks = trackLogRefsFromValue([{
+            uid: 'cot-1',
+            name: 'TRK OP2 · 05 · Team 3',
+            source: 'team3.gpx',
+            points: 12,
+            lengthMi: 1.4,
+            contentHash: 'hash-abc',
+            geojsonName: 'team3_OP2.geojson',
+        }, {
+            name: 'missing uid',
+        }]);
+        assert.equal(tracks.length, 1);
+        assert.equal(tracks[0].contentHash, 'hash-abc');
+        assert.equal(tracks[0].geojsonName, 'team3_OP2.geojson');
+        assert.equal(tracks[0].source, 'team3.gpx');
     });
 });

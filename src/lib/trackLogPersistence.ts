@@ -6,15 +6,16 @@
  * tracks travel with that OP's mission archive in the demob package.
  *
  * Two ways in:
- * - a file the user uploads (.gpx / .kml / .geojson / .json), parsed by the
- *   pure readers in domain/trackLog.ts;
+ * - a file the user uploads (.gpx / .kml / .geojson / .json), converted to
+ *   GeoJSON and stored as mission contents, then published as thinned CoT
+ *   LineStrings into Track Logs;
  * - a LineString already drawn on the map, picked from a candidate list.
  */
 
 import Subscription from '../../../../src/base/subscription.ts';
 import type { ActiveMission } from '../composables/useIncident.ts';
 import type { DebriefRecord, OpPeriodRegistryEntry } from '../domain/entities.ts';
-import type { TrackLogPublisher } from '../domain/ports.ts';
+import type { MissionContentsUploader, TrackLogPublisher } from '../domain/ports.ts';
 import {
     parseTrackFile,
     referencedTrackUids,
@@ -24,6 +25,7 @@ import {
 import { attachFeaturesToFolder } from './folder.ts';
 import { loadIncidentSubscription, loadSchemaSubscription } from './incidentSubscription.ts';
 import { pushLineToMission } from './missionFeatures.ts';
+import { uploadMissionFile } from './missionUpload.ts';
 
 /** Accept attribute for the file input. */
 export const TRACK_FILE_ACCEPT = '.gpx,.kml,.geojson,.json';
@@ -107,6 +109,17 @@ export function createTrackLogPublisher(): TrackLogPublisher {
                 + `— it may not have reached the DataSync. Check the OP sync and attach it again. `
                 + `(${lastErr instanceof Error ? lastErr.message : String(lastErr)})`,
             );
+        },
+    };
+}
+
+/** Upload a converted track GeoJSON file into the OP DataSync's mission contents. */
+export function createTrackContentsUploader(): MissionContentsUploader {
+    return {
+        async upload(op, filename, data) {
+            return uploadMissionFile(op.guid, filename, data, {
+                missionToken: op.ownerToken,
+            });
         },
     };
 }
