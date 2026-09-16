@@ -68,7 +68,7 @@ const VALID_NAV_KEYS = new Set([
     'generate-closing-package',
 ]);
 
-const VALID_HTAB_KEYS = new Set(['main', 'dashboard', 'task', 'clues', 'casie', 'organization', 'risk-assessment']);
+const VALID_HTAB_KEYS = new Set(['main', 'dashboard', 'task', 'clues', 'casie', 'lpb', 'organization', 'risk-assessment']);
 
 function loadNavFromSession(): PaneNavState {
     try {
@@ -192,6 +192,8 @@ const effectiveIncidentType = computed(() => {
     return draftIncidentType.value;
 });
 const isSearchIncident = computed(() => isSearchIncidentType(effectiveIncidentType.value));
+/** Selected DataSync is `search` — ignores Create-form draft type. */
+const isSearchMission = computed(() => isSearchIncidentType(activeMission.value?.incidentType));
 
 const MISSION_EXEMPT_NAV_KEYS = new Set(['create-open', 'settings']);
 
@@ -226,11 +228,10 @@ function requireActiveMission(): boolean {
 }
 
 function bounceHiddenSearchViews(): void {
-    if (isSearchIncident.value) return;
     let key = activeKey.value;
     let htab = activeHTab.value;
-    if (SEARCH_ONLY_HTAB_KEYS.has(htab)) htab = 'main';
-    if (SEARCH_ONLY_NAV_KEYS.has(key)) {
+    if (!isSearchMission.value && SEARCH_ONLY_HTAB_KEYS.has(htab)) htab = 'main';
+    if (!isSearchIncident.value && SEARCH_ONLY_NAV_KEYS.has(key)) {
         key = 'create-open';
         htab = 'main';
     }
@@ -251,7 +252,7 @@ function selectKeyGuarded(key: string): void {
 }
 
 function selectHTabGuarded(htab: string): void {
-    if (!isSearchIncident.value && SEARCH_ONLY_HTAB_KEYS.has(htab)) {
+    if (!isSearchMission.value && SEARCH_ONLY_HTAB_KEYS.has(htab)) {
         activeHTab.value = 'main';
         return;
     }
@@ -275,7 +276,7 @@ watch(activeMission, (m) => {
     if (m) closeNoMissionModal();
 });
 
-watch(isSearchIncident, () => {
+watch([isSearchIncident, isSearchMission], () => {
     bounceHiddenSearchViews();
 }, { immediate: true });
 
@@ -377,6 +378,7 @@ export function useIncident() {
         casieExpandRequested,
         noMissionModalOpen,
         isSearchIncident,
+        isSearchMission,
         effectiveIncidentType,
         setActiveMission,
         setDraftIncidentType,

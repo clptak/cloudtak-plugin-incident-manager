@@ -16,6 +16,7 @@ export const SEARCH_ONLY_HTAB_KEYS = new Set<string>([
     'task',
     'clues',
     'casie',
+    'lpb',
 ]);
 
 export function isSearchIncidentType(type: string | undefined | null): boolean {
