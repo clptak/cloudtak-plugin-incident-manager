@@ -37,6 +37,7 @@
         <template v-else>
             <div class='incident-chip-bar-chips d-flex align-items-center gap-2'>
                 <IncidentManagerTaskbarChip />
+                <LpbTaskbarChip />
                 <ResourcesTaskbarChip />
                 <AssignmentsTaskbarChip />
                 <SegmentsTaskbarChip />
@@ -104,6 +105,7 @@ import {
 import { TablerDropdown } from '@tak-ps/vue-tabler';
 import { useMapStore } from '../../../../src/stores/map.ts';
 import IncidentManagerTaskbarChip from './IncidentManagerTaskbarChip.vue';
+import LpbTaskbarChip from './LpbTaskbarChip.vue';
 import ResourcesTaskbarChip from './ResourcesTaskbarChip.vue';
 import AssignmentsTaskbarChip from './AssignmentsTaskbarChip.vue';
 import SegmentsTaskbarChip from './SegmentsTaskbarChip.vue';

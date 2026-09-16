@@ -42,6 +42,13 @@
                 @click='openSection()'
             />
             <TaskbarChipButton
+                v-if='isSearchMission'
+                :icon='IconRuler2'
+                label='LPB'
+                title='Open LPB distance table'
+                @click='openLpb'
+            />
+            <TaskbarChipButton
                 :icon='IconUsersGroup'
                 label='Resources'
                 title='Open Resources'
@@ -70,6 +77,7 @@ import {
     IconClipboardList,
     IconMinus,
     IconPolygon,
+    IconRuler2,
     IconTarget,
     IconUsersGroup,
 } from '@tabler/icons-vue';
@@ -78,7 +86,7 @@ import IncidentManagerPane from '../IncidentManagerPane.vue';
 import TaskbarChipButton from '../TaskbarChipButton.vue';
 import { useIncident } from '../../composables/useIncident.ts';
 
-const { selectKeyGuarded, isSearchIncident } = useIncident();
+const { selectKeyGuarded, selectHTabGuarded, isSearchIncident, isSearchMission } = useIncident();
 
 /**
  * Popout-local minimize state: independent of the main window's floatMinimize
@@ -89,6 +97,11 @@ const paneOpen = ref(true);
 function openSection(key?: string): void {
     paneOpen.value = true;
     if (key) selectKeyGuarded(key);
+}
+
+function openLpb(): void {
+    paneOpen.value = true;
+    selectHTabGuarded('lpb');
 }
 </script>
 
