@@ -37,7 +37,7 @@
             v-else
             class='table-responsive'
         >
-            <table class='table table-sm table-vcenter small mb-0 align-middle'>
+            <table class='table table-sm table-vcenter table-hover small mb-0 align-middle'>
                 <thead>
                     <tr>
                         <th>Category</th>
