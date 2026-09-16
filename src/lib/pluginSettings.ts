@@ -15,6 +15,16 @@ export interface AzlpbEntry {
     qBmi: number;
     qCmi: number;
     qDmi: number;
+    maxMi?: number;
+    meanMi?: number;
+    qAme?: number;
+    qBme?: number;
+    qCme?: number;
+    qDme?: number;
+    qAlabel?: string;
+    qBlabel?: string;
+    qClabel?: string;
+    qDlabel?: string;
     [key: string]: unknown;
 }
 

@@ -54,7 +54,7 @@ test('search-only key sets cover the planned chrome', () => {
     for (const key of ['search-urgency', 'search-scenarios', 'search-area', 'segmentation', 'initial-consensus']) {
         assert.ok(SEARCH_ONLY_NAV_KEYS.has(key), key);
     }
-    for (const key of ['task', 'clues', 'casie']) {
+    for (const key of ['task', 'clues', 'casie', 'lpb']) {
         assert.ok(SEARCH_ONLY_HTAB_KEYS.has(key), key);
     }
 });
@@ -66,4 +66,5 @@ test('operational periods are available to every incident type', () => {
     // they are gated inside the pane, not by hiding it.
     assert.ok(!SEARCH_ONLY_NAV_KEYS.has('operational-periods'));
     assert.ok(SEARCH_ONLY_HTAB_KEYS.has('casie'), 'the rollup itself stays search-only');
+    assert.ok(SEARCH_ONLY_HTAB_KEYS.has('lpb'), 'LPB distance table is search-only');
 });
