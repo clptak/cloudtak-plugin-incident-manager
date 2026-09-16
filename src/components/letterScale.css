@@ -1,13 +1,13 @@
-/* A–I letter scale: one green / one red with stepped opacity. E is unstyled. */
+/* A–I letter scale: hot red / cold blue with stepped opacity. E is unstyled. */
 
-.letter-scale-A { --letter-scale-fill: rgba(var(--tblr-success-rgb, 47, 179, 68), 1); }
-.letter-scale-B { --letter-scale-fill: rgba(var(--tblr-success-rgb, 47, 179, 68), 0.75); }
-.letter-scale-C { --letter-scale-fill: rgba(var(--tblr-success-rgb, 47, 179, 68), 0.5); }
-.letter-scale-D { --letter-scale-fill: rgba(var(--tblr-success-rgb, 47, 179, 68), 0.25); }
-.letter-scale-F { --letter-scale-fill: rgba(var(--tblr-danger-rgb, 214, 57, 57), 0.25); }
-.letter-scale-G { --letter-scale-fill: rgba(var(--tblr-danger-rgb, 214, 57, 57), 0.5); }
-.letter-scale-H { --letter-scale-fill: rgba(var(--tblr-danger-rgb, 214, 57, 57), 0.75); }
-.letter-scale-I { --letter-scale-fill: rgba(var(--tblr-danger-rgb, 214, 57, 57), 1); }
+.letter-scale-A { --letter-scale-fill: rgba(var(--tblr-danger-rgb, 214, 57, 57), 1); }
+.letter-scale-B { --letter-scale-fill: rgba(var(--tblr-danger-rgb, 214, 57, 57), 0.75); }
+.letter-scale-C { --letter-scale-fill: rgba(var(--tblr-danger-rgb, 214, 57, 57), 0.5); }
+.letter-scale-D { --letter-scale-fill: rgba(var(--tblr-danger-rgb, 214, 57, 57), 0.25); }
+.letter-scale-F { --letter-scale-fill: rgba(var(--tblr-blue-rgb, 32, 107, 196), 0.25); }
+.letter-scale-G { --letter-scale-fill: rgba(var(--tblr-blue-rgb, 32, 107, 196), 0.5); }
+.letter-scale-H { --letter-scale-fill: rgba(var(--tblr-blue-rgb, 32, 107, 196), 0.75); }
+.letter-scale-I { --letter-scale-fill: rgba(var(--tblr-blue-rgb, 32, 107, 196), 1); }
 
 .letter-scale-btn {
     background-color: var(--letter-scale-fill) !important;

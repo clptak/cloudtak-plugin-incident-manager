@@ -1,4 +1,4 @@
-/** A–I Likert color scale: A–D green, E neutral, F–I red. */
+/** A–I Likert color scale: A–D red (hot), E neutral, F–I blue (cold). */
 
 export type LetterScaleNeutral = 'primary' | 'secondary';
 
