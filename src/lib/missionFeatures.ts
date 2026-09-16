@@ -43,7 +43,7 @@ function plainCenter(center: [number, number]): [number, number] {
 
 async function ensureConnOpen(worker: ReturnType<typeof useMapStore>['worker']): Promise<void> {
     if (await worker.conn.isOpen) return;
-    await worker.conn.reconnect(await worker.username);
+    await worker.conn.connect(await worker.username);
     if (!(await worker.conn.isOpen)) {
         throw new Error('TAK connection is not open. Connect to the map and try again.');
     }
