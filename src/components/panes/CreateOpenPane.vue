@@ -357,6 +357,58 @@
 
             <OpenExistingMission />
         </TablerBorder>
+
+        <div
+            v-if='pendingLocation'
+            class='modal modal-blur incident-modal show d-block'
+            tabindex='-1'
+            role='dialog'
+            @click.self='onLocationConfirmNo'
+        >
+            <div
+                class='modal-dialog modal-dialog-centered'
+                role='document'
+            >
+                <div class='modal-content'>
+                    <div class='modal-header'>
+                        <h5 class='modal-title'>
+                            Add location to DataSync
+                        </h5>
+                    </div>
+                    <div class='modal-body'>
+                        <p class='mb-2'>
+                            Add a location marker to DataSync
+                            &quot;{{ pendingLocation.missionName }}&quot;?
+                        </p>
+                        <p class='mb-0 text-muted small'>
+                            {{ pendingLocation.lat.toFixed(5) }}, {{ pendingLocation.lng.toFixed(5) }}
+                        </p>
+                    </div>
+                    <div class='modal-footer'>
+                        <button
+                            type='button'
+                            class='btn btn-secondary'
+                            :disabled='addingLocation'
+                            @click='onLocationConfirmNo'
+                        >
+                            No
+                        </button>
+                        <button
+                            type='button'
+                            class='btn btn-primary'
+                            :disabled='addingLocation'
+                            @click='onLocationConfirmYes'
+                        >
+                            {{ addingLocation ? 'Adding…' : 'Yes' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div
+            v-if='pendingLocation'
+            class='modal-backdrop fade show'
+        />
     </div>
 </template>
 
@@ -381,6 +433,8 @@ import { createCaltopoMap, caltopoAvailable } from '../../lib/caltopo.ts';
 import { useIncident } from '../../composables/useIncident.ts';
 import { usePluginSettings } from '../../composables/usePluginSettings.ts';
 import { SUBJECT_TYPE_PLACEHOLDER } from '../../lib/subjectTypes.ts';
+import { flyToCoords } from '../../lib/flyToFeature.ts';
+import { pushPointToMission } from '../../lib/missionFeatures.ts';
 
 const mapStore = useMapStore();
 const { setActiveMission, setDraftIncidentType, activeMission } = useIncident();
@@ -488,6 +542,18 @@ if (!form.incidentType && activeMission.value?.incidentType) {
 const loading = ref(false);
 const status = ref('');
 const statusError = ref(false);
+const addingLocation = ref(false);
+
+interface PendingLocation {
+    lat: number;
+    lng: number;
+    missionGuid: string;
+    missionToken?: string;
+    callsign: string;
+    missionName: string;
+}
+
+const pendingLocation = ref<PendingLocation | null>(null);
 
 const templates = ref<MissionTemplateList['items']>([]);
 const templatesLoading = ref(false);
@@ -742,11 +808,56 @@ async function createMission(): Promise<void> {
                 status.value += ' Caltopo creation skipped (provider not available).';
             }
         }
+
+        if (parsedCoords.value) {
+            pendingLocation.value = {
+                lat: parsedCoords.value.lat,
+                lng: parsedCoords.value.lng,
+                missionGuid: res.data.guid,
+                missionToken: res.data.token,
+                callsign: form.locationInfo.trim() || res.data.name,
+                missionName: res.data.name,
+            };
+        }
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);
     } finally {
         loading.value = false;
+    }
+}
+
+function centerPendingLocation(pending: PendingLocation): void {
+    flyToCoords({ lat: pending.lat, lng: pending.lng });
+}
+
+function onLocationConfirmNo(): void {
+    if (addingLocation.value) return;
+    const pending = pendingLocation.value;
+    pendingLocation.value = null;
+    if (pending) centerPendingLocation(pending);
+}
+
+async function onLocationConfirmYes(): Promise<void> {
+    const pending = pendingLocation.value;
+    if (!pending || addingLocation.value) return;
+
+    addingLocation.value = true;
+    try {
+        await pushPointToMission({
+            missionGuid: pending.missionGuid,
+            missionToken: pending.missionToken,
+            callsign: pending.callsign,
+            point: [pending.lng, pending.lat],
+        });
+        status.value = `${status.value} Added location ${pending.callsign} to the map.`;
+    } catch (err) {
+        statusError.value = true;
+        status.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        addingLocation.value = false;
+        pendingLocation.value = null;
+        centerPendingLocation(pending);
     }
 }
 </script>
