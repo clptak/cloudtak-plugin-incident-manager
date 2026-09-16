@@ -163,5 +163,6 @@
     "risk": {
         "tactic_assessments": {}
     },
-    "segments": {}
+    "segments": {},
+    "row_segments": {}
 }

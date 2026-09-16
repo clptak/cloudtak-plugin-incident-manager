@@ -4,6 +4,7 @@ import establishingSearchAreaMd from '../content/help/establishing_search_area_0
 import theoreticalSearchAreaMd from '../content/help/establishing_search_area_1_theoretical.md?raw';
 import statisticalSearchAreaMd from '../content/help/establishing_search_area_2_statistical.md?raw';
 import subjectiveSearchAreaMd from '../content/help/establishing_search_area_3_subjective.md?raw';
+import deductiveSearchAreaMd from '../content/help/establishing_search_area_4_deductive.md?raw';
 import segmentingSearchAreaMd from '../content/help/segmenting.md?raw';
 import initialConsensusMd from '../content/help/consensus_summary.md?raw';
 import resourceSummaryMd from '../content/help/resource_summary.md?raw';
@@ -15,6 +16,7 @@ export type NavSectionHelpKey =
     | 'theoretical-search-area'
     | 'statistical-search-area'
     | 'subjective-search-area'
+    | 'deductive-search-area'
     | 'segmenting-search-area'
     | 'initial-consensus'
     | 'resource-summary';
@@ -48,6 +50,10 @@ export const NAV_SECTION_HELP: Record<NavSectionHelpKey, NavSectionHelpDoc> = {
     'subjective-search-area': {
         markdown: subjectiveSearchAreaMd,
         ariaLabel: 'About Subjective Search Area',
+    },
+    'deductive-search-area': {
+        markdown: deductiveSearchAreaMd,
+        ariaLabel: 'About Deductive Reasoning Search Area',
     },
     'segmenting-search-area': {
         markdown: segmentingSearchAreaMd,

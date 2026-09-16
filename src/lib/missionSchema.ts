@@ -123,6 +123,8 @@ export interface MissionSchema {
     risk?: Record<string, unknown>;
     /** Search segments keyed by CoT feature UUID. */
     segments?: Record<string, SegmentRecord>;
+    /** ROW (Rest of the World) exclusion polygons keyed by CoT feature UUID. */
+    row_segments?: Record<string, SegmentRecord>;
     [key: string]: unknown;
 }
 
