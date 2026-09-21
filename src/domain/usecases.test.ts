@@ -108,6 +108,17 @@ test('openOperationalPeriod: forwards incident type keywords', async () => {
     });
 });
 
+test('openOperationalPeriod: replaces Create-form OP-00 instead of stacking OP1', async () => {
+    const registry = fakeRegistry();
+    const gateway = fakeGateway();
+    const entry = await openOperationalPeriod({ registry, gateway, now: NOW }, {
+        incidentName: '2026-09-21_search_foo_OP-00',
+        channels: ['a'],
+    });
+    assert.equal(entry.name, '2026-09-21_search_foo_OP-01');
+    assert.equal(entry.opNumber, 1);
+});
+
 test('openOperationalPeriod: validates inputs', async () => {
     const deps = { registry: fakeRegistry(), gateway: fakeGateway() };
     await assert.rejects(() => openOperationalPeriod(deps, { incidentName: ' ', channels: ['a'] }));
