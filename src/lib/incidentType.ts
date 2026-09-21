@@ -53,6 +53,7 @@ export function parentIncidentCandidateNames(name: string): string[] {
     add(stem);
     add(`${stem}_OP-00`);
     add(`${stem} - MGMT`);
+    add(`${stem}_OP-00 - MGMT`);
     return out;
 }
 

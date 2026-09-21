@@ -5,6 +5,7 @@ import {
     closeRegistryEntry,
     currentOpPeriod,
     nextOpNumber,
+    opSyncName,
     registryFromSchemaValue,
     upsertRegistryEntry,
 } from './registry.ts';
@@ -62,4 +63,16 @@ test('nextOpNumber / currentOpPeriod', () => {
     assert.equal(nextOpNumber(list), 4);
     assert.equal(currentOpPeriod(list)?.guid, 'g3');
     assert.equal(currentOpPeriod(list.map((e) => ({ ...e, status: 'closed' as const }))), null);
+});
+
+test('opSyncName: replaces Create-form _OP-00 instead of appending', () => {
+    assert.equal(opSyncName('2026-09-21_search_foo_OP-00', 1), '2026-09-21_search_foo_OP-01');
+    assert.equal(opSyncName('2026-09-21_search_foo_OP-00', 2), '2026-09-21_search_foo_OP-02');
+    assert.equal(opSyncName('base_OP-03', 1), 'base_OP-01');
+});
+
+test('opSyncName: keeps Area Search suffix when the common map has no _OP-NN', () => {
+    assert.equal(opSyncName('X', 1), 'X - OP1');
+    assert.equal(opSyncName('X', 2), 'X - OP2');
+    assert.equal(opSyncName('Alpha Incident - MGMT', 1), 'Alpha Incident - OP1');
 });

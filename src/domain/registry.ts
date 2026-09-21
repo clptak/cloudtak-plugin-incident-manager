@@ -81,6 +81,28 @@ export function nextOpNumber(entries: OpPeriodRegistryEntry[]): number {
     return max + 1;
 }
 
+const CREATE_FORM_OP_SUFFIX = /_OP-\d+$/;
+
+/**
+ * DataSync name for a new operational period.
+ *
+ * Create Mission names the common map `{stem}_OP-00` for Initial Response.
+ * Opening OP 1 must replace that suffix (`{stem}_OP-01`) rather than append
+ * (`{stem}_OP-00 - OP1`). Incidents without a Create-form suffix keep the
+ * Area Search ` - OP<n>` name.
+ */
+export function opSyncName(incidentName: string, opNumber: number): string {
+    const trimmed = incidentName.trim();
+    const padded = `OP-${String(opNumber).padStart(2, '0')}`;
+    if (CREATE_FORM_OP_SUFFIX.test(trimmed)) {
+        return trimmed.replace(CREATE_FORM_OP_SUFFIX, `_${padded}`);
+    }
+    const stem = trimmed
+        .replace(/ - MGMT$/, '')
+        .replace(/ - OP\d+$/, '');
+    return `${stem} - OP${opNumber}`;
+}
+
 /** The single open (or debriefing) OP with the highest number, if any. */
 export function currentOpPeriod(
     entries: OpPeriodRegistryEntry[],

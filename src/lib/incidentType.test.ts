@@ -47,6 +47,7 @@ test('incident stem treats OP DataSyncs as the same incident', () => {
         'Alpha Incident',
         'Alpha Incident_OP-00',
         'Alpha Incident - MGMT',
+        'Alpha Incident_OP-00 - MGMT',
     ]);
 });
 

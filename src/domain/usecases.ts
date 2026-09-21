@@ -20,7 +20,7 @@ import type {
     SegmentGeometrySource,
     TrackLogPublisher,
 } from './ports.ts';
-import { closeRegistryEntry, nextOpNumber, upsertRegistryEntry } from './registry.ts';
+import { closeRegistryEntry, nextOpNumber, opSyncName, upsertRegistryEntry } from './registry.ts';
 import {
     debriefKey,
     MAX_TRACK_POINTS,
@@ -48,7 +48,8 @@ export interface OpLifecycleDeps {
 
 /**
  * Open the next operational period: create the dual-channel, role-enabled OP
- * sync (suffix naming: `<incident> - OP<n>`) and register it Sworn-side.
+ * sync (`{stem}_OP-01` when the common map is `{stem}_OP-00`, otherwise
+ * `<incident> - OP<n>`) and register it Sworn-side.
  */
 export async function openOperationalPeriod(
     deps: OpLifecycleDeps,
@@ -68,7 +69,7 @@ export async function openOperationalPeriod(
     const opNumber = nextOpNumber(entries);
 
     const entry = await deps.gateway.create({
-        name: `${incidentName} - OP${opNumber}`,
+        name: opSyncName(incidentName, opNumber),
         opNumber,
         channels: input.channels,
         description: input.description,
