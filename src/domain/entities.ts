@@ -55,6 +55,8 @@ export interface SegmentState {
  * the mission schema — but the numbers a reader needs (how far, how long, how
  * many fixes) are carried here so the schema, and anything reading it
  * standalone, can report coverage without resolving the mission archive.
+ * File uploads also store a full-resolution `.geojson` as mission contents
+ * (`contentHash` / `geojsonName`); CloudTAK cannot overlay GPX.
  */
 export interface TrackLogRef {
     /** CoT uid of the LineString in the OP sync's Track Logs folder. */
@@ -74,6 +76,10 @@ export interface TrackLogRef {
     endedAt?: string;
     /** ISO timestamp of attachment. */
     attachedAt?: string;
+    /** Mission-contents hash of the converted .geojson (file uploads only). */
+    contentHash?: string;
+    /** Filename stored on the OP DataSync, e.g. team3_OP2.geojson. */
+    geojsonName?: string;
 }
 
 /**

@@ -5,7 +5,7 @@
                 Organizational Status
             </h3>
             <span
-                v-if='meta?.fetchedAt'
+                v-if='useD4hPersonnel && meta?.fetchedAt'
                 class='text-muted small'
             >
                 D4H sync {{ formatD4hSyncTime(meta.fetchedAt) }}
@@ -34,6 +34,7 @@
                     Clear canvas
                 </button>
                 <button
+                    v-if='useD4hPersonnel'
                     type='button'
                     class='btn btn-outline-primary btn-sm'
                     :disabled='loadingRoster'
@@ -46,7 +47,7 @@
 
         <p class='text-muted small mb-2 flex-shrink-0'>
             Create resource teams in the <strong>Resources</strong> tab, then drag them onto the chart
-            with incident command and rescue roles. Add D4H personnel from the palette. The org chart
+            with incident command and rescue roles. Add personnel from the palette. The org chart
             auto-saves in <strong>mission_schema.json</strong>. Use
             <strong>Sync org chart to DataSync</strong> for ICS 201 log lines; teams with a selected
             assignment CoT are linked via <code>entryUid</code>. Use
@@ -65,8 +66,8 @@
             v-if='!loadingRoster && !members.length'
             class='mb-2 flex-shrink-0'
             severity='info'
-            title='No D4H Roster'
-            description='No D4H roster in this browser. Open the D4H plugin, configure Team Manager, and run Sync now, then click Refresh D4H.'
+            :title='emptyPersonnelTitle'
+            :description='emptyPersonnelDescription'
         />
 
         <div class='d-flex gap-2 flex-grow-1 min-height-0 overflow-hidden assignments-workspace'>
@@ -311,8 +312,13 @@
                                 v-if='!members.length'
                                 class='text-muted small px-1 mb-2'
                             >
-                                No D4H roster — sync in the <strong>D4H</strong> plugin, then
-                                <strong>Refresh D4H</strong>.
+                                <template v-if='useD4hPersonnel'>
+                                    No D4H roster — sync in the <strong>D4H</strong> plugin, then
+                                    <strong>Refresh D4H</strong>.
+                                </template>
+                                <template v-else>
+                                    No custom roster — upload personnel in <strong>Settings</strong>.
+                                </template>
                             </div>
                             <div
                                 v-else-if='!filteredMembers.length'
@@ -454,9 +460,10 @@ import {
     TablerInlineAlert,
 } from '@tak-ps/vue-tabler';
 import { useIncident } from '../../composables/useIncident.ts';
+import { usePluginSettings } from '../../composables/usePluginSettings.ts';
 import type { RescueGroupLabel } from '../../data/rescueManagementPositions.ts';
 import type { RolePositionDef } from '../../data/rolePositionTypes.ts';
-import { formatD4hSyncTime, filterAndSortPaletteMembers, loadD4hMeta, loadD4hRoster, sortMembersByNameAsc } from '../../lib/d4hRoster.ts';
+import { formatD4hSyncTime, filterAndSortPaletteMembers, loadD4hMeta, loadEffectiveMembers, sortMembersByNameAsc } from '../../lib/d4hRoster.ts';
 import type { D4HMember, D4HRosterMeta } from '../../lib/d4hTypes.ts';
 import {
     resourceAssignmentMatchesFilter,
@@ -492,6 +499,7 @@ import { formatPersonNameFirstLast } from '../../lib/personName.ts';
 import { listMissionCots, type MissionCotRef } from '../../lib/missionCots.ts';
 
 const { activeMission, requireActiveMission } = useIncident();
+const { useD4hPersonnel, personnel } = usePluginSettings();
 const { assignments: resourceAssignments, loadForMission: loadResourceAssignments, updateAssignment: updateResourceAssignment } = useResourceAssignments();
 
 const teamTree = ref<HastyTreeNode>({});
@@ -512,7 +520,16 @@ const loadingOrgChart = ref(false);
 const savingOrgChart = ref(false);
 const persistStatus = ref('');
 
-const MEMBER_PLACEHOLDER = '— D4H —';
+const memberPlaceholder = computed(() => (useD4hPersonnel.value ? '— D4H —' : '— Select —'));
+
+const emptyPersonnelTitle = computed(() =>
+    useD4hPersonnel.value ? 'No D4H Roster' : 'No Personnel Roster',
+);
+
+const emptyPersonnelDescription = computed(() => (useD4hPersonnel.value
+    ? 'No D4H roster in this browser. Open the D4H plugin, configure Team Manager, and run Sync now, then click Refresh D4H.'
+    : 'No custom personnel list in Settings. Open Settings, turn D4H off under Personnel, and upload a D4H JSON or CSV roster.'
+));
 
 let saveOrgChartTimer: ReturnType<typeof setTimeout> | null = null;
 let saveOrgChartGeneration = 0;
@@ -560,7 +577,7 @@ const resourceAssignmentOptions = computed(() => [
 ]);
 
 const memberOptions = computed(() => [
-    MEMBER_PLACEHOLDER,
+    memberPlaceholder.value,
     ...configurationMembers.value.map((m) => m.name),
 ]);
 
@@ -581,14 +598,14 @@ async function onResourceAssignmentLabelChange(id: string, label: string): Promi
 
 function memberLabelForSlot(slot: RoleSlotConfig): string {
     const single = asSingleSlot(slot);
-    if (single.d4hMemberId === '') return MEMBER_PLACEHOLDER;
+    if (single.d4hMemberId === '') return memberPlaceholder.value;
     const member = configurationMembers.value.find((m) => m.id === single.d4hMemberId);
-    return member ? member.name : MEMBER_PLACEHOLDER;
+    return member ? member.name : memberPlaceholder.value;
 }
 
 function onMemberLabelChangeForSlot(slot: RoleSlotConfig, label: string): void {
     const single = asSingleSlot(slot);
-    if (label === MEMBER_PLACEHOLDER) {
+    if (label === memberPlaceholder.value) {
         single.d4hMemberId = '';
         return;
     }
@@ -597,7 +614,7 @@ function onMemberLabelChangeForSlot(slot: RoleSlotConfig, label: string): void {
 }
 
 function memberSubtitle(m: D4HMember): string {
-    return [m.ref, m.position].filter(Boolean).join(' · ') || 'D4H member';
+    return [m.ref, m.position].filter(Boolean).join(' · ') || 'Member';
 }
 
 function rolePositionPreview(
@@ -798,9 +815,8 @@ async function syncOrgChart(): Promise<void> {
 async function refreshRoster(): Promise<void> {
     loadingRoster.value = true;
     try {
-        const roster = await loadD4hRoster();
-        meta.value = await loadD4hMeta();
-        members.value = roster?.members ?? [];
+        members.value = await loadEffectiveMembers();
+        meta.value = useD4hPersonnel.value ? await loadD4hMeta() : null;
     } finally {
         loadingRoster.value = false;
     }
@@ -840,6 +856,10 @@ watch(() => activeMission.value?.guid, () => {
 watch(teamTree, () => {
     scheduleOrgChartSave();
 }, { deep: true });
+
+watch([useD4hPersonnel, personnel], () => {
+    void refreshRoster();
+});
 </script>
 
 <style scoped>

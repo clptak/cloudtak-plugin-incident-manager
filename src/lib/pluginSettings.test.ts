@@ -176,6 +176,21 @@ test('parseStoredPluginSettings defaults D4H aiding agencies on', () => {
     assert.equal(missing.useD4hAidingAgencies, true);
     assert.deepEqual(missing.aidingAgencies, []);
     assert.equal(missing.searchOpTemplateId, '');
+    assert.equal(missing.useD4hPersonnel, true);
+    assert.deepEqual(missing.personnel, []);
+});
+
+test('parseStoredPluginSettings reads personnel settings', () => {
+    const parsed = parseStoredPluginSettings({
+        useD4hPersonnel: false,
+        personnel: [
+            { id: 1, name: 'Smith, Jane', ref: '42', phone: '555' },
+            { id: 'x', name: 'Bad' },
+            { id: 1, name: 'Duplicate' },
+        ],
+    });
+    assert.equal(parsed.useD4hPersonnel, false);
+    assert.deepEqual(parsed.personnel, [{ id: 1, name: 'Smith, Jane', ref: '42' }]);
 });
 
 test('parseStoredPluginSettings reads searchOpTemplateId', () => {

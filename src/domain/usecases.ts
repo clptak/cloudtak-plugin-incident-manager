@@ -13,6 +13,7 @@ import type {
 import type {
     AssignmentStore,
     DebriefStore,
+    MissionContentsUploader,
     OpFeaturePublisher,
     OpPeriodGateway,
     RegistryStore,
@@ -24,8 +25,10 @@ import {
     debriefKey,
     MAX_TRACK_POINTS,
     simplifyTrack,
+    trackGeoJsonFilename,
     trackLogCallsign,
     trackMetrics,
+    tracksToGeoJSON,
     withoutTrack,
     withTrack,
     type ParsedTrack,
@@ -222,6 +225,10 @@ export async function attachTrackLog(
         /** 1-based position when one file yielded several tracks. */
         index?: number;
         total?: number;
+        /** Mission-contents hash of the converted .geojson (file uploads only). */
+        contentHash?: string;
+        /** Filename stored on the OP DataSync. */
+        geojsonName?: string;
     },
 ): Promise<TrackLogRef> {
     if (input.track.coords.length < 2) {
@@ -267,10 +274,74 @@ export async function attachTrackLog(
     if (coords.length !== metrics.points) ref.sourcePoints = metrics.points;
     if (metrics.startedAt) ref.startedAt = metrics.startedAt;
     if (metrics.endedAt) ref.endedAt = metrics.endedAt;
+    if (input.contentHash) ref.contentHash = input.contentHash;
+    if (input.geojsonName) ref.geojsonName = input.geojsonName;
 
     const updated = withTrack(record, ref);
     await deps.debriefs.setTracks(debriefKey(record), updated.tracks ?? []);
     return ref;
+}
+
+export interface TrackFileDeps extends TrackLogDeps {
+    contents: MissionContentsUploader;
+}
+
+/**
+ * Attach every line in an uploaded GPS file to a completed assignment.
+ *
+ * GPX/KML (and GeoJSON) are converted to a full-resolution FeatureCollection,
+ * uploaded as a `.geojson` into the OP DataSync (CloudTAK cannot overlay GPX),
+ * then each line is published as a thinned CoT into Track Logs. Upload runs
+ * first: a failed contents write must not leave schema refs claiming a file
+ * that is not on the mission. A later CoT failure still leaves the GeoJSON in
+ * Mission Files, which is recoverable.
+ */
+export async function attachTrackFile(
+    deps: TrackFileDeps,
+    op: OpPeriodRegistryEntry,
+    record: DebriefRecord,
+    input: {
+        tracks: { track: ParsedTrack; callsign?: string }[];
+        source: string;
+        segmentLabel?: string;
+    },
+): Promise<TrackLogRef[]> {
+    if (!input.tracks.length) {
+        throw new Error('attachTrackFile: no tracks');
+    }
+    for (const entry of input.tracks) {
+        if (entry.track.coords.length < 2) {
+            throw new Error('attachTrackFile: a track needs at least two points');
+        }
+    }
+
+    const collection = tracksToGeoJSON(input.tracks.map((entry) => entry.track));
+    if (!collection.features.length) {
+        throw new Error('attachTrackFile: a track needs at least two points');
+    }
+
+    const geojsonName = trackGeoJsonFilename(input.source, op.opNumber);
+    const bytes = new TextEncoder().encode(JSON.stringify(collection));
+    const contentHash = await deps.contents.upload(op, geojsonName, bytes);
+
+    const refs: TrackLogRef[] = [];
+    let current = record;
+    const total = input.tracks.length;
+    for (const [index, entry] of input.tracks.entries()) {
+        const ref = await attachTrackLog(deps, op, current, {
+            track: entry.track,
+            source: input.source,
+            segmentLabel: input.segmentLabel,
+            callsign: entry.callsign,
+            index: index + 1,
+            total,
+            contentHash,
+            geojsonName,
+        });
+        refs.push(ref);
+        current = { ...current, tracks: [...(current.tracks ?? []), ref] };
+    }
+    return refs;
 }
 
 /**

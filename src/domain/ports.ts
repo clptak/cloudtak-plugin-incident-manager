@@ -80,6 +80,18 @@ export interface TrackLogPublisher {
     ): Promise<string>;
 }
 
+/**
+ * Store a converted track .geojson as mission contents on the OP DataSync.
+ * Returns the content hash when the server reports one.
+ */
+export interface MissionContentsUploader {
+    upload(
+        op: OpPeriodRegistryEntry,
+        filename: string,
+        data: Uint8Array,
+    ): Promise<string | undefined>;
+}
+
 /** Style carried from the source feature so OP copies render identically. */
 export interface PolygonStyle {
     stroke?: string;

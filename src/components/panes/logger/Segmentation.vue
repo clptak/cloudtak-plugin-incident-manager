@@ -251,26 +251,8 @@ import {
 import { deletePolygonFromMission, pushPolygonToMission } from '../../../lib/missionFeatures.ts';
 import { fractionsFromAreas } from '../../../domain/rollup.ts';
 import { splitRegisteredSegment } from '../../../lib/segmentSplit.ts';
-
-function ringFromGeometry(geometry: unknown): [number, number][] | null {
-    const geom = geometry as { type?: string; coordinates?: unknown };
-    const coords = geom?.type === 'Polygon' ? geom.coordinates
-        : geom?.type === 'MultiPolygon' && Array.isArray(geom.coordinates) ? (geom.coordinates as unknown[])[0]
-            : null;
-    if (!Array.isArray(coords) || !Array.isArray(coords[0])) return null;
-    const ring: [number, number][] = [];
-    for (const point of coords[0] as unknown[]) {
-        if (!Array.isArray(point) || point.length < 2) return null;
-        ring.push([Number(point[0]), Number(point[1])]);
-    }
-    return ring.length >= 4 ? ring : null;
-}
-
-function ringCentroid(ring: [number, number][]): [number, number] {
-    let lon = 0; let lat = 0;
-    for (const [x, y] of ring) { lon += x; lat += y; }
-    return [lon / ring.length, lat / ring.length];
-}
+import { ringCentroid, ringFromGeometry } from '../../../lib/polygonRing.ts';
+import { loadRowSegmentsFromMission } from '../../../lib/rowSegmentsPersistence.ts';
 
 const SEGMENTS_FOLDER = 'Segments';
 
@@ -311,6 +293,7 @@ const missionPolygons = ref<MissionFeatureRef[]>([]);
 const loadingFeatures = ref(false);
 const segmentUids = ref<string[]>([]);
 const segments = ref<SegmentMap>({});
+const rowSegments = ref<SegmentMap>({});
 const contentHash = ref<string | undefined>();
 const loadingSegments = ref(false);
 const saving = ref(false);
@@ -328,7 +311,7 @@ const segmentRows = computed<SegmentRow[]>(() =>
 );
 
 const availablePolygons = computed(() =>
-    missionPolygons.value.filter((p) => !segments.value[p.uid]),
+    missionPolygons.value.filter((p) => !segments.value[p.uid] && !rowSegments.value[p.uid]),
 );
 
 async function loadSub(): Promise<Awaited<ReturnType<typeof Subscription.load>>> {
@@ -405,14 +388,19 @@ async function onFlyTo(uid: string): Promise<void> {
 async function loadSegments(): Promise<void> {
     if (!activeMission.value) {
         segments.value = {};
+        rowSegments.value = {};
         contentHash.value = undefined;
         return;
     }
     loadingSegments.value = true;
     try {
-        const loaded = await loadSegmentsFromMission(activeMission.value);
+        const [loaded, rowLoaded] = await Promise.all([
+            loadSegmentsFromMission(activeMission.value),
+            loadRowSegmentsFromMission(activeMission.value),
+        ]);
         segments.value = loaded.segments;
         contentHash.value = loaded.contentHash;
+        rowSegments.value = rowLoaded.segments;
     } catch (err) {
         statusError.value = true;
         status.value = `Could not load segments: ${err instanceof Error ? err.message : String(err)}`;
@@ -502,7 +490,7 @@ const splitChildUids = ref<string[]>([]);
 
 /** Unregistered candidate polygons usable as split children. */
 const splitCandidates = computed(() => missionPolygons.value.filter(
-    (p) => !segments.value[p.uid] && p.uid !== splitParentUid.value,
+    (p) => !segments.value[p.uid] && !rowSegments.value[p.uid] && p.uid !== splitParentUid.value,
 ));
 
 function splitFraction(uid: string): number | null {

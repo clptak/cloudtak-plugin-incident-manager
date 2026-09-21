@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import type { DebriefRecord, OpAssignment, OpPeriodRegistryEntry } from './entities.ts';
 import type { DebriefStore, OpPeriodGateway, RegistryStore } from './ports.ts';
 import {
+    attachTrackFile,
     attachTrackLog,
     checkInSubscriber,
     closeOperationalPeriod,
@@ -417,6 +418,112 @@ test('attachTrackLog: refuses a degenerate track and an unknown debrief', async 
         { gateway: fakeGateway(), publisher, debriefs: fakeDebriefStore([]) },
         op, record, { track: { name: '', coords: [[-105, 39], [-105, 39.1]] }, source: 'x.gpx' },
     ));
+});
+
+test('attachTrackFile: uploads GeoJSON once then publishes each track with the content hash', async () => {
+    const op: OpPeriodRegistryEntry = {
+        opNumber: 2, name: 'X - OP2', guid: 'g2', status: 'open', channels: [],
+    };
+    const record: DebriefRecord = {
+        opNumber: 2, segmentUid: 's5', pod: 60, resource: 'Team 3',
+        recordedAt: '2026-08-30T18:00:00.000Z',
+    };
+    const debriefs = fakeDebriefStore([record]);
+    const published: string[] = [];
+    const publisher = {
+        async publishTrack(_op: OpPeriodRegistryEntry, _folder: string, track: { callsign: string }) {
+            published.push(track.callsign);
+            return `cot-${published.length}`;
+        },
+    };
+    const uploads: { filename: string; text: string }[] = [];
+    const contents = {
+        async upload(_op: OpPeriodRegistryEntry, filename: string, data: Uint8Array) {
+            uploads.push({ filename, text: new TextDecoder().decode(data) });
+            return 'hash-abc';
+        },
+    };
+
+    const refs = await attachTrackFile(
+        { gateway: fakeGateway(), publisher, debriefs, contents, now: NOW },
+        op,
+        record,
+        {
+            tracks: [
+                { track: { name: 'a', coords: [[-105, 39], [-105, 39.01]] } },
+                { track: { name: 'b', coords: [[-105.1, 39], [-105.1, 39.01]] } },
+            ],
+            source: 'team3.gpx',
+            segmentLabel: '05',
+        },
+    );
+
+    assert.equal(uploads.length, 1);
+    assert.equal(uploads[0].filename, 'team3_OP2.geojson');
+    const fc = JSON.parse(uploads[0].text) as { features: unknown[] };
+    assert.equal(fc.features.length, 2);
+    assert.equal(published.length, 2);
+    assert.equal(refs.length, 2);
+    assert.equal(refs[0].contentHash, 'hash-abc');
+    assert.equal(refs[0].geojsonName, 'team3_OP2.geojson');
+    assert.equal(refs[1].contentHash, 'hash-abc');
+    assert.equal(debriefs.records[0].tracks?.length, 2);
+    assert.equal(debriefs.records[0].tracks?.[0].uid, 'cot-1');
+    assert.equal(debriefs.records[0].tracks?.[1].uid, 'cot-2');
+});
+
+test('attachTrackFile: aborts before CoT when the GeoJSON upload fails', async () => {
+    const op: OpPeriodRegistryEntry = {
+        opNumber: 1, name: 'X - OP1', guid: 'g1', status: 'open', channels: [],
+    };
+    const record: DebriefRecord = { opNumber: 1, segmentUid: 's1', pod: 50 };
+    const debriefs = fakeDebriefStore([record]);
+    let published = 0;
+    const publisher = {
+        async publishTrack() {
+            published += 1;
+            return 'cot';
+        },
+    };
+    const contents = {
+        async upload() { throw new Error('no write'); },
+    };
+
+    await assert.rejects(
+        () => attachTrackFile(
+            { gateway: fakeGateway(), publisher, debriefs, contents },
+            op,
+            record,
+            {
+                tracks: [{ track: { name: '', coords: [[-105, 39], [-105, 39.1]] } }],
+                source: 'x.gpx',
+            },
+        ),
+        /no write/,
+    );
+    assert.equal(published, 0);
+    assert.equal(debriefs.records[0].tracks, undefined);
+});
+
+test('attachTrackLog: does not call mission contents upload', async () => {
+    const op: OpPeriodRegistryEntry = {
+        opNumber: 1, name: 'X - OP1', guid: 'g1', status: 'open', channels: [],
+    };
+    const record: DebriefRecord = { opNumber: 1, segmentUid: 's1', pod: 50 };
+    const debriefs = fakeDebriefStore([record]);
+    const ref = await attachTrackLog(
+        {
+            gateway: fakeGateway(),
+            publisher: { async publishTrack() { return 'cot-map'; } },
+            debriefs,
+        },
+        op,
+        record,
+        { track: { name: '', coords: [[-105, 39], [-105, 39.1]] }, source: 'map' },
+    );
+    assert.equal(ref.uid, 'cot-map');
+    assert.equal(ref.contentHash, undefined);
+    assert.equal(ref.geojsonName, undefined);
 });
 
 test('detachTrackLog: drops the reference and leaves the CoT alone', async () => {

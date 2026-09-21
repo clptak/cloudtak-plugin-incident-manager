@@ -639,6 +639,233 @@
             </div>
         </TablerBorder>
 
+        <!-- 5 · Deductive Reasoning -->
+        <div
+            v-if='expanded !== "deductive"'
+            class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center user-select-none'
+            :class='openable(4) ? "cursor-pointer" : "opacity-50"'
+            :style='openable(4) ? "cursor:pointer" : "cursor:not-allowed"'
+            role='button'
+            tabindex='0'
+            :aria-expanded='false'
+            @click='toggle("deductive", 4)'
+            @keydown.enter.prevent='toggle("deductive", 4)'
+            @keydown.space.prevent='toggle("deductive", 4)'
+        >
+            <p class='text-uppercase text-white-50 small mb-0'>
+                Deductive Reasoning
+            </p>
+            <span
+                v-if='stepDone.deductive'
+                class='badge bg-success text-white ms-2'
+            >added</span>
+            <IconLock
+                v-else-if='!openable(4)'
+                :size='16'
+                stroke='1.5'
+                class='ms-2 text-white-50'
+            />
+            <span
+                class='ms-auto d-inline-flex me-2'
+                @click.stop
+            >
+                <NavHelpButton help-key='deductive-search-area' />
+            </span>
+            <IconChevronDown
+                class='transition-transform text-white-50 rotate-180'
+                :size='20'
+                stroke='1.5'
+            />
+        </div>
+        <TablerBorder
+            v-else
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <div
+                    class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='true'
+                    @click='toggle("deductive", 4)'
+                    @keydown.enter.prevent='toggle("deductive", 4)'
+                    @keydown.space.prevent='toggle("deductive", 4)'
+                >
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Deductive Reasoning
+                    </p>
+                    <span
+                        v-if='stepDone.deductive'
+                        class='badge bg-success text-white ms-2'
+                    >added</span>
+                    <span
+                        class='ms-auto d-inline-flex me-2'
+                        @click.stop
+                    >
+                        <NavHelpButton help-key='deductive-search-area' />
+                    </span>
+                    <IconChevronDown
+                        class='transition-transform text-white-50'
+                        :size='20'
+                        stroke='1.5'
+                    />
+                </div>
+            </template>
+
+            <div>
+                <p class='text-uppercase text-white-50 small mb-1'>
+                    Choose a polygon from the active DataSync
+                </p>
+                <select
+                    v-model='deductiveUid'
+                    class='form-select form-select-sm'
+                >
+                    <option value=''>
+                        — select a polygon —
+                    </option>
+                    <option
+                        v-for='p in missionPolygons'
+                        :key='p.uid'
+                        :value='p.uid'
+                    >
+                        {{ p.callsign }}
+                    </option>
+                </select>
+                <div
+                    v-if='!missionPolygons.length'
+                    class='form-text text-muted'
+                >
+                    No polygons in the active DataSync.
+                </div>
+                <button
+                    class='btn btn-primary btn-sm mt-2'
+                    :disabled='!canAddDeductive || pushing'
+                    @click='onAddDeductive'
+                >
+                    Add to DataSync
+                </button>
+            </div>
+        </TablerBorder>
+
+        <!-- ROW Segments (optional exclusions; not a required accordion step) -->
+        <TablerBorder
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0 d-flex align-items-center gap-2 w-100'>
+                    <span>ROW Segments</span>
+                    <span
+                        class='ms-auto d-inline-flex'
+                        @click.stop
+                    >
+                        <NavHelpButton help-key='segmenting-search-area' />
+                    </span>
+                </p>
+            </template>
+
+            <p class='form-text mt-0'>
+                Register polygons that are outside the search area (Rest of the World).
+            </p>
+            <label class='form-label'>Select polygons from the active DataSync (multiple)</label>
+            <div
+                class='border rounded p-2'
+                style='max-height: 240px; overflow:auto;'
+            >
+                <div
+                    v-if='loadingFeatures || loadingRowSegments'
+                    class='text-muted small'
+                >
+                    Loading mission polygons…
+                </div>
+                <div
+                    v-else-if='!availableRowPolygons.length'
+                    class='text-muted small'
+                >
+                    No available polygons in the active DataSync.
+                </div>
+                <label
+                    v-for='p in availableRowPolygons'
+                    :key='p.uid'
+                    class='d-flex gap-2 align-items-center py-1'
+                    style='cursor:pointer'
+                >
+                    <input
+                        v-model='rowUids'
+                        type='checkbox'
+                        :value='p.uid'
+                        class='form-check-input'
+                    >
+                    <span>{{ p.callsign }}</span>
+                </label>
+            </div>
+            <button
+                class='btn btn-primary btn-sm mt-2'
+                :disabled='!rowUids.length || pushing'
+                @click='onAddRowSegments'
+            >
+                Add {{ rowUids.length }} to ROW
+            </button>
+
+            <p class='text-uppercase text-white-50 small mb-1 mt-3'>
+                ROW in this search ({{ rowSegmentRows.length }})
+            </p>
+            <div
+                v-if='loadingRowSegments'
+                class='text-muted small'
+            >
+                Loading…
+            </div>
+            <div
+                v-else-if='!rowSegmentRows.length'
+                class='text-muted small'
+            >
+                No ROW polygons registered yet. Select polygons above to add them.
+            </div>
+            <table
+                v-else
+                class='table table-sm table-vcenter mb-0'
+            >
+                <thead>
+                    <tr>
+                        <th>Polygon</th>
+                        <th>Area (mi²)</th>
+                        <th class='text-end' />
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr
+                        v-for='row in rowSegmentRows'
+                        :key='row.uid'
+                    >
+                        <td>
+                            <FeatureCallsignCell
+                                :uid='row.uid'
+                                :callsign='row.callsign'
+                                @fly='onFlyTo(row.uid)'
+                            />
+                        </td>
+                        <td>{{ formatSqMi(areaForUid(row.uid)) }}</td>
+                        <td class='text-end'>
+                            <button
+                                type='button'
+                                class='btn btn-sm btn-link text-danger p-0'
+                                :disabled='pushing'
+                                @click='removeRowSegment(row.uid)'
+                            >
+                                Remove
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </TablerBorder>
+
         <!-- Recall: areas already on DataSync -->
         <TablerBorder
             class='cloudtak-accent text-white mb-3'
@@ -772,6 +999,9 @@ import { flyToFeature } from '../../../lib/flyToFeature.ts';
 import FeatureCallsignCell from '../../FeatureCallsignCell.vue';
 import { areaSqMi, formatSqMi } from '../../../lib/geometryArea.ts';
 import { loadMissionSchema } from '../../../lib/missionSchema.ts';
+import { ringCentroid, ringFromGeometry } from '../../../lib/polygonRing.ts';
+import { segmentsFromSchema, type SegmentMap } from '../../../lib/segmentsPersistence.ts';
+import { rowSegmentsFromSchema, saveRowSegmentsToMission } from '../../../lib/rowSegmentsPersistence.ts';
 import { toDatetimeLocalValue } from '../../../lib/ics234Datetime.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import { usePluginSettings } from '../../../composables/usePluginSettings.ts';
@@ -784,6 +1014,7 @@ import NavHelpButton from '../../NavHelpButton.vue';
 
 const SEARCH_AREA_KEYWORD = 'search-area';
 const SEARCH_AREA_FOLDER = 'Search Area';
+const ROW_SEGMENTS_FOLDER = 'ROW Segments';
 const IPP_KEY = 'ipp';
 const IPP_ICON = '83198b4872a8c34eb9c549da8a4de5a28f07821185b39a2277948f66c24ac17a/Wildfire/Fire Origin.png';
 const LPB_RING_STYLE: RingStyle = {
@@ -813,6 +1044,14 @@ interface MissionFeatureRef {
     callsign: string;
     coords?: [number, number];
     areaSqMi?: number;
+    onCommonMap?: boolean;
+    geometry?: Feature['geometry'];
+}
+
+interface RowSegmentRow {
+    uid: string;
+    callsign: string;
+    created: string;
 }
 
 /** A search area recalled from a DataSync log entry. */
@@ -869,6 +1108,12 @@ const ippPromptDismissed = ref(false);
 const schemaIppCoords = ref<[number, number] | null>(null);
 
 const subjectiveUid = ref('');
+const deductiveUid = ref('');
+const rowUids = ref<string[]>([]);
+const rowSegments = ref<SegmentMap>({});
+const searchSegments = ref<SegmentMap>({});
+const rowContentHash = ref<string | undefined>();
+const loadingRowSegments = ref(false);
 
 const categories = computed(() => lpbTable.value.map((t) => t.category));
 const category = ref('');
@@ -1008,7 +1253,7 @@ function planningTarget(): { guid: string; missionToken?: string } {
 
 // ---- Sequential accordion state -------------------------------------------
 
-const STEPS = ['ipp', 'theoretical', 'statistical', 'subjective'] as const;
+const STEPS = ['ipp', 'theoretical', 'statistical', 'subjective', 'deductive'] as const;
 type StepKey = typeof STEPS[number];
 
 const expanded = ref<StepKey | ''>('ipp');
@@ -1018,6 +1263,7 @@ const stepDone = computed(() => ({
     theoretical: sentAreas.value.some((a) => a.key === 'theoretical'),
     statistical: sentAreas.value.some((a) => a.key.startsWith('lpb:')),
     subjective: sentAreas.value.some((a) => a.key === 'subjective'),
+    deductive: sentAreas.value.some((a) => a.key === 'deductive'),
 }));
 
 /** Index of the current (first not-yet-done) step; === STEPS.length when all done. */
@@ -1043,7 +1289,7 @@ function toggle(key: StepKey, index: number): void {
  * Open the first not-yet-completed step — i.e. resume where the operator left
  * off based on what's already on DataSync. Called after every list load (mount,
  * mission switch, and after each push/remove), so reopening the tab picks up at
- * the right step (e.g. all 4 LPB rings present → opens Subjective).
+ * the right step (e.g. Subjective present → opens Deductive).
  */
 function resumeToCurrentStep(): void {
     const idx = currentIndex.value;
@@ -1059,6 +1305,9 @@ async function loadAreas(sub?: LoadedSub): Promise<void> {
         timeReportedMissing.value = '';
         ippCoordsCache.value = null;
         schemaIppCoords.value = null;
+        rowSegments.value = {};
+        searchSegments.value = {};
+        rowContentHash.value = undefined;
         return;
     }
     loadingAreas.value = true;
@@ -1108,9 +1357,13 @@ async function loadAreas(sub?: LoadedSub): Promise<void> {
 
 /** Prefill Theoretical Time Reported Missing and IPP from mission_schema.json. */
 async function loadSchemaPrefills(): Promise<void> {
+    loadingRowSegments.value = true;
     try {
         const schemaSub = await loadSchemaSubscription(activeMission.value!);
-        const { schema } = await loadMissionSchema(schemaSub);
+        const { schema, contentHash } = await loadMissionSchema(schemaSub);
+        rowSegments.value = rowSegmentsFromSchema(schema);
+        searchSegments.value = segmentsFromSchema(schema);
+        rowContentHash.value = contentHash;
         const created = schema.cad_data?.call_timestamps?.call_created?.trim() ?? '';
         if (created) {
             const local = toDatetimeLocalInput(created);
@@ -1127,7 +1380,12 @@ async function loadSchemaPrefills(): Promise<void> {
             schemaIppCoords.value = null;
         }
     } catch {
+        rowSegments.value = {};
+        searchSegments.value = {};
+        rowContentHash.value = undefined;
         // Schema may be missing on new missions; leave the fields as-is.
+    } finally {
+        loadingRowSegments.value = false;
     }
 }
 
@@ -1149,10 +1407,11 @@ function rank(key: string): number {
     if (key === 'theoretical') return 1;
     if (key.startsWith('lpb:')) return 2;
     if (key === 'subjective') return 3;
+    if (key === 'deductive') return 4;
     return 9;
 }
 
-/** Grouped recall table: IPP/Theoretical, Statistical (by folder), Subjective. */
+/** Grouped recall table: IPP/Theoretical, Statistical (by folder), Subjective, Deductive. */
 const recallRows = computed((): RecallRow[] => {
     const areas = sentAreas.value;
     const rows: RecallRow[] = [];
@@ -1188,6 +1447,9 @@ const recallRows = computed((): RecallRow[] => {
     const subjective = areas.find((a) => a.key === 'subjective');
     if (subjective) rows.push({ kind: 'area', rowKey: subjective.key, area: subjective });
 
+    const deductive = areas.find((a) => a.key === 'deductive');
+    if (deductive) rows.push({ kind: 'area', rowKey: deductive.key, area: deductive });
+
     // Any unexpected keys (keep visible)
     const known = new Set(rows.filter((r): r is Extract<RecallRow, { kind: 'area' }> => r.kind === 'area').map((r) => r.area.key));
     for (const a of areas) {
@@ -1212,9 +1474,14 @@ async function loadFeatures(): Promise<void> {
             ? await listMissionFeatures(loadSub)
             : [];
         const pointFeats = mergeFeaturesByUid(commonFeats, planningFeats);
-        const polygonFeats = mergeFeaturesByUid(planningFeats, commonFeats);
         missionMarkers.value = pointFeats.filter(isPointFeature).map(toFeatureRef);
-        missionPolygons.value = polygonFeats.filter(isPolygonFeature).map(toFeatureRef);
+        const planningPolys = planningFeats.filter(isPolygonFeature).map((f) => toPolygonRef(f, false));
+        const seen = new Set(planningPolys.map((p) => p.uid));
+        const commonPolys = commonFeats
+            .filter(isPolygonFeature)
+            .map((f) => toPolygonRef(f, true))
+            .filter((p) => !seen.has(p.uid));
+        missionPolygons.value = [...planningPolys, ...commonPolys];
     } catch {
         missionMarkers.value = [];
         missionPolygons.value = [];
@@ -1281,6 +1548,14 @@ function toFeatureRef(f: Feature): MissionFeatureRef {
     };
 }
 
+function toPolygonRef(f: Feature, onCommonMap: boolean): MissionFeatureRef {
+    return {
+        ...toFeatureRef(f),
+        onCommonMap,
+        geometry: f.geometry,
+    };
+}
+
 onMounted(() => { void loadAreas(); void loadFeatures(); });
 watch(() => activeMission.value?.guid, () => {
     ippCoordsCache.value = null;
@@ -1288,6 +1563,9 @@ watch(() => activeMission.value?.guid, () => {
     ippInput.value = '';
     selectedObjectUid.value = '';
     ippPromptDismissed.value = false;
+    rowUids.value = [];
+    deductiveUid.value = '';
+    subjectiveUid.value = '';
     void loadAreas();
     void loadFeatures();
 });
@@ -1749,6 +2027,150 @@ async function addSubjective(): Promise<void> {
     }
 }
 
+// ---- Deductive (reference existing mission polygons, same as Subjective) ---
+
+const canAddDeductive = computed(() => !!deductiveUid.value);
+
+async function onAddDeductive(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await addDeductive();
+}
+
+async function addDeductive(): Promise<void> {
+    if (!activeMission.value || !deductiveUid.value) return;
+    pushing.value = true; status.value = ''; statusError.value = false;
+    try {
+        const sub = await loadSub();
+        const poly = missionPolygons.value.find((p) => p.uid === deductiveUid.value);
+        const label = `Deductive: ${poly?.callsign ?? deductiveUid.value}`;
+        await writeAreaLog(sub, 'deductive', label, deductiveUid.value);
+        try {
+            const folder = await ensureMissionFolder(sub, SEARCH_AREA_FOLDER);
+            await sub.layer.attachFeatures(folder.uid, [deductiveUid.value]);
+        } catch (attachErr) {
+            console.warn('Failed to file deductive polygon into Search Area folder', attachErr);
+        }
+        await loadAreas(sub);
+        status.value = `Saved deductive search area to ${activeMission.value.name}.`;
+    } catch (err) {
+        statusError.value = true;
+        status.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        pushing.value = false;
+    }
+}
+
+// ---- ROW Segments (persist like Segmentation; optional, not an accordion step)
+
+const searchAreaFeatureUids = computed(() => {
+    const uids = new Set<string>();
+    for (const a of sentAreas.value) {
+        if (a.key === IPP_KEY) continue;
+        if (a.uuid) uids.add(a.uuid);
+    }
+    return uids;
+});
+
+const availableRowPolygons = computed(() =>
+    missionPolygons.value.filter((p) =>
+        !rowSegments.value[p.uid]
+        && !searchSegments.value[p.uid]
+        && !searchAreaFeatureUids.value.has(p.uid)),
+);
+
+const rowSegmentRows = computed<RowSegmentRow[]>(() =>
+    Object.entries(rowSegments.value)
+        .map(([uid, rec]) => ({
+            uid,
+            callsign: rec.callsign || uid,
+            created: rec.created || '',
+        }))
+        .sort((a, b) => a.callsign.localeCompare(b.callsign) || a.uid.localeCompare(b.uid)),
+);
+
+async function onAddRowSegments(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await addRowSegments();
+}
+
+async function addRowSegments(): Promise<void> {
+    if (!activeMission.value || !rowUids.value.length) return;
+    pushing.value = true; status.value = ''; statusError.value = false;
+    try {
+        const mission = activeMission.value;
+        const planning = schemaMission(mission);
+        const next: SegmentMap = { ...rowSegments.value };
+        const now = new Date().toISOString();
+        const registeredUids: string[] = [];
+        let moved = 0;
+        for (const uid of [...rowUids.value]) {
+            const poly = missionPolygons.value.find((p) => p.uid === uid);
+            let finalUid = uid;
+            if (poly?.onCommonMap && mission.mgmt && poly.geometry) {
+                const ring = ringFromGeometry(poly.geometry);
+                if (ring) {
+                    finalUid = await pushPolygonToMission({
+                        missionGuid: planning.guid,
+                        missionToken: planning.missionToken,
+                        callsign: poly.callsign,
+                        ring,
+                        center: ringCentroid(ring),
+                    });
+                    try {
+                        await deletePolygonFromMission({
+                            missionGuid: mission.guid,
+                            uid,
+                            missiontoken: missionAuthToken(mission) || undefined,
+                        });
+                    } catch { /* copy exists in MGMT; stale common copy is cosmetic */ }
+                    moved++;
+                }
+            }
+            next[finalUid] = {
+                callsign: poly?.callsign ?? finalUid,
+                created: next[finalUid]?.created || now,
+            };
+            registeredUids.push(finalUid);
+        }
+        rowContentHash.value = await saveRowSegmentsToMission(mission, next, rowContentHash.value);
+        rowSegments.value = next;
+        rowUids.value = [];
+        try {
+            const sub = await loadSub();
+            const folder = await ensureMissionFolder(sub, ROW_SEGMENTS_FOLDER);
+            await sub.layer.attachFeatures(folder.uid, registeredUids);
+        } catch (attachErr) {
+            console.warn('Failed to file ROW polygons into ROW Segments folder', attachErr);
+        }
+        await loadFeatures();
+        status.value = `Saved ${registeredUids.length} ROW polygon${registeredUids.length === 1 ? '' : 's'}`
+            + (moved ? ` (${moved} moved to ${mission.mgmt?.name ?? 'MGMT'})` : '') + '.';
+    } catch (err) {
+        statusError.value = true;
+        status.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        pushing.value = false;
+    }
+}
+
+async function removeRowSegment(uid: string): Promise<void> {
+    if (!activeMission.value || !rowSegments.value[uid]) return;
+    pushing.value = true; status.value = ''; statusError.value = false;
+    try {
+        const removed = rowSegments.value[uid];
+        const next: SegmentMap = { ...rowSegments.value };
+        delete next[uid];
+        rowContentHash.value = await saveRowSegmentsToMission(activeMission.value, next, rowContentHash.value);
+        rowSegments.value = next;
+        status.value = `Removed ${removed.callsign || uid}.`;
+    } catch (err) {
+        statusError.value = true;
+        status.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        pushing.value = false;
+    }
+}
+
 // ---- Remove ----------------------------------------------------------------
 
 /** Remove a search area: delete its log entry and (for rings/markers we created) the feature. */
@@ -1759,8 +2181,8 @@ async function removeArea(area: SentArea): Promise<void> {
         const sub = await loadSub();
         const log = sub.log as unknown as LogApi;
         await log.delete(area.logId);
-        // Best-effort: drop the feature from the mission map. Subjective
-        // references user-drawn polygons, so leave those in place.
+        // Best-effort: drop the feature from the mission map. Subjective and
+        // Deductive reference user-drawn polygons, so leave those in place.
         const ownsFeature = area.key === 'theoretical' || area.key.startsWith('lpb:') || area.key === IPP_KEY;
         if (ownsFeature) {
             try {

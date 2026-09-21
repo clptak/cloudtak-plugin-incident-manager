@@ -541,7 +541,7 @@ import {
     workAssignmentDetailRows,
     type DashboardTeamRoster,
 } from '../../lib/dashboardPanels.ts';
-import { loadD4hRoster } from '../../lib/d4hRoster.ts';
+import { loadEffectiveMembers } from '../../lib/d4hRoster.ts';
 import {
     initialInfoDetailRows,
     type IncidentInfoForm,
@@ -803,11 +803,11 @@ async function refresh(): Promise<void> {
                 : [];
             trackedClues.value = await listTrackedClues(mission, opRegistry);
         } catch { trackedClues.value = []; }
-        const [orgChartLoaded, resourceLoaded, workLoaded, roster] = await Promise.all([
+        const [orgChartLoaded, resourceLoaded, workLoaded, members] = await Promise.all([
             loadOrgChartFromMission(mission),
             loadResourceAssignmentsFromMission(mission),
             loadWorkAssignmentsFromMission(mission),
-            loadD4hRoster(),
+            loadEffectiveMembers(),
         ]);
 
         initialInfo.value = resolveIncidentInfoForm(schema, logs);
@@ -815,7 +815,7 @@ async function refresh(): Promise<void> {
         tacticAssessments.value = tacticAssessmentsFromSchema(schema);
         teams.value = dashboardTeamsFromOrgChart(
             orgChartLoaded.tree,
-            roster?.members ?? [],
+            members,
         );
         resourceAssignments.value = resourceLoaded.assignments;
         workAssignments.value = workLoaded.assignments;

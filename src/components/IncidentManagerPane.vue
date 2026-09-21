@@ -87,7 +87,7 @@
                         <SettingsPane v-else-if='activeKey === "settings"' />
                         <ResourcesTab v-else-if='activeKey === "resources"' />
                         <AssignmentsTab v-else-if='activeKey === "work-assignments"' />
-                        <WrapUpPane v-else-if='activeKey === "generate-report-template"' />
+                        <WrapUpPane v-else-if='activeKey === "generate-closing-package"' />
                         <LoggerPane
                             v-else
                             :sub='activeKey'
