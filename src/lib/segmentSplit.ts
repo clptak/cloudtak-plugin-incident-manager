@@ -14,6 +14,7 @@ import { splitDebriefRecords } from '../domain/rollup.ts';
 import { debriefsFromSchema } from './debriefPersistence.ts';
 import { loadSchemaSubscription, schemaMissionToken } from './incidentSubscription.ts';
 import { loadMissionSchema, saveMissionSchema, type MissionSchema } from './missionSchema.ts';
+import { allocateParentValue, poaSharesMatchSource, sumPoaShares } from './poaShares.ts';
 import { segmentsFromSchema, applySegmentsToSchema, type SegmentMap } from './segmentsPersistence.ts';
 
 export interface SplitChildInput {
@@ -175,6 +176,104 @@ export async function expandSearchArea(
         schema,
         `Expanded search area: R.O.W. retains ${input.rowRetainedPct}%, `
         + input.additions.map((a) => `${a.callsign} (${a.pct}%)`).join(', ')
+        + ` — Note: ${input.note.trim()}`,
+        now,
+    );
+
+    await saveMissionSchema(sub, schema, {
+        contentHash: loaded.contentHash,
+        legacyLogId: loaded.legacyLogId,
+        missionToken: schemaMissionToken(sub, mission),
+    });
+}
+
+export interface SplitPoaShare {
+    uid: string;
+    callsign: string;
+    /** Absolute POA percent. All shares must sum to `sourcePoa`. */
+    pct: number;
+}
+
+/**
+ * CASIE "Split Segment": the parent segment is retained and new segments are
+ * funded out of its POA, the same way an expansion is funded out of R.O.W.
+ * Shares are proportions of each respondent's stored value for the parent
+ * (`pct / sourcePoa`). Other segments, R.O.W., and debrief history stay put.
+ * The first share is the parent; later shares are new segments.
+ */
+export async function splitSegmentFromPoa(
+    mission: ActiveMission,
+    input: {
+        parentUid: string;
+        /** Latest-OP POA the entered shares must total. */
+        sourcePoa: number;
+        shares: SplitPoaShare[];
+        note: string;
+    },
+): Promise<void> {
+    if (input.shares.length < 2) {
+        throw new Error('Split needs the original segment and at least one new segment');
+    }
+    if (!(input.sourcePoa > 0)) throw new Error('Selected segment has no POA to split');
+    if (input.shares.some((share) => !Number.isFinite(share.pct) || share.pct < 0)) {
+        throw new Error('% of POA must be zero or greater');
+    }
+    const entered = input.shares.map((share) => share.pct);
+    if (!poaSharesMatchSource(entered, input.sourcePoa)) {
+        throw new Error(
+            `% of POA must total ${input.sourcePoa}% (currently ${sumPoaShares(entered)}%)`,
+        );
+    }
+    if (!input.note.trim()) throw new Error('A note explaining the split is required');
+    const retained = input.shares[0];
+    if (retained.uid !== input.parentUid) {
+        throw new Error('First share must be the segment being split');
+    }
+    const additions = input.shares.slice(1).filter((share) => share.pct > 0);
+    if (!additions.length) throw new Error('Split needs at least one new segment with POA');
+
+    const sub = await loadSchemaSubscription(mission);
+    const loaded = await loadMissionSchema(sub);
+    const schema = loaded.schema;
+
+    const segments: SegmentMap = segmentsFromSchema(schema);
+    const parent = segments[input.parentUid];
+    if (!parent) throw new Error(`Segment ${input.parentUid} is not registered`);
+    const now = new Date().toISOString();
+    for (const addition of additions) {
+        if (segments[addition.uid]) throw new Error(`Segment ${addition.callsign} already registered`);
+        segments[addition.uid] = {
+            callsign: addition.callsign,
+            created: now,
+            parentUid: input.parentUid,
+            parentCallsign: parent.callsign,
+        };
+    }
+    applySegmentsToSchema(schema, segments);
+
+    const kept = [retained, ...additions];
+    const keptPcts = kept.map((share) => share.pct);
+    const ir = schema.incident_response as Record<string, unknown>;
+    const casie = ir.casie as Record<string, unknown> | undefined;
+    const consensus = casie?.initial_consensus as {
+        respondents?: { values?: Record<string, number> }[];
+    } | undefined;
+    for (const respondent of consensus?.respondents ?? []) {
+        const values = respondent.values;
+        if (!values) continue;
+        const parentValue = values[input.parentUid];
+        if (typeof parentValue !== 'number') continue;
+        const parts = allocateParentValue(parentValue, keptPcts, input.sourcePoa);
+        values[input.parentUid] = parts[0];
+        kept.slice(1).forEach((share, index) => {
+            values[share.uid] = parts[index + 1];
+        });
+    }
+
+    appendCasieHistory(
+        schema,
+        `Split ${parent.callsign || input.parentUid}: retains ${retained.pct}%, `
+        + additions.map((addition) => `${addition.callsign} (${addition.pct}%)`).join(', ')
         + ` — Note: ${input.note.trim()}`,
         now,
     );
