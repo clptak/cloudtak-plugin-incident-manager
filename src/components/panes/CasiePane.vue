@@ -167,23 +167,61 @@
             </TablerBorder>
 
             <!-- ── Expand Search Area (WC3) ────────────────────────────── -->
+            <div
+                v-if='!expandCardOpen'
+                class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+                role='button'
+                tabindex='0'
+                :aria-expanded='false'
+                @click='expandCardOpen = true'
+                @keydown.enter.prevent='expandCardOpen = true'
+                @keydown.space.prevent='expandCardOpen = true'
+            >
+                <p class='text-uppercase text-white-50 small mb-0'>
+                    Expand Search Area
+                </p>
+                <IconChevronDown
+                    class='ms-auto transition-transform text-white-50 rotate-180'
+                    :size='20'
+                    stroke='1.5'
+                />
+            </div>
             <TablerBorder
+                v-else
                 class='cloudtak-accent text-white mb-3'
                 :fill-height='false'
                 :shadow='false'
                 gap='sm'
             >
                 <template #label>
-                    <p class='text-uppercase text-white-50 small mb-0 d-flex align-items-center w-100'>
-                        <span>Expand Search Area</span>
+                    <div
+                        class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                        role='button'
+                        tabindex='0'
+                        :aria-expanded='true'
+                        @click='expandCardOpen = false'
+                        @keydown.enter.prevent='expandCardOpen = false'
+                        @keydown.space.prevent='expandCardOpen = false'
+                    >
+                        <p class='text-uppercase text-white-50 small mb-0'>
+                            Expand Search Area
+                        </p>
                         <button
                             v-if='!expandOpen'
-                            class='btn btn-outline-primary btn-sm ms-auto'
-                            @click='startExpansion'
+                            class='btn btn-outline-primary btn-sm ms-auto me-2'
+                            @click.stop='startExpansion'
+                            @keydown.enter.stop
+                            @keydown.space.stop
                         >
                             Expand…
                         </button>
-                    </p>
+                        <IconChevronDown
+                            class='transition-transform text-white-50'
+                            :class='expandOpen ? "ms-auto" : ""'
+                            :size='20'
+                            stroke='1.5'
+                        />
+                    </div>
                 </template>
 
                 <p
@@ -311,16 +349,51 @@
             </TablerBorder>
 
             <!-- ── Split Segment (funded out of one segment's POA) ───── -->
+            <div
+                v-if='!splitCardOpen'
+                class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+                role='button'
+                tabindex='0'
+                :aria-expanded='false'
+                @click='splitCardOpen = true'
+                @keydown.enter.prevent='splitCardOpen = true'
+                @keydown.space.prevent='splitCardOpen = true'
+            >
+                <p class='text-uppercase text-white-50 small mb-0'>
+                    Split Segment
+                </p>
+                <IconChevronDown
+                    class='ms-auto transition-transform text-white-50 rotate-180'
+                    :size='20'
+                    stroke='1.5'
+                />
+            </div>
             <TablerBorder
+                v-else
                 class='cloudtak-accent text-white mb-3'
                 :fill-height='false'
                 :shadow='false'
                 gap='sm'
             >
                 <template #label>
-                    <p class='text-uppercase text-white-50 small mb-0'>
-                        Split Segment
-                    </p>
+                    <div
+                        class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                        role='button'
+                        tabindex='0'
+                        :aria-expanded='true'
+                        @click='splitCardOpen = false'
+                        @keydown.enter.prevent='splitCardOpen = false'
+                        @keydown.space.prevent='splitCardOpen = false'
+                    >
+                        <p class='text-uppercase text-white-50 small mb-0'>
+                            Split Segment
+                        </p>
+                        <IconChevronDown
+                            class='ms-auto transition-transform text-white-50'
+                            :size='20'
+                            stroke='1.5'
+                        />
+                    </div>
                 </template>
 
                 <div class='row g-2 align-items-end mb-2'>
@@ -465,16 +538,51 @@
             </TablerBorder>
 
             <!-- ── History (WC3-style audit trail) ─────────────────────── -->
+            <div
+                v-if='!historyCardOpen'
+                class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+                role='button'
+                tabindex='0'
+                :aria-expanded='false'
+                @click='historyCardOpen = true'
+                @keydown.enter.prevent='historyCardOpen = true'
+                @keydown.space.prevent='historyCardOpen = true'
+            >
+                <p class='text-uppercase text-white-50 small mb-0'>
+                    History
+                </p>
+                <IconChevronDown
+                    class='ms-auto transition-transform text-white-50 rotate-180'
+                    :size='20'
+                    stroke='1.5'
+                />
+            </div>
             <TablerBorder
+                v-else
                 class='cloudtak-accent text-white mb-3'
                 :fill-height='false'
                 :shadow='false'
                 gap='sm'
             >
                 <template #label>
-                    <p class='text-uppercase text-white-50 small mb-0'>
-                        History
-                    </p>
+                    <div
+                        class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                        role='button'
+                        tabindex='0'
+                        :aria-expanded='true'
+                        @click='historyCardOpen = false'
+                        @keydown.enter.prevent='historyCardOpen = false'
+                        @keydown.space.prevent='historyCardOpen = false'
+                    >
+                        <p class='text-uppercase text-white-50 small mb-0'>
+                            History
+                        </p>
+                        <IconChevronDown
+                            class='ms-auto transition-transform text-white-50'
+                            :size='20'
+                            stroke='1.5'
+                        />
+                    </div>
                 </template>
 
                 <div
@@ -496,16 +604,51 @@
             </TablerBorder>
 
             <!-- ── What-if scenarios ───────────────────────────────────── -->
+            <div
+                v-if='!whatIfCardOpen'
+                class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+                role='button'
+                tabindex='0'
+                :aria-expanded='false'
+                @click='whatIfCardOpen = true'
+                @keydown.enter.prevent='whatIfCardOpen = true'
+                @keydown.space.prevent='whatIfCardOpen = true'
+            >
+                <p class='text-uppercase text-white-50 small mb-0'>
+                    What If?
+                </p>
+                <IconChevronDown
+                    class='ms-auto transition-transform text-white-50 rotate-180'
+                    :size='20'
+                    stroke='1.5'
+                />
+            </div>
             <TablerBorder
+                v-else
                 class='cloudtak-accent text-white mb-3'
                 :fill-height='false'
                 :shadow='false'
                 gap='sm'
             >
                 <template #label>
-                    <p class='text-uppercase text-white-50 small mb-0'>
-                        What If?
-                    </p>
+                    <div
+                        class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                        role='button'
+                        tabindex='0'
+                        :aria-expanded='true'
+                        @click='whatIfCardOpen = false'
+                        @keydown.enter.prevent='whatIfCardOpen = false'
+                        @keydown.space.prevent='whatIfCardOpen = false'
+                    >
+                        <p class='text-uppercase text-white-50 small mb-0'>
+                            What If?
+                        </p>
+                        <IconChevronDown
+                            class='ms-auto transition-transform text-white-50'
+                            :size='20'
+                            stroke='1.5'
+                        />
+                    </div>
                 </template>
 
                 <div class='row g-2'>
@@ -695,6 +838,7 @@
 
 <script setup lang='ts'>
 import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { IconChevronDown } from '@tabler/icons-vue';
 import { TablerBorder, TablerInlineAlert, TablerInput } from '@tak-ps/vue-tabler';
 import { useIncident } from '../../composables/useIncident.ts';
 import type { DebriefRecord } from '../../domain/entities.ts';
@@ -970,6 +1114,11 @@ interface ExpandPoly {
     geometry: unknown;
 }
 
+const expandCardOpen = ref(false);
+const splitCardOpen = ref(false);
+const historyCardOpen = ref(false);
+const whatIfCardOpen = ref(false);
+
 const expandOpen = ref(false);
 const expandCount = ref(3);
 const expandRows = ref<ExpandRow[]>([]);
@@ -1016,6 +1165,7 @@ function rebuildExpansionRows(): void {
 }
 
 function startExpansion(): void {
+    expandCardOpen.value = true;
     expandOpen.value = true;
     expandNote.value = '';
     rebuildExpansionRows();
