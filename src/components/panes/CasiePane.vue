@@ -310,6 +310,160 @@
                 </template>
             </TablerBorder>
 
+            <!-- ── Split Segment (funded out of one segment's POA) ───── -->
+            <TablerBorder
+                class='cloudtak-accent text-white mb-3'
+                :fill-height='false'
+                :shadow='false'
+                gap='sm'
+            >
+                <template #label>
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Split Segment
+                    </p>
+                </template>
+
+                <div class='row g-2 align-items-end mb-2'>
+                    <div class='col-md-5'>
+                        <label class='form-label'>Segment</label>
+                        <select
+                            v-model='splitParentUid'
+                            class='form-select form-select-sm'
+                        >
+                            <option value=''>
+                                — segment —
+                            </option>
+                            <option
+                                v-for='seg in inputs.segments'
+                                :key='seg.uid'
+                                :value='seg.uid'
+                            >
+                                {{ inputs.segmentLabels[seg.uid] }}
+                            </option>
+                        </select>
+                    </div>
+                    <div class='col-md-4'>
+                        <TablerInput
+                            v-model='splitTotal'
+                            :label='splitTotalLabel'
+                        />
+                    </div>
+                    <div class='col-md-3'>
+                        <button
+                            class='btn btn-primary btn-sm'
+                            :disabled='savingSplit || !canBuildSplit'
+                            @click='buildSplitRows'
+                        >
+                            Split Segment
+                        </button>
+                    </div>
+                </div>
+                <p class='form-text mt-0 mb-1'>
+                    The total number of segments this segment will be split into, including itself.
+                </p>
+                <p
+                    v-if='splitParentUid'
+                    class='form-text mt-0 mb-0'
+                >
+                    {{ splitPeriodLabel }}: {{ splitSourcePoa.toFixed(2) }}%.
+                    Shares must total this exactly.
+                </p>
+                <p
+                    v-if='splitParentUid && splitSourcePoa <= 0'
+                    class='small text-danger mb-0'
+                >
+                    This segment has no POA to split.
+                </p>
+
+                <template v-if='splitRows.length'>
+                    <div class='d-flex align-items-center gap-2 mt-3 mb-2'>
+                        <p class='form-text mt-0 mb-0'>
+                            Draw new polygons on the map (it stays live), Refresh, and select them
+                            for each new segment. The first row keeps the segment being split.
+                        </p>
+                        <button
+                            class='btn btn-link btn-sm p-0 ms-auto text-nowrap'
+                            :disabled='loadingExpandPolys'
+                            @click='loadExpandCandidates'
+                        >
+                            {{ loadingExpandPolys ? 'Loading…' : 'Refresh polygons' }}
+                        </button>
+                    </div>
+                    <div class='row g-2 align-items-center mb-1'>
+                        <div class='col-4'>
+                            <span class='form-label mb-0'>Segment</span>
+                        </div>
+                        <div class='col-3'>
+                            <span class='form-label mb-0'>% of POA</span>
+                        </div>
+                        <div class='col-5' />
+                    </div>
+                    <div
+                        v-for='(row, i) in splitRows'
+                        :key='i'
+                        class='row g-2 align-items-center mb-1'
+                    >
+                        <div class='col-4'>
+                            <span v-if='row.locked'>{{ row.callsign }}</span>
+                            <TablerInput
+                                v-else
+                                v-model='row.callsign'
+                            />
+                        </div>
+                        <div class='col-3'>
+                            <TablerInput v-model='row.pct' />
+                        </div>
+                        <div class='col-5'>
+                            <span v-if='row.locked'>{{ row.callsign }}</span>
+                            <select
+                                v-else
+                                v-model='row.polygonUid'
+                                class='form-select form-select-sm'
+                            >
+                                <option value=''>
+                                    — no polygon yet —
+                                </option>
+                                <option
+                                    v-for='p in availableExpandPolys(row.polygonUid)'
+                                    :key='p.uid'
+                                    :value='p.uid'
+                                >
+                                    {{ p.callsign }} · {{ p.source }}
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+                    <div
+                        class='small mb-2'
+                        :class='splitSharesOk ? "text-success" : "text-danger"'
+                    >
+                        Allocated {{ splitAllocated.toFixed(2) }}% — must equal {{ splitBudget.toFixed(2) }}%
+                        ({{ splitBudgetPeriodLabel }}).
+                    </div>
+                    <TablerInput
+                        v-model='splitNote'
+                        label='Note (required — recorded in History)'
+                        placeholder='Why this segment is being split'
+                    />
+                    <div class='d-flex gap-2 mt-2'>
+                        <button
+                            class='btn btn-primary btn-sm'
+                            :disabled='savingSplit || !splitValid'
+                            @click='applySplit'
+                        >
+                            {{ savingSplit ? 'Working…' : 'Accept' }}
+                        </button>
+                        <button
+                            class='btn btn-outline-secondary btn-sm'
+                            :disabled='savingSplit'
+                            @click='cancelSplit'
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </template>
+            </TablerBorder>
+
             <!-- ── History (WC3-style audit trail) ─────────────────────── -->
             <TablerBorder
                 class='cloudtak-accent text-white mb-3'
@@ -555,8 +709,9 @@ import Subscription from '../../../../../src/base/subscription.ts';
 import { flyToFeature } from '../../lib/flyToFeature.ts';
 import { schemaMission } from '../../lib/incidentSubscription.ts';
 import { deletePolygonFromMission, pushPolygonToMission } from '../../lib/missionFeatures.ts';
+import { defaultPoaShares, poaSharesMatchSource } from '../../lib/poaShares.ts';
 import { loadRollupInputs, saveScenarios, type RollupInputs } from '../../lib/rollupPersistence.ts';
-import { expandSearchArea } from '../../lib/segmentSplit.ts';
+import { expandSearchArea, splitSegmentFromPoa } from '../../lib/segmentSplit.ts';
 import { downloadWc3PeriodZip } from '../../lib/wc3Export.ts';
 import { computeRollup } from '../../domain/rollup.ts';
 
@@ -823,6 +978,22 @@ const expandPolys = ref<ExpandPoly[]>([]);
 const loadingExpandPolys = ref(false);
 const savingExpansion = ref(false);
 
+interface SplitRow {
+    callsign: string;
+    pct: string;
+    polygonUid: string;
+    locked: boolean;
+}
+
+const splitParentUid = ref('');
+const splitTotal = ref('2');
+const splitRows = ref<SplitRow[]>([]);
+const splitNote = ref('');
+const splitBudget = ref(0);
+const splitBudgetPeriodLabel = ref('');
+const splitBuiltParentUid = ref('');
+const savingSplit = ref(false);
+
 function nextSegmentNumber(): { start: number; width: number } {
     let max = 0;
     let width = 2;
@@ -876,8 +1047,81 @@ const expansionValid = computed(() =>
     && expandRows.value.every((s) => s.callsign.trim()));
 
 function availableExpandPolys(current: string): ExpandPoly[] {
-    const taken = new Set(expandRows.value.map((s) => s.polygonUid).filter((u) => u && u !== current));
-    return expandPolys.value.filter((p) => !taken.has(p.uid));
+    const taken = new Set(
+        [...expandRows.value, ...splitRows.value]
+            .map((row) => row.polygonUid)
+            .filter((uid) => uid && uid !== current),
+    );
+    return expandPolys.value.filter((poly) => !taken.has(poly.uid));
+}
+
+const splitParentLabel = computed(() => (
+    splitParentUid.value
+        ? (inputs.value.segmentLabels[splitParentUid.value] ?? splitParentUid.value)
+        : ''
+));
+
+const splitTotalLabel = computed(() => `Total Segment from ${splitParentLabel.value || '…'}`);
+
+const splitPeriodLabel = computed(() => {
+    const op = history.value.final.opNumber;
+    return op === 0 ? 'Initial' : `POA after OP${op}`;
+});
+
+const splitSourcePoa = computed(() => (
+    splitParentUid.value ? (history.value.final.poa[splitParentUid.value] ?? 0) : 0
+));
+
+const canBuildSplit = computed(() => {
+    const total = Number(splitTotal.value);
+    return Boolean(splitParentUid.value)
+        && Number.isInteger(total)
+        && total >= 2
+        && splitSourcePoa.value > 0;
+});
+
+const splitAllocated = computed(() =>
+    Math.round(splitRows.value.reduce((total, row) => total + (Number(row.pct) || 0), 0) * 100) / 100);
+
+const splitSharesOk = computed(() =>
+    splitRows.value.length >= 2
+    && poaSharesMatchSource(
+        splitRows.value.map((row) => Number(row.pct) || 0),
+        splitBudget.value,
+    ));
+
+const splitValid = computed(() =>
+    splitSharesOk.value
+    && splitNote.value.trim().length > 0
+    && splitRows.value.every((row) => row.callsign.trim())
+    && splitRows.value.slice(1).some((row) => (Number(row.pct) || 0) > 0));
+
+/** Rebuild the share table from the selected segment. Clears in-progress edits. */
+function buildSplitRows(): void {
+    if (!canBuildSplit.value || !splitParentUid.value) return;
+    const count = Number(splitTotal.value);
+    const budget = Math.round(splitSourcePoa.value * 100) / 100;
+    const { start, width } = nextSegmentNumber();
+    const shares = defaultPoaShares(budget, count);
+    splitBudget.value = budget;
+    splitBudgetPeriodLabel.value = splitPeriodLabel.value;
+    splitBuiltParentUid.value = splitParentUid.value;
+    splitNote.value = '';
+    splitRows.value = shares.map((pct, index) => ({
+        callsign: index === 0
+            ? splitParentLabel.value
+            : String(start + index - 1).padStart(width, '0'),
+        pct: String(pct),
+        polygonUid: '',
+        locked: index === 0,
+    }));
+    void loadExpandCandidates();
+}
+
+function cancelSplit(): void {
+    splitRows.value = [];
+    splitNote.value = '';
+    splitBuiltParentUid.value = '';
 }
 
 /** Unregistered polygons from the common map, MGMT, and open OP syncs. */
@@ -946,6 +1190,38 @@ function expandRing(geometry: unknown): [number, number][] | null {
     return ring.length >= 4 ? ring : null;
 }
 
+/** Copy a chosen polygon onto MGMT, or mint a uid when none is selected yet. */
+async function uidForPolygon(
+    callsign: string,
+    polygonUid: string,
+    planning: { guid: string; missionToken?: string },
+): Promise<string> {
+    let uid: string = globalThis.crypto.randomUUID();
+    const poly = expandPolys.value.find((candidate) => candidate.uid === polygonUid);
+    if (!poly) return uid;
+    if (poly.onMgmt) return poly.uid;
+    const ring = expandRing(poly.geometry);
+    if (!ring) return uid;
+    let lon = 0;
+    let lat = 0;
+    for (const [x, y] of ring) { lon += x; lat += y; }
+    uid = await pushPolygonToMission({
+        missionGuid: planning.guid,
+        missionToken: planning.missionToken,
+        callsign,
+        ring,
+        center: [lon / ring.length, lat / ring.length],
+    });
+    try {
+        await deletePolygonFromMission({
+            missionGuid: poly.sourceGuid,
+            uid: poly.uid,
+            missiontoken: poly.sourceToken || undefined,
+        });
+    } catch { /* cosmetic */ }
+    return uid;
+}
+
 async function applyExpansion(): Promise<void> {
     const mission = activeMission.value;
     if (!mission?.mgmt || !expansionValid.value) return;
@@ -956,33 +1232,7 @@ async function applyExpansion(): Promise<void> {
         const additions: { uid: string; callsign: string; pct: number }[] = [];
         for (const row of expandRows.value) {
             const callsign = row.callsign.trim();
-            let uid: string = globalThis.crypto.randomUUID();
-            const poly = expandPolys.value.find((p) => p.uid === row.polygonUid);
-            if (poly) {
-                if (poly.onMgmt) {
-                    uid = poly.uid;
-                } else {
-                    const ring = expandRing(poly.geometry);
-                    if (ring) {
-                        let lon = 0; let lat = 0;
-                        for (const [x, y] of ring) { lon += x; lat += y; }
-                        uid = await pushPolygonToMission({
-                            missionGuid: planning.guid,
-                            missionToken: planning.missionToken,
-                            callsign,
-                            ring,
-                            center: [lon / ring.length, lat / ring.length],
-                        });
-                        try {
-                            await deletePolygonFromMission({
-                                missionGuid: poly.sourceGuid,
-                                uid: poly.uid,
-                                missiontoken: poly.sourceToken || undefined,
-                            });
-                        } catch { /* cosmetic */ }
-                    }
-                }
-            }
+            const uid = await uidForPolygon(callsign, row.polygonUid, planning);
             additions.push({ uid, callsign, pct: Number(row.pct) || 0 });
         }
 
@@ -997,6 +1247,46 @@ async function applyExpansion(): Promise<void> {
         error.value = err instanceof Error ? err.message : String(err);
     } finally {
         savingExpansion.value = false;
+    }
+}
+
+async function applySplit(): Promise<void> {
+    const mission = activeMission.value;
+    const parentUid = splitBuiltParentUid.value;
+    if (!mission?.mgmt || !splitValid.value || !parentUid) return;
+    savingSplit.value = true;
+    error.value = '';
+    try {
+        const planning = schemaMission(mission);
+        const parentRow = splitRows.value[0];
+        const shares: { uid: string; callsign: string; pct: number }[] = [{
+            uid: parentUid,
+            callsign: parentRow.callsign.trim(),
+            pct: Number(parentRow.pct) || 0,
+        }];
+        for (const row of splitRows.value.slice(1)) {
+            const pct = Number(row.pct) || 0;
+            if (pct <= 0) continue;
+            const callsign = row.callsign.trim();
+            shares.push({
+                uid: await uidForPolygon(callsign, row.polygonUid, planning),
+                callsign,
+                pct,
+            });
+        }
+
+        await splitSegmentFromPoa(mission, {
+            parentUid,
+            sourcePoa: splitBudget.value,
+            shares,
+            note: splitNote.value,
+        });
+        cancelSplit();
+        await refresh();
+    } catch (err) {
+        error.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        savingSplit.value = false;
     }
 }
 
