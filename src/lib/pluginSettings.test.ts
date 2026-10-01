@@ -4,6 +4,7 @@ import {
     parseLpbTable,
     parseLpbTableJson,
     parseStoredPluginSettings,
+    parseWisarUrl,
 } from './pluginSettings.ts';
 import {
     DEFAULT_SUBJECT_TYPES,
@@ -198,4 +199,19 @@ test('parseStoredPluginSettings reads searchOpTemplateId', () => {
         searchOpTemplateId: '  tmpl-sar-1  ',
     });
     assert.equal(parsed.searchOpTemplateId, 'tmpl-sar-1');
+});
+
+test('parseStoredPluginSettings reads and normalizes wisarUrl', () => {
+    assert.equal(parseStoredPluginSettings({}).wisarUrl, '');
+    assert.equal(parseStoredPluginSettings({ wisarUrl: ' https://wisar.example.org/api/v1/ ' }).wisarUrl,
+        'https://wisar.example.org');
+    assert.equal(parseStoredPluginSettings({ wisarUrl: 'wisar.example.org' }).wisarUrl, 'https://wisar.example.org');
+    assert.equal(parseStoredPluginSettings({ wisarUrl: 'ftp://nope' }).wisarUrl, '');
+    assert.equal(parseStoredPluginSettings({ wisarUrl: 42 }).wisarUrl, '');
+});
+
+test('parseWisarUrl: blank, valid, invalid', () => {
+    assert.equal(parseWisarUrl('  '), '');
+    assert.equal(parseWisarUrl('http://localhost:8760/'), 'http://localhost:8760');
+    assert.equal(parseWisarUrl('ftp://x'), null);
 });
