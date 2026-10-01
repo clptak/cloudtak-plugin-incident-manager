@@ -123,18 +123,6 @@
                 class='text-danger'
             >{{ error }}</span>
         </div>
-        <ul
-            v-if='phase === "succeeded" && warnings.length'
-            class='small mt-2 mb-0 ps-3'
-        >
-            <li
-                v-for='(w, i) in warnings'
-                :key='i'
-                :class='w.severity === "warning" ? "text-warning" : "text-muted"'
-            >
-                {{ w.message }}
-            </li>
-        </ul>
     </div>
 </template>
 
@@ -174,7 +162,6 @@ const { job, phase, error, startedAt, now, run, cancel } = useWisarJob();
 const busy = computed(() => ['submitting', 'queued', 'running'].includes(phase.value));
 const problem = computed(() => travelTimeProblem(props.ipp, String(speedText.value ?? ''), unit.value, intervals.value));
 const elapsed = computed(() => formatElapsed(now.value - startedAt.value));
-const warnings = computed(() => job.value?.result?.warnings ?? []);
 
 function setUnit(next: SpeedUnit): void {
     speedText.value = convertSpeedText(String(speedText.value ?? ''), unit.value, next);
