@@ -52,7 +52,7 @@ test('incident stem treats OP DataSyncs as the same incident', () => {
 });
 
 test('search-only key sets cover the planned chrome', () => {
-    for (const key of ['search-urgency', 'search-scenarios', 'search-area', 'segmentation', 'initial-consensus']) {
+    for (const key of ['search-urgency', 'search-scenarios', 'physical-wisar', 'search-area', 'segmentation', 'initial-consensus']) {
         assert.ok(SEARCH_ONLY_NAV_KEYS.has(key), key);
     }
     for (const key of ['task', 'clues', 'casie', 'lpb']) {

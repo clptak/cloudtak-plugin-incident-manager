@@ -60,6 +60,7 @@ const labels: Record<string, string> = {
     'ir-briefing': 'IR Briefing',
     'ics-201': 'ICS 201',
     'search-scenarios': 'Search Scenarios',
+    'physical-wisar': 'Physical – WiSAR',
     'risk-assessment': 'Risk Assessment',
     'incident-post': 'Incident POST',
     'operational-periods': 'Operational Periods',

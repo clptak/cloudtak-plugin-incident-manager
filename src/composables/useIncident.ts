@@ -60,6 +60,7 @@ const VALID_NAV_KEYS = new Set([
     'work-assignments',
     'ics-201',
     'search-scenarios',
+    'physical-wisar',
     'search-area',
     'segmentation',
     'initial-consensus',

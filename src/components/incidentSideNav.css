@@ -102,6 +102,17 @@
     background: transparent;
 }
 
+/* Sub-heading inside a section (Search incidents: Investigation / Containment / Search). */
+.incident-side-nav .incident-nav-group {
+    margin-top: 0.4rem;
+    padding: 0.2rem 1rem 0.1rem 1.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--tblr-body-color, var(--bs-body-color)) 60%, transparent);
+}
+
 .incident-side-nav .incident-nav-section-toggle {
     display: inline-flex;
     align-items: center;

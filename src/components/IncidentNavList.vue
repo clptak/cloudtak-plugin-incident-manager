@@ -31,27 +31,36 @@
             @toggle='emit("toggleSection", section.key)'
         />
         <template v-if='sectionExpanded[section.key] !== false'>
-            <div
-                v-for='item in section.items'
+            <template
+                v-for='(item, index) in section.items'
                 :key='item.key'
-                class='incident-nav-item-row'
-                :class='{ "incident-nav-item-row--with-help": !!item.helpKey }'
             >
-                <button
-                    type='button'
-                    class='incident-nav-item incident-nav-sub'
-                    :class='{ active: activeKey === item.key && activeHTab === "main" }'
-                    :data-bs-dismiss='mobile ? "offcanvas" : undefined'
-                    :data-bs-target='mobile ? "#incident-manager-nav" : undefined'
-                    @click='onSelect(item.key)'
+                <div
+                    v-if='navGroupHeading(section.items, index)'
+                    class='incident-nav-group'
                 >
-                    {{ item.label }}
-                </button>
-                <NavHelpButton
-                    v-if='item.helpKey'
-                    :help-key='item.helpKey'
-                />
-            </div>
+                    {{ navGroupHeading(section.items, index) }}
+                </div>
+                <div
+                    class='incident-nav-item-row'
+                    :class='{ "incident-nav-item-row--with-help": !!item.helpKey }'
+                >
+                    <button
+                        type='button'
+                        class='incident-nav-item incident-nav-sub'
+                        :class='{ active: activeKey === item.key && activeHTab === "main" }'
+                        :data-bs-dismiss='mobile ? "offcanvas" : undefined'
+                        :data-bs-target='mobile ? "#incident-manager-nav" : undefined'
+                        @click='onSelect(item.key)'
+                    >
+                        {{ item.label }}
+                    </button>
+                    <NavHelpButton
+                        v-if='item.helpKey'
+                        :help-key='item.helpKey'
+                    />
+                </div>
+            </template>
         </template>
     </template>
 </template>
@@ -63,6 +72,7 @@ import NavHelpButton from './NavHelpButton.vue';
 import {
     CREATE_OPEN_NAV,
     SETTINGS_NAV,
+    navGroupHeading,
     visibleNavSections,
 } from '../lib/incidentNav.ts';
 import { useIncident } from '../composables/useIncident.ts';
