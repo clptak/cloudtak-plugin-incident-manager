@@ -716,6 +716,16 @@
             </template>
 
             <div>
+                <div class='d-flex align-items-center flex-wrap gap-2 mb-2'>
+                    <span class='small text-muted'>Terrain-aware TARR and Travel Time:</span>
+                    <button
+                        type='button'
+                        class='btn btn-sm btn-outline-primary'
+                        @click='openWisarTools'
+                    >
+                        WiSAR Tools
+                    </button>
+                </div>
                 <p class='text-uppercase text-white-50 small mb-1'>
                     Choose a polygon from the active DataSync
                 </p>
@@ -996,6 +1006,7 @@ import { pushPolygonToMission, pushPointToMission, deletePolygonFromMission } fr
 import type { RingStyle } from '../../../lib/missionFeatures.ts';
 import { ensureMissionFolder, attachFeaturesToFolder } from '../../../lib/folder.ts';
 import { flyToFeature } from '../../../lib/flyToFeature.ts';
+import { openWisarTools } from '../../../lib/wisarTools.ts';
 import FeatureCallsignCell from '../../FeatureCallsignCell.vue';
 import { areaSqMi, formatSqMi } from '../../../lib/geometryArea.ts';
 import { loadMissionSchema } from '../../../lib/missionSchema.ts';
