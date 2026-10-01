@@ -7,6 +7,12 @@ export interface NavSectionItem {
     helpKey?: NavSectionHelpKey;
     /** Hide unless the active incident type is `search`. */
     searchOnly?: boolean;
+    /**
+     * Sub-heading inside the section (Search incidents only). Consecutive
+     * items with the same group sit under one sub-heading; non-search
+     * incidents get the flat list without sub-headings.
+     */
+    group?: string;
 }
 
 export interface NavSection {
@@ -34,15 +40,16 @@ export const NAV_SECTIONS: NavSection[] = [
         label: 'Initial Response',
         helpKey: 'route-location-search',
         items: [
-            { key: 'initial-information', label: 'Initial Information' },
-            { key: 'subject-info', label: 'Subject Information' },
-            { key: 'search-urgency', label: 'Search Urgency', searchOnly: true },
-            { key: 'search-scenarios', label: 'Search Scenarios', searchOnly: true },
-            { key: 'ir-briefing', label: 'IR Briefing' },
-            { key: 'incident-post', label: 'Incident POST' },
-            { key: 'resources', label: 'Resources' },
-            { key: 'work-assignments', label: 'Assignments' },
-            { key: 'ics-201', label: 'ICS 201' },
+            { key: 'initial-information', label: 'Initial Information', group: 'Investigation' },
+            { key: 'subject-info', label: 'Subject Information', group: 'Investigation' },
+            { key: 'search-urgency', label: 'Search Urgency', searchOnly: true, group: 'Investigation' },
+            { key: 'search-scenarios', label: 'Search Scenarios', searchOnly: true, group: 'Investigation' },
+            { key: 'physical-wisar', label: 'Physical – WiSAR', searchOnly: true, group: 'Containment' },
+            { key: 'ir-briefing', label: 'IR Briefing', group: 'Search' },
+            { key: 'incident-post', label: 'Incident POST', group: 'Search' },
+            { key: 'resources', label: 'Resources', group: 'Search' },
+            { key: 'work-assignments', label: 'Assignments', group: 'Search' },
+            { key: 'ics-201', label: 'ICS 201', group: 'Search' },
         ],
     },
     {
@@ -91,14 +98,27 @@ export function sectionKeyForNavItem(key: string): string | null {
     return null;
 }
 
-/** Drop search-only items (and empty section headers) when the incident is not Search. */
+/**
+ * Drop search-only items (and empty section headers) when the incident is not
+ * Search. Non-search incidents also lose the sub-headings (`group`), so their
+ * list stays flat as before.
+ */
 export function visibleNavSections(isSearch: boolean): NavSection[] {
     if (isSearch) return NAV_SECTIONS;
     return NAV_SECTIONS
         .map((section) => ({
             ...section,
             label: section.nonSearchLabel ?? section.label,
-            items: section.items.filter((item) => !item.searchOnly && !SEARCH_ONLY_NAV_KEYS.has(item.key)),
+            items: section.items
+                .filter((item) => !item.searchOnly && !SEARCH_ONLY_NAV_KEYS.has(item.key))
+                .map(({ group: _group, ...item }) => item),
         }))
         .filter((section) => section.items.length > 0);
+}
+
+/** Sub-heading to draw above items[index], or null when it continues the previous group. */
+export function navGroupHeading(items: readonly NavSectionItem[], index: number): string | null {
+    const group = items[index]?.group;
+    if (!group) return null;
+    return index > 0 && items[index - 1].group === group ? null : group;
 }

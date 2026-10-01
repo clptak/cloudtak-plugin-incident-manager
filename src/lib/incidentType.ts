@@ -4,6 +4,7 @@ export const INCIDENT_TYPE_KEYWORD_PREFIX = 'incidentType:';
 export const SEARCH_ONLY_NAV_KEYS = new Set<string>([
     'search-urgency',
     'search-scenarios',
+    'physical-wisar',
     'search-area',
     'segmentation',
     'initial-consensus',
