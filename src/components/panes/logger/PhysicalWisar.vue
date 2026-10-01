@@ -20,7 +20,12 @@
 
             <WisarIppPicker v-model='ipp' />
 
-            <!-- Built up step by step: Travel Time form (4c), results (4e), reference links (4f). -->
+            <WisarTravelTimeForm
+                :ipp='ipp'
+                @result='onResult'
+            />
+
+            <!-- Still to come on this card: results (4e) and reference links (4f). -->
         </div>
     </TablerBorder>
 </template>
@@ -29,7 +34,15 @@
 import { ref } from 'vue';
 import { TablerBorder } from '@tak-ps/vue-tabler';
 import WisarIppPicker from '../../wisar/WisarIppPicker.vue';
+import WisarTravelTimeForm from '../../wisar/WisarTravelTimeForm.vue';
+import type { Job } from '../../../lib/wisar.ts';
 import type { WisarIppOption } from '../../../lib/wisarIpp.ts';
 
 const ipp = ref<WisarIppOption | null>(null);
+/** Latest succeeded Travel Time job; shown by the results section (4e). */
+const lastJob = ref<Job | null>(null);
+
+function onResult(job: Job): void {
+    lastJob.value = job;
+}
 </script>
