@@ -2,6 +2,7 @@ import { computed, ref } from 'vue';
 import bundledAzlpb from '../data/azlpb_table.json';
 import {
     loadPluginSettings,
+    parseWisarUrl,
     savePluginSettings,
     type AzlpbEntry,
     type PluginSettings,
@@ -13,6 +14,7 @@ import {
     normalizeSubjectTypes,
     subjectTypeEnumOptions,
 } from '../lib/subjectTypes.ts';
+import { resolveWisarUrl } from '../lib/wisar.ts';
 
 const BUNDLED_LPB_TABLE = bundledAzlpb as AzlpbEntry[];
 
@@ -28,6 +30,7 @@ function persist(next: PluginSettings): void {
         useD4hPersonnel: next.useD4hPersonnel,
         personnel: normalizePersonnel(next.personnel),
         searchOpTemplateId: next.searchOpTemplateId.trim(),
+        wisarUrl: parseWisarUrl(next.wisarUrl) ?? '',
     };
     savePluginSettings(state.value);
 }
@@ -43,6 +46,10 @@ export function usePluginSettings() {
     const useD4hPersonnel = computed(() => state.value.useD4hPersonnel);
     const personnel = computed(() => state.value.personnel);
     const searchOpTemplateId = computed(() => state.value.searchOpTemplateId);
+    /** Saved per-browser override ('' = default). */
+    const wisarUrl = computed(() => state.value.wisarUrl);
+    /** The WiSAR server to use: the override, else the branch default. */
+    const wisarBaseUrl = computed(() => resolveWisarUrl(state.value.wisarUrl));
 
     function setSubjectTypes(types: string[]): void {
         persist({ ...state.value, subjectTypes: types });
@@ -84,6 +91,10 @@ export function usePluginSettings() {
         persist({ ...state.value, searchOpTemplateId: id });
     }
 
+    function setWisarUrl(url: string): void {
+        persist({ ...state.value, wisarUrl: url });
+    }
+
     function enumOptions(current = ''): string[] {
         return subjectTypeEnumOptions(subjectTypes.value, current);
     }
@@ -99,6 +110,8 @@ export function usePluginSettings() {
         useD4hPersonnel,
         personnel,
         searchOpTemplateId,
+        wisarUrl,
+        wisarBaseUrl,
         setSubjectTypes,
         resetSubjectTypes,
         setLpbTable,
@@ -109,6 +122,7 @@ export function usePluginSettings() {
         setUseD4hPersonnel,
         setPersonnel,
         setSearchOpTemplateId,
+        setWisarUrl,
         enumOptions,
     };
 }

@@ -8,6 +8,7 @@ import {
     OUTPUT_NAMES,
     WISAR_SPEC_VERSION,
     WisarError,
+    checkWisarConnection,
     createWisarClient,
     distancesProblem,
     normalizeBaseUrl,
@@ -249,6 +250,49 @@ test('content fetches a section by id', async () => {
     assert.equal((await c.content('metadata')).title, 'T');
     assert.equal(f.calls[0].url, 'https://w.example.org/api/v1/content/metadata');
     assert.equal(f.calls[0].headers.get('If-None-Match'), null); // not allowed by WiSAR's CORS headers
+});
+
+// ---- connection check ------------------------------------------------------
+
+const HEALTH = { status: 'ok', version: '1.0.0-draft', auth: 'cloudtak', queue: {},
+    snapshots: { osm: { available: true, age_days: 1 } } };
+
+function checkClient(health: Response | (() => never), profiles?: Response) {
+    const fetch = async (url: string) => {
+        if (url.endsWith('/health')) {
+            if (typeof health === 'function') health();
+            return health as Response;
+        }
+        return profiles as Response;
+    };
+    return createWisarClient({ baseUrl: 'https://w.example.org', getToken: () => 't', fetch });
+}
+
+test('checkWisarConnection: ok', async () => {
+    const r = await checkWisarConnection(checkClient(jsonResponse(HEALTH), jsonResponse({ datasets: [], default_dataset: 'koester' })));
+    assert.equal(r.status, 'ok');
+    assert.match(r.message, /Connected to WiSAR 1\.0\.0-draft at https:\/\/w\.example\.org/);
+});
+
+test('checkWisarConnection: degraded on missing snapshots or version mismatch', async () => {
+    const h = { ...HEALTH, status: 'degraded', version: '2.0.0', snapshots: { nhd: { available: false, age_days: null } } };
+    const r = await checkWisarConnection(checkClient(jsonResponse(h), jsonResponse({ datasets: [], default_dataset: 'k' })));
+    assert.equal(r.status, 'degraded');
+    assert.match(r.message, /built for 1\.0\.0-draft/);
+    assert.match(r.message, /Missing data snapshots: nhd/);
+});
+
+test('checkWisarConnection: unreachable (also how an unregistered CloudTAK looks to a browser)', async () => {
+    const r = await checkWisarConnection(checkClient(() => { throw new TypeError('Failed to fetch'); }));
+    assert.equal(r.status, 'unreachable');
+    assert.match(r.message, /WISAR_CLOUDTAK_INSTANCES/);
+});
+
+test('checkWisarConnection: session rejected / not registered', async () => {
+    const p401 = jsonResponse({ type: 'about:blank', title: 'Unauthorized', status: 401 }, 401);
+    assert.equal((await checkWisarConnection(checkClient(jsonResponse(HEALTH), p401))).status, 'unauthorized');
+    const p403 = jsonResponse({ type: 'about:blank', title: 'CloudTAK not registered', status: 403 }, 403);
+    assert.equal((await checkWisarConnection(checkClient(jsonResponse(HEALTH), p403))).status, 'not-registered');
 });
 
 // ---- drift against the WiSAR contract ---------------------------------------

@@ -10,6 +10,7 @@ import {
     normalizeSubjectTypes,
     type ParseResult,
 } from './subjectTypes.ts';
+import { normalizeBaseUrl } from './wisar.ts';
 
 export const PLUGIN_SETTINGS_KEY = 'incident-manager:settings';
 
@@ -46,6 +47,8 @@ export interface PluginSettings {
     personnel: D4HMember[];
     /** DataSync mission template id for search OPs. Empty = auto-pick SAR by name. */
     searchOpTemplateId: string;
+    /** WiSAR server for this browser. Empty = the branch default (WISAR_DEFAULT_URL in lib/wisar.ts). */
+    wisarUrl: string;
 }
 
 export function defaultPluginSettings(): PluginSettings {
@@ -58,7 +61,17 @@ export function defaultPluginSettings(): PluginSettings {
         useD4hPersonnel: true,
         personnel: [],
         searchOpTemplateId: '',
+        wisarUrl: '',
     };
+}
+
+/** Normalized WiSAR URL, '' for blank, or null when it isn't a usable http(s) URL. */
+export function parseWisarUrl(raw: string): string | null {
+    try {
+        return normalizeBaseUrl(raw);
+    } catch {
+        return null;
+    }
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -185,6 +198,10 @@ export function parseStoredPluginSettings(raw: unknown): PluginSettings {
         defaults.searchOpTemplateId = rec.searchOpTemplateId.trim();
     }
 
+    if (typeof rec.wisarUrl === 'string') {
+        defaults.wisarUrl = parseWisarUrl(rec.wisarUrl) ?? '';
+    }
+
     return defaults;
 }
 
@@ -222,6 +239,7 @@ export function savePluginSettings(settings: PluginSettings): void {
             useD4hPersonnel: settings.useD4hPersonnel,
             personnel: normalizePersonnel(settings.personnel),
             searchOpTemplateId: settings.searchOpTemplateId.trim(),
+            wisarUrl: parseWisarUrl(settings.wisarUrl) ?? '',
         } satisfies PluginSettings));
     } catch {
         // quota / private mode

@@ -782,6 +782,103 @@
                 :description='lpbUploadOk'
             />
         </TablerBorder>
+
+        <!-- ══ WiSAR Server ══ -->
+        <div
+            v-if='expandedCard !== "wisar"'
+            class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+            role='button'
+            tabindex='0'
+            :aria-expanded='false'
+            @click='toggleCard("wisar")'
+            @keydown.enter.prevent='toggleCard("wisar")'
+            @keydown.space.prevent='toggleCard("wisar")'
+        >
+            <p class='text-uppercase text-white-50 small mb-0'>
+                WiSAR Server
+            </p>
+            <IconChevronDown
+                class='ms-auto transition-transform text-white-50 rotate-180'
+                :size='20'
+                stroke='1.5'
+            />
+        </div>
+        <TablerBorder
+            v-else
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <div
+                    class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='true'
+                    @click='toggleCard("wisar")'
+                    @keydown.enter.prevent='toggleCard("wisar")'
+                    @keydown.space.prevent='toggleCard("wisar")'
+                >
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        WiSAR Server
+                    </p>
+                    <IconChevronDown
+                        class='ms-auto transition-transform text-white-50'
+                        :size='20'
+                        stroke='1.5'
+                    />
+                </div>
+            </template>
+
+            <p class='text-muted small mb-3'>
+                Where Travel Time and TARR analyses run. Leave blank to use the
+                default ({{ wisarDefaultUrl }}). Applies in this browser only.
+            </p>
+            <TablerInput
+                v-model='draftWisarUrl'
+                label='WiSAR Server'
+                :placeholder='wisarDefaultUrl'
+                :error='draftWisarUrlInvalid ? "Enter an http(s) address, e.g. https://wisar.example.org" : ""'
+                autocomplete='url'
+            />
+            <p class='text-muted small mt-2 mb-0'>
+                In use: {{ wisarBaseUrl }}
+            </p>
+            <div class='d-flex flex-wrap gap-2 mt-3'>
+                <button
+                    type='button'
+                    class='btn btn-primary'
+                    :disabled='!wisarUrlDirty || draftWisarUrlInvalid'
+                    @click='saveWisarUrl'
+                >
+                    Save
+                </button>
+                <button
+                    type='button'
+                    class='btn btn-outline-secondary'
+                    :disabled='draftWisarUrlInvalid || wisarChecking'
+                    @click='testWisarConnection'
+                >
+                    {{ wisarChecking ? 'Testing…' : 'Test connection' }}
+                </button>
+                <button
+                    type='button'
+                    class='btn btn-outline-secondary'
+                    :disabled='!wisarUrl && !draftWisarUrl'
+                    @click='resetWisarUrl'
+                >
+                    Use default
+                </button>
+            </div>
+            <TablerInlineAlert
+                v-if='wisarCheck'
+                class='mt-3'
+                :severity='wisarCheck.status === "ok" ? "success" : wisarCheck.status === "degraded" ? "warning" : "danger"'
+                :title='wisarCheckTitle'
+                :description='wisarCheck.message'
+            />
+        </TablerBorder>
     </div>
 </template>
 
@@ -810,7 +907,14 @@ import {
     resolveSearchOpTemplate,
     type MissionTemplateItem,
 } from '../../lib/missionTemplates.ts';
-import { parseLpbTableJson } from '../../lib/pluginSettings.ts';
+import { parseLpbTableJson, parseWisarUrl } from '../../lib/pluginSettings.ts';
+import {
+    WISAR_DEFAULT_URL,
+    checkWisarConnection,
+    resolveWisarUrl,
+    type ConnectionCheck,
+} from '../../lib/wisar.ts';
+import { wisarClientFor } from '../../composables/useWisar.ts';
 import {
     MAX_AIDING_AGENCIES,
     MAX_SUBJECT_TYPES,
@@ -826,7 +930,7 @@ import {
     savedFileTarget,
 } from '../../lib/fileTarget.ts';
 
-type SettingsCard = 'folder' | 'your-agency' | 'aiding-agencies' | 'personnel' | 'search-op-template' | 'subject-types' | 'lpb';
+type SettingsCard = 'folder' | 'your-agency' | 'aiding-agencies' | 'personnel' | 'search-op-template' | 'subject-types' | 'lpb' | 'wisar';
 const expandedCard = ref<SettingsCard | null>('folder');
 
 function toggleCard(card: SettingsCard): void {
@@ -843,6 +947,8 @@ const {
     useD4hPersonnel,
     personnel,
     searchOpTemplateId,
+    wisarUrl,
+    wisarBaseUrl,
     setSubjectTypes,
     resetSubjectTypes,
     setLpbTable,
@@ -853,6 +959,7 @@ const {
     setUseD4hPersonnel,
     setPersonnel,
     setSearchOpTemplateId,
+    setWisarUrl,
 } = usePluginSettings();
 
 const draftTypes = ref<string[]>([...subjectTypes.value]);
@@ -945,6 +1052,55 @@ const aidingAgenciesDirty = computed(() =>
     JSON.stringify(draftAidingAgencies.value.map((t) => t.trim()).filter(Boolean))
         !== JSON.stringify(aidingAgencies.value),
 );
+
+// ── WiSAR Server ──
+const wisarDefaultUrl = WISAR_DEFAULT_URL;
+const draftWisarUrl = ref(wisarUrl.value);
+const wisarCheck = ref<ConnectionCheck | null>(null);
+const wisarChecking = ref(false);
+
+watch(wisarUrl, (url) => {
+    draftWisarUrl.value = url;
+});
+
+watch(draftWisarUrl, () => {
+    wisarCheck.value = null;
+});
+
+const draftWisarUrlInvalid = computed(() => parseWisarUrl(draftWisarUrl.value) === null);
+const wisarUrlDirty = computed(() => (parseWisarUrl(draftWisarUrl.value) ?? draftWisarUrl.value) !== wisarUrl.value);
+const wisarCheckTitle = computed(() => ({
+    ok: 'Connected',
+    degraded: 'Connected, with notes',
+    unreachable: 'Not reachable',
+    unauthorized: 'Session not accepted',
+    'not-registered': 'CloudTAK not registered',
+    error: 'Error',
+})[wisarCheck.value?.status ?? 'error']);
+
+function saveWisarUrl(): void {
+    setWisarUrl(parseWisarUrl(draftWisarUrl.value) ?? '');
+    draftWisarUrl.value = wisarUrl.value;
+}
+
+function resetWisarUrl(): void {
+    setWisarUrl('');
+    draftWisarUrl.value = '';
+    wisarCheck.value = null;
+}
+
+/** Tests the address in the field (saved or not), so it can be checked before saving. */
+async function testWisarConnection(): Promise<void> {
+    const draft = parseWisarUrl(draftWisarUrl.value);
+    if (draft === null) return;
+    wisarChecking.value = true;
+    wisarCheck.value = null;
+    try {
+        wisarCheck.value = await checkWisarConnection(wisarClientFor(resolveWisarUrl(draft)));
+    } finally {
+        wisarChecking.value = false;
+    }
+}
 
 function saveYourAgency(): void {
     setYourAgency(draftYourAgency.value);

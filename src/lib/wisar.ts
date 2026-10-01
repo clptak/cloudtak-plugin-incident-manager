@@ -118,6 +118,8 @@ export interface Job {
     status: JobStatus;
     queue_position?: number | null;
     owner?: string;
+    /** CloudTAK web origin the owner signed in to; null when WiSAR serves one CloudTAK. */
+    instance?: string | null;
     created_at: string;
     started_at?: string | null;
     finished_at?: string | null;
@@ -491,3 +493,63 @@ export function createWisarClient(opts: WisarClientOptions) {
 }
 
 export type WisarClient = ReturnType<typeof createWisarClient>;
+
+export type ConnectionStatus = 'ok' | 'degraded' | 'unreachable' | 'unauthorized' | 'not-registered' | 'error';
+
+export interface ConnectionCheck {
+    status: ConnectionStatus;
+    /** One line for the UI. */
+    message: string;
+    version?: string;
+}
+
+/**
+ * Settings "Test connection": is WiSAR reachable from this page, and does it
+ * accept this CloudTAK session?
+ *
+ * A browser can't tell "WiSAR is down" from "WiSAR doesn't list this
+ * CloudTAK": WiSAR sends no CORS headers to an unregistered origin, so both
+ * look like a failed fetch. The message says so.
+ */
+export async function checkWisarConnection(client: WisarClient, signal?: AbortSignal): Promise<ConnectionCheck> {
+    let health: Health;
+    try {
+        health = await client.health(signal);
+    } catch (err) {
+        if (err instanceof WisarError && err.status === 0) {
+            return {
+                status: 'unreachable',
+                message: `Can't reach WiSAR at ${client.baseUrl}. Check the address; if it is right, WiSAR may be down `
+                    + 'or not set up for this CloudTAK (WISAR_CLOUDTAK_INSTANCES / WISAR_CORS_ORIGINS).',
+            };
+        }
+        return { status: 'error', message: err instanceof Error ? err.message : String(err) };
+    }
+    try {
+        await client.profiles(signal);
+    } catch (err) {
+        if (err instanceof WisarError) {
+            if (err.status === 401) {
+                return { status: 'unauthorized', version: health.version,
+                    message: 'WiSAR is up but did not accept this CloudTAK session. Sign in again; if it persists, '
+                        + 'WiSAR is checking tokens against a different CloudTAK.' };
+            }
+            if (err.status === 403) {
+                return { status: 'not-registered', version: health.version,
+                    message: 'WiSAR is up but this CloudTAK is not on its list (WISAR_CLOUDTAK_INSTANCES).' };
+            }
+        }
+        return { status: 'error', version: health.version, message: err instanceof Error ? err.message : String(err) };
+    }
+    const notes: string[] = [];
+    if (health.version !== WISAR_SPEC_VERSION) {
+        notes.push(`API version ${health.version}; this plugin was built for ${WISAR_SPEC_VERSION}.`);
+    }
+    const missing = Object.entries(health.snapshots ?? {}).filter(([, s]) => !s.available).map(([k]) => k);
+    if (missing.length) notes.push(`Missing data snapshots: ${missing.join(', ')} (analyses run with warnings).`);
+    return {
+        status: health.status === 'ok' && !notes.length ? 'ok' : 'degraded',
+        version: health.version,
+        message: [`Connected to WiSAR ${health.version} at ${client.baseUrl}.`, ...notes].join(' '),
+    };
+}
