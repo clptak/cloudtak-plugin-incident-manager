@@ -96,46 +96,26 @@
             {{ problem }}
         </div>
 
-        <div
-            v-if='phase !== "idle"'
-            class='mt-2 small'
-            role='status'
-        >
-            <span v-if='phase === "submitting"'>Sending to WiSAR…</span>
-            <span v-else-if='phase === "queued"'>
-                Queued at WiSAR<span v-if='job?.queue_position'> — position {{ job.queue_position }}</span> · {{ elapsed }}
-            </span>
-            <span v-else-if='phase === "running"'>
-                Running on WiSAR · {{ elapsed }} (typically one to a few minutes)
-            </span>
-            <span
-                v-else-if='phase === "succeeded"'
-                class='text-success'
-            >
-                Done in {{ elapsed }} — {{ job?.result?.contour_count ?? 0 }} contour(s).
-            </span>
-            <span
-                v-else-if='phase === "cancelled"'
-                class='text-muted'
-            >Cancelled.</span>
-            <span
-                v-else
-                class='text-danger'
-            >{{ error }}</span>
-        </div>
+        <WisarJobStatus
+            :phase='phase'
+            :job='job'
+            :error='error'
+            :started-at='startedAt'
+            :now='now'
+        />
     </div>
 </template>
 
 <script setup lang='ts'>
 import { computed, ref } from 'vue';
 import { useWisarJob } from '../../composables/useWisarJob.ts';
+import WisarJobStatus from './WisarJobStatus.vue';
 import type { Job } from '../../lib/wisar.ts';
 import type { WisarIppOption } from '../../lib/wisarIpp.ts';
 import {
     INTERVAL_OPTIONS,
     SPEED_PRESETS,
     convertSpeedText,
-    formatElapsed,
     travelTimeProblem,
     travelTimeRequest,
     unitLabel,
@@ -161,7 +141,6 @@ const { job, phase, error, startedAt, now, run, cancel } = useWisarJob();
 
 const busy = computed(() => ['submitting', 'queued', 'running'].includes(phase.value));
 const problem = computed(() => travelTimeProblem(props.ipp, String(speedText.value ?? ''), unit.value, intervals.value));
-const elapsed = computed(() => formatElapsed(now.value - startedAt.value));
 
 function setUnit(next: SpeedUnit): void {
     speedText.value = convertSpeedText(String(speedText.value ?? ''), unit.value, next);
