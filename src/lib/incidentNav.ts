@@ -111,7 +111,11 @@ export function visibleNavSections(isSearch: boolean): NavSection[] {
             label: section.nonSearchLabel ?? section.label,
             items: section.items
                 .filter((item) => !item.searchOnly && !SEARCH_ONLY_NAV_KEYS.has(item.key))
-                .map(({ group: _group, ...item }) => item),
+                .map((item) => {
+                    const flat = { ...item };
+                    delete flat.group;
+                    return flat;
+                }),
         }))
         .filter((section) => section.items.length > 0);
 }
