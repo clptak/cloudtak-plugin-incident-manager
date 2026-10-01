@@ -25,7 +25,12 @@
                 @result='onResult'
             />
 
-            <!-- Still to come on this card: results (4e) and reference links (4f). -->
+            <WisarResults
+                v-if='lastJob'
+                :job='lastJob'
+            />
+
+            <!-- Still to come on this card: reference links (4f). -->
         </div>
     </TablerBorder>
 </template>
@@ -34,12 +39,13 @@
 import { ref } from 'vue';
 import { TablerBorder } from '@tak-ps/vue-tabler';
 import WisarIppPicker from '../../wisar/WisarIppPicker.vue';
+import WisarResults from '../../wisar/WisarResults.vue';
 import WisarTravelTimeForm from '../../wisar/WisarTravelTimeForm.vue';
 import type { Job } from '../../../lib/wisar.ts';
 import type { WisarIppOption } from '../../../lib/wisarIpp.ts';
 
 const ipp = ref<WisarIppOption | null>(null);
-/** Latest succeeded Travel Time job; shown by the results section (4e). */
+/** Latest succeeded Travel Time job, shown in Results. */
 const lastJob = ref<Job | null>(null);
 
 function onResult(job: Job): void {
