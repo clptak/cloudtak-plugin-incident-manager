@@ -218,3 +218,22 @@ export function sortedContours(fc: ContourCollection): ContourFeature[] {
     return [...fc.features].sort((a, b) => (a.properties.hours ?? a.properties.threshold_m)
         - (b.properties.hours ?? b.properties.threshold_m));
 }
+
+/** Search Area log keys written for WiSAR rings ("wisar-tt:…", "wisar-tarr:…"). */
+export function isWisarAreaKey(key: string): boolean {
+    return key.startsWith(`${TT_AREA_PREFIX}:`) || key.startsWith(`${TARR_AREA_PREFIX}:`);
+}
+
+/**
+ * Order for WiSAR rings in Search Area's list: by folder name, then by the
+ * ring's number (2h before 10h; 25% before 75%), then by key.
+ */
+export function compareWisarAreas(a: { key: string; folder?: string }, b: { key: string; folder?: string }): number {
+    const folder = (a.folder || 'Unfiled').localeCompare(b.folder || 'Unfiled');
+    if (folder) return folder;
+    const num = (k: string): number => Number(k.split(':').pop());
+    const na = num(a.key);
+    const nb = num(b.key);
+    if (Number.isFinite(na) && Number.isFinite(nb) && na !== nb) return na - nb;
+    return a.key.localeCompare(b.key);
+}

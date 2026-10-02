@@ -4,7 +4,9 @@ import type { ContourCollection, ContourFeature, Job } from './wisar.ts';
 import {
     OUTPUT_LABELS,
     TT_FOLDER_NAME,
+    compareWisarAreas,
     contourBounds,
+    isWisarAreaKey,
     contourLabel,
     ringNaming,
     tarrFolderName,
@@ -112,4 +114,19 @@ test('TARR naming follows decision 5 for each source', () => {
     const g = feature(4, { type: 'Polygon', coordinates: [square(0, 0, 1)] });
     assert.deepEqual(ringNaming(tt, g), { folder: 'WiSAR Distance Traveled', callsign: '4h Travel Time', areaPrefix: 'wisar-tt', areaId: '4' });
     assert.equal(contourLabel(g), '4h');
+});
+
+test('Search Area grouping helpers for WiSAR rings', () => {
+    assert.ok(isWisarAreaKey('wisar-tt:abc:2'));
+    assert.ok(isWisarAreaKey('wisar-tarr:abc:25'));
+    assert.ok(!isWisarAreaKey('lpb:abc:A'));
+    assert.ok(!isWisarAreaKey('wisar-ttx'));
+    const rows = [
+        { key: 'wisar-tt:p1:10', folder: 'WiSAR Distance Traveled' },
+        { key: 'wisar-tarr:p2:75', folder: 'AZ LPB Search-Hiker WiSAR' },
+        { key: 'wisar-tt:p1:2', folder: 'WiSAR Distance Traveled' },
+        { key: 'wisar-tarr:p2:25', folder: 'AZ LPB Search-Hiker WiSAR' },
+    ];
+    assert.deepEqual([...rows].sort(compareWisarAreas).map((r) => r.key),
+        ['wisar-tarr:p2:25', 'wisar-tarr:p2:75', 'wisar-tt:p1:2', 'wisar-tt:p1:10']);
 });
