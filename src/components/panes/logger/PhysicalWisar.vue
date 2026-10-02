@@ -11,7 +11,7 @@
             @keydown.space.prevent='wisarExpanded = true'
         >
             <p class='text-uppercase text-white-50 small mb-0'>
-                Physical – WiSAR
+                WiSAR
             </p>
             <IconChevronDown
                 class='ms-auto transition-transform text-white-50 rotate-180'
@@ -37,7 +37,7 @@
                     @keydown.space.prevent='wisarExpanded = false'
                 >
                     <p class='text-uppercase text-white-50 small mb-0'>
-                        Physical – WiSAR
+                        WiSAR
                     </p>
                     <IconChevronDown
                         class='ms-auto transition-transform text-white-50'
