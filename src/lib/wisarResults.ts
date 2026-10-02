@@ -55,7 +55,7 @@ export const METERS_PER_MILE = 1609.344;
 /**
  * "25% - 0.80mi - Search-Hiker" (Paul, 2026-10-01): the ring's applied
  * (calibrated) distance in miles, 2 decimals. To label with the table/profile
- * distance instead, see docs-archive/wisar-tarr-ring-labels.md.
+ * distance instead, see wisar-tarr-ring-labels.md at the repo root.
  */
 export function tarrCallsign(percentile: string, thresholdM: number, category: string): string {
     return `${percentile} - ${(thresholdM / METERS_PER_MILE).toFixed(2)}mi - ${category}`;
