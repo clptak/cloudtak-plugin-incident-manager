@@ -44,7 +44,7 @@ export const NAV_SECTIONS: NavSection[] = [
             { key: 'subject-info', label: 'Subject Information', group: 'Investigation' },
             { key: 'search-urgency', label: 'Search Urgency', searchOnly: true, group: 'Investigation' },
             { key: 'search-scenarios', label: 'Search Scenarios', searchOnly: true, group: 'Investigation' },
-            { key: 'physical-wisar', label: 'Physical – WiSAR', searchOnly: true, group: 'Containment' },
+            { key: 'physical-wisar', label: 'Motion Model Tools', searchOnly: true, group: 'Containment' },
             { key: 'ir-briefing', label: 'IR Briefing', group: 'Search' },
             { key: 'incident-post', label: 'Incident POST', group: 'Search' },
             { key: 'resources', label: 'Resources', group: 'Search' },

@@ -31,7 +31,7 @@ test('search incidents: Initial Response has Investigation / Containment / Searc
     assert.deepEqual(headings(initial.items), [
         'Investigation', null, null, null, 'Containment', 'Search', null, null, null, null,
     ]);
-    assert.equal(initial.items.find((i) => i.key === 'physical-wisar')?.label, 'Physical – WiSAR');
+    assert.equal(initial.items.find((i) => i.key === 'physical-wisar')?.label, 'Motion Model Tools');
 });
 
 test('non-search incidents: same flat Initial Response list as before, no sub-headings or WiSAR', () => {
@@ -56,7 +56,7 @@ test('only Initial Response is grouped; other sections are unchanged', () => {
     }
 });
 
-test('Physical – WiSAR is a search-only nav key in Initial Response', () => {
+test('Motion Model Tools is a search-only nav key in Initial Response', () => {
     assert.ok(SEARCH_ONLY_NAV_KEYS.has('physical-wisar'));
     assert.equal(sectionKeyForNavItem('physical-wisar'), 'h-initial');
     assert.ok(ALL_NAV_ITEMS.some((i) => i.key === 'physical-wisar'));
