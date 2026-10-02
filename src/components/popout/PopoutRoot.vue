@@ -86,7 +86,7 @@ import IncidentManagerPane from '../IncidentManagerPane.vue';
 import TaskbarChipButton from '../TaskbarChipButton.vue';
 import { useIncident } from '../../composables/useIncident.ts';
 
-const { selectKeyGuarded, selectHTabGuarded, isSearchIncident, isSearchMission } = useIncident();
+const { selectKeyGuarded, isSearchIncident, isSearchMission, lpbDistancesRequested } = useIncident();
 
 /**
  * Popout-local minimize state: independent of the main window's floatMinimize
@@ -101,7 +101,8 @@ function openSection(key?: string): void {
 
 function openLpb(): void {
     paneOpen.value = true;
-    selectHTabGuarded('lpb');
+    lpbDistancesRequested.value = true;
+    selectKeyGuarded('physical-wisar');
 }
 </script>
 

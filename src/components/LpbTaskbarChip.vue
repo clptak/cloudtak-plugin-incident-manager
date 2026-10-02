@@ -14,10 +14,11 @@ import TaskbarChipButton from './TaskbarChipButton.vue';
 import { openDesktopPane } from '../lib/floatMinimize.ts';
 import { useIncident } from '../composables/useIncident.ts';
 
-const { selectHTabGuarded, isSearchMission } = useIncident();
+const { selectKeyGuarded, isSearchMission, lpbDistancesRequested } = useIncident();
 
 function openLpb(): void {
     openDesktopPane();
-    selectHTabGuarded('lpb');
+    lpbDistancesRequested.value = true;
+    selectKeyGuarded('physical-wisar');
 }
 </script>
