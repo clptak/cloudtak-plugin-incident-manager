@@ -38,12 +38,10 @@
                     :ipp='ipp'
                     @result='tarrJob = $event'
                 />
-                <p
+                <WisarResults
                     v-if='tarrJob'
-                    class='form-text mt-2'
-                >
-                    TARR results on the map, Add to DataSync and downloads come next.
-                </p>
+                    :job='tarrJob'
+                />
             </template>
             <template v-else>
                 <WisarTravelTimeForm

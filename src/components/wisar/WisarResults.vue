@@ -46,7 +46,7 @@
                         class='wisar-swatch'
                         :style='{ borderColor: f.properties.stroke, background: f.properties.fill }'
                     />
-                    {{ f.properties.label || f.properties.callsign }}
+                    {{ contourLabel(f) }}
                 </label>
                 <span
                     v-if='!rows.length'
@@ -149,11 +149,12 @@ import { useMapStore } from '../../../../../src/stores/map.ts';
 import { useIncident } from '../../composables/useIncident.ts';
 import { useWisar } from '../../composables/useWisar.ts';
 import { describeSave, saveGeneratedFile } from '../../lib/fileTarget.ts';
-import { addTravelTimeToDataSync } from '../../lib/wisarDataSync.ts';
+import { addContoursToDataSync } from '../../lib/wisarDataSync.ts';
 import { clearPreview, showPreview, type PreviewMap } from '../../lib/wisarPreview.ts';
 import {
     OUTPUT_LABELS,
     contourKey,
+    contourLabel,
     selectContours,
     sortedContours,
     type DataSyncTarget,
@@ -161,7 +162,7 @@ import {
 import type { ContourCollection, Job, OutputName } from '../../lib/wisar.ts';
 
 const props = defineProps<{
-    /** A succeeded Travel Time job. */
+    /** A succeeded Travel Time or TARR job. */
     job: Job;
 }>();
 
@@ -246,7 +247,7 @@ async function addToDataSync(): Promise<void> {
     addStatus.value = '';
     addError.value = false;
     try {
-        const r = await addTravelTimeToDataSync(mission, props.job, fc, target.value);
+        const r = await addContoursToDataSync(mission, props.job, fc, target.value);
         const parts = [`Added ${r.posted} ring${r.posted === 1 ? '' : 's'} to ${r.missionName}${r.filed ? ` (${r.folderName})` : ''}.`];
         if (r.droppedParts || r.droppedHoles) {
             parts.push(`Each ring is the contour's main outline; ${r.droppedParts} detached piece(s) and ${r.droppedHoles} hole(s) are only in the downloads.`);

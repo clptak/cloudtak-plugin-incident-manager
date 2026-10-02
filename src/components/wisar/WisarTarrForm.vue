@@ -95,6 +95,12 @@
                 Coconino calibration: {{ formatMultipliers(calibration.mult) }} (p25/p50/p75) —
                 {{ calibration.profileSpecific ? 'profile-specific' : 'global default' }}
             </div>
+            <div
+                v-if='calibration && !edited'
+                class='form-text'
+            >
+                Rings are drawn at the calibrated distances, and their DataSync labels show those miles.
+            </div>
         </template>
         <template v-if='source === "arizona" && arizonaRow'>
             <div class='form-text'>
@@ -153,6 +159,13 @@
                 Apply Coconino global calibration ({{ globalLabel }})
             </span>
         </label>
+        <div
+            v-if='(source === "arizona" || edited) && globalCalibration'
+            class='form-text text-warning'
+        >
+            Calibration moves the rings out (×{{ globalLabel }}), so their DataSync labels show the
+            calibrated miles, not the values above.
+        </div>
 
         <div class='d-flex gap-2 mt-3'>
             <button

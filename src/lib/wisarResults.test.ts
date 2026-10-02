@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { ContourCollection, ContourFeature } from './wisar.ts';
+import type { ContourCollection, ContourFeature, Job } from './wisar.ts';
 import {
     OUTPUT_LABELS,
     TT_FOLDER_NAME,
     contourBounds,
+    contourLabel,
+    ringNaming,
+    tarrFolderName,
+    tarrNaming,
     contourKey,
     mainOutline,
     selectContours,
@@ -85,4 +89,27 @@ test('selectContours keeps only the chosen contours', () => {
     assert.deepEqual(fc.features.map(contourKey), ['2', '4', '6']);
     assert.deepEqual(selectContours(fc, new Set(['2', '6'])).features.map((f) => f.properties.hours), [2, 6]);
     assert.equal(selectContours(fc, new Set()).features.length, 0);
+});
+
+test('TARR naming follows decision 5 for each source', () => {
+    const listed = { type: 'tarr', request: { subject: { kind: 'listed', category: 'Hiker' } } } as unknown as Job;
+    const az = { type: 'tarr', request: { subject: { kind: 'custom', name: 'Search-Hiker (AZ)' } } } as unknown as Job;
+    const azEdited = { type: 'tarr', request: { subject: { kind: 'custom', name: 'Search-Hiker (AZ, edited)' } } } as unknown as Job;
+    const kEdited = { type: 'tarr', request: { subject: { kind: 'custom', name: 'Hiker (edited)' } } } as unknown as Job;
+    assert.equal(tarrFolderName(listed), 'Koester LPB Hiker WiSAR');
+    assert.equal(tarrFolderName(az), 'AZ LPB Search-Hiker WiSAR');
+    assert.equal(tarrFolderName(azEdited), 'AZ LPB Search-Hiker WiSAR');
+    assert.equal(tarrFolderName(kEdited), 'Koester LPB Hiker WiSAR');
+    assert.deepEqual(tarrNaming({ request: { subject: { kind: 'custom', name: 'Odd' } } } as unknown as Job), { category: 'Odd', source: 'AZ' });
+
+    const f = feature(0, { type: 'Polygon', coordinates: [square(0, 0, 1)] });
+    f.properties.hours = undefined;
+    f.properties.percentile = '25%';
+    f.properties.threshold_m = 1287.4752; // 0.80 mi
+    assert.equal(contourLabel(f), '25%');
+    assert.deepEqual(ringNaming(az, f), { folder: 'AZ LPB Search-Hiker WiSAR', callsign: '25% - 0.80mi - Search-Hiker', areaPrefix: 'wisar-tarr', areaId: '25' });
+    const tt = { type: 'travel_time', request: {} } as unknown as Job;
+    const g = feature(4, { type: 'Polygon', coordinates: [square(0, 0, 1)] });
+    assert.deepEqual(ringNaming(tt, g), { folder: 'WiSAR Distance Traveled', callsign: '4h Travel Time', areaPrefix: 'wisar-tt', areaId: '4' });
+    assert.equal(contourLabel(g), '4h');
 });
