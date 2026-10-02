@@ -69,7 +69,10 @@ const VALID_NAV_KEYS = new Set([
     'generate-closing-package',
 ]);
 
-const VALID_HTAB_KEYS = new Set(['main', 'dashboard', 'task', 'clues', 'casie', 'lpb', 'organization', 'risk-assessment']);
+const VALID_HTAB_KEYS = new Set(['main', 'dashboard', 'task', 'clues', 'casie', 'organization', 'risk-assessment']);
+
+/** One-shot signal: open Motion Model Tools with the LPB Distances card expanded. */
+const lpbDistancesRequested = ref(false);
 
 function loadNavFromSession(): PaneNavState {
     try {
@@ -109,6 +112,12 @@ function loadNavFromSession(): PaneNavState {
         if (key === 'clue-log') {
             key = 'create-open';
             if (htab === 'main') htab = 'clues';
+        }
+        // LPB distance table moved from its horizontal tab onto Motion Model Tools.
+        if (htab === 'lpb') {
+            htab = 'main';
+            key = 'physical-wisar';
+            lpbDistancesRequested.value = true;
         }
         return {
             activeKey: VALID_NAV_KEYS.has(key) ? key : 'create-open',
@@ -377,6 +386,7 @@ export function useIncident() {
         activeKey,
         activeHTab,
         casieExpandRequested,
+        lpbDistancesRequested,
         noMissionModalOpen,
         isSearchIncident,
         isSearchMission,
