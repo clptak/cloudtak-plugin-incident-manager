@@ -2,12 +2,13 @@
  * Pure helpers for WiSAR results: DataSync naming (decision 5), contour →
  * single TAK ring, preview bounds, raw-data labels. No CloudTAK imports.
  */
-import type { ContourCollection, ContourFeature, OutputName } from './wisar.ts';
+import type { ContourCollection, ContourFeature, Job, OutputName } from './wisar.ts';
 
 export type Ring = [number, number][];
 
-/** Area-log key prefix for rings posted from a Travel Time job. */
+/** Area-log key prefixes for rings posted from WiSAR jobs. */
 export const TT_AREA_PREFIX = 'wisar-tt';
+export const TARR_AREA_PREFIX = 'wisar-tarr';
 
 /** Raw-data download labels, in display order (as in the web tool). */
 export const OUTPUT_LABELS: readonly { name: OutputName; label: string }[] = [
@@ -27,6 +28,57 @@ export type DataSyncTarget = 'active' | 'mgmt';
 
 function trimNumber(n: number): string {
     return String(Math.round(n * 100) / 100);
+}
+
+/**
+ * Category and source label for a TARR job, read back from the request the
+ * TARR form built: a listed subject is Koester; custom names end in
+ * "(AZ)", "(AZ, edited)" or "(edited)" (Koester values edited).
+ */
+export function tarrNaming(job: Pick<Job, 'request'>): { category: string; source: 'AZ' | 'Koester' } {
+    const subject = (job.request as { subject?: { kind?: string; category?: string; name?: string } }).subject;
+    if (subject?.kind === 'listed') return { category: subject.category ?? 'TARR', source: 'Koester' };
+    const name = subject?.name ?? 'TARR';
+    const m = /^(.*?)\s*\((AZ(?:, edited)?|edited)\)$/.exec(name);
+    if (!m) return { category: name, source: 'AZ' };
+    return { category: m[1], source: m[2].startsWith('AZ') ? 'AZ' : 'Koester' };
+}
+
+/** "AZ LPB Search-Hiker WiSAR" (Paul, 2026-10-01); Koester profiles: "Koester LPB Hiker WiSAR". */
+export function tarrFolderName(job: Pick<Job, 'request'>): string {
+    const n = tarrNaming(job);
+    return `${n.source} LPB ${n.category} WiSAR`;
+}
+
+export const METERS_PER_MILE = 1609.344;
+
+/**
+ * "25% - 0.80mi - Search-Hiker" (Paul, 2026-10-01): the ring's applied
+ * (calibrated) distance in miles, 2 decimals. To label with the table/profile
+ * distance instead, see docs-archive/wisar-tarr-ring-labels.md.
+ */
+export function tarrCallsign(percentile: string, thresholdM: number, category: string): string {
+    return `${percentile} - ${(thresholdM / METERS_PER_MILE).toFixed(2)}mi - ${category}`;
+}
+
+/** Short label for a contour in the results key: "25%" or "2h". */
+export function contourLabel(f: ContourFeature): string {
+    return f.properties.percentile ?? f.properties.label ?? f.properties.callsign;
+}
+
+/** Folder base name, ring name and log prefix for one contour of a job. */
+export function ringNaming(job: Pick<Job, 'type' | 'request'>, f: ContourFeature): { folder: string; callsign: string; areaPrefix: string; areaId: string } {
+    if (job.type === 'tarr') {
+        const pct = f.properties.percentile ?? '';
+        return {
+            folder: tarrFolderName(job),
+            callsign: tarrCallsign(pct, f.properties.threshold_m, tarrNaming(job).category),
+            areaPrefix: TARR_AREA_PREFIX,
+            areaId: pct.replace('%', ''),
+        };
+    }
+    const hours = f.properties.hours ?? 0;
+    return { folder: TT_FOLDER_NAME, callsign: travelTimeCallsign(hours), areaPrefix: TT_AREA_PREFIX, areaId: String(hours) };
 }
 
 /** "2h Travel Time" */

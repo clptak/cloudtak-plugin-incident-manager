@@ -1,5 +1,5 @@
 /**
- * Post WiSAR Travel Time contours to the incident's active DataSync or its
+ * Post WiSAR contours (Travel Time or TARR) to the incident's active DataSync or its
  * MGMT (planning) DataSync, the same way Search Area posts LPB rings: a
  * uniquely named folder in that DataSync, one shape per contour filed in it,
  * and a search-area log entry per shape. The log entries always go to the
@@ -17,12 +17,10 @@ import { SEARCH_AREA_KEYWORD } from './ippFormat.ts';
 import { pushPolygonToMission } from './missionFeatures.ts';
 import type { ContourCollection, Job } from './wisar.ts';
 import {
-    TT_AREA_PREFIX,
-    TT_FOLDER_NAME,
     mainOutline,
+    ringNaming,
     simplifyRing,
     sortedContours,
-    travelTimeCallsign,
     uniqueName,
     type DataSyncTarget,
 } from './wisarResults.ts';
@@ -44,7 +42,7 @@ export interface DataSyncAddResult {
 }
 
 /** `fc` holds only the contours to post. */
-export async function addTravelTimeToDataSync(
+export async function addContoursToDataSync(
     mission: ActiveMission,
     job: Job,
     fc: ContourCollection,
@@ -71,7 +69,9 @@ export async function addTravelTimeToDataSync(
     } catch {
         // local layer cache may be empty
     }
-    const folderName = uniqueName(TT_FOLDER_NAME, taken);
+    const first = sortedContours(fc)[0];
+    if (!first) throw new Error('No contours to add.');
+    const folderName = uniqueName(ringNaming(job, first).folder, taken);
     let folderUid: string | undefined;
     try {
         folderUid = (await ensureMissionFolder(sub, folderName)).uid;
@@ -89,8 +89,8 @@ export async function addTravelTimeToDataSync(
         if (!outline) continue;
         droppedParts += outline.parts - 1;
         droppedHoles += outline.holes;
-        const hours = f.properties.hours ?? 0;
-        const callsign = travelTimeCallsign(hours);
+        const naming = ringNaming(job, f);
+        const callsign = naming.callsign;
         const uid = await pushPolygonToMission({
             missionGuid: dest.guid,
             missionToken: dest.missionToken,
@@ -107,7 +107,7 @@ export async function addTravelTimeToDataSync(
             folderUid,
         });
         uids.push(uid);
-        const keywords = [SEARCH_AREA_KEYWORD, `area:${TT_AREA_PREFIX}:${pushId}:${hours}`, `uid:${uid}`,
+        const keywords = [SEARCH_AREA_KEYWORD, `area:${naming.areaPrefix}:${pushId}:${naming.areaId}`, `uid:${uid}`,
             `folder:${folderName}`, `datasync:${target}`];
         await log.create({ dtg: new Date().toISOString(), content: callsign, keywords, entryUid: uid });
     }
