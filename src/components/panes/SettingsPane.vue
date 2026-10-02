@@ -683,7 +683,7 @@
         <!-- ══ Statistical Distance (LPB) ══ -->
         <div
             v-if='expandedCard !== "lpb"'
-            class='cloudtak-accent border rounded-3 text-white px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+            class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
             role='button'
             tabindex='0'
             :aria-expanded='false'
@@ -702,7 +702,7 @@
         </div>
         <TablerBorder
             v-else
-            class='cloudtak-accent text-white'
+            class='cloudtak-accent text-white mb-3'
             :fill-height='false'
             :shadow='false'
             gap='sm'
