@@ -16,6 +16,10 @@
                 Where could the subject physically be after a given time, at a
                 given flat-ground speed? Calculated by WiSAR over terrain, land
                 cover, trails and water.
+                <WisarContentLink
+                    id='travel-time-explainer'
+                    label='What’s Travel Time?'
+                />
             </p>
 
             <WisarIppPicker v-model='ipp' />
@@ -30,7 +34,7 @@
                 :job='lastJob'
             />
 
-            <!-- Still to come on this card: reference links (4f). -->
+            <WisarContentFooter />
         </div>
     </TablerBorder>
 </template>
@@ -38,6 +42,8 @@
 <script setup lang='ts'>
 import { ref } from 'vue';
 import { TablerBorder } from '@tak-ps/vue-tabler';
+import WisarContentFooter from '../../wisar/WisarContentFooter.vue';
+import WisarContentLink from '../../wisar/WisarContentLink.vue';
 import WisarIppPicker from '../../wisar/WisarIppPicker.vue';
 import WisarResults from '../../wisar/WisarResults.vue';
 import WisarTravelTimeForm from '../../wisar/WisarTravelTimeForm.vue';

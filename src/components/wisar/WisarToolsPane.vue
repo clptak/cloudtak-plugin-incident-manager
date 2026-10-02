@@ -1,14 +1,14 @@
 <template>
     <div class='wisar-tools p-3 text-white'>
-        <div class='row g-2 mb-2'>
+        <div class='row g-2 mb-1'>
             <div
                 v-for='m in MODES'
                 :key='m.key'
-                class='col-6'
+                class='col-6 d-flex flex-column'
             >
                 <button
                     type='button'
-                    class='btn w-100 h-100 text-start wisar-mode'
+                    class='btn w-100 flex-grow-1 text-start wisar-mode'
                     :class='mode === m.key ? "btn-primary" : "btn-outline-secondary"'
                     @click='mode = m.key'
                 >
@@ -19,9 +19,15 @@
                         {{ m.desc }}
                     </div>
                 </button>
+                <div class='small text-center mt-1'>
+                    <WisarContentLink
+                        :id='m.explainer'
+                        :label='m.explainerLabel'
+                    />
+                </div>
             </div>
         </div>
-        <!-- "What's a TARR?" / "What's Travel Time?", the scope note and footer links arrive with 4f. -->
+        <WisarScopeNote />
 
         <template v-if='!activeMission'>
             <p class='text-muted small mt-3'>
@@ -54,25 +60,32 @@
                 />
             </template>
         </template>
+
+        <WisarContentFooter />
     </div>
 </template>
 
 <script setup lang='ts'>
 import { ref } from 'vue';
 import { useIncident } from '../../composables/useIncident.ts';
-import type { Job } from '../../lib/wisar.ts';
+import type { ContentId, Job } from '../../lib/wisar.ts';
 import type { WisarIppOption } from '../../lib/wisarIpp.ts';
+import WisarContentFooter from './WisarContentFooter.vue';
+import WisarContentLink from './WisarContentLink.vue';
 import WisarIppPicker from './WisarIppPicker.vue';
 import WisarResults from './WisarResults.vue';
+import WisarScopeNote from './WisarScopeNote.vue';
 import WisarTarrForm from './WisarTarrForm.vue';
 import WisarTravelTimeForm from './WisarTravelTimeForm.vue';
 
 type Mode = 'tarr' | 'travel-time';
 
 /** Titles and descriptions from the WiSAR web tool's start screen. */
-const MODES: { key: Mode; title: string; desc: string }[] = [
-    { key: 'tarr', title: 'TARR Analysis', desc: 'Terrain-Aware Range Rings from an IPP using a Lost Person Behavior subject profile.' },
-    { key: 'travel-time', title: 'Travel Time', desc: 'Where a subject could reach over time at a given travel speed. No LPB profile needed.' },
+const MODES: { key: Mode; title: string; desc: string; explainer: ContentId; explainerLabel: string }[] = [
+    { key: 'tarr', title: 'TARR Analysis', desc: 'Terrain-Aware Range Rings from an IPP using a Lost Person Behavior subject profile.',
+        explainer: 'tarr-explainer', explainerLabel: 'What’s a TARR?' },
+    { key: 'travel-time', title: 'Travel Time', desc: 'Where a subject could reach over time at a given travel speed. No LPB profile needed.',
+        explainer: 'travel-time-explainer', explainerLabel: 'What’s Travel Time?' },
 ];
 
 const { activeMission } = useIncident();
