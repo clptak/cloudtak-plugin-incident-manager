@@ -1007,6 +1007,7 @@ import type { RingStyle } from '../../../lib/missionFeatures.ts';
 import { ensureMissionFolder, attachFeaturesToFolder } from '../../../lib/folder.ts';
 import { flyToFeature } from '../../../lib/flyToFeature.ts';
 import { openWisarTools } from '../../../lib/wisarTools.ts';
+import { compareWisarAreas, isWisarAreaKey } from '../../../lib/wisarResults.ts';
 import FeatureCallsignCell from '../../FeatureCallsignCell.vue';
 import { areaSqMi, formatSqMi } from '../../../lib/geometryArea.ts';
 import { loadMissionSchema } from '../../../lib/missionSchema.ts';
@@ -1074,6 +1075,8 @@ interface SentArea {
     created: string;
     folder?: string;   // LPB mission folder name from keywords folder:…
     coords?: [number, number]; // IPP [lng, lat] from lat:/lng: keywords
+    /** WiSAR rings: the DataSync the ring was posted to (keyword datasync:…; older entries = MGMT). */
+    datasync?: 'active' | 'mgmt';
 }
 
 type RecallRow =
@@ -1335,6 +1338,7 @@ async function loadAreas(sub?: LoadedSub): Promise<void> {
             const key = kw(log.keywords, 'area:');
             const uuid = kw(log.keywords, 'uid:');
             const folder = kw(log.keywords, 'folder:') || undefined;
+            const datasync = kw(log.keywords, 'datasync:') === 'active' ? 'active' as const : undefined;
             const lat = Number(kw(log.keywords, 'lat:'));
             const lng = Number(kw(log.keywords, 'lng:'));
             const coords: [number, number] | undefined =
@@ -1352,6 +1356,7 @@ async function loadAreas(sub?: LoadedSub): Promise<void> {
                     created,
                     folder,
                     coords,
+                    datasync,
                 });
             }
         }
@@ -1419,6 +1424,7 @@ function rank(key: string): number {
     if (key.startsWith('lpb:')) return 2;
     if (key === 'subjective') return 3;
     if (key === 'deductive') return 4;
+    if (isWisarAreaKey(key)) return 5;
     return 9;
 }
 
@@ -1460,6 +1466,21 @@ const recallRows = computed((): RecallRow[] => {
 
     const deductive = areas.find((a) => a.key === 'deductive');
     if (deductive) rows.push({ kind: 'area', rowKey: deductive.key, area: deductive });
+
+    // Rings sent from WiSAR (Physical – WiSAR card / WiSAR Tools), by folder.
+    const wisarAreas = areas.filter((a) => isWisarAreaKey(a.key)).sort(compareWisarAreas);
+    if (wisarAreas.length) {
+        rows.push({ kind: 'section', rowKey: 'section:wisar', label: 'WiSAR' });
+        let current = '';
+        for (const a of wisarAreas) {
+            const name = a.folder || 'Unfiled';
+            if (name !== current) {
+                rows.push({ kind: 'folder', rowKey: `wisar-folder:${name}`, label: name });
+                current = name;
+            }
+            rows.push({ kind: 'area', rowKey: a.key, area: a, indent: true });
+        }
+    }
 
     // Any unexpected keys (keep visible)
     const known = new Set(rows.filter((r): r is Extract<RecallRow, { kind: 'area' }> => r.kind === 'area').map((r) => r.area.key));
@@ -2194,11 +2215,14 @@ async function removeArea(area: SentArea): Promise<void> {
         await log.delete(area.logId);
         // Best-effort: drop the feature from the mission map. Subjective and
         // Deductive reference user-drawn polygons, so leave those in place.
-        const ownsFeature = area.key === 'theoretical' || area.key.startsWith('lpb:') || area.key === IPP_KEY;
+        const ownsFeature = area.key === 'theoretical' || area.key.startsWith('lpb:') || area.key === IPP_KEY
+            || isWisarAreaKey(area.key);
         if (ownsFeature) {
             try {
-                // Polygons live on the MGMT sync; the IPP point on the common map.
-                const target = area.key === IPP_KEY
+                // Polygons live on the MGMT sync; the IPP point, and WiSAR rings
+                // sent to the active DataSync, on the common map.
+                const onCommon = area.key === IPP_KEY || area.datasync === 'active';
+                const target = onCommon
                     ? { guid: activeMission.value.guid, missionToken: missionAuthToken(activeMission.value) }
                     : planningTarget();
                 await deletePolygonFromMission({
