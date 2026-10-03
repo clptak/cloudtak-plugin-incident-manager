@@ -605,6 +605,16 @@
             </template>
 
             <div>
+                <div class='d-flex align-items-center flex-wrap gap-2 mb-2'>
+                    <span class='small text-muted'>Terrain-aware TARR and Travel Time:</span>
+                    <button
+                        type='button'
+                        class='btn btn-sm btn-outline-primary'
+                        @click='openWisarTools'
+                    >
+                        WiSAR Tools
+                    </button>
+                </div>
                 <p class='text-uppercase text-white-50 small mb-1'>
                     Choose a polygon from the active DataSync
                 </p>
