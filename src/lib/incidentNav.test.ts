@@ -22,6 +22,7 @@ test('search incidents: Initial Response has Investigation / Containment / Searc
         ['Investigation', 'search-urgency'],
         ['Investigation', 'search-scenarios'],
         ['Containment', 'physical-wisar'],
+        ['Containment', 'lpb-distances'],
         ['Search', 'ir-briefing'],
         ['Search', 'incident-post'],
         ['Search', 'resources'],
@@ -29,9 +30,10 @@ test('search incidents: Initial Response has Investigation / Containment / Searc
         ['Search', 'ics-201'],
     ]);
     assert.deepEqual(headings(initial.items), [
-        'Investigation', null, null, null, 'Containment', 'Search', null, null, null, null,
+        'Investigation', null, null, null, 'Containment', null, 'Search', null, null, null, null,
     ]);
     assert.equal(initial.items.find((i) => i.key === 'physical-wisar')?.label, 'Motion Model Tools');
+    assert.equal(initial.items.find((i) => i.key === 'lpb-distances')?.label, 'LPB Distances');
 });
 
 test('non-search incidents: same flat Initial Response list as before, no sub-headings or WiSAR', () => {
@@ -60,6 +62,8 @@ test('Motion Model Tools is a search-only nav key in Initial Response', () => {
     assert.ok(SEARCH_ONLY_NAV_KEYS.has('physical-wisar'));
     assert.equal(sectionKeyForNavItem('physical-wisar'), 'h-initial');
     assert.ok(ALL_NAV_ITEMS.some((i) => i.key === 'physical-wisar'));
+    assert.ok(SEARCH_ONLY_NAV_KEYS.has('lpb-distances'));
+    assert.equal(sectionKeyForNavItem('lpb-distances'), 'h-initial');
 });
 
 test('navGroupHeading handles ungrouped items and bounds', () => {

@@ -61,6 +61,7 @@ const VALID_NAV_KEYS = new Set([
     'ics-201',
     'search-scenarios',
     'physical-wisar',
+    'lpb-distances',
     'search-area',
     'segmentation',
     'initial-consensus',
@@ -70,9 +71,6 @@ const VALID_NAV_KEYS = new Set([
 ]);
 
 const VALID_HTAB_KEYS = new Set(['main', 'dashboard', 'task', 'clues', 'casie', 'organization', 'risk-assessment']);
-
-/** One-shot signal: open Motion Model Tools with the LPB Distances card expanded. */
-const lpbDistancesRequested = ref(false);
 
 function loadNavFromSession(): PaneNavState {
     try {
@@ -113,11 +111,10 @@ function loadNavFromSession(): PaneNavState {
             key = 'create-open';
             if (htab === 'main') htab = 'clues';
         }
-        // LPB distance table moved from its horizontal tab onto Motion Model Tools.
+        // LPB distance table moved from its horizontal tab into Containment on Main.
         if (htab === 'lpb') {
             htab = 'main';
-            key = 'physical-wisar';
-            lpbDistancesRequested.value = true;
+            key = 'lpb-distances';
         }
         return {
             activeKey: VALID_NAV_KEYS.has(key) ? key : 'create-open',
@@ -386,7 +383,6 @@ export function useIncident() {
         activeKey,
         activeHTab,
         casieExpandRequested,
-        lpbDistancesRequested,
         noMissionModalOpen,
         isSearchIncident,
         isSearchMission,
