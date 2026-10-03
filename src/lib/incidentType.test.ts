@@ -52,7 +52,7 @@ test('incident stem treats OP DataSyncs as the same incident', () => {
 });
 
 test('search-only key sets cover the planned chrome', () => {
-    for (const key of ['search-urgency', 'search-scenarios', 'physical-wisar', 'search-area', 'segmentation', 'initial-consensus']) {
+    for (const key of ['search-urgency', 'search-scenarios', 'physical-wisar', 'lpb-distances', 'search-area', 'segmentation', 'initial-consensus']) {
         assert.ok(SEARCH_ONLY_NAV_KEYS.has(key), key);
     }
     for (const key of ['task', 'clues', 'casie']) {
@@ -67,6 +67,6 @@ test('operational periods are available to every incident type', () => {
     // they are gated inside the pane, not by hiding it.
     assert.ok(!SEARCH_ONLY_NAV_KEYS.has('operational-periods'));
     assert.ok(SEARCH_ONLY_HTAB_KEYS.has('casie'), 'the rollup itself stays search-only');
-    assert.ok(!SEARCH_ONLY_HTAB_KEYS.has('lpb'), 'LPB distances moved onto Motion Model Tools');
-    assert.ok(SEARCH_ONLY_NAV_KEYS.has('physical-wisar'), 'LPB distances stay search-only via Motion Model Tools');
+    assert.ok(!SEARCH_ONLY_HTAB_KEYS.has('lpb'), 'LPB distances is a Main nav item');
+    assert.ok(SEARCH_ONLY_NAV_KEYS.has('lpb-distances'), 'LPB distances stays search-only');
 });

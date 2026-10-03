@@ -5,6 +5,7 @@ export const SEARCH_ONLY_NAV_KEYS = new Set<string>([
     'search-urgency',
     'search-scenarios',
     'physical-wisar',
+    'lpb-distances',
     'search-area',
     'segmentation',
     'initial-consensus',

@@ -14,6 +14,7 @@
         <Ics201 v-else-if='sub === "ics-201"' />
         <SearchScenarios v-else-if='sub === "search-scenarios"' />
         <PhysicalWisar v-else-if='sub === "physical-wisar"' />
+        <LpbTab v-else-if='sub === "lpb-distances"' />
         <RiskAssessment v-else-if='sub === "risk-assessment"' />
         <IncidentPost v-else-if='sub === "incident-post"' />
         <AreaSearch v-else-if='sub === "operational-periods"' />
@@ -46,6 +47,7 @@ const IrBriefing = defineAsyncComponent(() => import('./logger/IrBriefing.vue'))
 const Ics201 = defineAsyncComponent(() => import('./logger/Ics201.vue'));
 const SearchScenarios = defineAsyncComponent(() => import('./logger/SearchScenarios.vue'));
 const PhysicalWisar = defineAsyncComponent(() => import('./logger/PhysicalWisar.vue'));
+const LpbTab = defineAsyncComponent(() => import('./LpbTab.vue'));
 const RiskAssessment = defineAsyncComponent(() => import('./logger/RiskAssessment.vue'));
 const IncidentPost = defineAsyncComponent(() => import('./logger/IncidentPost.vue'));
 const AreaSearch = defineAsyncComponent(() => import('./logger/AreaSearch.vue'));
@@ -63,6 +65,7 @@ const labels: Record<string, string> = {
     'ics-201': 'ICS 201',
     'search-scenarios': 'Search Scenarios',
     'physical-wisar': 'Motion Model Tools',
+    'lpb-distances': 'LPB Distances',
     'risk-assessment': 'Risk Assessment',
     'incident-post': 'Incident POST',
     'operational-periods': 'Operational Periods',
