@@ -41,10 +41,11 @@
                 v-for='p in SPEED_PRESETS'
                 :key='p.label'
                 type='button'
-                class='btn btn-sm btn-outline-secondary wisar-preset'
+                class='btn btn-sm btn-outline-secondary wisar-preset d-flex flex-column align-items-center'
                 @click='applyPreset(p.mph)'
             >
-                {{ p.mph.toFixed(1) }} mph<br><span class='small text-muted'>{{ p.label }}</span>
+                <span class='fw-bold'>{{ p.mph.toFixed(1) }} mph</span>
+                <span class='small text-muted fw-normal'>{{ p.label }}</span>
             </button>
         </div>
 
