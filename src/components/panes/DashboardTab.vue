@@ -873,7 +873,7 @@ watch(activeMission, (m) => {
 }
 
 .dashboard-log-col-time {
-    width: 12%;
+    width: 11rem;
 }
 
 .dashboard-log-col-entry {

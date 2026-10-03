@@ -38,10 +38,16 @@ const LOCAL_TIME_OPTS: Intl.DateTimeFormatOptions = {
     timeStyle: 'short',
 };
 
-/** Format a log timestamp in the browser's local timezone. */
+function pad2(n: number): string {
+    return String(n).padStart(2, '0');
+}
+
+/** Format a log timestamp in the browser's local timezone as `YYYY-MM-DD HH:mm`. */
 export function formatLocalTime(epoch: number, raw?: string): string {
     if (epoch > 0) {
-        return new Date(epoch).toLocaleString(undefined, LOCAL_TIME_OPTS);
+        const d = new Date(epoch);
+        const date = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+        return `${date} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
     }
     if (raw) return raw;
     return '';
