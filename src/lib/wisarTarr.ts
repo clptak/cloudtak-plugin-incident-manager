@@ -18,19 +18,22 @@ export type TarrSource = 'arizona' | 'koester';
 /** Label for the "no eco region / terrain" choice, as in the web tool. */
 export const OTHER_DEFAULT = 'Other/Default';
 
-/** The parts of an IM LPB table row the TARR form uses (25/50/75 % in miles). */
+/** The parts of an IM LPB table row the TARR form uses (25/50/75/90 % in miles). */
 export interface ArizonaRow {
     category: string;
     cases: number;
     qAmi: number;
     qBmi: number;
     qCmi: number;
+    qDmi: number;
 }
 
 export interface Percentiles {
     p25: number;
     p50: number;
     p75: number;
+    /** Arizona 90% (`qDmi`). Shown and editable; not sent to WiSAR. */
+    p90?: number;
 }
 
 /** Why an Arizona row can't be sent to WiSAR, or null. */
@@ -41,7 +44,7 @@ export function arizonaRowProblem(row: ArizonaRow): string | null {
 }
 
 export function arizonaPercentiles(row: ArizonaRow): Percentiles {
-    return { p25: row.qAmi, p50: row.qBmi, p75: row.qCmi };
+    return { p25: row.qAmi, p50: row.qBmi, p75: row.qCmi, p90: row.qDmi };
 }
 
 // ---- Koester (WiSAR /profiles) ---------------------------------------------
@@ -154,7 +157,12 @@ export function tarrRequest(ipp: { lat: number; lon: number }, state: TarrFormSt
         subject: {
             kind: 'custom',
             name: `${state.category} (${suffix})`.slice(0, 80),
-            distances: { ...values, unit: sourceUnit(state.source) },
+            distances: {
+                p25: values.p25,
+                p50: values.p50,
+                p75: values.p75,
+                unit: sourceUnit(state.source),
+            },
         },
         calibration,
     };

@@ -129,9 +129,9 @@
         </div>
         <div class='row g-2'>
             <div
-                v-for='k in KEYS'
+                v-for='k in percentileKeys'
                 :key='k'
-                class='col-4'
+                :class='source === "arizona" ? "col-3" : "col-4"'
             >
                 <label class='form-label small mb-0'>{{ k.slice(1) }}th %</label>
                 <input
@@ -239,7 +239,7 @@ const emit = defineEmits<{
     result: [job: Job];
 }>();
 
-const KEYS = ['p25', 'p50', 'p75'] as const;
+type PercentileKey = 'p25' | 'p50' | 'p75' | 'p90';
 
 const { lpbTable } = usePluginSettings();
 const { client } = useWisar();
@@ -271,6 +271,9 @@ const ecos = computed(() => ecoOptions(koesterCategory.value));
 const terrains = computed(() => terrainOptions(koesterCategory.value, eco.value));
 const calibration = computed(() => categoryCalibration(dataset.value, koesterCategory.value));
 const unit = computed(() => sourceUnit(source.value));
+const percentileKeys = computed((): PercentileKey[] => (
+    source.value === 'arizona' ? ['p25', 'p50', 'p75', 'p90'] : ['p25', 'p50', 'p75']
+));
 const globalLabel = computed(() => {
     const m = dataset.value?.default_calibration;
     return m ? `${m.m25.toFixed(2)} / ${m.m50.toFixed(2)} / ${m.m75.toFixed(2)}` : '1.05 / 1.35 / 1.80';
@@ -350,7 +353,7 @@ function toggleEdit(): void {
     edited.value = edited.value ? null : { ...(baseValues.value ?? { p25: 0, p50: 0, p75: 0 }) };
 }
 
-function onEdit(key: typeof KEYS[number], text: string): void {
+function onEdit(key: PercentileKey, text: string): void {
     if (!edited.value) return;
     edited.value = { ...edited.value, [key]: Number(text) };
 }

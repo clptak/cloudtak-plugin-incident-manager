@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import type { ProfileDataset } from './wisar.ts';
 import {
     OTHER_DEFAULT,
+    arizonaPercentiles,
     arizonaRowProblem,
     categoryCalibration,
     ecoOptions,
@@ -87,6 +88,18 @@ test('Koester unedited → listed subject with auto calibration', () => {
         dataset: 'koester',
         subject: { kind: 'listed', category: 'Hiker', eco_region: 'Dry', terrain: 'Mountainous' },
         calibration: 'auto',
+    });
+});
+
+test('Arizona percentiles include the 90% table distance, and the job omits it', () => {
+    const row = { category: 'Hiker', cases: 10, qAmi: 0.9, qBmi: 1.9, qCmi: 3.5, qDmi: 8.2 };
+    assert.deepEqual(arizonaPercentiles(row), { p25: 0.9, p50: 1.9, p75: 3.5, p90: 8.2 });
+    const az = state({ source: 'arizona', category: 'Hiker', eco: null, terrain: null });
+    const sent = tarrRequest(IPP, az, arizonaPercentiles(row));
+    assert.deepEqual(sent.subject, {
+        kind: 'custom',
+        name: 'Hiker (AZ)',
+        distances: { p25: 0.9, p50: 1.9, p75: 3.5, unit: 'mi' },
     });
 });
 
