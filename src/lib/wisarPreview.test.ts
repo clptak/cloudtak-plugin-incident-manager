@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { ContourCollection } from './wisar.ts';
-import { PREVIEW_FILL, PREVIEW_LINE, PREVIEW_SOURCE, clearPreview, showPreview, type PreviewMap } from './wisarPreview.ts';
+import { PREVIEW_FILL, PREVIEW_LINE, PREVIEW_SOURCE, clearPreview, previewSourceId, showPreview, type PreviewMap } from './wisarPreview.ts';
 
 function fakeMap() {
     const sources = new Map<string, unknown>();
@@ -36,4 +36,18 @@ test('showPreview adds one source and two layers, fits, and can be repeated', ()
     clearPreview(m.map);
     assert.equal(m.sources.size + m.layers.size, 0);
     clearPreview(m.map); // no-op when already clear
+});
+
+test('two panels keep separate previews; clearing one leaves the other', () => {
+    const m = fakeMap();
+    const card = previewSourceId();
+    const pane = previewSourceId();
+    assert.notEqual(card, pane);
+    showPreview(m.map, FC, { source: card });
+    showPreview(m.map, FC, { source: pane, fit: false });
+    assert.deepEqual([...m.sources.keys()].sort(), [card, pane].sort());
+    assert.equal(m.layers.size, 4);
+    clearPreview(m.map, card);
+    assert.deepEqual([...m.sources.keys()], [pane]);
+    assert.deepEqual([...m.layers.keys()].sort(), [`${pane}-fill`, `${pane}-line`].sort());
 });
