@@ -111,6 +111,43 @@
                 {{ addStatus }}
             </div>
 
+            <template v-if='overlays'>
+                <p class='text-uppercase text-white-50 small mb-1 mt-3'>
+                    Map Layers
+                </p>
+                <div
+                    v-if='!overlays.length'
+                    class='small text-muted'
+                >
+                    No map layers were drawn for this run.
+                </div>
+                <template v-else>
+                    <div
+                        v-for='o in overlays'
+                        :key='o.id'
+                        class='d-flex flex-wrap align-items-center gap-2 small mb-1'
+                    >
+                        <button
+                            type='button'
+                            class='btn btn-sm'
+                            :class='overlayOn(o.id) ? "btn-primary" : "btn-outline-secondary"'
+                            :disabled='overlayBusy(o.id)'
+                            @click='toggleOverlay(o)'
+                        >
+                            {{ overlayBusy(o.id) ? 'Loading…' : overlayOn(o.id) ? 'Hide preview' : 'Preview' }}
+                        </button>
+                        <span>{{ o.title }}</span>
+                        <span
+                            v-if='overlayError(o.id)'
+                            class='text-danger'
+                        >{{ overlayError(o.id) }}</span>
+                    </div>
+                    <div class='form-text mt-0'>
+                        Previews are temporary and only on your map, drawn like the WiSAR web tool's layers.
+                    </div>
+                </template>
+            </template>
+
             <p class='text-uppercase text-white-50 small mb-1 mt-3'>
                 Download Raw Data
             </p>
@@ -151,6 +188,7 @@ import { useWisar } from '../../composables/useWisar.ts';
 import { describeSave, saveGeneratedFile } from '../../lib/fileTarget.ts';
 import { addContoursToDataSync } from '../../lib/wisarDataSync.ts';
 import { clearPreview, previewSourceId, showPreview, type PreviewMap } from '../../lib/wisarPreview.ts';
+import { OVERLAY_OPACITY, clearOverlay, overlaySourceId, showOverlay, type OverlayMap } from '../../lib/wisarOverlays.ts';
 import {
     OUTPUT_LABELS,
     contourKey,
@@ -159,7 +197,7 @@ import {
     sortedContours,
     type DataSyncTarget,
 } from '../../lib/wisarResults.ts';
-import type { ContourCollection, Job, OutputName } from '../../lib/wisar.ts';
+import type { ContourCollection, Job, OutputName, Overlay } from '../../lib/wisar.ts';
 
 const props = defineProps<{
     /** A succeeded Travel Time or TARR job. */
@@ -176,6 +214,60 @@ const loadError = ref('');
 const previewOn = ref(false);
 /** This panel's own preview layer, separate from any other results panel. */
 const previewSource = previewSourceId();
+
+/** Colored map layers WiSAR drew for this job (1.1.0+); null on an older WiSAR. */
+const overlays = computed<Overlay[] | null>(() => props.job.result?.overlays ?? null);
+const overlayState = ref<Record<string, { on: boolean; busy: boolean; error: string }>>({});
+const overlayUrls = new Map<string, string>();
+
+function overlayOn(id: string): boolean { return !!overlayState.value[id]?.on; }
+function overlayBusy(id: string): boolean { return !!overlayState.value[id]?.busy; }
+function overlayError(id: string): string { return overlayState.value[id]?.error ?? ''; }
+
+function overlayMap(): OverlayMap | null {
+    return (mapStore.map as unknown as OverlayMap | undefined) ?? null;
+}
+
+function hideOverlay(id: string): void {
+    const m = overlayMap();
+    if (m) clearOverlay(m, overlaySourceId(previewSource, id));
+    const url = overlayUrls.get(id);
+    if (url) URL.revokeObjectURL(url);
+    overlayUrls.delete(id);
+    overlayState.value = { ...overlayState.value, [id]: { on: false, busy: false, error: '' } };
+}
+
+function hideAllOverlays(): void {
+    for (const id of Object.keys(overlayState.value)) hideOverlay(id);
+    overlayState.value = {};
+}
+
+/** Preview: fetch the layer's PNG with the CloudTAK token and draw it under the contours. */
+async function toggleOverlay(o: Overlay): Promise<void> {
+    if (overlayOn(o.id)) {
+        hideOverlay(o.id);
+        return;
+    }
+    const m = overlayMap();
+    if (!m) return;
+    const jobId = props.job.id;
+    overlayState.value = { ...overlayState.value, [o.id]: { on: false, busy: true, error: '' } };
+    try {
+        const { blob } = await client.value.output(props.job, o.png);
+        if (props.job.id !== jobId) return; // a new run replaced this one meanwhile
+        const url = URL.createObjectURL(blob);
+        overlayUrls.set(o.id, url);
+        showOverlay(m, overlaySourceId(previewSource, o.id), url, o.bounds, {
+            opacity: OVERLAY_OPACITY,
+            beforeId: `${previewSource}-fill`,
+        });
+        overlayState.value = { ...overlayState.value, [o.id]: { on: true, busy: false, error: '' } };
+    } catch (err) {
+        overlayState.value = { ...overlayState.value, [o.id]: {
+            on: false, busy: false, error: err instanceof Error ? err.message : String(err),
+        } };
+    }
+}
 /** Contours checked for preview and DataSync (all, after each run). */
 const selected = ref<Set<string>>(new Set());
 const target = ref<DataSyncTarget>('active');
@@ -225,6 +317,7 @@ function togglePreview(): void {
 
 async function load(): Promise<void> {
     setPreview(false);
+    hideAllOverlays();
     contours.value = null;
     loadError.value = '';
     addStatus.value = '';
@@ -287,6 +380,7 @@ watch(() => props.job.id, () => { void load(); }, { immediate: true });
 
 onBeforeUnmount(() => {
     setPreview(false);
+    hideAllOverlays();
 });
 </script>
 
