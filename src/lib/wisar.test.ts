@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import {
     CONTENT_IDS,
     OUTPUT_NAMES,
+    OVERLAY_IDS,
     WISAR_SPEC_VERSION,
     WisarError,
     checkWisarConnection,
@@ -254,7 +255,7 @@ test('content fetches a section by id', async () => {
 
 // ---- connection check ------------------------------------------------------
 
-const HEALTH = { status: 'ok', version: '1.0.0-draft', auth: 'cloudtak', queue: {},
+const HEALTH = { status: 'ok', version: WISAR_SPEC_VERSION, auth: 'cloudtak', queue: {},
     snapshots: { osm: { available: true, age_days: 1 } } };
 
 function checkClient(health: Response | (() => never), profiles?: Response) {
@@ -271,14 +272,14 @@ function checkClient(health: Response | (() => never), profiles?: Response) {
 test('checkWisarConnection: ok', async () => {
     const r = await checkWisarConnection(checkClient(jsonResponse(HEALTH), jsonResponse({ datasets: [], default_dataset: 'koester' })));
     assert.equal(r.status, 'ok');
-    assert.match(r.message, /Connected to WiSAR 1\.0\.0-draft at https:\/\/w\.example\.org/);
+    assert.match(r.message, /Connected to WiSAR 1\.1\.0-draft at https:\/\/w\.example\.org/);
 });
 
 test('checkWisarConnection: degraded on missing snapshots or version mismatch', async () => {
     const h = { ...HEALTH, status: 'degraded', version: '2.0.0', snapshots: { nhd: { available: false, age_days: null } } };
     const r = await checkWisarConnection(checkClient(jsonResponse(h), jsonResponse({ datasets: [], default_dataset: 'k' })));
     assert.equal(r.status, 'degraded');
-    assert.match(r.message, /built for 1\.0\.0-draft/);
+    assert.match(r.message, /built for 1\.1\.0-draft/);
     assert.match(r.message, /Missing data snapshots: nhd/);
 });
 
@@ -315,6 +316,9 @@ test('drift: client matches WiSAR openapi.json', { skip }, () => {
     assert.deepEqual([...CONTENT_IDS].sort(), [...s.Content.properties.id.enum].sort());
     assert.deepEqual(s.JobStatus.enum, ['queued', 'running', 'succeeded', 'failed']);
     assert.deepEqual(s.JobType.enum, ['tarr', 'travel_time']);
+    assert.deepEqual([...OVERLAY_IDS].sort(), [...s.Overlay.properties.id.enum].sort());
+    assert.deepEqual(Object.keys(s.Overlay.properties).sort(), ['bounds', 'geotiff', 'id', 'png', 'title']);
+    assert.ok(s.JobResult.properties.overlays, 'JobResult.overlays');
     assert.deepEqual(s.Calibration.enum, ['auto', 'global', 'none']);
     assert.deepEqual(s.Speed.properties.unit.enum, ['mph', 'kmh']);
     assert.deepEqual(s.Distances.properties.unit.enum, ['km', 'mi']);

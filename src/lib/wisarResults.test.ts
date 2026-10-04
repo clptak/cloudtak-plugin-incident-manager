@@ -78,8 +78,9 @@ test('contourBounds and sortedContours', () => {
     assert.equal(contourBounds({ type: 'FeatureCollection', features: [] }), null);
 });
 
-test('every API output has a download label', () => {
-    assert.deepEqual(OUTPUT_LABELS.map((o) => o.name).sort(), [...OUTPUT_NAMES].sort());
+test('every API data output has a download label; overlays are map layers, not downloads', () => {
+    const data = OUTPUT_NAMES.filter((n) => !n.startsWith('overlay-'));
+    assert.deepEqual(OUTPUT_LABELS.map((o) => o.name).sort(), [...data].sort());
 });
 
 test('selectContours keeps only the chosen contours', () => {
