@@ -22,13 +22,15 @@ test('image corners run top-left, top-right, bottom-right, bottom-left', () => {
     assert.deepEqual(imageCoordinates(B), [[-112, 35.1], [-111.9, 35.1], [-111.9, 35], [-112, 35]]);
 });
 
-test('showOverlay adds one image source and one raster layer at 60%, repeatable, then clears', () => {
+test('showOverlay adds one static canvas source and one raster layer at 60%, repeatable, then clears', () => {
     const m = fakeMap();
     const src = overlaySourceId('im-wisar-preview-1', 'attractor');
     assert.equal(src, 'im-wisar-preview-1-overlay-attractor');
-    showOverlay(m.map, src, 'blob:a', B);
-    showOverlay(m.map, src, 'blob:b', B);
-    assert.deepEqual(m.sources.get(src), { type: 'image', url: 'blob:b', coordinates: imageCoordinates(B) });
+    const canvasA = { id: 'a' };
+    const canvasB = { id: 'b' };
+    showOverlay(m.map, src, canvasA, B);
+    showOverlay(m.map, src, canvasB, B);
+    assert.deepEqual(m.sources.get(src), { type: 'canvas', canvas: canvasB, animate: false, coordinates: imageCoordinates(B) });
     assert.equal(m.layers.length, 1);
     assert.equal((m.layers[0].layer.paint as Record<string, number>)['raster-opacity'], OVERLAY_OPACITY);
     assert.equal(OVERLAY_OPACITY, 0.6);
@@ -39,9 +41,9 @@ test('showOverlay adds one image source and one raster layer at 60%, repeatable,
 
 test('the raster goes under the contour preview when it is on the map', () => {
     const m = fakeMap(['panel-fill']);
-    showOverlay(m.map, 's', 'blob:a', B, { beforeId: 'panel-fill' });
+    showOverlay(m.map, 's', {}, B, { beforeId: 'panel-fill' });
     assert.equal(m.layers[1].before, 'panel-fill');
     const n = fakeMap();
-    showOverlay(n.map, 's', 'blob:a', B, { beforeId: 'panel-fill' });
+    showOverlay(n.map, 's', {}, B, { beforeId: 'panel-fill' });
     assert.equal(n.layers[0].before, undefined);
 });

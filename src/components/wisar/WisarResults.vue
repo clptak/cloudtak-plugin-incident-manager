@@ -235,7 +235,6 @@ const previewSource = previewSourceId();
 /** Colored map layers WiSAR drew for this job (1.1.0+); null on an older WiSAR. */
 const overlays = computed<Overlay[] | null>(() => props.job.result?.overlays ?? null);
 const overlayState = ref<Record<string, { on: boolean; busy: boolean; error: string }>>({});
-const overlayUrls = new Map<string, string>();
 
 function overlayOn(id: string): boolean { return !!overlayState.value[id]?.on; }
 function overlayBusy(id: string): boolean { return !!overlayState.value[id]?.busy; }
@@ -248,9 +247,6 @@ function overlayMap(): OverlayMap | null {
 function hideOverlay(id: string): void {
     const m = overlayMap();
     if (m) clearOverlay(m, overlaySourceId(previewSource, id));
-    const url = overlayUrls.get(id);
-    if (url) URL.revokeObjectURL(url);
-    overlayUrls.delete(id);
     overlayState.value = { ...overlayState.value, [id]: { on: false, busy: false, error: '' } };
 }
 
@@ -311,6 +307,19 @@ function stopKeeps(): void {
     keepState.value = {};
 }
 
+/** The PNG decoded onto an off-screen canvas: no request, so CloudTAK's CSP can't block it. */
+async function pngCanvas(blob: Blob): Promise<HTMLCanvasElement> {
+    const bitmap = await createImageBitmap(blob);
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('This browser cannot draw the preview.');
+    ctx.drawImage(bitmap, 0, 0);
+    bitmap.close();
+    return canvas;
+}
+
 /** Preview: fetch the layer's PNG with the CloudTAK token and draw it under the contours. */
 async function toggleOverlay(o: Overlay): Promise<void> {
     if (overlayOn(o.id)) {
@@ -323,10 +332,9 @@ async function toggleOverlay(o: Overlay): Promise<void> {
     overlayState.value = { ...overlayState.value, [o.id]: { on: false, busy: true, error: '' } };
     try {
         const { blob } = await client.value.output(props.job, o.png);
+        const canvas = await pngCanvas(blob);
         if (props.job.id !== jobId) return; // a new run replaced this one meanwhile
-        const url = URL.createObjectURL(blob);
-        overlayUrls.set(o.id, url);
-        showOverlay(m, overlaySourceId(previewSource, o.id), url, o.bounds, {
+        showOverlay(m, overlaySourceId(previewSource, o.id), canvas, o.bounds, {
             opacity: OVERLAY_OPACITY,
             beforeId: `${previewSource}-fill`,
         });

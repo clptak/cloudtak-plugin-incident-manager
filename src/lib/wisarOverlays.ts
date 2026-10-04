@@ -1,8 +1,16 @@
 /**
  * Temporary map preview of WiSAR's colored overlays (item 5, Paul
  * 2026-10-04): a PNG from the job (overlay-*.png, fetched with the CloudTAK
- * token) drawn as a MapLibre image source over the overlay's bounds, at the
- * web tool's 60% opacity. Nothing is written to the mission or the profile.
+ * token), decoded in the browser onto a canvas and drawn as a MapLibre
+ * canvas source over the overlay's bounds, at the web tool's 60% opacity.
+ * Nothing is written to the mission or the profile.
+ *
+ * Why a canvas and not an image source with a blob: URL: MapLibre loads image
+ * sources with fetch(), and CloudTAK's Content-Security-Policy connect-src
+ * does not allow blob: (only img-src does), so on a deployed CloudTAK the
+ * preview never appeared; dev on localhost has no CSP. A canvas needs no
+ * request at all.
+ *
  * Takes any MapLibre-like map so it can be tested without CloudTAK.
  */
 import type { Bounds } from './wisar.ts';
@@ -36,19 +44,19 @@ export function clearOverlay(map: OverlayMap, source: string): void {
 }
 
 /**
- * Draw `url` (a PNG; a blob: URL from the authenticated download) over
- * `bounds`. Placed under `beforeId` when that layer exists, so the panel's
- * contour preview stays on top of the raster.
+ * Draw `canvas` (the decoded PNG) over `bounds`. Placed under `beforeId`
+ * when that layer exists, so the panel's contour preview stays on top of
+ * the raster.
  */
 export function showOverlay(
     map: OverlayMap,
     source: string,
-    url: string,
+    canvas: unknown,
     bounds: Bounds,
     opts: { opacity?: number; beforeId?: string } = {},
 ): void {
     clearOverlay(map, source);
-    map.addSource(source, { type: 'image', url, coordinates: imageCoordinates(bounds) });
+    map.addSource(source, { type: 'canvas', canvas, animate: false, coordinates: imageCoordinates(bounds) });
     const before = opts.beforeId && map.getLayer(opts.beforeId) ? opts.beforeId : undefined;
     map.addLayer({
         id: `${source}-raster`,
