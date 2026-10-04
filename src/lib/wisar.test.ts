@@ -322,6 +322,8 @@ test('drift: client matches WiSAR openapi.json', { skip }, () => {
     assert.deepEqual(s.Calibration.enum, ['auto', 'global', 'none']);
     assert.deepEqual(s.Speed.properties.unit.enum, ['mph', 'kmh']);
     assert.deepEqual(s.Distances.properties.unit.enum, ['km', 'mi']);
+    assert.deepEqual(Object.keys(s.Distances.properties).sort(), ['p25', 'p50', 'p75', 'p90', 'unit']);
+    assert.deepEqual(s.ContourFeature.properties.properties.properties.percentile.enum, ['25%', '50%', '75%', '90%']);
     assert.deepEqual(Object.keys(s.TarrJobRequest.properties).sort(), ['calibration', 'dataset', 'ipp', 'subject']);
     assert.deepEqual(Object.keys(s.TravelTimeJobRequest.properties).sort(), ['intervals_hours', 'ipp', 'min_radius_m', 'speed']);
     assert.deepEqual(Object.keys(s.ListedSubject.properties).sort(), ['category', 'eco_region', 'kind', 'terrain']);

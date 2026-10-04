@@ -32,7 +32,7 @@ export interface Percentiles {
     p25: number;
     p50: number;
     p75: number;
-    /** Arizona 90% (`qDmi`). Shown and editable; not sent to WiSAR. */
+    /** Arizona 90% (`qDmi`). Sent as p90 when it can form a ring (see p90Status). */
     p90?: number;
 }
 
@@ -95,6 +95,52 @@ export function formatMultipliers(m: Multipliers): string {
     return `×${m.m25.toFixed(2)} / ×${m.m50.toFixed(2)} / ×${m.m75.toFixed(2)}`;
 }
 
+// ---- the Arizona 90% ring --------------------------------------------------
+
+export interface P90Status {
+    /** Value to send as p90; undefined = no 90% ring. */
+    send?: number;
+    /** Note for the form, or null. */
+    note: string | null;
+    /** Show the note as a warning (no ring expected) rather than information. */
+    warn: boolean;
+}
+
+/**
+ * The Arizona 90% ring (Paul, 2026-10-04). Only Arizona sends a 90%. A blank
+ * or zero value, or one not above 75%, is left out and the run goes ahead with
+ * 25/50/75. WiSAR never calibrates p90; with global calibration it drops the
+ * ring when the calibrated 75% reaches it. This predicts that for the form;
+ * WiSAR's `p90` warning in the results is what counts.
+ */
+export function p90Status(
+    state: Pick<TarrFormState, 'source' | 'globalCalibration'>,
+    values: Percentiles | null,
+    m75?: number,
+): P90Status {
+    if (state.source !== 'arizona' || !values) return { note: null, warn: false };
+    const mi = (v: number) => `${v.toFixed(2)} mi`;
+    const p90 = values.p90;
+    if (typeof p90 !== 'number' || !Number.isFinite(p90) || p90 <= 0) {
+        return { note: 'No 90% ring: the 90% distance is blank.', warn: true };
+    }
+    if (!(p90 > values.p75)) {
+        return { note: `No 90% ring: the 90% distance must be greater than 75% (${mi(values.p75)}).`, warn: true };
+    }
+    if (state.globalCalibration && m75) {
+        const cal75 = values.p75 * m75;
+        if (cal75 >= p90) {
+            return {
+                send: p90,
+                note: `No 90% ring expected: calibration moves 75% to ${mi(cal75)}, past the uncalibrated 90% (${mi(p90)}).`,
+                warn: true,
+            };
+        }
+        return { send: p90, note: `The 90% ring isn't calibrated (there is no Coconino 90% multiplier); it stays at ${mi(p90)}.`, warn: false };
+    }
+    return { send: p90, note: null, warn: false };
+}
+
 // ---- request ---------------------------------------------------------------
 
 export interface TarrFormState {
@@ -137,7 +183,8 @@ export function tarrProblem(
 /**
  * The job body. Unedited Koester profiles go as a listed subject so WiSAR
  * applies its Coconino calibration ("auto"); Arizona rows and edited values go
- * as a custom subject, calibrated only when the checkbox is on.
+ * as a custom subject, calibrated only when the checkbox is on. Arizona adds
+ * its 90% distance when it can form a ring (p90Status).
  */
 export function tarrRequest(ipp: { lat: number; lon: number }, state: TarrFormState, values: Percentiles): TarrJobRequest {
     const base = { ipp: { lat: ipp.lat, lon: ipp.lon } };
@@ -151,6 +198,7 @@ export function tarrRequest(ipp: { lat: number; lon: number }, state: TarrFormSt
     }
     const calibration: Calibration = state.globalCalibration ? 'global' : 'none';
     const suffix = state.source === 'arizona' ? (state.edited ? 'AZ, edited' : 'AZ') : 'edited';
+    const p90 = p90Status(state, values).send;
     return {
         ...base,
         ...(state.globalCalibration ? { dataset: state.dataset } : {}),
@@ -161,6 +209,7 @@ export function tarrRequest(ipp: { lat: number; lon: number }, state: TarrFormSt
                 p25: values.p25,
                 p50: values.p50,
                 p75: values.p75,
+                ...(p90 !== undefined ? { p90 } : {}),
                 unit: sourceUnit(state.source),
             },
         },

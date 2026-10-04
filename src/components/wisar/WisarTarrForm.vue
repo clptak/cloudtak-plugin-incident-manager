@@ -166,6 +166,13 @@
             Calibration moves the rings out (×{{ globalLabel }}), so their DataSync labels show the
             calibrated miles, not the values above.
         </div>
+        <div
+            v-if='p90.note'
+            class='form-text'
+            :class='p90.warn ? "text-warning" : ""'
+        >
+            {{ p90.note }}
+        </div>
 
         <div class='d-flex gap-2 mt-3'>
             <button
@@ -220,6 +227,7 @@ import {
     ecoOptions,
     findCategory,
     formatMultipliers,
+    p90Status,
     resolveVariant,
     sourceUnit,
     tarrProblem,
@@ -299,6 +307,7 @@ const formState = computed(() => ({
     edited: edited.value,
     globalCalibration: globalCalibration.value,
 }));
+const p90 = computed(() => p90Status(formState.value, shown.value, dataset.value?.default_calibration?.m75 ?? 1.8));
 const busy = computed(() => ['submitting', 'queued', 'running'].includes(phase.value));
 const problem = computed(() => {
     if (source.value === 'koester' && koesterCategory.value && !shown.value) {
@@ -312,7 +321,8 @@ const resolvedLine = computed(() => {
     if (!r?.multipliers || !r.final_distances_km) return '';
     const f = r.final_distances_km;
     const km = (v: number) => v.toFixed(2);
-    return `Multipliers ${formatMultipliers(r.multipliers)} (${r.calibration_applied}); rings at ${km(f.p25)} / ${km(f.p50)} / ${km(f.p75)} km.`;
+    const p90 = f.p90 !== undefined ? ` / ${km(f.p90)}` : '';
+    return `Multipliers ${formatMultipliers(r.multipliers)} (${r.calibration_applied}); rings at ${km(f.p25)} / ${km(f.p50)} / ${km(f.p75)}${p90} km.`;
 });
 
 function ecoValue(label: string): string | null {

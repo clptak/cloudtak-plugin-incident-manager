@@ -9,6 +9,7 @@ import {
     ecoOptions,
     findCategory,
     formatMultipliers,
+    p90Status,
     resolveVariant,
     tarrProblem,
     tarrRequest,
@@ -92,7 +93,7 @@ test('Koester unedited → listed subject with auto calibration', () => {
     });
 });
 
-test('Arizona percentiles include the 90% table distance, and the job omits it', () => {
+test('Arizona percentiles include the 90% table distance, and the job sends it', () => {
     const row = { category: 'Hiker', cases: 10, qAmi: 0.9, qBmi: 1.9, qCmi: 3.5, qDmi: 8.2 };
     assert.deepEqual(arizonaPercentiles(row), { p25: 0.9, p50: 1.9, p75: 3.5, p90: 8.2 });
     const az = state({ source: 'arizona', category: 'Hiker', eco: null, terrain: null });
@@ -100,8 +101,40 @@ test('Arizona percentiles include the 90% table distance, and the job omits it',
     assert.deepEqual(sent.subject, {
         kind: 'custom',
         name: 'Hiker (AZ)',
-        distances: { p25: 0.9, p50: 1.9, p75: 3.5, unit: 'mi' },
+        distances: { p25: 0.9, p50: 1.9, p75: 3.5, p90: 8.2, unit: 'mi' },
     });
+});
+
+test('a 90% that cannot form a ring is left out and the run goes ahead', () => {
+    const az = state({ source: 'arizona', category: 'Hiker', eco: null, terrain: null });
+    const blank = { ...d(0.9, 1.9, 3.5), p90: 0 };
+    assert.deepEqual(p90Status(az, blank), { note: 'No 90% ring: the 90% distance is blank.', warn: true });
+    assert.deepEqual(p90Status(az, { ...d(0.9, 1.9, 3.5), p90: Number.NaN }).send, undefined);
+    assert.deepEqual(p90Status(az, { ...d(0.9, 1.9, 3.5), p90: 3.5 }),
+        { note: 'No 90% ring: the 90% distance must be greater than 75% (3.50 mi).', warn: true });
+    assert.equal(tarrProblem(IPP, az, blank, undefined), null);
+    const sent = tarrRequest(IPP, az, blank);
+    assert.deepEqual((sent.subject as { distances: object }).distances, { p25: 0.9, p50: 1.9, p75: 3.5, unit: 'mi' });
+});
+
+test('90% with global calibration: never calibrated; predicted drop when calibrated 75% reaches it', () => {
+    const az = state({ source: 'arizona', category: 'Hiker', eco: null, terrain: null, globalCalibration: true });
+    assert.deepEqual(p90Status(az, { ...d(1.2, 2.4, 4.6), p90: 9 }, 1.8),
+        { send: 9, note: "The 90% ring isn't calibrated (there is no Coconino 90% multiplier); it stays at 9.00 mi.", warn: false });
+    assert.deepEqual(p90Status(az, { ...d(1.2, 2.4, 4.6), p90: 5 }, 1.8), {
+        send: 5,
+        note: 'No 90% ring expected: calibration moves 75% to 8.28 mi, past the uncalibrated 90% (5.00 mi).',
+        warn: true,
+    });
+    // still sent: WiSAR decides, and its p90 warning shows in the results
+    const sent = tarrRequest(IPP, az, { ...d(1.2, 2.4, 4.6), p90: 5 });
+    assert.equal((sent.subject as { distances: { p90?: number } }).distances.p90, 5);
+});
+
+test('Koester never sends a 90%', () => {
+    assert.deepEqual(p90Status(state(), { ...d(2, 3, 4), p90: 9 }), { note: null, warn: false });
+    const r = tarrRequest(IPP, state({ edited: { ...d(1, 2, 5), p90: 9 } }), { ...d(1, 2, 5), p90: 9 });
+    assert.equal((r.subject as { distances: { p90?: number } }).distances.p90, undefined);
 });
 
 test('Arizona → custom subject in miles, calibration off by default, global when checked', () => {

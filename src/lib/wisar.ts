@@ -26,7 +26,14 @@ export type JobType = 'tarr' | 'travel_time';
 export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed';
 export type DistanceUnit = 'km' | 'mi';
 
-export interface Distances { p25: number; p50: number; p75: number; unit?: DistanceUnit }
+export interface Distances {
+    p25: number;
+    p50: number;
+    p75: number;
+    /** Optional 90% (custom subjects): WiSAR draws a 4th "90%" ring. Never calibrated; left out of final_distances_km when calibration moves p75 to or past it. */
+    p90?: number;
+    unit?: DistanceUnit;
+}
 
 export interface ListedSubject {
     kind: 'listed';
@@ -161,7 +168,7 @@ export interface ContourProperties {
     remarks: string;
     color: string;
     threshold_m: number;
-    percentile?: '25%' | '50%' | '75%';
+    percentile?: '25%' | '50%' | '75%' | '90%';
     hours?: number;
     label?: string;
     label_lat?: number;
