@@ -13,6 +13,7 @@ import {
     tarrProblem,
     tarrRequest,
     terrainOptions,
+    type ArizonaRow,
     type TarrFormState,
 } from './wisarTarr.ts';
 import azTable from '../data/azlpb_table.json' with { type: 'json' };
@@ -66,11 +67,11 @@ test('calibration line: category-specific or dataset default', () => {
 });
 
 test('Arizona rows WiSAR would reject are blocked with the reason', () => {
-    const rows = azTable as { category: string; cases: number; qAmi: number; qBmi: number; qCmi: number }[];
+    const rows = azTable as ArizonaRow[];
     const missing = rows.find((r) => r.category === 'Aircraft-Missing');
     assert.ok(missing);
     assert.match(arizonaRowProblem(missing!) ?? '', /strictly increasing/);
-    assert.equal(arizonaRowProblem({ category: 'x', cases: 0, qAmi: 0, qBmi: 0, qCmi: 0 }), 'The table has no cases for this category.');
+    assert.equal(arizonaRowProblem({ category: 'x', cases: 0, qAmi: 0, qBmi: 0, qCmi: 0, qDmi: 0 }), 'The table has no cases for this category.');
     const ok = rows.find((r) => r.category === 'Aircraft-Crashed');
     assert.equal(arizonaRowProblem(ok!), null);
 });
