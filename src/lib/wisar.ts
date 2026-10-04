@@ -12,7 +12,7 @@
  * token getter (CloudTAK's getRuntimeToken from src/std.ts).
  */
 
-export const WISAR_SPEC_VERSION = '1.0.0-draft';
+export const WISAR_SPEC_VERSION = '1.1.0-draft';
 
 /** Branch default (decision 3). A per-device override comes from plugin settings. */
 export const WISAR_DEFAULT_URL = 'https://wisar.clpdevtak.com';
@@ -84,6 +84,22 @@ export interface WisarWarning { severity: 'info' | 'warning'; source: string; me
 export interface Bounds { west: number; south: number; east: number; north: number }
 export interface OutputLink { href: string; media_type: string; bytes?: number }
 
+export const OVERLAY_IDS = ['attractor', 'terrain', 'probability'] as const;
+export type OverlayId = typeof OVERLAY_IDS[number];
+
+/**
+ * A colored map layer drawn like the web tool's (1.1.0): `png` is a preview
+ * image to place over `bounds`, `geotiff` the same picture as an RGBA COG
+ * for importing into CloudTAK. Both are output names.
+ */
+export interface Overlay {
+    id: OverlayId;
+    title: string;
+    png: OutputName;
+    geotiff: OutputName;
+    bounds: Bounds;
+}
+
 export interface JobResult {
     bounds: Bounds;
     crs: 'EPSG:4326';
@@ -91,6 +107,8 @@ export interface JobResult {
     grid?: { width?: number; height?: number };
     contour_count?: number;
     warnings: WisarWarning[];
+    /** Absent on a WiSAR older than 1.1.0. */
+    overlays?: Overlay[];
 }
 
 export const OUTPUT_NAMES = [
@@ -100,6 +118,12 @@ export const OUTPUT_NAMES = [
     'cost-surface.tif',
     'attractor-score.tif',
     'probability.tif',
+    'overlay-attractor.png',
+    'overlay-attractor.tif',
+    'overlay-terrain.png',
+    'overlay-terrain.tif',
+    'overlay-probability.png',
+    'overlay-probability.tif',
 ] as const;
 export type OutputName = typeof OUTPUT_NAMES[number];
 
