@@ -136,14 +136,29 @@
                         >
                             {{ overlayBusy(o.id) ? 'Loading…' : overlayOn(o.id) ? 'Hide preview' : 'Preview' }}
                         </button>
+                        <button
+                            v-if='overlayOn(o.id) || keepBusy(o.id)'
+                            type='button'
+                            class='btn btn-sm btn-primary'
+                            :disabled='keepBusy(o.id)'
+                            title='Add it to your CloudTAK Overlays (only you see it)'
+                            @click='keep(o)'
+                        >
+                            {{ keepLabel(o.id) }}
+                        </button>
                         <span>{{ o.title }}</span>
                         <span
                             v-if='overlayError(o.id)'
                             class='text-danger'
                         >{{ overlayError(o.id) }}</span>
+                        <span
+                            v-if='keepMessage(o.id)'
+                            :class='keepState[o.id]?.error ? "text-danger" : "text-success"'
+                        >{{ keepMessage(o.id) }}</span>
                     </div>
                     <div class='form-text mt-0'>
                         Previews are temporary and only on your map, drawn like the WiSAR web tool's layers.
+                        Keep adds a previewed layer to your CloudTAK Overlays (only you see it).
                     </div>
                 </template>
             </template>
@@ -189,6 +204,8 @@ import { describeSave, saveGeneratedFile } from '../../lib/fileTarget.ts';
 import { addContoursToDataSync } from '../../lib/wisarDataSync.ts';
 import { clearPreview, previewSourceId, showPreview, type PreviewMap } from '../../lib/wisarPreview.ts';
 import { OVERLAY_OPACITY, clearOverlay, overlaySourceId, showOverlay, type OverlayMap } from '../../lib/wisarOverlays.ts';
+import { keepOverlay, keptLayerName, type KeepPhase } from '../../lib/wisarKeep.ts';
+import { cloudTakKeepDeps } from '../../composables/wisarKeepDeps.ts';
 import {
     OUTPUT_LABELS,
     contourKey,
@@ -240,6 +257,58 @@ function hideOverlay(id: string): void {
 function hideAllOverlays(): void {
     for (const id of Object.keys(overlayState.value)) hideOverlay(id);
     overlayState.value = {};
+}
+
+/** Keep (5d): per layer, the current step and the result. */
+const keepState = ref<Record<string, { phase: KeepPhase | ''; message: string; error: boolean }>>({});
+const keepAborts = new Map<string, AbortController>();
+const KEEP_LABELS: Record<KeepPhase, string> = {
+    uploading: 'Uploading…', converting: 'Converting…', adding: 'Adding…', done: 'Kept',
+};
+
+function keepBusy(id: string): boolean {
+    const p = keepState.value[id]?.phase;
+    return p === 'uploading' || p === 'converting' || p === 'adding';
+}
+function keepLabel(id: string): string {
+    const p = keepState.value[id]?.phase;
+    return p && p !== 'done' ? KEEP_LABELS[p] : 'Keep';
+}
+function keepMessage(id: string): string { return keepState.value[id]?.message ?? ''; }
+
+/**
+ * Keep: send the layer's RGBA GeoTIFF through CloudTAK Imports and add it to
+ * the user's Overlays once tiled. The temporary preview is then removed.
+ */
+async function keep(o: Overlay): Promise<void> {
+    if (keepBusy(o.id)) return;
+    const ac = new AbortController();
+    keepAborts.set(o.id, ac);
+    const name = keptLayerName(props.job, o.title);
+    const set = (v: { phase: KeepPhase | ''; message: string; error: boolean }) => {
+        keepState.value = { ...keepState.value, [o.id]: v };
+    };
+    set({ phase: 'uploading', message: '', error: false });
+    try {
+        const { blob } = await client.value.output(props.job, o.geotiff);
+        await keepOverlay(cloudTakKeepDeps(), blob, name, {
+            signal: ac.signal,
+            onPhase: (phase) => set({ phase, message: '', error: false }),
+        });
+        set({ phase: 'done', message: `Added to your Overlays as “${name}”.`, error: false });
+        hideOverlay(o.id);
+    } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') return;
+        set({ phase: '', message: err instanceof Error ? err.message : String(err), error: true });
+    } finally {
+        if (keepAborts.get(o.id) === ac) keepAborts.delete(o.id);
+    }
+}
+
+function stopKeeps(): void {
+    for (const ac of keepAborts.values()) ac.abort();
+    keepAborts.clear();
+    keepState.value = {};
 }
 
 /** Preview: fetch the layer's PNG with the CloudTAK token and draw it under the contours. */
@@ -318,6 +387,7 @@ function togglePreview(): void {
 async function load(): Promise<void> {
     setPreview(false);
     hideAllOverlays();
+    stopKeeps();
     contours.value = null;
     loadError.value = '';
     addStatus.value = '';
@@ -381,6 +451,8 @@ watch(() => props.job.id, () => { void load(); }, { immediate: true });
 onBeforeUnmount(() => {
     setPreview(false);
     hideAllOverlays();
+    // A Keep still converting stays in the user's Files; it just isn't added to Overlays
+    stopKeeps();
 });
 </script>
 
