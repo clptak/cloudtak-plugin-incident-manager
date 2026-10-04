@@ -150,7 +150,7 @@ import { useIncident } from '../../composables/useIncident.ts';
 import { useWisar } from '../../composables/useWisar.ts';
 import { describeSave, saveGeneratedFile } from '../../lib/fileTarget.ts';
 import { addContoursToDataSync } from '../../lib/wisarDataSync.ts';
-import { clearPreview, showPreview, type PreviewMap } from '../../lib/wisarPreview.ts';
+import { clearPreview, previewSourceId, showPreview, type PreviewMap } from '../../lib/wisarPreview.ts';
 import {
     OUTPUT_LABELS,
     contourKey,
@@ -174,6 +174,8 @@ const contours = ref<ContourCollection | null>(null);
 const loading = ref(false);
 const loadError = ref('');
 const previewOn = ref(false);
+/** This panel's own preview layer, separate from any other results panel. */
+const previewSource = previewSourceId();
 /** Contours checked for preview and DataSync (all, after each run). */
 const selected = ref<Set<string>>(new Set());
 const target = ref<DataSyncTarget>('active');
@@ -204,8 +206,8 @@ function setPreview(on: boolean, fit = true): void {
     const m = map();
     if (!m) return;
     const fc = chosen();
-    if (on && fc?.features.length) showPreview(m, fc, { fit });
-    else clearPreview(m);
+    if (on && fc?.features.length) showPreview(m, fc, { fit, source: previewSource });
+    else clearPreview(m, previewSource);
     previewOn.value = on && !!fc?.features.length;
 }
 
