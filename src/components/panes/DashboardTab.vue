@@ -546,6 +546,7 @@ import {
     initialInfoDetailRows,
     type IncidentInfoForm,
 } from '../../lib/incidentInfo.ts';
+import { ACTION_201_HASH_KEYWORD, ACTION_201_KEYWORD } from '../../lib/ics201.ts';
 import { loadMissionSchema, resolveIncidentInfoForm } from '../../lib/missionSchema.ts';
 import { loadOrgChartFromMission } from '../../lib/orgChartPersistence.ts';
 import { loadResourceAssignmentsFromMission } from '../../lib/resourceAssignmentPersistence.ts';
@@ -601,6 +602,14 @@ const FILTERS: KeywordFilter[] = [
     { id: 'area', label: 'Search Area', test: (k) => k.includes('search-area') },
     { id: 'segment', label: 'Area Segment', test: (k) => k.some((w) => /^area:segment:/.test(w)) },
     { id: 'post', label: 'Incident POST', test: (k) => k.includes('incident-post') },
+    {
+        id: '201',
+        label: '201',
+        test: (k) => k.some((w) => {
+            const word = w.toLowerCase();
+            return word === ACTION_201_KEYWORD || word === ACTION_201_HASH_KEYWORD;
+        }),
+    },
     // Regex/prefix filters — match any keyword beginning with the token:
     { id: 'objective', label: 'Objectives', test: (k) => k.some((w) => /^objective:/.test(w)) },
     { id: 'strategy', label: 'Strategies', test: (k) => k.some((w) => /^strategy:/.test(w)) },

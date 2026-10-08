@@ -45,6 +45,8 @@ export const PLANNED_KEYWORD = 'planned';
 export const CURRENT_KEYWORD = 'current';
 /** Mission-log keyword for ICS 201 §8 Current/Planned Actions rows. */
 export const ACTION_201_KEYWORD = '201';
+/** ATAK requires a leading # on the same action tag. */
+export const ACTION_201_HASH_KEYWORD = '#201';
 
 export const MAX_ACTION_ROWS = 22;
 export const MAX_RESOURCE_ROWS = 17;
@@ -646,6 +648,12 @@ function hasExactKeyword(keywords: string[], keyword: string): boolean {
     return keywords.some((k) => k.toLowerCase() === target);
 }
 
+/** Exact `201` or ATAK `#201`. Does not match `ics-201`. */
+function hasAction201Keyword(keywords: string[]): boolean {
+    return hasExactKeyword(keywords, ACTION_201_KEYWORD)
+        || hasExactKeyword(keywords, ACTION_201_HASH_KEYWORD);
+}
+
 /** Time cell for §8: date + time from log dtg/created. */
 export function logActionTimeLabel(log: MissionLogLike): string {
     const raw = log.dtg || log.created || '';
@@ -674,7 +682,7 @@ function sortLogsByTime(logs: MissionLogLike[]): MissionLogLike[] {
 
 /**
  * Actions for ICS 201 §8:
- * 1. Mission logs tagged exactly `201` (time = date/timestamp, actions = remarks/content)
+ * 1. Mission logs tagged exactly `201` or `#201` (time = date/timestamp, actions = remarks/content)
  * 2. Logs tagged `planned` / `current`
  * 3. Incident POST: one row per Objective / strategy / tactic line
  */
@@ -697,17 +705,17 @@ export function actionsFromLogsAndPost(
         return rows.length >= capacity;
     };
 
-    // Primary: keyword `201` → Time from log timestamp, Actions from remarks (content).
+    // Primary: keyword `201` or `#201` → Time from log timestamp, Actions from remarks (content).
     for (const log of sortLogsByTime(logs)) {
         const kws = normalizeLogKeywords(log.keywords);
-        if (!hasExactKeyword(kws, ACTION_201_KEYWORD)) continue;
+        if (!hasAction201Keyword(kws)) continue;
         if (pushLogRow(log, logRemarks(log))) return padActions(rows, capacity);
     }
 
     for (const log of sortLogsByTime(logs)) {
         const kws = normalizeLogKeywords(log.keywords);
         // Exact match only — do not treat `ics-201` as `201`.
-        if (hasExactKeyword(kws, ACTION_201_KEYWORD)) continue;
+        if (hasAction201Keyword(kws)) continue;
         if (!hasExactKeyword(kws, PLANNED_KEYWORD) && !hasExactKeyword(kws, CURRENT_KEYWORD)) {
             continue;
         }

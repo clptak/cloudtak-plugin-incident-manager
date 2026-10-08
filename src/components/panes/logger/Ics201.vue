@@ -2,7 +2,7 @@
     <div>
         <p class='text-muted small mb-3'>
             ICS 201 Incident Briefing — auto-filled from Initial Information, mission logs
-            (201 / planned / current / RESOURCES), Risk Assessment strategies/tactics, and IPP weather.
+            (201 / #201 / planned / current / RESOURCES), Risk Assessment strategies/tactics, and IPP weather.
             Save to mission log to persist; generate PDF when ready.
         </p>
 
@@ -360,7 +360,7 @@
                 </span>
             </div>
             <div class='form-text mt-1'>
-                Prefills from mission logs tagged <code>201</code>
+                Prefills from mission logs tagged <code>201</code> or <code>#201</code>
                 (time = log date/timestamp, actions = remarks with line breaks collapsed), then
                 <code>planned</code> / <code>current</code>, then Incident POST as separate
                 Objective / strategy (<code>1.</code>) / tactic (<code>1.1</code>) rows.
