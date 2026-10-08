@@ -1,10 +1,16 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+    applyDeploymentDefaults,
+    deploymentFromConfig,
+    hasDeploymentDefaults,
     parseLpbTable,
     parseLpbTableJson,
     parseStoredPluginSettings,
     parseWisarUrl,
+    resolveDeployment,
+    settingsForStorage,
+    type ResolvedDeployment,
 } from './pluginSettings.ts';
 import {
     DEFAULT_SUBJECT_TYPES,
@@ -214,4 +220,135 @@ test('parseWisarUrl: blank, valid, invalid', () => {
     assert.equal(parseWisarUrl('  '), '');
     assert.equal(parseWisarUrl('http://localhost:8760/'), 'http://localhost:8760');
     assert.equal(parseWisarUrl('ftp://x'), null);
+});
+
+const deployed: ResolvedDeployment = {
+    yourAgency: 'County SAR',
+    searchOpTemplateId: 'tmpl-sar-1',
+    wisarUrl: 'https://wisar.example.org',
+    useD4hAidingAgencies: false,
+    useD4hPersonnel: false,
+    subjectTypes: ['Climber', 'Hiker'],
+    aidingAgencies: ['Forest Service', 'Sheriff'],
+    personnel: [{ id: 1, name: 'Smith, Jane', ref: '42' }],
+    lpbTable: [validLpbRow],
+};
+
+test('resolveDeployment does not throw when no config.local.ts is bundled', () => {
+    const resolved = resolveDeployment();
+    assert.equal(resolved.yourAgency, '');
+    assert.equal(resolved.wisarUrl, '');
+    assert.equal(hasDeploymentDefaults(resolved), false);
+});
+
+test('deploymentFromConfig reads scalars and staged list files', () => {
+    const resolved = deploymentFromConfig({
+        yourAgency: '  County SAR  ',
+        wisarUrl: 'https://wisar.example.org/api/v1/',
+        useD4hPersonnel: false,
+        subjectTypesFile: 'subject-types.json',
+        aidingAgenciesFile: '../secret.json',
+        personnelFile: 'personnel.csv',
+        lpbTableFile: 'missing.json',
+    }, {
+        'subject-types.json': '{ "subjectTypes": ["Child", "Elderly"] }',
+        'secret.json': '["Nope"]',
+        'personnel.csv': 'id,name,callsign\n7,Ada Lovelace,ADA\n',
+        'bad-lpb.json': '{ "category": "Nope" }',
+    });
+    assert.equal(resolved.yourAgency, 'County SAR');
+    assert.equal(resolved.wisarUrl, 'https://wisar.example.org');
+    assert.equal(resolved.useD4hPersonnel, false);
+    assert.equal(resolved.useD4hAidingAgencies, undefined);
+    assert.deepEqual(resolved.subjectTypes, ['Child', 'Elderly']);
+    assert.equal(resolved.aidingAgencies, undefined);
+    assert.deepEqual(resolved.personnel, [{ id: 7, name: 'Ada Lovelace', callsign: 'ADA' }]);
+    assert.equal(resolved.lpbTable, undefined);
+});
+
+test('deploymentFromConfig ignores an invalid staged file', () => {
+    const resolved = deploymentFromConfig({
+        lpbTableFile: 'lpb.json',
+    }, {
+        'lpb.json': '{ "category": "Nope" }',
+    });
+    assert.equal(resolved.lpbTable, undefined);
+});
+
+test('applyDeploymentDefaults fills blanks from deployment and lets saved values win', () => {
+    const fresh = applyDeploymentDefaults(null, deployed);
+    assert.equal(fresh.yourAgency, 'County SAR');
+    assert.equal(fresh.useD4hAidingAgencies, false);
+    assert.deepEqual(fresh.subjectTypes, ['Climber', 'Hiker']);
+    assert.equal(fresh.lpbTable?.[0].category, 'Hiker');
+
+    const overridden = applyDeploymentDefaults({
+        yourAgency: '  Other SAR  ',
+        searchOpTemplateId: '',
+        wisarUrl: '',
+        useD4hAidingAgencies: true,
+        aidingAgencies: [],
+        personnel: [],
+        lpbTable: null,
+    }, deployed);
+    assert.equal(overridden.yourAgency, 'Other SAR');
+    assert.equal(overridden.searchOpTemplateId, 'tmpl-sar-1');
+    assert.equal(overridden.wisarUrl, 'https://wisar.example.org');
+    assert.equal(overridden.useD4hAidingAgencies, true);
+    assert.equal(overridden.useD4hPersonnel, false);
+    assert.deepEqual(overridden.aidingAgencies, []);
+    assert.deepEqual(overridden.personnel, []);
+    assert.equal(overridden.lpbTable, null);
+    assert.deepEqual(overridden.subjectTypes, ['Climber', 'Hiker']);
+});
+
+test('settingsForStorage drops strings and lists that match deployment', () => {
+    const settings = applyDeploymentDefaults(null, deployed);
+    const stored = settingsForStorage(settings, deployed);
+    assert.equal(stored.yourAgency, '');
+    assert.equal(stored.searchOpTemplateId, '');
+    assert.equal(stored.wisarUrl, '');
+    assert.equal(stored.useD4hAidingAgencies, false);
+    assert.equal('subjectTypes' in stored, false);
+    assert.equal('aidingAgencies' in stored, false);
+    assert.equal('personnel' in stored, false);
+    assert.equal('lpbTable' in stored, false);
+
+    const custom = settingsForStorage({
+        ...settings,
+        yourAgency: 'Other SAR',
+        lpbTable: null,
+    }, deployed);
+    assert.equal(custom.yourAgency, 'Other SAR');
+    assert.equal(custom.lpbTable, null);
+});
+
+test('omitted storage keys load the deployment value again', () => {
+    const settings = applyDeploymentDefaults(null, deployed);
+    const stored = settingsForStorage(settings, deployed);
+    const again = applyDeploymentDefaults(stored, deployed);
+    assert.equal(again.yourAgency, 'County SAR');
+    assert.equal(again.wisarUrl, 'https://wisar.example.org');
+    assert.deepEqual(again.subjectTypes, ['Climber', 'Hiker']);
+    assert.equal(again.lpbTable?.[0].category, 'Hiker');
+    assert.equal(again.useD4hPersonnel, false);
+});
+
+test('hasDeploymentDefaults is true when a string or staged list is present', () => {
+    assert.equal(hasDeploymentDefaults({
+        yourAgency: '',
+        searchOpTemplateId: '',
+        wisarUrl: '',
+    }), false);
+    assert.equal(hasDeploymentDefaults({
+        yourAgency: 'County SAR',
+        searchOpTemplateId: '',
+        wisarUrl: '',
+    }), true);
+    assert.equal(hasDeploymentDefaults({
+        yourAgency: '',
+        searchOpTemplateId: '',
+        wisarUrl: '',
+        aidingAgencies: ['NPS'],
+    }), true);
 });
