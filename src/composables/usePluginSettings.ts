@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue';
 import bundledAzlpb from '../data/azlpb_table.json';
 import {
+    deploymentSubjectTypes,
     loadPluginSettings,
     parseWisarUrl,
     savePluginSettings,
@@ -56,7 +57,8 @@ export function usePluginSettings() {
     }
 
     function resetSubjectTypes(): void {
-        setSubjectTypes([...DEFAULT_SUBJECT_TYPES]);
+        const staged = deploymentSubjectTypes();
+        setSubjectTypes([...(staged ?? DEFAULT_SUBJECT_TYPES)]);
     }
 
     function setLpbTable(table: AzlpbEntry[] | null): void {

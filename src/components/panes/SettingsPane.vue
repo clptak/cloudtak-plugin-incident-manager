@@ -3,6 +3,13 @@
         <h3 class='mb-3'>
             Settings
         </h3>
+        <p
+            v-if='deploymentConfigured'
+            class='text-muted small mb-3'
+        >
+            These values are already filled in for this CloudTAK.
+            Edit a field only to override the deployment value.
+        </p>
 
         <!-- ══ Case File Folder ══ -->
         <div
@@ -907,7 +914,11 @@ import {
     resolveSearchOpTemplate,
     type MissionTemplateItem,
 } from '../../lib/missionTemplates.ts';
-import { parseLpbTableJson, parseWisarUrl } from '../../lib/pluginSettings.ts';
+import {
+    hasDeploymentDefaults,
+    parseLpbTableJson,
+    parseWisarUrl,
+} from '../../lib/pluginSettings.ts';
 import {
     WISAR_DEFAULT_URL,
     checkWisarConnection,
@@ -929,6 +940,8 @@ import {
     fileTargetSupported,
     savedFileTarget,
 } from '../../lib/fileTarget.ts';
+
+const deploymentConfigured = hasDeploymentDefaults();
 
 type SettingsCard = 'folder' | 'your-agency' | 'aiding-agencies' | 'personnel' | 'search-op-template' | 'subject-types' | 'lpb' | 'wisar';
 const expandedCard = ref<SettingsCard | null>('folder');
