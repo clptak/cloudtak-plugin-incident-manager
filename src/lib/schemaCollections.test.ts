@@ -202,3 +202,13 @@ test('upgrade: keys owned by other features are left alone', async () => {
     await backend.save(GUID, s);
     assert.equal(srv.store.get('cad.published.x'), '1');
 });
+
+test('collections: encodes schemas holding reactive (Proxy) objects, as Vue screens pass them', () => {
+    const s = busySchema();
+    const plans = ir(s).iap_plans as Rec;
+    plans['1'] = new Proxy({ ...(plans['1'] as Rec) }, {});
+    ir(s).iap_plans = new Proxy(plans, {});
+    const enc = encodeSchema(new Proxy(s, {}) as MissionSchema);
+    assert.equal(enc.get('c.iap.1.commandEmphasis'), '"Safety"');
+    assert.deepEqual([...enc].sort(), [...encodeSchema(busySchema())].sort());
+});
