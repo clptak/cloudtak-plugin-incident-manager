@@ -8,37 +8,15 @@
 import type { ActiveMission } from '../composables/useIncident.ts';
 import type { DebriefRecord, TrackLogRef } from '../domain/entities.ts';
 import type { DebriefStore } from '../domain/ports.ts';
-import { debriefKey, trackLogRefsFromValue } from '../domain/trackLog.ts';
+import { debriefRecordFromValue } from '../domain/debrief.ts';
+import { debriefKey } from '../domain/trackLog.ts';
 import { loadSchemaSubscription, schemaMissionToken } from './incidentSubscription.ts';
 import { loadMissionSchema, saveMissionSchema, type MissionSchema } from './missionSchema.ts';
 
 export function debriefsFromSchema(schema: MissionSchema): DebriefRecord[] {
     const raw = (schema.incident_response as Record<string, unknown>).debriefs;
     if (!Array.isArray(raw)) return [];
-    const records: DebriefRecord[] = [];
-    for (const value of raw) {
-        if (!value || typeof value !== 'object') continue;
-        const rec = value as Record<string, unknown>;
-        const segmentUid = typeof rec.segmentUid === 'string' ? rec.segmentUid.trim() : '';
-        const opNumber = Number(rec.opNumber);
-        if (!segmentUid || !Number.isInteger(opNumber)) continue;
-        const record: DebriefRecord = { opNumber, segmentUid };
-        // POD is search-only and absent on other incident types — a record
-        // without one is valid, not corrupt, and must not be dropped here.
-        if (rec.pod !== undefined && rec.pod !== null && rec.pod !== '') {
-            const pod = Number(rec.pod);
-            if (Number.isFinite(pod)) record.pod = pod;
-        }
-        if (typeof rec.label === 'string' && rec.label.trim()) record.label = rec.label.trim();
-        if (typeof rec.coverage === 'number' && Number.isFinite(rec.coverage)) record.coverage = rec.coverage;
-        if (typeof rec.resource === 'string' && rec.resource.trim()) record.resource = rec.resource.trim();
-        if (typeof rec.notes === 'string' && rec.notes.trim()) record.notes = rec.notes.trim();
-        if (typeof rec.recordedAt === 'string' && rec.recordedAt.trim()) record.recordedAt = rec.recordedAt;
-        const tracks = trackLogRefsFromValue(rec.tracks);
-        if (tracks.length) record.tracks = tracks;
-        records.push(record);
-    }
-    return records;
+    return raw.map(debriefRecordFromValue).filter((r): r is DebriefRecord => r !== null);
 }
 
 export function createDebriefStore(mission: ActiveMission): DebriefStore {
