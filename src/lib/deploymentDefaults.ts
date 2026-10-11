@@ -46,7 +46,7 @@ function basenameOf(globKey: string): string {
 }
 
 function readConfig(): DeploymentConfig {
-    let modules: Record<string, DeploymentModule> = {};
+    let modules: Record<string, DeploymentModule>;
     try {
         // Plugin root is two levels up from src/lib.
         modules = import.meta.glob<DeploymentModule>('../../config.local.ts', {
@@ -65,7 +65,7 @@ function readConfig(): DeploymentConfig {
 }
 
 function readFiles(): Record<string, string> {
-    let modules: Record<string, unknown> = {};
+    let modules: Record<string, unknown>;
     try {
         modules = import.meta.glob<unknown>('../../deployment/*.{json,csv,txt}', {
             eager: true,
