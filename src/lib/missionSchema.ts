@@ -17,6 +17,16 @@ import {
 } from './incidentInfo.ts';
 import type { MpsRow } from './mpsParser.ts';
 import { fetchMissionFileText, uploadMissionFile } from './missionUpload.ts';
+import { createMissionPropertyClient } from './missionProperties.ts';
+import { cloudtakPropertyTransport } from './missionPropertiesTransport.ts';
+import { createSchemaPropertyBackend } from './schemaPropertyBackend.ts';
+
+/**
+ * TAK Server 5.9+ Mission Properties backend. Only used for missions that
+ * carry the `meta.schema` key; every other mission keeps mission_schema.json.
+ */
+export const schemaPropertyBackend = createSchemaPropertyBackend((missionGuid, missionToken) =>
+    createMissionPropertyClient({ missionGuid, missionToken, transport: cloudtakPropertyTransport }));
 
 /** Legacy log keyword from earlier builds; only used when migrating stored schema. */
 export const MISSION_SCHEMA_KEYWORD = 'mission-schema';
@@ -455,6 +465,15 @@ export function findLatestSchemaLog(logs: SchemaLogLike[]): { logId: string; sch
 export async function loadMissionSchema(sub: LoadedSubLike): Promise<LoadedMissionSchema> {
     if (sub.fetch) await sub.fetch();
 
+    const fromKeys = await schemaPropertyBackend.load(sub.guid);
+    if (fromKeys) {
+        if (fromKeys.invalid.length) {
+            console.warn(`Mission ${sub.guid}: unreadable mission properties skipped:`, fromKeys.invalid);
+        }
+        hydrateAssignmentOnSchema(fromKeys.schema, await sub.log.list({ refresh: true }));
+        return { schema: fromKeys.schema };
+    }
+
     const contents = await sub.contents.list();
     const content = findLatestSchemaContent(contents);
     const logs = await sub.log.list({ refresh: true });
@@ -504,6 +523,10 @@ export async function saveMissionSchema(
     schema: MissionSchema,
     opts?: SaveMissionSchemaOpts,
 ): Promise<SavedMissionSchema> {
+    if (await schemaPropertyBackend.save(sub.guid, schema, opts?.missionToken)) {
+        return {};
+    }
+
     const json = JSON.stringify(schema, null, 2);
     const bytes = new TextEncoder().encode(json);
     if (sub.fetch) await sub.fetch();
