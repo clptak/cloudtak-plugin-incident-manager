@@ -26,13 +26,15 @@ export function createOpPeriodGateway(): OpPeriodGateway {
             // channel strip (volunteers lose the mission entirely) — stronger and
             // simpler than per-user demotion, which is illegal below defaultRole
             // on password-less missions anyway (MissionServiceDefaultImpl.java:4219).
+            // No keywords on create: node-tak sets them with a second request
+            // and returns THAT response, which has no token - the owner token
+            // would be lost. Keywords are set afterwards with the token.
             const res = await server.POST('/api/marti/mission', {
                 body: {
                     name: op.name,
                     group: op.channels,
                     description: op.description ?? '',
                     defaultRole: 'MISSION_SUBSCRIBER',
-                    keywords: op.keywords ?? [],
                 },
             });
             if (res.error) throw new Error(res.error.message);
@@ -45,6 +47,14 @@ export function createOpPeriodGateway(): OpPeriodGateway {
             };
             const token = (res.data as { token?: string }).token;
             if (token) entry.ownerToken = token;
+            if (op.keywords?.length) {
+                const kw = await server.PATCH('/api/marti/missions/{:guid}', {
+                    params: { path: { ':guid': entry.guid } },
+                    headers: authHeaders(entry),
+                    body: { keywords: op.keywords },
+                });
+                if (kw.error) throw new Error(`OP sync created, but setting its keywords failed: ${kw.error.message}`);
+            }
             return entry;
         },
 
@@ -84,8 +94,11 @@ export function createOpPeriodGateway(): OpPeriodGateway {
         },
 
         async setChannels(op, channels) {
+            // By guid, not name: with no owner token saved (OPs created before
+            // the token fix), CloudTAK falls back to the caller's own stored
+            // subscription token, which it can only find by mission guid.
             const res = await server.PATCH('/api/marti/missions/{:guid}', {
-                params: { path: { ':guid': op.name } },
+                params: { path: { ':guid': op.guid } },
                 headers: authHeaders(op),
                 body: { groups: channels },
             });
