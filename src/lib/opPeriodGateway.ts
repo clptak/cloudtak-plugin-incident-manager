@@ -29,7 +29,7 @@ function groupsOf(mission: unknown): string[] | null {
 
 async function currentGroups(op: OpPeriodRegistryEntry): Promise<string[] | null> {
     const res = await server.GET('/api/marti/missions/{:guid}', {
-        params: { path: { ':guid': op.name }, query: { changes: false, logs: false } },
+        params: { path: { ':guid': op.guid }, query: { changes: false, logs: false } },
         headers: authHeaders(op),
     });
     return res.error ? null : groupsOf(res.data);
@@ -43,13 +43,15 @@ export function createOpPeriodGateway(): OpPeriodGateway {
             // channel strip (volunteers lose the mission entirely) — stronger and
             // simpler than per-user demotion, which is illegal below defaultRole
             // on password-less missions anyway (MissionServiceDefaultImpl.java:4219).
+            // No keywords on create: node-tak sets them with a second request
+            // and returns THAT response, which has no token - the owner token
+            // would be lost. Keywords are set afterwards with the token.
             const res = await server.POST('/api/marti/mission', {
                 body: {
                     name: op.name,
                     group: op.channels,
                     description: op.description ?? '',
                     defaultRole: 'MISSION_SUBSCRIBER',
-                    keywords: op.keywords ?? [],
                 },
             });
             if (res.error) throw new Error(res.error.message);
@@ -62,6 +64,14 @@ export function createOpPeriodGateway(): OpPeriodGateway {
             };
             const token = (res.data as { token?: string }).token;
             if (token) entry.ownerToken = token;
+            if (op.keywords?.length) {
+                const kw = await server.PATCH('/api/marti/missions/{:guid}', {
+                    params: { path: { ':guid': entry.guid } },
+                    headers: authHeaders(entry),
+                    body: { keywords: op.keywords },
+                });
+                if (kw.error) throw new Error(`OP sync created, but setting its keywords failed: ${kw.error.message}`);
+            }
             return entry;
         },
 
@@ -101,8 +111,11 @@ export function createOpPeriodGateway(): OpPeriodGateway {
         },
 
         async setChannels(op, channels) {
+            // By guid, not name: with no owner token saved (OPs created before
+            // the token fix), CloudTAK falls back to the caller's own stored
+            // subscription token, which it can only find by mission guid.
             const res = await server.PATCH('/api/marti/missions/{:guid}', {
-                params: { path: { ':guid': op.name } },
+                params: { path: { ':guid': op.guid } },
                 headers: authHeaders(op),
                 body: { groups: channels },
             });
@@ -112,10 +125,14 @@ export function createOpPeriodGateway(): OpPeriodGateway {
             // Trust only what the mission reports back.
             const applied = groupsOf(res.data) ?? await currentGroups(op);
             if (!applied || !sameChannels(applied, channels)) {
+                const why = op.ownerToken
+                    ? 'You must be a member of every channel being set, and the OP owner token must be valid.'
+                    : 'No owner token is saved for this OP, and your own subscription to it does not carry '
+                        + 'owner rights. Close and reopen the OP from the account that created it, or change '
+                        + 'its channels as a TAK admin.';
                 throw new Error(
                     `TAK Server did not apply the channel change to ${op.name} `
-                    + `(asked for ${channels.join(', ')}; it has ${applied?.join(', ') || 'unknown'}). `
-                    + 'You must be a member of every channel being set, and the OP owner token must be valid.',
+                    + `(asked for ${channels.join(', ')}; it has ${applied?.join(', ') || 'unknown'}). ${why}`,
                 );
             }
         },
