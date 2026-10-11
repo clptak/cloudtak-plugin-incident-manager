@@ -252,3 +252,27 @@ test('backend: storage() reports unsupported, file, then keys after migrate', as
     }));
     assert.equal(await old.storage(GUID), 'unsupported');
 });
+
+test('backend: correcting one debrief rewrites only its key; deleting one removes only its key', async () => {
+    const { srv, backend } = backendWith();
+    await backend.migrate(GUID, sampleSchema());
+    const debriefsOf = (s: MissionSchema) =>
+        (s.incident_response as Record<string, unknown>).debriefs as Array<Record<string, unknown>>;
+
+    const s1 = (await backend.load(GUID))!.schema;
+    debriefsOf(s1)[0] = { ...debriefsOf(s1)[0], pod: 35, correctedAt: '2026-10-11T17:00:00Z' };
+    const before = srv.calls.length;
+    await backend.save(GUID, s1);
+    const writes = srv.calls.slice(before).filter((c) => c.method !== 'GET');
+    assert.equal(writes.length, 1);
+    assert.equal(writes[0].method, 'PUT');
+
+    const s2 = (await backend.load(GUID))!.schema;
+    debriefsOf(s2).splice(1, 1);
+    const before2 = srv.calls.length;
+    await backend.save(GUID, s2);
+    const writes2 = srv.calls.slice(before2).filter((c) => c.method !== 'GET');
+    assert.deepEqual(writes2.map((c) => c.method), ['DELETE']);
+    const final = debriefsOf((await backend.load(GUID))!.schema);
+    assert.deepEqual(final.map((d) => [d.resource, d.pod]), [['GT1', 35], ['GT5', 20]]);
+});

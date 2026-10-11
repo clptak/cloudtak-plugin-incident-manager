@@ -111,6 +111,27 @@ export function createPropertyDebriefStore(
         return out;
     }
 
+    async function find(key: string): Promise<{ key: string; record: DebriefRecord } | undefined> {
+        const opNumber = Number(key.split('|')[0]);
+        const prefix = Number.isInteger(opNumber) ? debriefPrefix(opNumber) : debriefPrefix();
+        return (await loadWithKeys(prefix)).find((r) => debriefKey(r.record) === key);
+    }
+
+    /**
+     * Throws when the record is gone - the caller may have already published
+     * a CoT (setTracks) or be correcting a record someone else deleted.
+     */
+    async function findOrThrow(key: string): Promise<{ key: string; record: DebriefRecord }> {
+        const match = await find(key);
+        if (!match) {
+            throw new Error(
+                'That completed assignment is no longer in the incident record — '
+                + 'refresh and try again.',
+            );
+        }
+        return match;
+    }
+
     return {
         async load(): Promise<DebriefRecord[]> {
             return (await loadWithKeys(debriefPrefix())).map((r) => r.record);
@@ -128,19 +149,24 @@ export function createPropertyDebriefStore(
          * unreferenced (same contract as the mission_schema.json store).
          */
         async setTracks(key: string, tracks: TrackLogRef[]): Promise<void> {
-            const opNumber = Number(key.split('|')[0]);
-            const prefix = Number.isInteger(opNumber) ? debriefPrefix(opNumber) : debriefPrefix();
-            const match = (await loadWithKeys(prefix)).find((r) => debriefKey(r.record) === key);
-            if (!match) {
-                throw new Error(
-                    'That completed assignment is no longer in the incident record — '
-                    + 'refresh and attach the track again.',
-                );
-            }
+            const match = await findOrThrow(key);
             const next: DebriefRecord = { ...match.record };
             if (tracks.length) next.tracks = tracks;
             else delete next.tracks;
             await client.setJson(match.key, next);
+        },
+
+        /** Old key out, new key in - the key changes if the resource does. */
+        async replace(key: string, record: DebriefRecord): Promise<void> {
+            const match = await findOrThrow(key);
+            const nextKey = debriefPropertyKey(record);
+            await client.setJson(nextKey, record);
+            if (nextKey !== match.key) await client.delete(match.key);
+        },
+
+        async remove(key: string): Promise<void> {
+            const match = await find(key);
+            if (match) await client.delete(match.key);
         },
     };
 }
