@@ -21,7 +21,14 @@ import type {
     TrackLogPublisher,
 } from './ports.ts';
 import { correctedDebrief, sameResourceDebriefs } from './debrief.ts';
-import { closeRegistryEntry, nextOpNumber, opSyncName, upsertRegistryEntry } from './registry.ts';
+import {
+    closeRegistryEntry,
+    nextOpNumber,
+    opSyncName,
+    planningOpPeriod,
+    sameChannels,
+    upsertRegistryEntry,
+} from './registry.ts';
 import {
     debriefKey,
     MAX_TRACK_POINTS,
@@ -67,6 +74,10 @@ export async function openOperationalPeriod(
     if (!input.channels.length) throw new Error('openOperationalPeriod: at least one channel required');
 
     const entries = await deps.registry.load();
+    const planning = planningOpPeriod(entries);
+    if (planning) {
+        throw new Error(`OP${planning.opNumber} is being planned - activate it instead of opening another OP.`);
+    }
     const opNumber = nextOpNumber(entries);
 
     const entry = await deps.gateway.create({
@@ -95,6 +106,86 @@ export async function openOperationalPeriod(
 
     await deps.registry.save(upsertRegistryEntry(entries, registered));
     return registered;
+}
+
+/**
+ * Start planning the next operational period. The OP sync is created on the
+ * management channels only, so field users cannot see it while planning
+ * builds the IAP, orders resources and publishes assignments into it. The
+ * field + management channels are kept for activation.
+ */
+export async function planOperationalPeriod(
+    deps: OpLifecycleDeps,
+    input: {
+        incidentName: string;
+        /** Applied now: management only. */
+        managementChannels: string[];
+        /** Applied at activation: field + management. */
+        channels: string[];
+        description?: string;
+        keywords?: string[];
+    },
+): Promise<OpPeriodRegistryEntry> {
+    const incidentName = input.incidentName.trim();
+    if (!incidentName) throw new Error('planOperationalPeriod: incident name required');
+    if (!input.managementChannels.length) {
+        throw new Error('Could not determine the management channels for this incident, so the next OP '
+            + 'cannot be created hidden from the field.');
+    }
+    const planned = [...new Set([...input.managementChannels, ...input.channels])];
+    if (sameChannels(planned, input.managementChannels)) {
+        throw new Error('Pick at least one field channel for the OP to open to when it is activated.');
+    }
+
+    const entries = await deps.registry.load();
+    if (planningOpPeriod(entries)) {
+        throw new Error(`OP${planningOpPeriod(entries)!.opNumber} is already being planned.`);
+    }
+    const opNumber = nextOpNumber(entries);
+
+    const entry = await deps.gateway.create({
+        name: opSyncName(incidentName, opNumber),
+        opNumber,
+        channels: input.managementChannels,
+        description: input.description,
+        keywords: input.keywords,
+    });
+
+    const registered: OpPeriodRegistryEntry = {
+        ...entry,
+        status: 'planning',
+        channels: input.managementChannels,
+        plannedChannels: planned,
+        openedAt: (deps.now?.() ?? new Date()).toISOString(),
+    };
+    try {
+        await deps.gateway.ensureFolder(registered, TRACK_LOG_FOLDER);
+    } catch {
+        // Non-fatal — created lazily on first attach.
+    }
+    await deps.registry.save(upsertRegistryEntry(entries, registered));
+    return registered;
+}
+
+/**
+ * Open a planning OP to the field: apply its planned channels. The current OP
+ * is left as it is - closing it is a separate, manual action.
+ */
+export async function activateOperationalPeriod(
+    deps: OpLifecycleDeps,
+    op: OpPeriodRegistryEntry,
+): Promise<OpPeriodRegistryEntry> {
+    if (op.status !== 'planning') throw new Error(`OP${op.opNumber} is not being planned.`);
+    const channels = op.plannedChannels?.length ? op.plannedChannels : op.channels;
+    await deps.gateway.setChannels(op, channels);
+
+    const activatedAt = (deps.now?.() ?? new Date()).toISOString();
+    const entries = await deps.registry.load();
+    const latest = entries.find((e) => e.guid === op.guid) ?? op;
+    const activated: OpPeriodRegistryEntry = { ...latest, status: 'open', channels, activatedAt };
+    delete activated.plannedChannels;
+    await deps.registry.save(upsertRegistryEntry(entries, activated));
+    return activated;
 }
 
 /**

@@ -6,7 +6,7 @@
 
 import type { OpPeriodRegistryEntry, OpStatus } from './entities.ts';
 
-const STATUSES: OpStatus[] = ['open', 'debriefing', 'closed'];
+const STATUSES: OpStatus[] = ['planning', 'open', 'debriefing', 'closed'];
 
 function asString(value: unknown, fallback = ''): string {
     return typeof value === 'string' ? value : fallback;
@@ -37,8 +37,14 @@ export function registryEntryFromValue(raw: unknown): OpPeriodRegistryEntry | nu
     if (ownerToken) entry.ownerToken = ownerToken;
     const openedAt = asString(rec.openedAt).trim();
     if (openedAt) entry.openedAt = openedAt;
+    const activatedAt = asString(rec.activatedAt).trim();
+    if (activatedAt) entry.activatedAt = activatedAt;
     const closedAt = asString(rec.closedAt).trim();
     if (closedAt) entry.closedAt = closedAt;
+    if (Array.isArray(rec.plannedChannels)) {
+        const planned = rec.plannedChannels.filter((c): c is string => typeof c === 'string');
+        if (planned.length) entry.plannedChannels = planned;
+    }
     return entry;
 }
 
@@ -103,11 +109,33 @@ export function opSyncName(incidentName: string, opNumber: number): string {
     return `${stem} - OP${opNumber}`;
 }
 
-/** The single open (or debriefing) OP with the highest number, if any. */
+/** Field-visible: open or debriefing (not planning, not closed). */
+export function isFieldActive(entry: OpPeriodRegistryEntry): boolean {
+    return entry.status === 'open' || entry.status === 'debriefing';
+}
+
+/**
+ * The field-active OP with the highest number, if any - where clues, logs and
+ * the IPP land. A planning OP is never current: the field cannot see it.
+ */
 export function currentOpPeriod(
     entries: OpPeriodRegistryEntry[],
 ): OpPeriodRegistryEntry | null {
-    const active = entries.filter((e) => e.status !== 'closed');
+    const active = entries.filter(isFieldActive);
     if (!active.length) return null;
     return active.reduce((best, e) => (e.opNumber > best.opNumber ? e : best));
+}
+
+/** The OP being planned, if any (at most one at a time). */
+export function planningOpPeriod(
+    entries: OpPeriodRegistryEntry[],
+): OpPeriodRegistryEntry | null {
+    return entries.find((e) => e.status === 'planning') ?? null;
+}
+
+/** Channels as a set: same members regardless of order or duplicates. */
+export function sameChannels(a: string[], b: string[]): boolean {
+    const sa = new Set(a);
+    const sb = new Set(b);
+    return sa.size === sb.size && [...sa].every((c) => sb.has(c));
 }

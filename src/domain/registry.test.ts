@@ -5,6 +5,9 @@ import {
     closeRegistryEntry,
     currentOpPeriod,
     nextOpNumber,
+    planningOpPeriod,
+    registryEntryFromValue,
+    sameChannels,
     opSyncName,
     registryFromSchemaValue,
     upsertRegistryEntry,
@@ -75,4 +78,20 @@ test('opSyncName: keeps Area Search suffix when the common map has no _OP-NN', (
     assert.equal(opSyncName('X', 1), 'X - OP1');
     assert.equal(opSyncName('X', 2), 'X - OP2');
     assert.equal(opSyncName('Alpha Incident - MGMT', 1), 'Alpha Incident - OP1');
+});
+
+test('planning OPs: never current, found by planningOpPeriod, fields round-trip', () => {
+    const list = [
+        { opNumber: 1, name: 'a', guid: 'g1', status: 'open' as const, channels: ['F'] },
+        { opNumber: 2, name: 'b', guid: 'g2', status: 'planning' as const, channels: ['M'], plannedChannels: ['F', 'M'] },
+    ];
+    assert.equal(currentOpPeriod(list)?.guid, 'g1');
+    assert.equal(planningOpPeriod(list)?.guid, 'g2');
+    assert.equal(currentOpPeriod([list[1]]), null);
+    const parsed = registryEntryFromValue({ ...list[1], activatedAt: '2026-10-11T00:00:00Z' });
+    assert.equal(parsed?.status, 'planning');
+    assert.deepEqual(parsed?.plannedChannels, ['F', 'M']);
+    assert.equal(parsed?.activatedAt, '2026-10-11T00:00:00Z');
+    assert.ok(sameChannels(['A', 'B'], ['B', 'A', 'A']));
+    assert.ok(!sameChannels(['A'], ['A', 'B']));
 });
