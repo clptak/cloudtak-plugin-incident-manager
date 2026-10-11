@@ -20,13 +20,16 @@ import { fetchMissionFileText, uploadMissionFile } from './missionUpload.ts';
 import { createMissionPropertyClient } from './missionProperties.ts';
 import { cloudtakPropertyTransport } from './missionPropertiesTransport.ts';
 import { createSchemaPropertyBackend } from './schemaPropertyBackend.ts';
+import { recordingClient } from './liveIncident.ts';
 
 /**
  * TAK Server 5.9+ Mission Properties backend. Only used for missions that
  * carry the `meta.schema` key; every other mission keeps mission_schema.json.
  */
-export const schemaPropertyBackend = createSchemaPropertyBackend((missionGuid, missionToken) =>
-    createMissionPropertyClient({ missionGuid, missionToken, transport: cloudtakPropertyTransport }));
+export const schemaPropertyBackend = createSchemaPropertyBackend((missionGuid, missionToken) => recordingClient(
+    missionGuid,
+    createMissionPropertyClient({ missionGuid, missionToken, transport: cloudtakPropertyTransport }),
+));
 
 /**
  * Start a brand-new incident's management sync on Mission Properties when the

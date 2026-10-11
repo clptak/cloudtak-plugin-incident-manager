@@ -75,7 +75,13 @@
                     />
                 </div>
 
+                <IncidentChangedBanner
+                    class='flex-shrink-0'
+                    @reload='screenNonce++'
+                />
+
                 <div
+                    :key='screenNonce'
                     class='tab-content flex-grow-1 min-height-0'
                     :class='activeHTab === "organization"
                         ? "overflow-hidden d-flex flex-column"
@@ -119,6 +125,7 @@ import { TablerIconButton, TablerPillGroup } from '@tak-ps/vue-tabler';
 import { IconMenu2 } from '@tabler/icons-vue';
 import IncidentNavList from './IncidentNavList.vue';
 import MissionRequiredModal from './MissionRequiredModal.vue';
+import IncidentChangedBanner from './IncidentChangedBanner.vue';
 import './incidentSideNav.css';
 import './incidentModal.css';
 import {
@@ -140,6 +147,9 @@ const ClueLog = defineAsyncComponent(() => import('./panes/logger/ClueLog.vue'))
 const AssignmentsTab = defineAsyncComponent(() => import('./panes/AssignmentsTab.vue'));
 const OrganizationTab = defineAsyncComponent(() => import('./panes/OrganizationTab.vue'));
 const ResourcesTab = defineAsyncComponent(() => import('./panes/ResourcesTab.vue'));
+
+/** Bumped by the banner's Reload to remount the open screen with fresh data. */
+const screenNonce = ref(0);
 
 const SESSION_NAV_SECTIONS_KEY = 'incident-manager:nav-sections-expanded';
 

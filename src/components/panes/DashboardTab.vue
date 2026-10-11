@@ -527,6 +527,7 @@
 
 <script setup lang='ts'>
 import { ref, reactive, computed, watch, onMounted } from 'vue';
+import { useIncidentChanges } from '../../composables/useIncidentChanges.ts';
 import { IconChevronDown } from '@tabler/icons-vue';
 import { TablerBorder, TablerInlineAlert } from '@tak-ps/vue-tabler';
 import type { DBSubscriptionLog } from '../../../../../src/database.ts';
@@ -857,6 +858,14 @@ async function refresh(): Promise<void> {
 }
 
 onMounted(loadDirectory);
+
+// Another manager changed the incident: refresh the summary. Filters and
+// selections are view state and are not touched by refresh().
+let liveRefresh: Promise<void> | null = null;
+useIncidentChanges(() => {
+    if (liveRefresh || loading.value) return;
+    liveRefresh = refresh().finally(() => { liveRefresh = null; });
+});
 
 // Auto-load when an active mission appears / changes.
 watch(activeMission, (m) => {
