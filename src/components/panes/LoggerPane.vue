@@ -7,38 +7,50 @@
         <InitialInformation v-if='sub === "initial-information"' />
         <SubjectInformation v-else-if='sub === "subject-info"' />
         <SearchArea v-else-if='sub === "search-area"' />
+        <Segmentation v-else-if='sub === "segmentation"' />
+        <InitialConsensus v-else-if='sub === "initial-consensus"' />
         <SearchUrgency v-else-if='sub === "search-urgency"' />
         <IrBriefing v-else-if='sub === "ir-briefing"' />
         <Ics201 v-else-if='sub === "ics-201"' />
         <SearchScenarios v-else-if='sub === "search-scenarios"' />
+        <PhysicalWisar v-else-if='sub === "physical-wisar"' />
+        <LpbTab v-else-if='sub === "lpb-distances"' />
         <RiskAssessment v-else-if='sub === "risk-assessment"' />
         <IncidentPost v-else-if='sub === "incident-post"' />
+        <AreaSearch v-else-if='sub === "operational-periods"' />
 
-        <div
+        <TablerBorder
             v-else
-            class='card'
+            class='cloudtak-accent text-white'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
         >
-            <div class='card-body'>
-                <p class='text-muted mb-0'>
-                    Stub for the "{{ subLabel }}" logger sub-pane.
-                </p>
-            </div>
-        </div>
+            <p class='text-muted mb-0'>
+                Stub for the "{{ subLabel }}" logger sub-pane.
+            </p>
+        </TablerBorder>
     </div>
 </template>
 
 <script setup lang='ts'>
 import { computed, defineAsyncComponent } from 'vue';
+import { TablerBorder } from '@tak-ps/vue-tabler';
 
 const InitialInformation = defineAsyncComponent(() => import('./logger/InitialInformation.vue'));
 const SubjectInformation = defineAsyncComponent(() => import('./logger/SubjectInformation.vue'));
 const SearchArea = defineAsyncComponent(() => import('./logger/SearchArea.vue'));
+const Segmentation = defineAsyncComponent(() => import('./logger/Segmentation.vue'));
+const InitialConsensus = defineAsyncComponent(() => import('./logger/consensus/InitialConsensus.vue'));
 const SearchUrgency = defineAsyncComponent(() => import('./logger/SearchUrgency.vue'));
 const IrBriefing = defineAsyncComponent(() => import('./logger/IrBriefing.vue'));
 const Ics201 = defineAsyncComponent(() => import('./logger/Ics201.vue'));
 const SearchScenarios = defineAsyncComponent(() => import('./logger/SearchScenarios.vue'));
+const PhysicalWisar = defineAsyncComponent(() => import('./logger/PhysicalWisar.vue'));
+const LpbTab = defineAsyncComponent(() => import('./LpbTab.vue'));
 const RiskAssessment = defineAsyncComponent(() => import('./logger/RiskAssessment.vue'));
 const IncidentPost = defineAsyncComponent(() => import('./logger/IncidentPost.vue'));
+const AreaSearch = defineAsyncComponent(() => import('./logger/AreaSearch.vue'));
 
 const props = defineProps<{ sub: string }>();
 
@@ -46,12 +58,17 @@ const labels: Record<string, string> = {
     'initial-information': 'Initial Information',
     'subject-info': 'Subject Information',
     'search-area': 'Search Area',
+    segmentation: 'Segmentation',
+    'initial-consensus': 'Initial Consensus',
     'search-urgency': 'Search Urgency',
     'ir-briefing': 'IR Briefing',
     'ics-201': 'ICS 201',
     'search-scenarios': 'Search Scenarios',
+    'physical-wisar': 'Motion Model Tools',
+    'lpb-distances': 'LPB Distances',
     'risk-assessment': 'Risk Assessment',
     'incident-post': 'Incident POST',
+    'operational-periods': 'Operational Periods',
 };
 
 const subLabel = computed(() => labels[props.sub] ?? props.sub);

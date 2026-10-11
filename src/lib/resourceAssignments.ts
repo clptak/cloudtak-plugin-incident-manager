@@ -1,9 +1,8 @@
 /** Mission resource team / assignment records (Resources tab → Assignments palette). */
 
 import { ASSIGNMENT_RESOURCES } from '../data/assignmentResources.ts';
-import type { D4HExternalResource } from './d4hTypes.ts';
 
-export type ResourceAssignmentStatus = 'current' | 'planned';
+export type ResourceAssignmentStatus = 'requested' | 'have' | 'need' | 'demobilized' | 'cancelled';
 
 export interface ResourceAssignment {
     id: string;
@@ -17,27 +16,63 @@ export interface ResourceAssignment {
     /** Mission CoT uuid for assignment linkage (DataSync log entryUid). */
     assignmentUid?: string;
     assignmentCallsign?: string;
+    /** Operational period this resource is assigned to (Area Search phase). */
+    opNumber?: number | null;
 }
 
 export const RESOURCE_ASSIGNMENT_STATUSES: { value: ResourceAssignmentStatus; label: string }[] = [
-    { value: 'planned', label: 'Planned' },
-    { value: 'current', label: 'Current' },
+    { value: 'requested', label: 'Requested' },
+    { value: 'have', label: 'Have' },
+    { value: 'need', label: 'Need' },
+    { value: 'demobilized', label: 'Demobilized' },
+    { value: 'cancelled', label: 'Cancelled' },
 ];
+
+export function resourceStatusLabel(status: ResourceAssignmentStatus): string {
+    return RESOURCE_ASSIGNMENT_STATUSES.find((s) => s.value === status)?.label ?? 'Requested';
+}
+
+/** Resources still in play — excludes demobilized and cancelled. */
+export function isActiveResource(a: ResourceAssignment): boolean {
+    return a.status !== 'demobilized' && a.status !== 'cancelled';
+}
 
 export const DEFAULT_AGENCY = '';
 
 export const RESOURCE_TYPE_OPTIONS = [...ASSIGNMENT_RESOURCES] as string[];
 
-export function buildAgencyOptions(d4hExternalResources: D4HExternalResource[]): string[] {
+/** Mission override wins; then Settings Your Agency; D4H team/org name is last fallback. */
+export function resolveEffectiveDefaultAgency(
+    schemaDefaultAgency: string,
+    d4hContextName?: string,
+    yourAgency?: string,
+): string {
+    const override = schemaDefaultAgency.trim();
+    if (override) return override;
+    const home = (yourAgency ?? '').trim();
+    if (home) return home;
+    return (d4hContextName ?? '').trim();
+}
+
+export function buildAgencyOptions(
+    aidingNames: string[],
+    effectiveDefaultAgency = '',
+): string[] {
     const seen = new Set<string>();
     const out: string[] = [];
 
-    const d4hNames = [...d4hExternalResources]
-        .map((r) => r.name.trim())
+    const home = effectiveDefaultAgency.trim();
+    if (home) {
+        seen.add(home);
+        out.push(home);
+    }
+
+    const names = [...aidingNames]
+        .map((name) => name.trim())
         .filter(Boolean)
         .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 
-    for (const name of d4hNames) {
+    for (const name of names) {
         if (!seen.has(name)) {
             seen.add(name);
             out.push(name);
@@ -51,7 +86,7 @@ export function resourceAssignmentDescription(a: ResourceAssignment): string {
     const parts = [
         a.resource,
         a.agency,
-        a.status === 'current' ? 'Current' : 'Planned',
+        resourceStatusLabel(a.status),
     ];
     if (a.eta != null && !Number.isNaN(a.eta)) {
         parts.push(`ETA ${a.eta}`);
@@ -69,9 +104,15 @@ export function blankResourceAssignmentForm(): Omit<ResourceAssignment, 'id'> {
         agency: DEFAULT_AGENCY,
         timeOrdered: '',
         eta: null,
-        status: 'planned',
+        status: 'requested',
         timeArrived: '',
+        opNumber: null,
     };
+}
+
+function normalizeOpNumber(value: unknown): number | null {
+    const n = Number(value);
+    return Number.isInteger(n) && n > 0 ? n : null;
 }
 
 /** Shape written to mission_schema.json → incident_response.resource_assignments[]. */
@@ -89,6 +130,7 @@ export function resourceAssignmentToSchemaRecord(a: ResourceAssignment): Resourc
         timeArrived: a.timeArrived.trim(),
         assignmentUid,
         assignmentCallsign: assignmentUid ? assignmentCallsign : undefined,
+        opNumber: normalizeOpNumber(a.opNumber),
     };
 }
 
@@ -106,7 +148,13 @@ export function mergeResourceAssignmentPatch(
 }
 
 function normalizeStatus(value: unknown): ResourceAssignmentStatus {
-    return value === 'current' ? 'current' : 'planned';
+    if (RESOURCE_ASSIGNMENT_STATUSES.some((s) => s.value === value)) {
+        return value as ResourceAssignmentStatus;
+    }
+    // Legacy values from pre-Phase-4 incidents
+    if (value === 'current') return 'have';
+    if (value === 'planned') return 'requested';
+    return 'requested';
 }
 
 function normalizeEta(value: unknown): number | null {
@@ -133,6 +181,7 @@ export function normalizeResourceAssignment(raw: unknown): ResourceAssignment | 
         timeArrived: String(r.timeArrived ?? r.resource_arrived_dtg ?? '').trim(),
         assignmentUid: String(r.assignmentUid ?? '').trim() || undefined,
         assignmentCallsign: String(r.assignmentCallsign ?? '').trim() || undefined,
+        opNumber: normalizeOpNumber(r.opNumber),
     };
 }
 

@@ -1,0 +1,308 @@
+<template>
+    <div
+        class='modal modal-blur incident-modal show d-block'
+        tabindex='-1'
+        role='dialog'
+        @click.self='emit("cancel")'
+    >
+        <div
+            class='modal-dialog modal-lg modal-dialog-centered'
+            role='document'
+        >
+            <div class='modal-content'>
+                <div class='modal-header'>
+                    <h5 class='modal-title'>
+                        {{ respondent.name }} : {{ methodTitle }}
+                    </h5>
+                    <button
+                        type='button'
+                        class='btn-close'
+                        aria-label='Close'
+                        @click='emit("cancel")'
+                    />
+                </div>
+                <div class='modal-body'>
+                    <div class='row g-3'>
+                        <div class='col-md-6'>
+                            <table class='table table-sm table-bordered mb-0'>
+                                <thead>
+                                    <tr>
+                                        <th />
+                                        <th class='text-center'>
+                                            {{ respondent.name }}
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <th class='text-end'>
+                                            R.O.W.
+                                        </th>
+                                        <td>
+                                            <input
+                                                v-model.number='row'
+                                                type='number'
+                                                step='0.01'
+                                                min='0'
+                                                max='100'
+                                                class='form-control form-control-sm text-end'
+                                            >
+                                        </td>
+                                    </tr>
+                                    <tr
+                                        v-for='seg in segments'
+                                        :key='seg.uid'
+                                    >
+                                        <th class='text-end'>
+                                            <button
+                                                type='button'
+                                                class='btn btn-link p-0 border-0 align-baseline text-end'
+                                                title='Center the map on this segment'
+                                                @click='onFlyTo(seg.uid)'
+                                            >
+                                                Seg. {{ seg.callsign }}
+                                            </button>
+                                        </th>
+                                        <td>
+                                            <div
+                                                v-if='isOconnor'
+                                                class='btn-group btn-group-sm'
+                                                role='group'
+                                            >
+                                                <button
+                                                    v-for='l in letterOptions'
+                                                    :key='l'
+                                                    type='button'
+                                                    class='btn px-2'
+                                                    :class='letterScaleClass(l, letters[seg.uid] === l)'
+                                                    :title='OCONNOR_SCALE[l] || `Between ${String.fromCharCode(l.charCodeAt(0) - 1)} and ${String.fromCharCode(l.charCodeAt(0) + 1)}`'
+                                                    @click='letters[seg.uid] = l'
+                                                >
+                                                    {{ l }}
+                                                </button>
+                                            </div>
+                                            <input
+                                                v-else
+                                                v-model.number='values[seg.uid]'
+                                                type='number'
+                                                step='0.01'
+                                                min='0'
+                                                max='100'
+                                                class='form-control form-control-sm text-end'
+                                            >
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class='col-md-6'>
+                            <div class='cloudtak-accent border rounded-3 text-white'>
+                                <div class='px-3 pt-2'>
+                                    <p class='text-uppercase text-white-50 small mb-0'>
+                                        Instructions
+                                    </p>
+                                </div>
+                                <div class='px-3 pb-3 pt-2 small text-primary'>
+                                    <template v-if='isOconnor'>
+                                        <p class='mb-1'>
+                                            The R.O.W. requires a percentage.
+                                        </p>
+                                        <p class='mb-1'>
+                                            Each segment requires a letter according to the following scheme:
+                                        </p>
+                                        <div
+                                            v-for='l in letterOptions'
+                                            :key='l'
+                                            class='d-flex gap-2'
+                                        >
+                                            <strong
+                                                :class='letterScaleLegendClass(l)'
+                                                style='min-width: 1rem;'
+                                            >{{ l }}</strong>
+                                            <span :class='OCONNOR_SCALE[l] ? "" : "text-muted"'>
+                                                {{ OCONNOR_SCALE[l] || '—' }}
+                                            </span>
+                                        </div>
+                                    </template>
+                                    <template v-else-if='isMattson'>
+                                        <p class='mb-1'>
+                                            Each evaluator is allotted 100 points.
+                                        </p>
+                                        <p class='mb-1'>
+                                            Assign points to R.O.W. and each segment so that all 100 points are
+                                            used. Higher probability areas should get more points.
+                                        </p>
+                                        <p class='mb-0'>
+                                            Current total: {{ mattsonTotal.toFixed(2) }} / 100
+                                        </p>
+                                    </template>
+                                    <template v-else>
+                                        <p class='mb-1'>
+                                            The R.O.W. requires a percentage.
+                                        </p>
+                                        <p class='mb-1'>
+                                            Each segment requires a positive number from 1 to 1000.
+                                            The numbers 1 and 1000 do not have to be used. It is
+                                            not a percentage.
+                                        </p>
+                                        <p class='mb-0'>
+                                            If one segment has the number 100 assigned to it and
+                                            another the number 25, the subject is considered 4 times
+                                            as likely to be in the first segment than the second.
+                                        </p>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <TablerInlineAlert
+                        v-if='flyError'
+                        class='mt-2'
+                        severity='danger'
+                        title='Error'
+                        :description='flyError'
+                    />
+                    <TablerInlineAlert
+                        v-if='error'
+                        class='mt-2'
+                        severity='danger'
+                        title='Error'
+                        :description='error'
+                    />
+                </div>
+                <div class='modal-footer'>
+                    <button
+                        type='button'
+                        class='btn btn-primary'
+                        @click='onAccept'
+                    >
+                        Accept
+                    </button>
+                    <button
+                        type='button'
+                        class='btn btn-secondary'
+                        @click='emit("cancel")'
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class='modal-backdrop fade show' />
+</template>
+
+<script setup lang='ts'>
+import { computed, reactive, ref } from 'vue';
+import { TablerInlineAlert } from '@tak-ps/vue-tabler';
+import {
+    OCONNOR_LETTERS,
+    methodLabel,
+    oconnorValues,
+    proportionalValues,
+    validateRespondentEntry,
+    type ConsensusRespondent,
+    type OconnorLetter,
+} from '../../../../lib/consensus.ts';
+import { flyToFeature } from '../../../../lib/flyToFeature.ts';
+import { letterScaleClass, letterScaleLegendClass } from '../../../../lib/letterScale.ts';
+import '../../../letterScale.css';
+
+export interface SegmentRef {
+    uid: string;
+    callsign: string;
+}
+
+const props = defineProps<{
+    respondent: ConsensusRespondent;
+    segments: SegmentRef[];
+}>();
+
+const emit = defineEmits<{
+    accept: [result: {
+        row: number;
+        letters: Record<string, OconnorLetter>;
+        ratings: Record<string, number>;
+        values: Record<string, number>;
+    }];
+    cancel: [];
+}>();
+
+const letterOptions = OCONNOR_LETTERS;
+
+/** O'Connor anchor letters; B/D/F/H are in-between gradations. */
+const OCONNOR_SCALE: Record<string, string> = {
+    A: 'very likely',
+    C: 'likely',
+    E: 'even chance',
+    G: 'unlikely',
+    I: 'very unlikely',
+};
+
+const isOconnor = computed(() => props.respondent.method === 'oconnor');
+const isMattson = computed(() => props.respondent.method === 'mattson');
+const methodTitle = computed(() => `${methodLabel(props.respondent.method)} Consensus`);
+
+const isProportional = computed(() => props.respondent.method === 'proportional');
+
+const row = ref<number>(props.respondent.row);
+const letters = reactive<Record<string, OconnorLetter | ''>>({});
+const values = reactive<Record<string, number>>({});
+for (const seg of props.segments) {
+    letters[seg.uid] = props.respondent.letters[seg.uid] ?? '';
+    // Proportional edits the raw 1–1000 ratings; other methods edit values.
+    values[seg.uid] = props.respondent.method === 'proportional'
+        ? (props.respondent.ratings?.[seg.uid] ?? 0)
+        : (props.respondent.values[seg.uid] ?? 0);
+}
+
+const error = ref('');
+const flyError = ref('');
+
+const mattsonTotal = computed(() =>
+    props.segments.reduce((sum, seg) => sum + (Number(values[seg.uid]) || 0), (Number(row.value) || 0)),
+);
+
+async function onFlyTo(uid: string): Promise<void> {
+    flyError.value = '';
+    const found = await flyToFeature(uid);
+    if (!found) {
+        flyError.value = 'Feature is not on the map yet — try Refresh map objects in Segmentation.';
+    }
+}
+
+function onAccept(): void {
+    const uids = props.segments.map((s) => s.uid);
+    const cleanLetters: Record<string, OconnorLetter> = {};
+    for (const uid of uids) {
+        if (letters[uid]) cleanLetters[uid] = letters[uid] as OconnorLetter;
+    }
+
+    const rowNum = Number(row.value) || 0;
+    const entered: Record<string, number> = Object.fromEntries(
+        uids.map((uid) => [uid, Number(values[uid]) || 0]),
+    );
+    const ratings: Record<string, number> = isProportional.value ? entered : {};
+    const finalValues: Record<string, number> = isOconnor.value
+        ? oconnorValues(rowNum, cleanLetters, uids)
+        : isProportional.value
+            ? proportionalValues(rowNum, ratings, uids)
+            : entered;
+
+    const candidate: ConsensusRespondent = {
+        ...props.respondent,
+        row: rowNum,
+        letters: cleanLetters,
+        ratings,
+        values: finalValues,
+    };
+
+    const message = validateRespondentEntry(candidate, uids);
+    if (message) {
+        error.value = message;
+        return;
+    }
+    error.value = '';
+    emit('accept', { row: rowNum, letters: cleanLetters, ratings, values: finalValues });
+}
+</script>

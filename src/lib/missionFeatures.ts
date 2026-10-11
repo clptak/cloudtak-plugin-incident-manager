@@ -3,13 +3,13 @@
  * (same path as CloudTAK draw/buffer). Raw sendCOT can silently no-op when the
  * Atlas websocket is closed and does not refresh the mission overlay cache.
  */
-import { Preferences } from '@capacitor/preferences';
 import COT, { OriginMode } from '../../../../src/base/cot.ts';
 import Subscription from '../../../../src/base/subscription.ts';
 import { useMapStore } from '../../../../src/stores/map.ts';
 import { server } from '../../../../src/std.ts';
 import type { Feature } from '../../../../src/types.ts';
 import type Atlas from '../../../../src/workers/atlas.ts';
+import { withMissionFolderDest } from './folder.ts';
 
 export interface RingStyle {
     stroke?: string;
@@ -41,14 +41,9 @@ function plainCenter(center: [number, number]): [number, number] {
     return [center[0], center[1]];
 }
 
-async function sessionToken(): Promise<string> {
-    const { value } = await Preferences.get({ key: 'token' });
-    return value || '';
-}
-
 async function ensureConnOpen(worker: ReturnType<typeof useMapStore>['worker']): Promise<void> {
     if (await worker.conn.isOpen) return;
-    await worker.conn.reconnect(await worker.username);
+    await worker.conn.connect(await worker.username);
     if (!(await worker.conn.isOpen)) {
         throw new Error('TAK connection is not open. Connect to the map and try again.');
     }
@@ -58,22 +53,33 @@ async function pushFeatureToMission(
     missionGuid: string,
     feat: Feature,
     missionToken?: string,
+    folderUid?: string,
 ): Promise<string> {
     const mapStore = useMapStore();
     await ensureConnOpen(mapStore.worker);
 
     const sub = await Subscription.load(missionGuid, {
-        token: await sessionToken(),
         missiontoken: missionToken,
         subscribed: true,
+        reload: false,
     });
 
-    const cot = await COT.load(toPlainFeature(feat), {
+    const plain = toPlainFeature(feat);
+    const cot = await COT.load(plain, {
         mode: OriginMode.MISSION,
         mode_id: missionGuid,
     }, { skipSave: true });
 
-    await sub.feature.update(mapStore.worker as unknown as Atlas, cot);
+    if (folderUid) {
+        // SubscriptionFeature.update overwrites dest to { 'mission-guid' } only,
+        // losing the folder. Send with an explicit dest.path (= layer UID) so
+        // TAK files the CoT into the folder on ingest, and only write locally.
+        await sub.feature.update(mapStore.worker as unknown as Atlas, cot, { skipNetwork: true });
+        await mapStore.worker.conn.sendCOT(withMissionFolderDest(plain, missionGuid, folderUid));
+    } else {
+        await sub.feature.update(mapStore.worker as unknown as Atlas, cot);
+    }
+
     return String(feat.id);
 }
 
@@ -93,6 +99,8 @@ export async function pushPolygonToMission(opts: {
     center: [number, number];
     style?: RingStyle;
     id?: string;
+    /** Mission layer (folder) UID to file the CoT under on ingest. */
+    folderUid?: string;
 }): Promise<string> {
     const now = new Date().toISOString();
     const id = opts.id ?? uuid();
@@ -127,7 +135,61 @@ export async function pushPolygonToMission(opts: {
         },
     } as unknown as Feature;
 
-    return pushFeatureToMission(opts.missionGuid, feat, opts.missionToken);
+    return pushFeatureToMission(opts.missionGuid, feat, opts.missionToken, opts.folderUid);
+}
+
+/**
+ * Send a LineString (GPS track log, route) to a mission. `line` is an ordered
+ * array of [lng, lat]. Returns the feature id sent.
+ *
+ * `u-d-f` with a LineString geometry is the same CoT type CloudTAK's own line
+ * draw tool emits, so the track renders and edits like any drawn line.
+ */
+export async function pushLineToMission(opts: {
+    missionGuid: string;
+    missionToken?: string;
+    callsign: string;
+    line: [number, number][];
+    remarks?: string;
+    stroke?: string;
+    strokeWidth?: number;
+    id?: string;
+    /** Mission layer (folder) UID to file the CoT under on ingest. */
+    folderUid?: string;
+}): Promise<string> {
+    if (opts.line.length < 2) throw new Error('A track needs at least two points');
+
+    const now = new Date().toISOString();
+    const id = opts.id ?? uuid();
+    const line = opts.line.map(([lng, lat]) => [lng, lat] as [number, number]);
+    const mid = line[Math.floor(line.length / 2)];
+
+    const feat: Feature = {
+        id,
+        type: 'Feature',
+        path: '/',
+        properties: {
+            id,
+            type: 'u-d-f',
+            how: 'h-g-i-g-o',
+            callsign: opts.callsign,
+            center: plainCenter(mid),
+            time: now,
+            start: now,
+            stale: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365).toISOString(),
+            remarks: opts.remarks,
+            stroke: opts.stroke ?? '#00d1ff',
+            'stroke-opacity': 1,
+            'stroke-width': opts.strokeWidth ?? 3,
+            'stroke-style': 'solid',
+        },
+        geometry: {
+            type: 'LineString',
+            coordinates: line,
+        },
+    } as unknown as Feature;
+
+    return pushFeatureToMission(opts.missionGuid, feat, opts.missionToken, opts.folderUid);
 }
 
 /**
@@ -180,9 +242,9 @@ export async function updateMissionFeatureRemarks(opts: {
     remarks: string;
 }): Promise<'updated' | 'missing'> {
     const sub = await Subscription.load(opts.missionGuid, {
-        token: await sessionToken(),
         missiontoken: opts.missionToken,
         subscribed: true,
+        reload: false,
     });
 
     const feats = await sub.feature.list({ refresh: true }) as Feature[];

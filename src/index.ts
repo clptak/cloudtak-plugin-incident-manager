@@ -9,15 +9,13 @@ import {
     cleanupFloatMinimize,
     openDesktopPane,
 } from './lib/floatMinimize.ts';
+import { bindPopout, closePopout } from './lib/popout.ts';
 
+const IncidentManagerFloatShell = defineAsyncComponent(
+    () => import('./components/IncidentManagerFloatShell.vue')
+);
 const IncidentManagerPane = defineAsyncComponent(
     () => import('./components/IncidentManagerPane.vue')
-);
-const MinimizePaneAction = defineAsyncComponent(
-    () => import('./components/MinimizePaneAction.vue')
-);
-const RestoreMinimizedChip = defineAsyncComponent(
-    () => import('./components/RestoreMinimizedChip.vue')
 );
 
 const ROUTE_NAME = 'home-menu-incident-manager';
@@ -32,11 +30,11 @@ export default class IncidentManagerPlugin implements PluginInstance {
     async enable(): Promise<void> {
         const api = this.api;
 
+        bindPopout(api);
+
         bindFloatMinimize({
             api,
-            pane: IncidentManagerPane as unknown as HostFloatComponent,
-            actions: MinimizePaneAction as unknown as HostFloatComponent,
-            restoreChip: RestoreMinimizedChip as unknown as HostBottomBarComponent,
+            shell: IncidentManagerFloatShell as unknown as HostFloatComponent,
         });
 
         this.api.routes.add({
@@ -55,6 +53,10 @@ export default class IncidentManagerPlugin implements PluginInstance {
                     return () => {
                         if (appStore.isMobileDetected) {
                             return h(MenuTemplate, { name: 'Incident Manager' }, {
+                                header: () => [
+                                    h(IconTarget, { size: 22, stroke: '1.5', class: 'flex-shrink-0' }),
+                                    h('span', { class: 'fw-semibold ms-2' }, 'Incident Manager'),
+                                ],
                                 default: () => h(IncidentManagerPane),
                             });
                         }
@@ -76,6 +78,7 @@ export default class IncidentManagerPlugin implements PluginInstance {
 
     async disable(): Promise<void> {
         this.api.menu.remove('incident-manager');
+        closePopout();
         cleanupFloatMinimize();
         if (this.api.router.hasRoute(ROUTE_NAME)) {
             this.api.router.removeRoute(ROUTE_NAME);
@@ -86,6 +89,5 @@ export default class IncidentManagerPlugin implements PluginInstance {
 type MenuItemIconType = NonNullable<Parameters<PluginAPI['menu']['add']>[0]['icon']>;
 type MenuItemConfig = Parameters<PluginAPI['menu']['add']>[0];
 type HostFloatComponent = Parameters<PluginAPI['float']['add']>[0]['component'];
-type HostBottomBarComponent = Parameters<PluginAPI['bottomBar']['add']>[0]['component'];
 
 export const _typecheck = IncidentManagerPlugin as unknown as PluginStatic;

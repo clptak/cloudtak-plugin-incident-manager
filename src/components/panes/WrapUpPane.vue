@@ -1,16 +1,22 @@
 <template>
-    <div class='card'>
-        <div class='card-header d-flex align-items-center'>
-            <h3 class='card-title mb-0'>
-                Generate Report Template
-            </h3>
-            <span class='badge bg-blue-lt ms-auto'>Patrol Report</span>
-        </div>
-        <div class='card-body'>
-            <p class='text-muted small mb-3'>
-                Produces a patrol report (.md) from the active DataSync mission's log entries.
+    <TablerBorder
+        class='cloudtak-accent text-white'
+        :fill-height='false'
+        :shadow='false'
+        gap='sm'
+    >
+        <template #label>
+            <p class='text-uppercase text-white-50 small mb-0 d-flex align-items-center gap-2 w-100'>
+                <span>Create Patrol Report Template</span>
+                <span class='badge bg-blue-lt ms-auto'>Patrol Report</span>
             </p>
+        </template>
 
+        <p class='text-muted small mb-0'>
+            Produces a patrol report (.md) from the active DataSync mission's log entries.
+        </p>
+
+        <div>
             <button
                 class='btn btn-primary'
                 :disabled='loading'
@@ -19,68 +25,148 @@
                 {{ loading ? 'Generating…' : 'Generate from active mission' }}
             </button>
 
-            <div
+            <TablerInlineAlert
                 v-if='!activeMission'
-                class='form-text text-warning'
-            >
-                No active mission. Select one in Create | Open first.
-            </div>
-            <div
+                class='mt-2'
+                severity='warning'
+                title='Mission Required'
+                description='No active mission. Select one in Create | Open first.'
+            />
+            <p
                 v-else
-                class='form-text'
+                class='form-text mt-2 mb-0'
             >
                 Active DataSync: <strong>{{ activeMission.name }}</strong>
-            </div>
-            <div
+            </p>
+            <TablerInlineAlert
                 v-if='error'
-                class='text-danger small mt-1'
-            >
-                {{ error }}
+                class='mt-2'
+                severity='danger'
+                title='Error'
+                :description='error'
+            />
+        </div>
+
+        <!-- ── Demobilization package ─────────────────────────────── -->
+        <div class='cloudtak-accent border rounded-3 mt-3 p-3'>
+            <p class='text-uppercase text-white-50 small mb-1'>
+                Demobilization Package
+            </p>
+            <p class='text-muted small mb-2'>
+                Bundles the complete case file into one zip: a mission archive for every
+                DataSync (common map, MGMT, each OP), the incident schema, the WinCASIE
+                export, every operational-period IAP, and a manifest.
+            </p>
+
+            <div class='row g-2'>
+                <div class='col-md-5'>
+                    <label class='form-label'>Closeout</label>
+                    <select
+                        v-model='demob.variant'
+                        class='form-select form-select-sm'
+                    >
+                        <option value='closed'>
+                            Search closed — archive everything
+                        </option>
+                        <option value='limited-continuous'>
+                            Limited continuous search — keep common map live
+                        </option>
+                    </select>
+                </div>
+                <div class='col-md-7 d-flex flex-wrap align-items-end gap-3'>
+                    <label class='form-check mb-0'>
+                        <input
+                            v-model='demob.includeArchives'
+                            type='checkbox'
+                            class='form-check-input'
+                        >
+                        <span class='form-check-label small'>Mission archives</span>
+                    </label>
+                    <label class='form-check mb-0'>
+                        <input
+                            v-model='demob.includeIaps'
+                            type='checkbox'
+                            class='form-check-input'
+                        >
+                        <span class='form-check-label small'>IAPs</span>
+                    </label>
+                    <label class='form-check mb-0'>
+                        <input
+                            v-model='demob.includeCasieExport'
+                            type='checkbox'
+                            class='form-check-input'
+                        >
+                        <span class='form-check-label small'>CASIE export</span>
+                    </label>
+                    <label class='form-check mb-0'>
+                        <input
+                            v-model='demob.includeReport'
+                            type='checkbox'
+                            class='form-check-input'
+                        >
+                        <span class='form-check-label small'>Incident log</span>
+                    </label>
+                </div>
             </div>
 
-            <div
-                v-if='report'
-                class='mt-3'
+            <button
+                class='btn btn-primary btn-sm mt-3'
+                :disabled='packaging || !activeMission'
+                @click='onBuildPackage'
             >
-                <div class='d-flex align-items-center mb-2'>
-                    <h4 class='mb-0'>
-                        Report Preview
-                    </h4>
-                    <div class='ms-auto btn-list'>
-                        <button
-                            class='btn btn-success btn-sm'
-                            @click='download'
-                        >
-                            Download .md
-                        </button>
-                        <button
-                            class='btn btn-outline-secondary btn-sm'
-                            @click='copy'
-                        >
-                            {{ copied ? 'Copied' : 'Copy' }}
-                        </button>
-                    </div>
-                </div>
-                <textarea
-                    v-model='report'
-                    class='form-control font-monospace'
-                    style='font-size:0.82rem; min-height:380px; white-space:pre;'
-                    spellcheck='false'
-                />
-            </div>
+                {{ packaging ? 'Packaging…' : 'Build demobilization package' }}
+            </button>
+            <span
+                v-if='packageStatus'
+                class='ms-2 small'
+                :class='packageError ? "text-danger" : "text-muted"'
+            >{{ packageStatus }}</span>
         </div>
-    </div>
+
+        <div v-if='report'>
+            <div class='d-flex align-items-center mb-2'>
+                <h4 class='mb-0 text-white'>
+                    Report Preview
+                </h4>
+                <div class='ms-auto btn-list'>
+                    <button
+                        class='btn btn-success btn-sm'
+                        @click='download'
+                    >
+                        Download .md
+                    </button>
+                    <button
+                        class='btn btn-outline-secondary btn-sm'
+                        @click='copy'
+                    >
+                        {{ copied ? 'Copied' : 'Copy' }}
+                    </button>
+                </div>
+            </div>
+            <TablerInput
+                v-model='report'
+                class='report-textarea'
+                :rows='16'
+            />
+        </div>
+    </TablerBorder>
 </template>
 
 <script setup lang='ts'>
 import { ref } from 'vue';
-import { latestIncidentInfoFromLogs, type MissionLogLike } from '../../lib/incidentInfo.ts';
-import { useIncident } from '../../composables/useIncident.ts';
-import { loadIncidentSubscription } from '../../lib/incidentSubscription.ts';
 import {
+    TablerBorder,
+    TablerInput,
+    TablerInlineAlert,
+} from '@tak-ps/vue-tabler';
+import { useIncident } from '../../composables/useIncident.ts';
+import { defaultDemobOptions } from '../../domain/demob.ts';
+import { buildDemobPackage, saveDemobPackage } from '../../lib/demobPackage.ts';
+import { listAllIncidentLogs, loadSchemaSubscription } from '../../lib/incidentSubscription.ts';
+import {
+    assignmentDataFromSchema,
     incidentFormFromSchema,
     loadMissionSchema,
-    resolveAssignmentData,
     type MissionSchema,
 } from '../../lib/missionSchema.ts';
 
@@ -88,6 +174,34 @@ const { activeMission, requireActiveMission } = useIncident();
 
 const loading = ref(false);
 const error = ref('');
+const demob = ref(defaultDemobOptions());
+const packaging = ref(false);
+const packageStatus = ref('');
+const packageError = ref(false);
+
+async function onBuildPackage(): Promise<void> {
+    if (!requireActiveMission() || !activeMission.value) return;
+    packaging.value = true;
+    packageError.value = false;
+    packageStatus.value = 'Starting…';
+    try {
+        const result = await buildDemobPackage(
+            activeMission.value,
+            demob.value,
+            (message) => { packageStatus.value = message; },
+        );
+        const where = await saveDemobPackage(result, activeMission.value.name);
+        packageStatus.value = result.failures.length
+            ? `${where} Unavailable: ${result.failures.join(', ')} (see MANIFEST.txt).`
+            : where;
+        packageError.value = result.failures.length > 0;
+    } catch (err) {
+        packageError.value = true;
+        packageStatus.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        packaging.value = false;
+    }
+}
 const report = ref('');
 const copied = ref(false);
 
@@ -102,13 +216,11 @@ function formatGenerationDate(epoch: number): string {
 
 function resolveReportMeta(
     schema: MissionSchema,
-    logs: MissionLogLike[],
 ): { reportNumber: string; icCoordinator: string } {
     const form = incidentFormFromSchema(schema);
-    const saved = latestIncidentInfoFromLogs(logs);
     return {
-        reportNumber: form.incidentId.trim() || saved?.fields.incidentId.trim() || '',
-        icCoordinator: form.icCoordinator.trim() || saved?.fields.icCoordinator.trim() || '',
+        reportNumber: form.incidentId.trim(),
+        icCoordinator: form.icCoordinator.trim(),
     };
 }
 
@@ -118,8 +230,8 @@ function reportHeaderLines(
     generatedAt: number,
 ): string[] {
     return [
-        `Report # ${reportNumber}`,
-        `Coordinator ${icCoordinator}`,
+        `PATROL DR #${reportNumber}`,
+        `DEP ${icCoordinator} #`,
         `C: ${formatGenerationDate(generatedAt)}`,
         '',
     ];
@@ -152,7 +264,7 @@ function formatReportDateTimeParts(epoch: number): { date: string; time: string 
 function formatReportTime(epoch: number, raw?: string): string {
     if (epoch <= 0) return raw || '';
     const { date, time } = formatReportDateTimeParts(epoch);
-    return `${date} at ${time}`;
+    return `On ${date} at approximately ${time} hours, `;
 }
 
 function parseTime(raw?: string): { rawTime: string; epoch: number } {
@@ -183,7 +295,7 @@ function assignmentLines(data: { text: string; datetime: string } | null): strin
                 : txt;
 
     return [
-        '## ASSIGNMENT:',
+        'ASSIGNMENT:',
         '',
         sentence,
         '',
@@ -199,12 +311,12 @@ async function generate(): Promise<void> {
     if (!activeMission.value) return;
     loading.value = true; error.value = ''; report.value = '';
     try {
-        const sub = await loadIncidentSubscription(activeMission.value);
-        const { schema } = await loadMissionSchema(sub);
-        const logs = await sub.log.list({ refresh: true });
-        const assignmentData = resolveAssignmentData(schema, logs);
+        const schemaSub = await loadSchemaSubscription(activeMission.value);
+        const { schema } = await loadMissionSchema(schemaSub);
+        const logs = await listAllIncidentLogs(activeMission.value);
+        const assignmentData = assignmentDataFromSchema(schema);
         const generatedAt = Date.now();
-        const { reportNumber, icCoordinator } = resolveReportMeta(schema, logs);
+        const { reportNumber, icCoordinator } = resolveReportMeta(schema);
         const sortedLogs = [...logs].sort((a, b) => {
             const ea = parseTime(a.dtg || a.created).epoch;
             const eb = parseTime(b.dtg || b.created).epoch;
@@ -215,7 +327,7 @@ async function generate(): Promise<void> {
         lines.push(...reportHeaderLines(reportNumber, icCoordinator, generatedAt));
         const assignment = assignmentLines(assignmentData);
         if (assignment) lines.push(...assignment);
-        lines.push('## INVESTIGATION:');
+        lines.push('INVESTIGATION:');
         lines.push('');
         if (!sortedLogs.length) {
             lines.push('_No log entries found._');
@@ -257,3 +369,12 @@ async function copy(): Promise<void> {
     }
 }
 </script>
+
+<style scoped>
+.report-textarea :deep(textarea) {
+    font-size: 0.82rem;
+    min-height: 380px;
+    white-space: pre;
+    font-family: var(--tblr-font-monospace, monospace);
+}
+</style>

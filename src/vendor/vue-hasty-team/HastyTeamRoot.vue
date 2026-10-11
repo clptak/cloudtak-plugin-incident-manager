@@ -140,7 +140,7 @@
             <slot name='controls'>
                 <TablerIconButton
                     title='Zoom in'
-                    @click.stop='zoom = Math.min(zoom + 0.1, 3)'
+                    @click.stop='setZoom(zoom + 0.1)'
                 >
                     <IconZoomIn
                         :size='32'
@@ -158,7 +158,7 @@
                 </TablerIconButton>
                 <TablerIconButton
                     title='Zoom out'
-                    @click.stop='zoom = Math.max(zoom - 0.1, 0.2)'
+                    @click.stop='setZoom(zoom - 0.1)'
                 >
                     <IconZoomOut
                         :size='32'
@@ -319,6 +319,9 @@ defineSlots<{
 defineOptions({
     name: 'HastyTeam'
 });
+
+const ZOOM_MIN = 0.2;
+const ZOOM_MAX = 3;
 
 const zoom = ref(1);
 const isPanning = ref(false);
@@ -532,11 +535,15 @@ function endPan() {
     window.removeEventListener('mouseleave', endPan);
 }
 
+function setZoom(next: number): void {
+    zoom.value = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
+}
+
 function wheel(event: WheelEvent): void {
     const delta = 'wheelDelta' in event && typeof event.wheelDelta === 'number'
         ? event.wheelDelta
         : -event.deltaY;
-    zoom.value += delta * 0.001;
+    setZoom(zoom.value + delta * 0.001);
 }
 
 function resetView() {

@@ -1,4 +1,6 @@
 import KV from '../../../../src/base/kv.ts';
+import { loadPluginSettings } from './pluginSettings.ts';
+import { selectEffectiveMembers } from './personnel.ts';
 import type {
     D4HRoster,
     D4HRosterMeta,
@@ -27,6 +29,13 @@ export async function loadD4hMeta(): Promise<D4HRosterMeta | null> {
     } catch {
         return null;
     }
+}
+
+/** D4H KV members when Settings D4H personnel is on; otherwise the uploaded list. */
+export async function loadEffectiveMembers(): Promise<D4HMember[]> {
+    const settings = loadPluginSettings();
+    const roster = settings.useD4hPersonnel ? await loadD4hRoster() : null;
+    return selectEffectiveMembers(settings.useD4hPersonnel, roster?.members, settings.personnel);
 }
 
 export function formatD4hSyncTime(iso?: string): string {

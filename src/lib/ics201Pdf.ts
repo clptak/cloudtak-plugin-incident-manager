@@ -8,12 +8,15 @@ import templateUrl from '../assets/ics-201-template.pdf?url';
 import {
     buildMapSketchText,
     collapseActionText,
+    formatObjectivesForPdf,
     MAX_ACTION_ROWS,
     MAX_RESOURCE_ROWS,
+    normalizeActionContinuationPages,
     type Ics201ActionRow,
     type Ics201Form,
     type Ics201Sources,
 } from './ics201.ts';
+import { toPdfWinAnsiText } from './pdfWinAnsiText.ts';
 
 export const ICS201_MISSION_FILENAME = 'ICS-201.pdf';
 
@@ -21,6 +24,8 @@ const PAGE_W = 612;
 const PAGE_H = 792;
 /** Form pages only — omit trailing instruction pages with no AcroForm fields. */
 const OUTPUT_PAGE_COUNT = 4;
+/** Template page index that holds §7 objectives + §8 action rows. */
+const ACTIONS_TEMPLATE_PAGE = 1;
 const FONT_SIZE = 9;
 const LINE_HEIGHT = 11;
 const CELL_PAD = 2;
@@ -29,6 +34,17 @@ const MAP_SKETCH_FIELD = '4 MapSketch include sketch showing the total area of o
 const SITUATION_FIELD = '5 Situation Summary and Health and Safety Briefing for briefings or transfer of command Recognize potential incident Health and Safety Hazards and develop necessary measures remove hazard provide personal protective equipment warn people of the hazard to protect responders from those hazards';
 const OBJECTIVES_FIELD = '7 Current and Planned Objectives';
 const ORG_NOTES_FIELD = '9 Current Organization fill in additional organization as appropriate Incident Commanders Operations Section Chief Planning Section Chief Logistics Section Chief FinanceAdministration Section Chief Safety Officer Public Information Officer Liaison Officer';
+
+/**
+ * §9 chief boxes by *printed* title. The template's AcroForm field names are
+ * swapped vs the printed box titles: the field named "Planning Section
+ * Chief_2" sits under the printed "Operations Section Chief" box, and so on
+ * (printed left-to-right: Ops, Plan, Log, Fin).
+ */
+const OPS_CHIEF_FIELD = 'Planning Section Chief_2';
+const PLAN_CHIEF_FIELD = 'Operations Section Chief_2';
+const LOG_CHIEF_FIELD = 'FinanceAdministration Section Chief';
+const FIN_CHIEF_FIELD = 'Logistics Section Chief';
 
 /** Single-widget fields and their template page index (0-based). */
 const SINGLE_FIELD_PAGES: Record<string, number> = {
@@ -132,8 +148,13 @@ function layoutsForField(
     }
 }
 
-function wrapLines(text: string, font: PDFFont, maxWidth: number): string[] {
-    const normalized = String(text ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+function wrapLines(
+    text: string,
+    font: PDFFont,
+    maxWidth: number,
+    fontSize: number = FONT_SIZE,
+): string[] {
+    const normalized = toPdfWinAnsiText(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
     if (!normalized) return [];
 
     const lines: string[] = [];
@@ -146,7 +167,7 @@ function wrapLines(text: string, font: PDFFont, maxWidth: number): string[] {
         let line = words[0];
         for (let i = 1; i < words.length; i++) {
             const next = `${line} ${words[i]}`;
-            if (font.widthOfTextAtSize(next, FONT_SIZE) <= maxWidth) {
+            if (font.widthOfTextAtSize(next, fontSize) <= maxWidth) {
                 line = next;
             } else {
                 lines.push(line);
@@ -170,7 +191,7 @@ function whiteOutField(page: PDFPage, layout: FieldLayout): void {
 }
 
 function drawSingleLine(page: PDFPage, font: PDFFont, text: string, layout: FieldLayout): void {
-    const trimmed = text.trim();
+    const trimmed = toPdfWinAnsiText(text).trim();
     if (!trimmed) return;
     page.drawText(trimmed, {
         x: layout.x + CELL_PAD,
@@ -198,12 +219,67 @@ function drawWrapped(page: PDFPage, font: PDFFont, text: string, layout: FieldLa
     }
 }
 
+/** Candidate sizes for shrink-to-fit cells (largest first). */
+const FIT_FONT_SIZES = [9, 8, 7, 6, 5] as const;
+
+/**
+ * Wrap the text into the cell, stepping the font size down until every line
+ * fits the cell width and all lines fit the cell height. Falls back to the
+ * smallest size (truncated) when even that overflows.
+ */
+function drawFitted(page: PDFPage, font: PDFFont, text: string, layout: FieldLayout): void {
+    const collapsed = toPdfWinAnsiText(text).replace(/\s+/g, ' ').trim();
+    if (!collapsed) return;
+    const contentW = Math.max(4, layout.w - CELL_PAD * 2);
+    const contentH = Math.max(4, layout.h - CELL_PAD * 2);
+
+    let size: number = FIT_FONT_SIZES[FIT_FONT_SIZES.length - 1];
+    let lines: string[] | null = null;
+    for (const candidate of FIT_FONT_SIZES) {
+        const lineHeight = candidate + 2;
+        const maxLines = Math.max(1, Math.floor(contentH / lineHeight));
+        const wrapped = wrapLines(collapsed, font, contentW, candidate);
+        const fitsWidth = wrapped.every(
+            (line) => font.widthOfTextAtSize(line, candidate) <= contentW,
+        );
+        if (fitsWidth && wrapped.length <= maxLines) {
+            size = candidate;
+            lines = wrapped;
+            break;
+        }
+    }
+    if (!lines) {
+        const lineHeight = size + 2;
+        const maxLines = Math.max(1, Math.floor(contentH / lineHeight));
+        lines = wrapLines(collapsed, font, contentW, size).slice(0, maxLines);
+    }
+
+    const lineHeight = size + 2;
+    const blockH = lines.length * lineHeight;
+    // Center the block vertically inside the cell.
+    const topOffset = Math.max(CELL_PAD, (layout.h - blockH) / 2 + (lineHeight - size) / 2);
+    let y = layout.y + layout.h - topOffset - size;
+    for (const line of lines) {
+        if (line) {
+            page.drawText(line, {
+                x: layout.x + CELL_PAD,
+                y,
+                size,
+                font,
+            });
+        }
+        y -= lineHeight;
+    }
+}
+
+type PaintMode = 'single' | 'wrapped' | 'fit';
+
 function paintLayouts(
     pages: PDFPage[],
     font: PDFFont,
     layouts: FieldLayout[],
     value: string,
-    wrapped: boolean,
+    mode: PaintMode,
 ): void {
     const trimmed = value.trim();
     if (!trimmed) return;
@@ -211,7 +287,8 @@ function paintLayouts(
         const page = pages[layout.pageIndex];
         if (!page) continue;
         whiteOutField(page, layout);
-        if (wrapped) drawWrapped(page, font, value, layout);
+        if (mode === 'wrapped') drawWrapped(page, font, value, layout);
+        else if (mode === 'fit') drawFitted(page, font, value, layout);
         else drawSingleLine(page, font, value, layout);
     }
 }
@@ -223,9 +300,11 @@ function paintNamedField(
     fieldName: string,
     value: string,
     pageOverride?: number,
+    fit = false,
 ): void {
     const layouts = layoutsForField(form, fieldName, pageOverride);
-    paintLayouts(pages, font, layouts, value, WRAPPED_FIELDS.has(fieldName));
+    const mode: PaintMode = fit ? 'fit' : (WRAPPED_FIELDS.has(fieldName) ? 'wrapped' : 'single');
+    paintLayouts(pages, font, layouts, value, mode);
 }
 
 function notesFieldName(rowIndex: number): string {
@@ -235,27 +314,37 @@ function notesFieldName(rowIndex: number): string {
     return `Notes locationassignmentstatusRow${n}`;
 }
 
+interface PaintJob {
+    name: string;
+    value: string;
+    page?: number;
+    /** Shrink-to-fit cells (resource rows) — wrap and reduce font size to fit. */
+    fit?: boolean;
+}
+
 function collectPaintJobs(
     form: Ics201Form,
     sources: Pick<Ics201Sources, 'missionName' | 'missionGuid'>,
-): Array<{ name: string; value: string; page?: number }> {
-    const jobs: Array<{ name: string; value: string; page?: number }> = [
+): PaintJob[] {
+    const jobs: PaintJob[] = [
         { name: 'Incident Name', value: form.incidentName },
         { name: 'Incident Number', value: form.incidentNumber },
         { name: 'Date', value: form.date },
         { name: 'Time', value: form.time },
         { name: MAP_SKETCH_FIELD, value: buildMapSketchText(form, sources) },
         { name: SITUATION_FIELD, value: form.situationSummary },
-        { name: OBJECTIVES_FIELD, value: form.objectives },
+        { name: OBJECTIVES_FIELD, value: formatObjectivesForPdf(form.currentObjectives, form.plannedObjectives) || form.objectives },
         { name: 'Incident Commanders', value: form.incidentCommanders },
         { name: 'Liaison Officer', value: form.liaisonOfficer },
         { name: 'Safety Officer', value: form.safetyOfficer },
         { name: 'Public Information Officer', value: form.publicInformationOfficer },
-        { name: 'Planning Section Chief_2', value: form.planningSectionChief },
-        { name: 'Operations Section Chief_2', value: form.operationsSectionChief },
-        { name: 'FinanceAdministration Section Chief', value: form.financeSectionChief },
-        { name: 'Logistics Section Chief', value: form.logisticsSectionChief },
-        { name: ORG_NOTES_FIELD, value: form.organizationNotes },
+        // Template quirk: §9 chief field names are swapped vs the printed box
+        // titles (printed order Ops, Plan, Log, Fin; field-name order Plan,
+        // Ops, Fin, Log). Map by printed title, not field name.
+        { name: OPS_CHIEF_FIELD, value: form.operationsSectionChief },
+        { name: PLAN_CHIEF_FIELD, value: form.planningSectionChief },
+        { name: LOG_CHIEF_FIELD, value: form.logisticsSectionChief },
+        { name: FIN_CHIEF_FIELD, value: form.financeSectionChief },
     ];
 
     for (const suffix of ['', '_2', '_3', '_4']) {
@@ -272,12 +361,12 @@ function collectPaintJobs(
         if (!row) continue;
         const n = i + 1;
         jobs.push(
-            { name: `ResourceRow${n}`, value: row.resource, page: 3 },
-            { name: `Resource IdentifierRow${n}`, value: row.identifier, page: 3 },
-            { name: `DateTime OrderedRow${n}`, value: row.dateTimeOrdered, page: 3 },
-            { name: `ETARow${n}`, value: row.eta, page: 3 },
+            { name: `ResourceRow${n}`, value: row.resource, page: 3, fit: true },
+            { name: `Resource IdentifierRow${n}`, value: row.identifier, page: 3, fit: true },
+            { name: `DateTime OrderedRow${n}`, value: row.dateTimeOrdered, page: 3, fit: true },
+            { name: `ETARow${n}`, value: row.eta, page: 3, fit: true },
             { name: `Check Box${n}`, value: row.arrived ? 'X' : '', page: 3 },
-            { name: notesFieldName(i), value: row.notes, page: 3 },
+            { name: notesFieldName(i), value: row.notes, page: 3, fit: true },
         );
     }
 
@@ -298,7 +387,7 @@ async function embedTemplatePage(
 
 /** Word-wrap collapsed action text to one PDF row width (no embedded line breaks). */
 function wrapActionToRowWidth(text: string, font: PDFFont, maxWidth: number): string[] {
-    const collapsed = collapseActionText(text);
+    const collapsed = toPdfWinAnsiText(collapseActionText(text));
     if (!collapsed) return [];
     const words = collapsed.split(' ').filter(Boolean);
     if (!words.length) return [];
@@ -326,17 +415,19 @@ export function expandActionRowsForPdf(
     actions: Ics201ActionRow[],
     font: PDFFont,
     maxWidth: number,
+    maxRows: number = MAX_ACTION_ROWS,
 ): Ics201ActionRow[] {
+    const capacity = Math.max(1, maxRows);
     const out: Ics201ActionRow[] = [];
     for (const row of actions) {
-        if (out.length >= MAX_ACTION_ROWS) break;
+        if (out.length >= capacity) break;
         const lines = wrapActionToRowWidth(row.actions, font, maxWidth);
         if (!lines.length) {
             if (row.time.trim()) out.push({ time: row.time.trim(), actions: '' });
             continue;
         }
         for (let i = 0; i < lines.length; i++) {
-            if (out.length >= MAX_ACTION_ROWS) break;
+            if (out.length >= capacity) break;
             out.push({
                 time: i === 0 ? row.time.trim() : '',
                 actions: lines[i],
@@ -347,9 +438,128 @@ export function expandActionRowsForPdf(
 }
 
 function actionsFieldContentWidth(form: BriefingPdfForm): number {
-    const layouts = layoutsForField(form, 'ActionsRow1', 1);
+    const layouts = layoutsForField(form, 'ActionsRow1', ACTIONS_TEMPLATE_PAGE);
     const width = layouts[0]?.w ?? 468;
     return Math.max(40, width - CELL_PAD * 2);
+}
+
+/** Output page index for the Nth §8 page (0 = primary, 1+ = continuation). */
+function actionSheetOutputPageIndex(sheetIndex: number): number {
+    if (sheetIndex <= 0) return ACTIONS_TEMPLATE_PAGE;
+    return OUTPUT_PAGE_COUNT + (sheetIndex - 1);
+}
+
+/**
+ * Prefer the widget that lives on the §8 template page, remapped onto an output page.
+ * Used for multi-widget header fields and single-widget §8 cells.
+ */
+function layoutForActionsSheet(
+    form: BriefingPdfForm,
+    fieldName: string,
+    outPageIndex: number,
+): FieldLayout | null {
+    const natural = layoutsForField(form, fieldName);
+    if (!natural.length) {
+        const overridden = layoutsForField(form, fieldName, outPageIndex);
+        return overridden[0] ?? null;
+    }
+    const onActionsPage = natural.find((l) => l.pageIndex === ACTIONS_TEMPLATE_PAGE);
+    const base = onActionsPage ?? natural[0];
+    return { ...base, pageIndex: outPageIndex };
+}
+
+function paintLayoutValue(
+    pages: PDFPage[],
+    font: PDFFont,
+    layout: FieldLayout | null,
+    value: string,
+    mode: PaintMode,
+): void {
+    if (!layout) return;
+    paintLayouts(pages, font, [layout], value, mode);
+}
+
+function paintContinuationHeaders(
+    pages: PDFPage[],
+    font: PDFFont,
+    form: BriefingPdfForm,
+    ics201: Ics201Form,
+    continuationPages: number,
+): void {
+    for (let c = 0; c < continuationPages; c++) {
+        const outPageIndex = actionSheetOutputPageIndex(c + 1);
+        const page = pages[outPageIndex];
+        if (!page) continue;
+
+        const objectivesLayout = layoutForActionsSheet(form, OBJECTIVES_FIELD, outPageIndex);
+        if (objectivesLayout) {
+            whiteOutField(page, objectivesLayout);
+            const label = '8. Current and Planned Actions (Continued)';
+            page.drawText(toPdfWinAnsiText(label), {
+                x: objectivesLayout.x + CELL_PAD,
+                y: objectivesLayout.y + objectivesLayout.h - CELL_PAD - FONT_SIZE,
+                size: FONT_SIZE,
+                font,
+            });
+        }
+
+        paintLayoutValue(
+            pages,
+            font,
+            layoutForActionsSheet(form, 'Incident Name', outPageIndex),
+            ics201.incidentName,
+            'single',
+        );
+        paintLayoutValue(
+            pages,
+            font,
+            layoutForActionsSheet(form, 'Incident Number', outPageIndex),
+            ics201.incidentNumber,
+            'single',
+        );
+        paintLayoutValue(
+            pages,
+            font,
+            layoutForActionsSheet(form, 'Date', outPageIndex),
+            ics201.date,
+            'single',
+        );
+        paintLayoutValue(
+            pages,
+            font,
+            layoutForActionsSheet(form, 'Time', outPageIndex),
+            ics201.time,
+            'single',
+        );
+        paintLayoutValue(
+            pages,
+            font,
+            layoutForActionsSheet(form, '6 Prepared by Name_2', outPageIndex),
+            ics201.preparedByName,
+            'single',
+        );
+        paintLayoutValue(
+            pages,
+            font,
+            layoutForActionsSheet(form, 'PositionTitle_2', outPageIndex),
+            ics201.positionTitle,
+            'single',
+        );
+        paintLayoutValue(
+            pages,
+            font,
+            layoutForActionsSheet(form, 'Signature_2', outPageIndex),
+            ics201.signature,
+            'single',
+        );
+        paintLayoutValue(
+            pages,
+            font,
+            layoutForActionsSheet(form, 'DateTime_2', outPageIndex),
+            ics201.preparedDateTime,
+            'single',
+        );
+    }
 }
 
 function paintActionRows(
@@ -357,13 +567,102 @@ function paintActionRows(
     font: PDFFont,
     form: BriefingPdfForm,
     actions: Ics201ActionRow[],
+    continuationPages: number,
 ): void {
+    const sheets = 1 + normalizeActionContinuationPages(continuationPages);
+    const maxRows = MAX_ACTION_ROWS * sheets;
     const maxWidth = actionsFieldContentWidth(form);
-    const expanded = expandActionRowsForPdf(actions, font, maxWidth);
+    const expanded = expandActionRowsForPdf(actions, font, maxWidth, maxRows);
+
     for (let i = 0; i < expanded.length; i++) {
-        const n = i + 1;
-        paintNamedField(pages, font, form, `TimeRow${n}`, expanded[i].time, 1);
-        paintNamedField(pages, font, form, `ActionsRow${n}`, expanded[i].actions, 1);
+        const sheetIndex = Math.floor(i / MAX_ACTION_ROWS);
+        const rowOnPage = (i % MAX_ACTION_ROWS) + 1;
+        const outPageIndex = actionSheetOutputPageIndex(sheetIndex);
+        paintLayoutValue(
+            pages,
+            font,
+            layoutForActionsSheet(form, `TimeRow${rowOnPage}`, outPageIndex),
+            expanded[i].time,
+            'single',
+        );
+        paintLayoutValue(
+            pages,
+            font,
+            layoutForActionsSheet(form, `ActionsRow${rowOnPage}`, outPageIndex),
+            expanded[i].actions,
+            'single',
+        );
+    }
+}
+
+/** §9 unit columns: section-units form field paired with its chief box field. */
+const ORG_SECTION_COLUMNS: Array<{
+    chiefField: string;
+    units: (form: Ics201Form) => string;
+}> = [
+    { chiefField: OPS_CHIEF_FIELD, units: (f) => f.operationsSectionUnits },
+    { chiefField: PLAN_CHIEF_FIELD, units: (f) => f.planningSectionUnits },
+    { chiefField: LOG_CHIEF_FIELD, units: (f) => f.logisticsSectionUnits },
+    { chiefField: FIN_CHIEF_FIELD, units: (f) => f.financeSectionUnits },
+];
+
+/**
+ * Fill the §9 Current Organization area (big box under the chief row):
+ * each section's teams/personnel wrap in a column aligned under its chief box,
+ * and leftover organization notes draw full-width below the deepest column.
+ */
+function paintOrganizationSection(
+    pages: PDFPage[],
+    font: PDFFont,
+    form: BriefingPdfForm,
+    ics201: Ics201Form,
+): void {
+    const areaLayout = layoutsForField(form, ORG_NOTES_FIELD)[0];
+    const page = areaLayout ? pages[areaLayout.pageIndex] : undefined;
+    if (!areaLayout || !page) {
+        paintNamedField(pages, font, form, ORG_NOTES_FIELD, ics201.organizationNotes);
+        return;
+    }
+
+    const notes = ics201.organizationNotes.trim();
+    const columns = ORG_SECTION_COLUMNS
+        .map((col) => ({
+            text: col.units(ics201).trim(),
+            chiefLayout: layoutsForField(form, col.chiefField)[0],
+        }))
+        .filter((col) => col.text && col.chiefLayout);
+    if (!notes && !columns.length) return;
+
+    whiteOutField(page, areaLayout);
+
+    const topBaseline = areaLayout.y + areaLayout.h - CELL_PAD - FONT_SIZE;
+    const bottomY = areaLayout.y + CELL_PAD;
+    let lowestColumnY = Number.POSITIVE_INFINITY;
+
+    for (const col of columns) {
+        const colX = col.chiefLayout.x + CELL_PAD;
+        const colW = col.chiefLayout.w - CELL_PAD * 2;
+        let y = topBaseline;
+        for (const line of wrapLines(col.text, font, colW)) {
+            if (y < bottomY) break;
+            if (line) {
+                page.drawText(line, { x: colX, y, size: FONT_SIZE, font });
+            }
+            y -= LINE_HEIGHT;
+        }
+        lowestColumnY = Math.min(lowestColumnY, y);
+    }
+
+    if (!notes) return;
+    let y = columns.length
+        ? lowestColumnY - LINE_HEIGHT
+        : topBaseline;
+    for (const line of wrapLines(notes, font, areaLayout.w - CELL_PAD * 2)) {
+        if (y < bottomY) break;
+        if (line) {
+            page.drawText(line, { x: areaLayout.x + CELL_PAD, y, size: FONT_SIZE, font });
+        }
+        y -= LINE_HEIGHT;
     }
 }
 
@@ -388,10 +687,17 @@ export async function buildIcs201Pdf(
         pages.push(await embedTemplatePage(templateDoc, outDoc, pageIndex));
     }
 
-    for (const job of collectPaintJobs(form, sources)) {
-        paintNamedField(pages, font, pdfForm, job.name, job.value, job.page);
+    const continuationPages = normalizeActionContinuationPages(form.actionContinuationPages);
+    for (let c = 0; c < continuationPages; c++) {
+        pages.push(await embedTemplatePage(templateDoc, outDoc, ACTIONS_TEMPLATE_PAGE));
     }
-    paintActionRows(pages, font, pdfForm, form.actions);
+
+    for (const job of collectPaintJobs(form, sources)) {
+        paintNamedField(pages, font, pdfForm, job.name, job.value, job.page, job.fit);
+    }
+    paintOrganizationSection(pages, font, pdfForm, form);
+    paintContinuationHeaders(pages, font, pdfForm, form, continuationPages);
+    paintActionRows(pages, font, pdfForm, form.actions, continuationPages);
 
     return outDoc.save();
 }

@@ -1,13 +1,21 @@
 <template>
-    <div class='card'>
-        <div class='card-header'>
-            <h3 class='card-title mb-0'>
+    <TablerBorder
+        class='cloudtak-accent text-white'
+        :fill-height='false'
+        :shadow='false'
+        gap='sm'
+    >
+        <template #label>
+            <p class='text-uppercase text-white-50 small mb-0'>
                 Search Urgency Rating
-            </h3>
-        </div>
-        <div class='card-body'>
+            </p>
+        </template>
+
+        <div>
             <p class='text-muted small mb-3'>
                 Score each factor 1 (most urgent) to 3 (least urgent).
+                Save stores the rating in <strong>mission_schema.json</strong>;
+                Send to DataSync posts a mission log entry.
             </p>
 
             <div class='table-responsive urgency-table-wrap'>
@@ -84,28 +92,79 @@
                 </table>
             </div>
 
-            <div class='d-flex align-items-center gap-2 mt-2'>
-                <progress
-                    :value='Math.max(7, Math.min(21, total))'
-                    max='21'
-                    style='flex:1;'
-                />
+            <div class='d-flex align-items-start gap-2 mt-2'>
+                <div class='urgency-scale flex-fill'>
+                    <div
+                        class='urgency-scale-track'
+                        role='progressbar'
+                        :aria-valuenow='clampedTotal'
+                        aria-valuemin='0'
+                        aria-valuemax='21'
+                        :aria-label='`Urgency total ${clampedTotal} of 21, ${level.label}`'
+                    >
+                        <div
+                            class='urgency-scale-fill'
+                            :style='{
+                                width: `${progressPercent}%`,
+                                backgroundColor: level.barColor,
+                            }'
+                        />
+                    </div>
+                    <div
+                        class='urgency-scale-ticks'
+                        aria-hidden='true'
+                    >
+                        <span
+                            v-for='mark in urgencyScaleMarks'
+                            :key='mark'
+                            class='urgency-scale-tick'
+                            :style='{ left: `${(mark / 21) * 100}%` }'
+                        >
+                            <span class='urgency-scale-tick-mark' />
+                            <span class='urgency-scale-tick-label'>{{ mark }}</span>
+                        </span>
+                    </div>
+                </div>
                 <span
-                    class='badge'
+                    class='badge mt-0'
                     :class='level.cls'
                 >{{ level.label }}</span>
             </div>
 
-            <div class='mt-3'>
+            <div class='mt-3 d-flex flex-wrap gap-2'>
                 <button
                     class='btn btn-primary btn-sm'
-                    :disabled='posting || !valid'
+                    :disabled='saving || posting || !valid || !activeMission || loading'
+                    @click='onSave'
+                >
+                    {{ saving ? 'Saving…' : 'Save' }}
+                </button>
+                <button
+                    class='btn btn-outline-secondary btn-sm'
+                    :disabled='posting || saving || !valid || !activeMission || loading'
                     @click='onSend'
                 >
                     {{ posting ? 'Sending…' : 'Send to DataSync' }}
                 </button>
                 <button
-                    class='btn btn-outline-secondary btn-sm ms-2'
+                    type='button'
+                    class='btn btn-outline-primary btn-sm'
+                    :disabled='exporting || !valid || loading'
+                    @click='downloadPdf'
+                >
+                    {{ exporting ? 'Generating PDF…' : 'Download PDF' }}
+                </button>
+                <button
+                    type='button'
+                    class='btn btn-outline-primary btn-sm'
+                    :disabled='uploading || !valid || !activeMission || loading'
+                    @click='onAddPdfToDataSync'
+                >
+                    {{ uploading ? 'Uploading…' : 'Add PDF to DataSync' }}
+                </button>
+                <button
+                    class='btn btn-outline-secondary btn-sm'
+                    :disabled='saving || posting || loading'
                     @click='reset'
                 >
                     Clear
@@ -118,34 +177,181 @@
             >
                 Each rating must be 1, 2, or 3.
             </div>
-            <div
+            <TablerInlineAlert
                 v-if='!activeMission'
-                class='form-text text-warning'
-            >
-                No active mission. Select one in Create | Open first.
-            </div>
+                class='mt-2'
+                severity='warning'
+                title='No Active Mission'
+                description='Select one in Create | Open first.'
+            />
             <div
                 v-else
                 class='form-text'
             >
                 Active DataSync: <strong>{{ activeMission.name }}</strong>
             </div>
-            <div
+            <TablerInlineAlert
                 v-if='status'
-                class='fw-bold mt-1'
-                :class='statusError ? "text-danger" : "text-success"'
+                class='mt-2'
+                :severity='statusError ? "danger" : "success"'
+                :title='statusError ? "Error" : "Success"'
+                :description='status'
+            />
+
+            <!-- Urgency Rating Chart PDF -->
+            <div
+                v-if='!pdfExpanded'
+                class='cloudtak-accent border rounded-3 text-white mt-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+                role='button'
+                tabindex='0'
+                :aria-expanded='false'
+                @click='pdfExpanded = true'
+                @keydown.enter.prevent='pdfExpanded = true'
+                @keydown.space.prevent='pdfExpanded = true'
             >
-                {{ status }}
+                <p class='text-uppercase text-white-50 small mb-0'>
+                    Urgency Rating Chart PDF
+                </p>
+                <IconChevronDown
+                    class='ms-auto transition-transform text-white-50 rotate-180'
+                    :size='20'
+                    stroke='1.5'
+                />
             </div>
+            <TablerBorder
+                v-else
+                class='cloudtak-accent text-white mt-3'
+                :fill-height='false'
+                :shadow='false'
+                gap='sm'
+            >
+                <template #label>
+                    <div
+                        class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                        role='button'
+                        tabindex='0'
+                        :aria-expanded='true'
+                        @click='pdfExpanded = false'
+                        @keydown.enter.prevent='pdfExpanded = false'
+                        @keydown.space.prevent='pdfExpanded = false'
+                    >
+                        <p class='text-uppercase text-white-50 small mb-0'>
+                            Urgency Rating Chart PDF
+                        </p>
+                        <IconChevronDown
+                            class='ms-auto transition-transform text-white-50'
+                            :size='20'
+                            stroke='1.5'
+                        />
+                    </div>
+                </template>
+
+                <div>
+                    <p class='text-muted small mb-2'>
+                        Prefills from ICS 201 / Initial Information when available.
+                        Edit header and Prepared By before downloading.
+                    </p>
+                    <div class='row g-2 mb-2'>
+                        <div class='col-md-6'>
+                            <TablerInput
+                                v-model='pdfHeader.incidentName'
+                                label='Incident Name'
+                                :disabled='incidentNameReadonly'
+                            />
+                        </div>
+                        <div class='col-md-6'>
+                            <TablerInput
+                                v-model='pdfHeader.incidentNumber'
+                                label='Incident Number'
+                                :disabled='incidentNumberReadonly'
+                            />
+                        </div>
+                        <div class='col-md-3'>
+                            <TablerInput
+                                v-model='pdfHeader.date'
+                                label='Date'
+                            />
+                        </div>
+                        <div class='col-md-3'>
+                            <TablerInput
+                                v-model='pdfHeader.time'
+                                label='Time'
+                            />
+                        </div>
+                        <div class='col-md-6'>
+                            <TablerInput
+                                v-model='pdfHeader.preparedByName'
+                                label='Prepared by (Name)'
+                            />
+                        </div>
+                        <div class='col-md-4'>
+                            <TablerInput
+                                v-model='pdfHeader.positionTitle'
+                                label='Position / Title'
+                            />
+                        </div>
+                        <div class='col-md-4'>
+                            <TablerInput
+                                v-model='pdfHeader.signature'
+                                label='Signature'
+                            />
+                        </div>
+                        <div class='col-md-4'>
+                            <TablerInput
+                                v-model='pdfHeader.preparedDateTime'
+                                label='Date / Time'
+                            />
+                        </div>
+                    </div>
+                    <div class='d-flex flex-wrap gap-2'>
+                        <button
+                            type='button'
+                            class='btn btn-outline-primary btn-sm'
+                            :disabled='exporting || !valid'
+                            @click='downloadPdf'
+                        >
+                            {{ exporting ? 'Generating PDF…' : 'Download Urgency Rating Chart PDF' }}
+                        </button>
+                        <button
+                            type='button'
+                            class='btn btn-outline-primary btn-sm'
+                            :disabled='uploading || !valid || !activeMission'
+                            @click='onAddPdfToDataSync'
+                        >
+                            {{ uploading ? 'Uploading…' : 'Add Urgency-Rating-Chart.pdf to DataSync' }}
+                        </button>
+                    </div>
+                </div>
+            </TablerBorder>
         </div>
-    </div>
+    </TablerBorder>
 </template>
 
 <script setup lang='ts'>
-import { reactive, ref, computed, onMounted, onUnmounted } from 'vue';
-import { IconInfoCircle } from '@tabler/icons-vue';
-import Subscription from '../../../../../../src/base/subscription.ts';
+import { reactive, ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { IconInfoCircle, IconChevronDown } from '@tabler/icons-vue';
+import { TablerBorder, TablerInput, TablerInlineAlert } from '@tak-ps/vue-tabler';
+import { loadSchemaSubscription, schemaMission } from '../../../lib/incidentSubscription.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
+import { loadIcs201FromMission } from '../../../lib/ics201.ts';
+import { nowBriefingDate, nowBriefingTime } from '../../../lib/irBriefing.ts';
+import { downloadPdfBytes, uploadMissionFile } from '../../../lib/missionUpload.ts';
+import {
+    buildUrgencyRating,
+    defaultUrgencyFactors,
+    urgencyLevelFromTotal,
+    type UrgencyFactorKey,
+} from '../../../lib/urgencyRating.ts';
+import {
+    buildUrgencyRatingChartPdf,
+    defaultUrgencyRatingChartFilename,
+    URGENCY_RATING_CHART_MISSION_FILENAME,
+    type UrgencyRatingChartHeader,
+} from '../../../lib/urgencyRatingChartPdf.ts';
+import {
+    loadUrgencyRatingFromMission,
+    saveUrgencyRatingToMission,
+} from '../../../lib/urgencyRatingPersistence.ts';
 
 interface HelpLine {
     text: string;
@@ -153,13 +359,33 @@ interface HelpLine {
 }
 
 interface Factor {
-    key: string;
+    key: UrgencyFactorKey;
     label: string;
     value: number;
     helpLines: HelpLine[];
 }
 
 const { activeMission, requireActiveMission } = useIncident();
+
+function blankPdfHeader(): UrgencyRatingChartHeader {
+    return {
+        incidentName: '',
+        incidentNumber: '',
+        date: '',
+        time: '',
+        preparedByName: '',
+        positionTitle: '',
+        signature: '',
+        preparedDateTime: '',
+    };
+}
+
+const pdfHeader = reactive<UrgencyRatingChartHeader>(blankPdfHeader());
+const incidentNameReadonly = ref(false);
+const incidentNumberReadonly = ref(false);
+const exporting = ref(false);
+const uploading = ref(false);
+const pdfExpanded = ref(true);
 
 const factors = reactive<Factor[]>([
     {
@@ -253,30 +479,134 @@ function onDocumentClick(event: MouseEvent): void {
     }
 }
 
-onMounted(() => {
-    document.addEventListener('click', onDocumentClick);
-});
-
-onUnmounted(() => {
-    document.removeEventListener('click', onDocumentClick);
-});
+const urgencyScaleMarks = [0, 7, 14, 21] as const;
 
 const total = computed(() => factors.reduce((s, f) => s + (Number(f.value) || 0), 0));
 const valid = computed(() => factors.every((f) => [1, 2, 3].includes(Number(f.value))));
+const clampedTotal = computed(() => Math.max(0, Math.min(21, total.value)));
+const progressPercent = computed(() => (clampedTotal.value / 21) * 100);
 
 const level = computed(() => {
-    if (total.value <= 10) return { label: 'High', cls: 'bg-danger-lt text-danger' };
-    if (total.value <= 16) return { label: 'Moderate', cls: 'bg-yellow-lt text-yellow' };
-    return { label: 'Lower', cls: 'bg-green-lt text-green' };
+    const label = urgencyLevelFromTotal(total.value);
+    if (label === 'High') {
+        return { label, cls: 'bg-danger-lt text-danger', barColor: 'var(--tblr-danger)' };
+    }
+    if (label === 'Moderate') {
+        return { label, cls: 'bg-yellow-lt text-yellow', barColor: 'var(--tblr-yellow)' };
+    }
+    return { label, cls: 'bg-green-lt text-green', barColor: 'var(--tblr-green)' };
 });
 
 const posting = ref(false);
+const saving = ref(false);
+const loading = ref(false);
 const status = ref('');
 const statusError = ref(false);
+const contentHash = ref<string | undefined>();
+
+function currentFactors(): Record<UrgencyFactorKey, number> {
+    const out = defaultUrgencyFactors();
+    for (const f of factors) {
+        out[f.key] = Number(f.value) || 1;
+    }
+    return out;
+}
+
+function applyFactors(scores: Record<UrgencyFactorKey, number>): void {
+    for (const f of factors) {
+        f.value = scores[f.key] ?? 1;
+    }
+}
 
 function reset(): void {
-    factors.forEach((f) => (f.value = 1));
+    applyFactors(defaultUrgencyFactors());
     status.value = '';
+    statusError.value = false;
+}
+
+async function prefillPdfHeader(): Promise<void> {
+    const date = nowBriefingDate();
+    const time = nowBriefingTime();
+    Object.assign(pdfHeader, blankPdfHeader());
+    incidentNameReadonly.value = false;
+    incidentNumberReadonly.value = false;
+
+    if (!activeMission.value) return;
+
+    try {
+        const loaded = await loadIcs201FromMission(
+            activeMission.value.guid,
+            activeMission.value.token,
+            activeMission.value.name,
+            activeMission.value,
+        );
+        const form = loaded.form;
+        pdfHeader.incidentName = form.incidentName.trim() || activeMission.value.name || '';
+        pdfHeader.incidentNumber = form.incidentNumber.trim();
+        pdfHeader.date = form.date.trim() || date;
+        pdfHeader.time = form.time.trim() || time;
+        pdfHeader.preparedByName = form.preparedByName.trim();
+        pdfHeader.positionTitle = form.positionTitle.trim();
+        pdfHeader.signature = form.signature.trim();
+        pdfHeader.preparedDateTime = form.preparedDateTime.trim() || `${pdfHeader.date} ${pdfHeader.time}`;
+        incidentNameReadonly.value = Boolean(pdfHeader.incidentName.trim());
+        incidentNumberReadonly.value = Boolean(pdfHeader.incidentNumber.trim());
+    } catch {
+        pdfHeader.incidentName = activeMission.value.name || '';
+        pdfHeader.date = date;
+        pdfHeader.time = time;
+        pdfHeader.preparedDateTime = `${date} ${time}`;
+        incidentNameReadonly.value = Boolean(pdfHeader.incidentName.trim());
+    }
+}
+
+async function recall(): Promise<void> {
+    if (!activeMission.value) {
+        contentHash.value = undefined;
+        Object.assign(pdfHeader, blankPdfHeader());
+        incidentNameReadonly.value = false;
+        incidentNumberReadonly.value = false;
+        return;
+    }
+    loading.value = true;
+    status.value = '';
+    statusError.value = false;
+    try {
+        const loaded = await loadUrgencyRatingFromMission(activeMission.value);
+        contentHash.value = loaded.contentHash;
+        if (loaded.rating) {
+            applyFactors(loaded.rating.factors);
+            status.value = 'Loaded saved urgency from mission_schema.json.';
+        }
+        await prefillPdfHeader();
+    } catch (err) {
+        statusError.value = true;
+        status.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        loading.value = false;
+    }
+}
+
+async function onSave(): Promise<void> {
+    if (!requireActiveMission()) return;
+    if (!activeMission.value || !valid.value) return;
+    saving.value = true;
+    status.value = '';
+    statusError.value = false;
+    try {
+        const rating = buildUrgencyRating(currentFactors());
+        contentHash.value = await saveUrgencyRatingToMission(
+            activeMission.value,
+            rating,
+            contentHash.value,
+        );
+        status.value = `Saved urgency rating (${rating.level}) to mission_schema.json on ${activeMission.value.name}.`;
+    } catch (err) {
+        statusError.value = true;
+        status.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        saving.value = false;
+    }
 }
 
 async function onSend(): Promise<void> {
@@ -290,9 +620,7 @@ async function send(): Promise<void> {
     try {
         const breakdown = factors.map((f) => `${f.label}: ${f.value}`).join('; ');
         const content = `Search Urgency: ${level.value.label} (total ${total.value}/21). ${breakdown}`;
-        const sub = await Subscription.load(activeMission.value.guid, {
-            token: activeMission.value.token ?? '',
-        });
+        const sub = await loadSchemaSubscription(activeMission.value);
         await sub.log.create({
             content,
             keywords: ['search-urgency', `urgency:${level.value.label}`, `total:${total.value}`],
@@ -305,10 +633,145 @@ async function send(): Promise<void> {
         posting.value = false;
     }
 }
+
+async function generatePdfBytes(): Promise<Uint8Array> {
+    return buildUrgencyRatingChartPdf(currentFactors(), { ...pdfHeader });
+}
+
+async function downloadPdf(): Promise<void> {
+    if (!valid.value) return;
+    exporting.value = true;
+    status.value = '';
+    statusError.value = false;
+    try {
+        const bytes = await generatePdfBytes();
+        const filename = defaultUrgencyRatingChartFilename(
+            pdfHeader.incidentName || activeMission.value?.name || 'incident',
+        );
+        downloadPdfBytes(bytes, filename);
+        status.value = 'Urgency Rating Chart downloaded.';
+    } catch (err) {
+        statusError.value = true;
+        status.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        exporting.value = false;
+    }
+}
+
+async function onAddPdfToDataSync(): Promise<void> {
+    if (!requireActiveMission()) return;
+    await addPdfToDataSync();
+}
+
+async function addPdfToDataSync(): Promise<void> {
+    if (!activeMission.value || !valid.value) return;
+    uploading.value = true;
+    status.value = '';
+    statusError.value = false;
+    try {
+        const bytes = await generatePdfBytes();
+        const planningTarget = schemaMission(activeMission.value);
+        await uploadMissionFile(
+            planningTarget.guid,
+            URGENCY_RATING_CHART_MISSION_FILENAME,
+            bytes,
+            { missionToken: planningTarget.missionToken },
+        );
+        const sub = await loadSchemaSubscription(activeMission.value);
+        await sub.fetch();
+        status.value = `Added ${URGENCY_RATING_CHART_MISSION_FILENAME} to ${activeMission.value.name}.`;
+    } catch (err) {
+        statusError.value = true;
+        status.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        uploading.value = false;
+    }
+}
+
+watch(
+    () => activeMission.value?.guid,
+    () => {
+        void recall();
+    },
+);
+
+onMounted(() => {
+    document.addEventListener('click', onDocumentClick);
+    void recall();
+});
+
+onUnmounted(() => {
+    document.removeEventListener('click', onDocumentClick);
+});
 </script>
 
 <style scoped>
+.rotate-180 {
+    transform: rotate(-90deg);
+}
+
+.transition-transform {
+    transition: transform 0.2s ease-out;
+}
+
 .urgency-table-wrap {
     overflow: visible;
+}
+
+.urgency-scale {
+    min-width: 0;
+    padding-top: 0.15rem;
+}
+
+.urgency-scale-track {
+    height: 0.5rem;
+    border-radius: 0.25rem;
+    background: var(--tblr-border-color, rgba(0, 0, 0, 0.12));
+    overflow: hidden;
+}
+
+.urgency-scale-fill {
+    height: 100%;
+    border-radius: inherit;
+    transition: width 0.15s ease, background-color 0.15s ease;
+}
+
+.urgency-scale-ticks {
+    position: relative;
+    height: 1.35rem;
+    margin-top: 0.15rem;
+}
+
+.urgency-scale-tick {
+    position: absolute;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transform: translateX(-50%);
+}
+
+.urgency-scale-tick:first-child {
+    transform: translateX(0);
+    align-items: flex-start;
+}
+
+.urgency-scale-tick:last-child {
+    transform: translateX(-100%);
+    align-items: flex-end;
+}
+
+.urgency-scale-tick-mark {
+    display: block;
+    width: 1px;
+    height: 0.35rem;
+    background: var(--tblr-secondary, rgba(0, 0, 0, 0.35));
+}
+
+.urgency-scale-tick-label {
+    margin-top: 0.1rem;
+    font-size: 0.7rem;
+    line-height: 1;
+    color: var(--tblr-secondary, inherit);
 }
 </style>

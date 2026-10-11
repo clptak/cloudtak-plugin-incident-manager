@@ -14,6 +14,15 @@ import {
     subjectDetailRows,
     type ParsedSubject,
 } from './subjectInfo.ts';
+import {
+    GAR_FACTORS,
+    entryHasRespondents,
+    worstComplacencyRespondent,
+    worstGarRespondent,
+    worstSpeRespondent,
+    type GarRiskRespondent,
+    type TacticRiskMap,
+} from './tacticRisk.ts';
 import type { WorkAssignment } from './workAssignments.ts';
 
 /** Rows exported from the Dashboard log table. */
@@ -29,10 +38,16 @@ const LOCAL_TIME_OPTS: Intl.DateTimeFormatOptions = {
     timeStyle: 'short',
 };
 
-/** Format a log timestamp in the browser's local timezone. */
+function pad2(n: number): string {
+    return String(n).padStart(2, '0');
+}
+
+/** Format a log timestamp in the browser's local timezone as `YYYY-MM-DD HH:mm`. */
 export function formatLocalTime(epoch: number, raw?: string): string {
     if (epoch > 0) {
-        return new Date(epoch).toLocaleString(undefined, LOCAL_TIME_OPTS);
+        const d = new Date(epoch);
+        const date = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+        return `${date} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
     }
     if (raw) return raw;
     return '';
@@ -224,6 +239,15 @@ function pdfSourceKeywords(keywords: string[]): string {
         .join(', ');
 }
 
+function formatGarMitigationsForPdf(resp: GarRiskRespondent): string {
+    const parts: string[] = [];
+    for (const { key, label } of GAR_FACTORS) {
+        const text = (resp.mitigations[key] ?? '').trim();
+        if (text) parts.push(`${label}: ${text}`);
+    }
+    return parts.length ? parts.join('; ') : '—';
+}
+
 function buildPdf(
     rows: DashboardExportRow[],
     missionName: string,
@@ -233,6 +257,7 @@ function buildPdf(
     teams: DashboardTeamRoster[] = [],
     resourceAssignments: ResourceAssignment[] = [],
     workAssignments: WorkAssignment[] = [],
+    assessments: TacticRiskMap = {},
 ): string {
     const contentW = PAGE_W - MARGIN * 2;
     const colWidths = [
@@ -512,6 +537,66 @@ function buildPdf(
         addThreeColumnSection('Work Assignments', entries);
     }
 
+    const riskGroups = Object.entries(assessments)
+        .filter(([, entry]) => entryHasRespondents(entry))
+        .sort((a, b) => a[1].tacticLabel.localeCompare(b[1].tacticLabel));
+
+    if (riskGroups.length) {
+        newPage();
+        addWrappedBlock('Risk Assessment', 0, 10, true);
+        y -= 4;
+
+        for (const [, entry] of riskGroups) {
+            addWrappedBlock(entry.tacticLabel || '(untitled tactic)', 0, FONT_SIZE, true);
+            if (entry.description) {
+                addWrappedBlock(entry.description, 8, FONT_SIZE, false);
+            }
+
+            const worstParts: string[] = [];
+            const worstGar = worstGarRespondent(entry);
+            const worstComp = worstComplacencyRespondent(entry);
+            const worstSpe = worstSpeRespondent(entry);
+            if (worstGar) {
+                worstParts.push(`GAR worst: ${worstGar.score} — ${worstGar.level}`);
+            }
+            if (worstComp) {
+                worstParts.push(`Comp worst: ${worstComp.score} — ${worstComp.level}`);
+            }
+            if (worstSpe) {
+                worstParts.push(`SPE worst: ${worstSpe.score} — ${worstSpe.level}`);
+            }
+            if (worstParts.length) {
+                addWrappedBlock(worstParts.join('  |  '), 8, FONT_SIZE, false);
+            }
+
+            for (const resp of entry.garRespondents) {
+                const detail = formatGarMitigationsForPdf(resp);
+                addWrappedBlock(
+                    `GAR — ${resp.name || '(unnamed)'} — ${resp.score} — ${resp.level}`
+                    + ` — ${resp.recommendation} — ${detail}`,
+                    12,
+                );
+            }
+            for (const resp of entry.complacencyRespondents) {
+                addWrappedBlock(
+                    `Complacency — ${resp.name || '(unnamed)'} — ${resp.score} — ${resp.level}`
+                    + ` — ${resp.recommendation}`
+                    + ` — ${resp.repetition} × ${resp.confidence} × ${resp.experience}`,
+                    12,
+                );
+            }
+            for (const resp of entry.speRespondents) {
+                addWrappedBlock(
+                    `SPE — ${resp.name || '(unnamed)'} — ${resp.score} — ${resp.level}`
+                    + ` — ${resp.recommendation}`
+                    + ` — ${resp.severity} × ${resp.probability} × ${resp.exposure}`,
+                    12,
+                );
+            }
+            y -= 6;
+        }
+    }
+
     // Serialize PDF objects
     const objects: string[] = [];
     const offsets: number[] = [0];
@@ -579,6 +664,7 @@ export function exportDashboardPdf(
     teams: DashboardTeamRoster[] = [],
     resourceAssignments: ResourceAssignment[] = [],
     workAssignments: WorkAssignment[] = [],
+    assessments: TacticRiskMap = {},
 ): void {
     const exportedAt = new Date().toLocaleString(undefined, LOCAL_TIME_OPTS);
     const pdf = buildPdf(
@@ -590,6 +676,7 @@ export function exportDashboardPdf(
         teams,
         resourceAssignments,
         workAssignments,
+        assessments,
     );
     const blob = new Blob([pdf], { type: 'application/pdf' });
     downloadBlob(blob, `${safeFilename(missionName)}-dashboard.pdf`);

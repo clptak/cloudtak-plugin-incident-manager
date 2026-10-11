@@ -11,6 +11,7 @@ import {
 } from '../lib/resourceAssignments.ts';
 
 const assignments = ref<ResourceAssignment[]>([]);
+const defaultAgency = ref('');
 const schemaHash = ref<string | undefined>();
 const loading = ref(false);
 const saving = ref(false);
@@ -21,6 +22,7 @@ export function useResourceAssignments() {
     async function loadForMission(mission: ActiveMission | null): Promise<void> {
         if (!mission) {
             assignments.value = [];
+            defaultAgency.value = '';
             schemaHash.value = undefined;
             statusMessage.value = '';
             return;
@@ -33,12 +35,14 @@ export function useResourceAssignments() {
         try {
             const loaded = await loadResourceAssignmentsFromMission(mission);
             assignments.value = loaded.assignments;
+            defaultAgency.value = loaded.defaultAgency;
             schemaHash.value = loaded.contentHash;
             statusMessage.value = loaded.assignments.length
                 ? `${loaded.assignments.length} resource assignment${loaded.assignments.length === 1 ? '' : 's'} loaded`
                 : '';
         } catch (err) {
             assignments.value = [];
+            defaultAgency.value = '';
             schemaHash.value = undefined;
             statusError.value = true;
             statusMessage.value = err instanceof Error ? err.message : String(err);
@@ -57,6 +61,7 @@ export function useResourceAssignments() {
                 mission,
                 assignments.value,
                 schemaHash.value,
+                defaultAgency.value,
             );
             statusMessage.value = `${assignments.value.length} resource assignment${assignments.value.length === 1 ? '' : 's'} saved`;
         } catch (err) {
@@ -109,8 +114,14 @@ export function useResourceAssignments() {
         await persist(mission);
     }
 
+    async function updateDefaultAgency(mission: ActiveMission, value: string): Promise<void> {
+        defaultAgency.value = value.trim();
+        await persist(mission);
+    }
+
     return {
         assignments,
+        defaultAgency,
         schemaHash,
         loading,
         saving,
@@ -121,5 +132,6 @@ export function useResourceAssignments() {
         addAssignment,
         removeAssignment,
         updateAssignment,
+        updateDefaultAgency,
     };
 }

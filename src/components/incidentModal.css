@@ -1,0 +1,12 @@
+/* Float-matched Bootstrap modal surfaces (no TablerModal teleport — popout-safe). */
+.incident-modal .modal-content {
+    background-color: var(--cloudtak-panel-bg, rgba(20, 20, 25, 0.98));
+    color: inherit;
+    border-color: var(--cloudtak-inset-border, rgba(255, 255, 255, 0.12));
+}
+
+.incident-modal .modal-header,
+.incident-modal .modal-footer {
+    border-color: var(--cloudtak-inset-border, rgba(255, 255, 255, 0.12));
+    background: transparent;
+}

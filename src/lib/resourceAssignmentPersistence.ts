@@ -1,7 +1,7 @@
 /** Persist resource assignments in mission_schema.json (incident_response.resource_assignments). */
 
 import type { ActiveMission } from '../composables/useIncident.ts';
-import { loadIncidentSubscription, subscriptionMissionToken } from './incidentSubscription.ts';
+import { loadSchemaSubscription, schemaMissionToken } from './incidentSubscription.ts';
 import {
     applyMissionContextToSchema,
     loadMissionSchema,
@@ -13,6 +13,14 @@ import {
     resourceAssignmentToSchemaRecord,
     type ResourceAssignment,
 } from './resourceAssignments.ts';
+
+export function defaultAgencyFromSchema(schema: MissionSchema): string {
+    return String(schema.default_agency ?? '').trim();
+}
+
+export function applyDefaultAgencyToSchema(schema: MissionSchema, defaultAgency: string): void {
+    schema.default_agency = defaultAgency.trim();
+}
 
 export function resourceAssignmentsFromSchema(schema: MissionSchema): ResourceAssignment[] {
     const ir = schema.incident_response as Record<string, unknown> | undefined;
@@ -27,7 +35,7 @@ export function applyResourceAssignmentsToSchema(
         schema.incident_response = {
             incident_name: '',
             incident_id: '',
-            indicent_datetime: '',
+            incident_datetime: '',
         };
     }
     (schema.incident_response as Record<string, unknown>).resource_assignments = assignments.map(
@@ -37,11 +45,12 @@ export function applyResourceAssignmentsToSchema(
 
 export async function loadResourceAssignmentsFromMission(
     mission: ActiveMission,
-): Promise<{ assignments: ResourceAssignment[]; contentHash?: string }> {
-    const sub = await loadIncidentSubscription(mission);
+): Promise<{ assignments: ResourceAssignment[]; defaultAgency: string; contentHash?: string }> {
+    const sub = await loadSchemaSubscription(mission);
     const loaded = await loadMissionSchema(sub);
     return {
         assignments: resourceAssignmentsFromSchema(loaded.schema),
+        defaultAgency: defaultAgencyFromSchema(loaded.schema),
         contentHash: loaded.contentHash,
     };
 }
@@ -50,17 +59,21 @@ export async function saveResourceAssignmentsToMission(
     mission: ActiveMission,
     assignments: ResourceAssignment[],
     contentHash?: string,
+    defaultAgency?: string,
 ): Promise<string | undefined> {
-    const sub = await loadIncidentSubscription(mission);
+    const sub = await loadSchemaSubscription(mission);
     const loaded = await loadMissionSchema(sub);
 
     applyResourceAssignmentsToSchema(loaded.schema, assignments);
+    if (defaultAgency !== undefined) {
+        applyDefaultAgencyToSchema(loaded.schema, defaultAgency);
+    }
     applyMissionContextToSchema(loaded.schema, mission.name);
 
     const saved = await saveMissionSchema(sub, loaded.schema, {
         contentHash: contentHash ?? loaded.contentHash,
         legacyLogId: loaded.legacyLogId,
-        missionToken: subscriptionMissionToken(sub, mission),
+        missionToken: schemaMissionToken(sub, mission),
     });
 
     return saved.contentHash;

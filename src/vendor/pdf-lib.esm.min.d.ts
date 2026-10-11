@@ -19,7 +19,7 @@ export interface PDFPage {
     getSize(): { width: number; height: number };
     drawText(
         text: string,
-        options: { x: number; y: number; size: number; font: PDFFont },
+        options: { x: number; y: number; size: number; font: PDFFont; color?: RGB },
     ): void;
     drawRectangle(options: {
         x: number;
@@ -27,6 +27,7 @@ export interface PDFPage {
         width: number;
         height: number;
         color?: RGB;
+        borderColor?: RGB;
         borderWidth?: number;
     }): void;
     drawPage(
@@ -43,6 +44,47 @@ export interface PDFPage {
 
 export type PDFEmbeddedPage = object;
 
+/** AcroForm field types used by the IAP generator (official ICS templates). */
+export interface PDFWidgetAnnotation {
+    getRectangle(): { x: number; y: number; width: number; height: number };
+}
+
+export interface PDFAcroField {
+    getWidgets(): PDFWidgetAnnotation[];
+}
+
+export interface PDFTextField {
+    acroField: PDFAcroField;
+    setText(text: string): void;
+    setFontSize(size: number): void;
+    enableMultiline(): void;
+    isMultiline(): boolean;
+}
+
+export interface PDFCheckBox {
+    check(): void;
+    uncheck(): void;
+}
+
+export interface PDFField {
+    getName(): string;
+}
+
+export interface PDFForm {
+    getFields(): PDFField[];
+    getTextField(name: string): PDFTextField;
+    getCheckBox(name: string): PDFCheckBox;
+    getField(name: string): {
+        acroField: {
+            getWidgets(): Array<{
+                getRectangle(): { x: number; y: number; width: number; height: number };
+            }>;
+        };
+    };
+    updateFieldAppearances(font?: PDFFont): void;
+    flatten(): void;
+}
+
 export class PDFDocument {
     static load(bytes: ArrayBuffer | Uint8Array): Promise<PDFDocument>;
     static create(): Promise<PDFDocument>;
@@ -51,5 +93,6 @@ export class PDFDocument {
     embedFont(name: StandardFonts): Promise<PDFFont>;
     addPage(size: [number, number]): PDFPage;
     getPageCount(): number;
+    getForm(): PDFForm;
     save(): Promise<Uint8Array>;
 }

@@ -9,6 +9,7 @@
     ],
     "sar_coordinators": "",
     "assisting_agencies": "",
+    "default_agency": "",
     "subject_located": {},
     "tak_missions": [],
     "caltopo_maps": [],
@@ -118,7 +119,7 @@
     "incident_response": {
         "incident_name": "",
         "incident_id": "",
-        "indicent_datetime": "",
+        "incident_datetime": "",
         "initial_objectives": [{
             "objective_id": "",
             "objective_description": ""
@@ -147,24 +148,20 @@
         "mission_summary": "",
         "urgency_rating": {},
         "casie": {},
-        "scenarios": [
-            {
-                "scenario_id": "",
-                "scenario_description": "",
-                "scenario_mobility": true,
-                "search_responsiveness": true,
-                "search_priority": 1
-            }
-        ],
+        "scenarios": [],
         "objectives": [],
         "strategies": [],
         "tactics": [],
         "initial_situation_summary": "",
-        "subjects": {}
+        "subjects": []
     },
     "assignment": {
         "text": "",
         "datetime": ""
     },
-    "assignments_org_chart": {}
+    "assignments_org_chart": {},
+    "risk": {
+        "tactic_assessments": {}
+    },
+    "segments": {}
 }

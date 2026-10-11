@@ -11,6 +11,7 @@ Vendoring keeps ICS 234 PDF export self-contained with no CloudTAK changes:
 
 - `pdf-lib.esm.min.js` — self-contained pdf-lib ESM bundle. Prefixed with
   `/* eslint-disable */` because CloudTAK lints `./plugins/` with its own ESLint config.
+  Strip the trailing `//# sourceMappingURL=...` line after copying (the `.map` is not vendored).
 - `pdf-lib.esm.min.d.ts` — minimal types for `src/lib/ics234Pdf.ts`.
 
 ## Updating
@@ -31,11 +32,11 @@ grep -oE 'from["'"'"'][^./][^"'"'"']*["'"'"']' src/vendor/pdf-lib.esm.min.js
 
 ## vue-hasty-team (org chart)
 
-Vendored from [@tak-ps/vue-hasty-team](https://github.com/dfpc-coe/vue-hasty-team) v3.70.0 with a layout fix for 3-wide sibling rows (explicit column widths so SVG connectors align with node cards).
+Vendored from [@tak-ps/vue-hasty-team](https://github.com/dfpc-coe/vue-hasty-team) v3.70.0 with a layout fix for 3-wide sibling rows (explicit column widths so SVG connectors align with node cards) and a wheel-zoom clamp (`0.2`–`3`) so CSS `scale` never goes negative and inverts the chart.
 
 CloudTAK Docker builds only run `npm install` in `api/web/`, so `@tak-ps/vue-hasty-team` is not available as a peer dependency at build time. Vendoring keeps the Organization tab self-contained.
 
-- `vue-hasty-team/HastyTeamRoot.vue` — patched `HastyTeam` component (`nodeWidth` / `nodeMarginX` props).
+- `vue-hasty-team/HastyTeamRoot.vue` — patched `HastyTeam` component (`nodeWidth` / `nodeMarginX` props; wheel zoom clamped to `0.2`–`3`).
 - `vue-hasty-team/index.ts` — re-exports `HastyTeam`.
 
 ### Updating

@@ -1,0 +1,10 @@
+[
+    {
+        "category": "Example",
+        "cases": 1,
+        "qAmi": 0.5,
+        "qBmi": 1.2,
+        "qCmi": 2.4,
+        "qDmi": 5.0
+    }
+]

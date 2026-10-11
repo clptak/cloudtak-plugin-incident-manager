@@ -76,12 +76,13 @@
             <div class='small text-muted mb-2'>
                 {{ activeMission.name }} — showing {{ displayRows.length }} of {{ rows.length }} entr{{ rows.length === 1 ? 'y' : 'ies' }}
             </div>
-            <div
+            <TablerInlineAlert
                 v-if='error'
-                class='text-danger small mb-2'
-            >
-                {{ error }}
-            </div>
+                class='mb-2'
+                severity='danger'
+                title='Error'
+                :description='error'
+            />
 
             <div
                 v-if='showInfoPanels'
@@ -91,47 +92,61 @@
                     v-if='initialInfoRows.length'
                     class='col-lg-6'
                 >
-                    <h4 class='h5 mb-2'>
-                        Initial Information
-                    </h4>
-                    <div class='card'>
-                        <div class='card-body py-2'>
-                            <dl class='row mb-0 small'>
-                                <template
-                                    v-for='row in initialInfoRows'
-                                    :key='row.label'
-                                >
-                                    <dt class='col-sm-4 text-muted'>
-                                        {{ row.label }}
-                                    </dt>
-                                    <dd class='col-sm-8 mb-1'>
-                                        {{ row.value }}
-                                    </dd>
-                                </template>
-                            </dl>
-                        </div>
-                    </div>
+                    <TablerBorder
+                        class='cloudtak-accent text-white'
+                        :fill-height='false'
+                        :shadow='false'
+                        gap='sm'
+                    >
+                        <template #label>
+                            <p class='text-uppercase text-white-50 small mb-0'>
+                                Initial Information
+                            </p>
+                        </template>
+
+                        <dl class='row mb-0 small'>
+                            <template
+                                v-for='row in initialInfoRows'
+                                :key='row.label'
+                            >
+                                <dt class='col-sm-4 text-muted'>
+                                    {{ row.label }}
+                                </dt>
+                                <dd class='col-sm-8 mb-1'>
+                                    {{ row.value }}
+                                </dd>
+                            </template>
+                        </dl>
+                    </TablerBorder>
                 </div>
                 <div
                     v-if='subjects.length'
                     :class='initialInfoRows.length ? "col-lg-6" : "col-12"'
                 >
-                    <h4 class='h5 mb-2'>
-                        Subject Information
-                    </h4>
-                    <div
-                        v-for='s in subjects'
-                        :key='s.subjectCaseID'
-                        class='card mb-2'
+                    <TablerBorder
+                        class='cloudtak-accent text-white'
+                        :fill-height='false'
+                        :shadow='false'
+                        gap='sm'
                     >
-                        <div class='card-header py-2'>
-                            <strong>Subject {{ displaySubjectNumber(s.subjectCaseID) }}</strong>
-                            <span
-                                v-if='s.subjectName'
-                                class='text-muted ms-2'
-                            >{{ s.subjectName }}</span>
-                        </div>
-                        <div class='card-body py-2'>
+                        <template #label>
+                            <p class='text-uppercase text-white-50 small mb-0'>
+                                Subject Information
+                            </p>
+                        </template>
+
+                        <div
+                            v-for='s in subjects'
+                            :key='s.subjectCaseID'
+                            class='cloudtak-accent border rounded-3 mb-2 p-2'
+                        >
+                            <div class='mb-1'>
+                                <strong>Subject {{ displaySubjectNumber(s.subjectCaseID) }}</strong>
+                                <span
+                                    v-if='s.subjectName'
+                                    class='text-muted ms-2'
+                                >{{ s.subjectName }}</span>
+                            </div>
                             <dl class='row mb-0 small'>
                                 <template
                                     v-for='row in subjectDetailRows(s)'
@@ -146,192 +161,306 @@
                                 </template>
                             </dl>
                         </div>
-                    </div>
+                    </TablerBorder>
                 </div>
             </div>
 
-            <div
-                v-if='teams.length'
-                class='card mb-3'
+            <TablerBorder
+                v-if='trackedClues.length'
+                class='cloudtak-accent text-white mb-3'
+                :fill-height='false'
+                :shadow='false'
+                gap='sm'
             >
+                <template #label>
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Clues ({{ trackedClues.length }})
+                    </p>
+                </template>
+                <div class='table-responsive'>
+                    <table class='table table-sm small mb-0 align-middle'>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Marker</th>
+                                <th>Validation</th>
+                                <th>Disposition</th>
+                                <th>Finder</th>
+                                <th>Sync</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for='clue in trackedClues'
+                                :key='clue.logId'
+                            >
+                                <td><strong>{{ clue.number }}</strong></td>
+                                <td>{{ clue.markerCallsign || '—' }}</td>
+                                <td>
+                                    <span
+                                        class='badge'
+                                        :class='clue.validation === "Yes" ? "bg-success-lt text-success"
+                                            : clue.validation === "No" ? "bg-danger-lt text-danger"
+                                                : "bg-warning-lt text-warning"'
+                                    >{{ clue.validation }}</span>
+                                </td>
+                                <td>{{ clue.disposition || '—' }}</td>
+                                <td>{{ clue.finder || '—' }}</td>
+                                <td class='text-muted'>
+                                    {{ clue.sourceLabel }}
+                                </td>
+                                <td class='text-muted text-nowrap'>
+                                    {{ clue.at ? clue.at.slice(0, 16).replace('T', ' ') : '' }}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </TablerBorder>
+
+            <template v-if='teams.length'>
                 <div
-                    class='card-header py-2 d-flex align-items-center cursor-pointer user-select-none'
+                    v-if='!teamsExpanded'
+                    class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
                     role='button'
                     tabindex='0'
-                    :aria-expanded='teamsExpanded'
-                    @click='teamsExpanded = !teamsExpanded'
-                    @keydown.enter.prevent='teamsExpanded = !teamsExpanded'
-                    @keydown.space.prevent='teamsExpanded = !teamsExpanded'
+                    :aria-expanded='false'
+                    @click='teamsExpanded = true'
+                    @keydown.enter.prevent='teamsExpanded = true'
+                    @keydown.space.prevent='teamsExpanded = true'
                 >
-                    <h4 class='h5 mb-0'>
+                    <p class='text-uppercase text-white-50 small mb-0'>
                         Teams
-                    </h4>
+                    </p>
                     <span class='text-muted small ms-2'>({{ teams.length }})</span>
                     <IconChevronDown
-                        class='ms-auto transition-transform'
-                        :class='{ "rotate-180": !teamsExpanded }'
+                        class='ms-auto transition-transform text-white-50 rotate-180'
                         :size='18'
                         stroke='1.5'
                     />
                 </div>
-                <div
-                    v-show='teamsExpanded'
-                    class='card-body py-2'
+                <TablerBorder
+                    v-else
+                    class='cloudtak-accent text-white mb-3'
+                    :fill-height='false'
+                    :shadow='false'
+                    gap='sm'
                 >
+                    <template #label>
+                        <div
+                            class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                            role='button'
+                            tabindex='0'
+                            :aria-expanded='true'
+                            @click='teamsExpanded = false'
+                            @keydown.enter.prevent='teamsExpanded = false'
+                            @keydown.space.prevent='teamsExpanded = false'
+                        >
+                            <p class='text-uppercase text-white-50 small mb-0'>
+                                Teams
+                            </p>
+                            <span class='text-muted small ms-2'>({{ teams.length }})</span>
+                            <IconChevronDown
+                                class='ms-auto transition-transform text-white-50'
+                                :size='18'
+                                stroke='1.5'
+                            />
+                        </div>
+                    </template>
+
                     <div
                         v-for='team in teams'
                         :key='team.title'
-                        class='card mb-2'
+                        class='cloudtak-accent border rounded-3 mb-2 p-2'
                     >
-                        <div class='card-header py-2'>
+                        <div>
                             <strong>{{ team.title }}</strong>
                             <span
                                 v-if='team.assignmentCallsign'
                                 class='text-muted ms-2'
                             >{{ team.assignmentCallsign }}</span>
                         </div>
-                        <div class='card-body py-2'>
-                            <div
-                                v-if='team.description'
-                                class='text-muted small mb-2'
+                        <div
+                            v-if='team.description'
+                            class='text-muted small mb-2'
+                        >
+                            {{ team.description }}
+                        </div>
+                        <ul
+                            v-if='team.children.length'
+                            class='list-unstyled mb-0 small'
+                        >
+                            <li
+                                v-for='(child, childIndex) in team.children'
+                                :key='`${team.title}-${childIndex}`'
                             >
-                                {{ team.description }}
-                            </div>
-                            <ul
-                                v-if='team.children.length'
-                                class='list-unstyled mb-0 small'
-                            >
-                                <li
-                                    v-for='(child, childIndex) in team.children'
-                                    :key='`${team.title}-${childIndex}`'
-                                >
-                                    {{ formatTeamRosterChild(child) }}
-                                </li>
-                            </ul>
-                            <div
-                                v-else
-                                class='text-muted small'
-                            >
-                                No roster entries on the org chart.
-                            </div>
+                                {{ formatTeamRosterChild(child) }}
+                            </li>
+                        </ul>
+                        <div
+                            v-else
+                            class='text-muted small'
+                        >
+                            No roster entries on the org chart.
                         </div>
                     </div>
-                </div>
-            </div>
+                </TablerBorder>
+            </template>
 
-            <div
-                v-if='resourceAssignments.length'
-                class='card mb-3'
-            >
+            <template v-if='resourceAssignments.length'>
                 <div
-                    class='card-header py-2 d-flex align-items-center cursor-pointer user-select-none'
+                    v-if='!resourceAssignmentsExpanded'
+                    class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
                     role='button'
                     tabindex='0'
-                    :aria-expanded='resourceAssignmentsExpanded'
-                    @click='resourceAssignmentsExpanded = !resourceAssignmentsExpanded'
-                    @keydown.enter.prevent='resourceAssignmentsExpanded = !resourceAssignmentsExpanded'
-                    @keydown.space.prevent='resourceAssignmentsExpanded = !resourceAssignmentsExpanded'
+                    :aria-expanded='false'
+                    @click='resourceAssignmentsExpanded = true'
+                    @keydown.enter.prevent='resourceAssignmentsExpanded = true'
+                    @keydown.space.prevent='resourceAssignmentsExpanded = true'
                 >
-                    <h4 class='h5 mb-0'>
+                    <p class='text-uppercase text-white-50 small mb-0'>
                         Resource Assignments
-                    </h4>
+                    </p>
                     <span class='text-muted small ms-2'>({{ resourceAssignments.length }})</span>
                     <IconChevronDown
-                        class='ms-auto transition-transform'
-                        :class='{ "rotate-180": !resourceAssignmentsExpanded }'
+                        class='ms-auto transition-transform text-white-50 rotate-180'
                         :size='18'
                         stroke='1.5'
                     />
                 </div>
-                <div
-                    v-show='resourceAssignmentsExpanded'
-                    class='card-body py-2'
+                <TablerBorder
+                    v-else
+                    class='cloudtak-accent text-white mb-3'
+                    :fill-height='false'
+                    :shadow='false'
+                    gap='sm'
                 >
+                    <template #label>
+                        <div
+                            class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                            role='button'
+                            tabindex='0'
+                            :aria-expanded='true'
+                            @click='resourceAssignmentsExpanded = false'
+                            @keydown.enter.prevent='resourceAssignmentsExpanded = false'
+                            @keydown.space.prevent='resourceAssignmentsExpanded = false'
+                        >
+                            <p class='text-uppercase text-white-50 small mb-0'>
+                                Resource Assignments
+                            </p>
+                            <span class='text-muted small ms-2'>({{ resourceAssignments.length }})</span>
+                            <IconChevronDown
+                                class='ms-auto transition-transform text-white-50'
+                                :size='18'
+                                stroke='1.5'
+                            />
+                        </div>
+                    </template>
+
                     <div
                         v-for='assignment in resourceAssignments'
                         :key='assignment.id'
-                        class='card mb-2'
+                        class='cloudtak-accent border rounded-3 mb-2 p-2'
                     >
-                        <div class='card-header py-2'>
+                        <div class='mb-1'>
                             <strong>{{ assignment.resourceIdentifier }}</strong>
                         </div>
-                        <div class='card-body py-2'>
-                            <dl class='row mb-0 small'>
-                                <template
-                                    v-for='row in resourceAssignmentDetailRows(assignment)'
-                                    :key='row.label'
-                                >
-                                    <dt class='col-sm-4 text-muted'>
-                                        {{ row.label }}
-                                    </dt>
-                                    <dd class='col-sm-8 mb-1'>
-                                        {{ row.value }}
-                                    </dd>
-                                </template>
-                            </dl>
-                        </div>
+                        <dl class='row mb-0 small'>
+                            <template
+                                v-for='row in resourceAssignmentDetailRows(assignment)'
+                                :key='row.label'
+                            >
+                                <dt class='col-sm-4 text-muted'>
+                                    {{ row.label }}
+                                </dt>
+                                <dd class='col-sm-8 mb-1'>
+                                    {{ row.value }}
+                                </dd>
+                            </template>
+                        </dl>
                     </div>
-                </div>
-            </div>
+                </TablerBorder>
+            </template>
 
-            <div
-                v-if='workAssignments.length'
-                class='card mb-3'
-            >
+            <template v-if='workAssignments.length'>
                 <div
-                    class='card-header py-2 d-flex align-items-center cursor-pointer user-select-none'
+                    v-if='!workAssignmentsExpanded'
+                    class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
                     role='button'
                     tabindex='0'
-                    :aria-expanded='workAssignmentsExpanded'
-                    @click='workAssignmentsExpanded = !workAssignmentsExpanded'
-                    @keydown.enter.prevent='workAssignmentsExpanded = !workAssignmentsExpanded'
-                    @keydown.space.prevent='workAssignmentsExpanded = !workAssignmentsExpanded'
+                    :aria-expanded='false'
+                    @click='workAssignmentsExpanded = true'
+                    @keydown.enter.prevent='workAssignmentsExpanded = true'
+                    @keydown.space.prevent='workAssignmentsExpanded = true'
                 >
-                    <h4 class='h5 mb-0'>
+                    <p class='text-uppercase text-white-50 small mb-0'>
                         Work Assignments
-                    </h4>
+                    </p>
                     <span class='text-muted small ms-2'>({{ workAssignments.length }})</span>
                     <IconChevronDown
-                        class='ms-auto transition-transform'
-                        :class='{ "rotate-180": !workAssignmentsExpanded }'
+                        class='ms-auto transition-transform text-white-50 rotate-180'
                         :size='18'
                         stroke='1.5'
                     />
                 </div>
-                <div
-                    v-show='workAssignmentsExpanded'
-                    class='card-body py-2'
+                <TablerBorder
+                    v-else
+                    class='cloudtak-accent text-white mb-3'
+                    :fill-height='false'
+                    :shadow='false'
+                    gap='sm'
                 >
+                    <template #label>
+                        <div
+                            class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                            role='button'
+                            tabindex='0'
+                            :aria-expanded='true'
+                            @click='workAssignmentsExpanded = false'
+                            @keydown.enter.prevent='workAssignmentsExpanded = false'
+                            @keydown.space.prevent='workAssignmentsExpanded = false'
+                        >
+                            <p class='text-uppercase text-white-50 small mb-0'>
+                                Work Assignments
+                            </p>
+                            <span class='text-muted small ms-2'>({{ workAssignments.length }})</span>
+                            <IconChevronDown
+                                class='ms-auto transition-transform text-white-50'
+                                :size='18'
+                                stroke='1.5'
+                            />
+                        </div>
+                    </template>
+
                     <div
                         v-for='assignment in workAssignments'
                         :key='assignment.id'
-                        class='card mb-2'
+                        class='cloudtak-accent border rounded-3 mb-2 p-2'
                     >
-                        <div class='card-header py-2'>
+                        <div class='mb-1'>
                             <strong>Assignment {{ assignment.assignmentNumber }}</strong>
                             <span
                                 v-if='assignment.teamLabel'
                                 class='text-muted ms-2'
                             >{{ assignment.teamLabel }}</span>
                         </div>
-                        <div class='card-body py-2'>
-                            <dl class='row mb-0 small'>
-                                <template
-                                    v-for='row in workAssignmentDetailRows(assignment)'
-                                    :key='row.label'
-                                >
-                                    <dt class='col-sm-4 text-muted'>
-                                        {{ row.label }}
-                                    </dt>
-                                    <dd class='col-sm-8 mb-1'>
-                                        {{ row.value }}
-                                    </dd>
-                                </template>
-                            </dl>
-                        </div>
+                        <dl class='row mb-0 small'>
+                            <template
+                                v-for='row in workAssignmentDetailRows(assignment)'
+                                :key='row.label'
+                            >
+                                <dt class='col-sm-4 text-muted'>
+                                    {{ row.label }}
+                                </dt>
+                                <dd class='col-sm-8 mb-1'>
+                                    {{ row.value }}
+                                </dd>
+                            </template>
+                        </dl>
                     </div>
-                </div>
-            </div>
+                </TablerBorder>
+            </template>
 
             <div class='table-responsive'>
                 <table class='table table-sm table-vcenter table-striped table-hover mb-0 dashboard-log-table'>
@@ -394,9 +523,12 @@
 <script setup lang='ts'>
 import { ref, reactive, computed, watch, onMounted } from 'vue';
 import { IconChevronDown } from '@tabler/icons-vue';
+import { TablerBorder, TablerInlineAlert } from '@tak-ps/vue-tabler';
 import type { DBSubscriptionLog } from '../../../../../src/database.ts';
 import { useIncident } from '../../composables/useIncident.ts';
-import { loadIncidentSubscription } from '../../lib/incidentSubscription.ts';
+import { registryFromSchemaValue } from '../../domain/registry.ts';
+import { listTrackedClues, type TrackedClue } from '../../lib/clueLog.ts';
+import { listAllIncidentLogs, loadSchemaSubscription } from '../../lib/incidentSubscription.ts';
 import {
     exportDashboardCsv,
     exportDashboardPdf,
@@ -409,24 +541,27 @@ import {
     workAssignmentDetailRows,
     type DashboardTeamRoster,
 } from '../../lib/dashboardPanels.ts';
-import { loadD4hRoster } from '../../lib/d4hRoster.ts';
+import { loadEffectiveMembers } from '../../lib/d4hRoster.ts';
 import {
     initialInfoDetailRows,
     type IncidentInfoForm,
 } from '../../lib/incidentInfo.ts';
+import { ACTION_201_HASH_KEYWORD, ACTION_201_KEYWORD } from '../../lib/ics201.ts';
 import { loadMissionSchema, resolveIncidentInfoForm } from '../../lib/missionSchema.ts';
 import { loadOrgChartFromMission } from '../../lib/orgChartPersistence.ts';
 import { loadResourceAssignmentsFromMission } from '../../lib/resourceAssignmentPersistence.ts';
 import type { ResourceAssignment } from '../../lib/resourceAssignments.ts';
 import {
     displaySubjectNumber,
-    parseSubjectsFromLogs,
     subjectDetailRows,
     SUBJECT_KEYWORD,
     type ParsedSubject,
 } from '../../lib/subjectInfo.ts';
+import { resolveSubjects } from '../../lib/subjectsPersistence.ts';
 import { loadWorkAssignmentsFromMission } from '../../lib/workAssignmentPersistence.ts';
 import type { WorkAssignment } from '../../lib/workAssignments.ts';
+import { entryHasRespondents, type TacticRiskMap } from '../../lib/tacticRisk.ts';
+import { tacticAssessmentsFromSchema } from '../../lib/tacticRiskPersistence.ts';
 
 const { activeMission, requireActiveMission } = useIncident();
 
@@ -441,9 +576,11 @@ interface Row {
 const rows = ref<Row[]>([]);
 const subjects = ref<ParsedSubject[]>([]);
 const initialInfo = ref<IncidentInfoForm | null>(null);
+const trackedClues = ref<TrackedClue[]>([]);
 const teams = ref<DashboardTeamRoster[]>([]);
 const resourceAssignments = ref<ResourceAssignment[]>([]);
 const workAssignments = ref<WorkAssignment[]>([]);
+const tacticAssessments = ref<TacticRiskMap>({});
 const teamsExpanded = ref(true);
 const resourceAssignmentsExpanded = ref(true);
 const workAssignmentsExpanded = ref(true);
@@ -465,6 +602,14 @@ const FILTERS: KeywordFilter[] = [
     { id: 'area', label: 'Search Area', test: (k) => k.includes('search-area') },
     { id: 'segment', label: 'Area Segment', test: (k) => k.some((w) => /^area:segment:/.test(w)) },
     { id: 'post', label: 'Incident POST', test: (k) => k.includes('incident-post') },
+    {
+        id: '201',
+        label: '201',
+        test: (k) => k.some((w) => {
+            const word = w.toLowerCase();
+            return word === ACTION_201_KEYWORD || word === ACTION_201_HASH_KEYWORD;
+        }),
+    },
     // Regex/prefix filters — match any keyword beginning with the token:
     { id: 'objective', label: 'Objectives', test: (k) => k.some((w) => /^objective:/.test(w)) },
     { id: 'strategy', label: 'Strategies', test: (k) => k.some((w) => /^strategy:/.test(w)) },
@@ -511,7 +656,8 @@ const canExport = computed(
         || teams.value.length > 0
         || resourceAssignments.value.length > 0
         || workAssignments.value.length > 0
-        || displayRows.value.length > 0,
+        || displayRows.value.length > 0
+        || Object.values(tacticAssessments.value).some(entryHasRespondents),
 );
 
 function sortBy(): void {
@@ -627,9 +773,9 @@ async function exportPdf(): Promise<void> {
     try {
         let info = initialInfo.value;
         if (!info) {
-            const sub = await loadIncidentSubscription(mission);
-            const { schema } = await loadMissionSchema(sub);
-            const logs = await sub.log.list({ refresh: true });
+            const schemaSub = await loadSchemaSubscription(mission);
+            const { schema } = await loadMissionSchema(schemaSub);
+            const logs = await listAllIncidentLogs(mission);
             info = resolveIncidentInfoForm(schema, logs);
         }
         exportDashboardPdf(
@@ -640,6 +786,7 @@ async function exportPdf(): Promise<void> {
             teams.value,
             resourceAssignments.value,
             workAssignments.value,
+            tacticAssessments.value,
         );
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
@@ -656,21 +803,28 @@ async function refresh(): Promise<void> {
     loading.value = true; error.value = '';
     try {
         const mission = activeMission.value;
-        const sub = await loadIncidentSubscription(mission);
-        const { schema } = await loadMissionSchema(sub);
-        const logs = await sub.log.list({ refresh: true });
-        const [orgChartLoaded, resourceLoaded, workLoaded, roster] = await Promise.all([
+        const schemaSub = await loadSchemaSubscription(mission);
+        const { schema } = await loadMissionSchema(schemaSub);
+        const logs = await listAllIncidentLogs(mission);
+        try {
+            const opRegistry = mission.mgmt
+                ? registryFromSchemaValue(schema.tak_missions)
+                : [];
+            trackedClues.value = await listTrackedClues(mission, opRegistry);
+        } catch { trackedClues.value = []; }
+        const [orgChartLoaded, resourceLoaded, workLoaded, members] = await Promise.all([
             loadOrgChartFromMission(mission),
             loadResourceAssignmentsFromMission(mission),
             loadWorkAssignmentsFromMission(mission),
-            loadD4hRoster(),
+            loadEffectiveMembers(),
         ]);
 
         initialInfo.value = resolveIncidentInfoForm(schema, logs);
-        subjects.value = parseSubjectsFromLogs(logs);
+        subjects.value = resolveSubjects(schema, logs);
+        tacticAssessments.value = tacticAssessmentsFromSchema(schema);
         teams.value = dashboardTeamsFromOrgChart(
             orgChartLoaded.tree,
-            roster?.members ?? [],
+            members,
         );
         resourceAssignments.value = resourceLoaded.assignments;
         workAssignments.value = workLoaded.assignments;
@@ -708,6 +862,7 @@ watch(activeMission, (m) => {
         teams.value = [];
         resourceAssignments.value = [];
         workAssignments.value = [];
+        tacticAssessments.value = {};
     }
 }, { immediate: true });
 </script>
@@ -727,7 +882,7 @@ watch(activeMission, (m) => {
 }
 
 .dashboard-log-col-time {
-    width: 12%;
+    width: 11rem;
 }
 
 .dashboard-log-col-entry {

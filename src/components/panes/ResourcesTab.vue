@@ -12,6 +12,19 @@
             </span>
             <div class='ms-auto d-flex gap-2'>
                 <button
+                    v-if='infoDismissed'
+                    type='button'
+                    class='btn btn-outline-secondary btn-sm d-inline-flex align-items-center'
+                    title='Show information'
+                    aria-label='Show information'
+                    @click='restoreInfo'
+                >
+                    <IconInfoCircle
+                        :size='16'
+                        stroke='1.5'
+                    />
+                </button>
+                <button
                     type='button'
                     class='btn btn-outline-secondary btn-sm'
                     :disabled='loadingRoster'
@@ -28,159 +41,231 @@
             and appears in the <strong>Organization</strong> palette by Resource Identifier.
         </p>
 
-        <div
+        <TablerInlineAlert
             v-if='!activeMission'
-            class='alert alert-info small mb-3'
-        >
-            Select a mission in <strong>Create | Open</strong> before creating resource assignments.
-        </div>
+            class='mb-3'
+            severity='info'
+            title='Mission required'
+            description='Select a mission in Create | Open before creating resource assignments.'
+        />
 
-        <div
+        <TablerInlineAlert
+            v-if='opRegistryError'
+            severity='warning'
+            title='Operational Periods'
+            :description='opRegistryError'
+        />
+        <TablerInlineAlert
             v-if='statusMessage'
-            class='alert small py-2 mb-3'
-            :class='statusError ? "alert-danger" : "alert-success"'
+            class='mb-3'
+            :severity='statusError ? "danger" : "success"'
+            :title='statusError ? "Error" : "Saved"'
+            :description='statusMessage'
+        />
+
+        <TablerBorder
+            v-if='!infoDismissed'
+            class='cloudtak-accent text-white mb-3'
+            :shadow='false'
+            :fill-height='false'
+            gap='sm'
         >
-            {{ statusMessage }}
-        </div>
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0 d-flex align-items-center gap-1'>
+                    <IconInfoCircle
+                        :size='16'
+                        stroke='1.5'
+                    />
+                    Information
+                </p>
+            </template>
+            <p class='small mb-2'>
+                Utilize the
+                <a
+                    href='#'
+                    @click.prevent='selectHTabGuarded("organization")'
+                >Organization Tab</a>
+                to create your ICS 201 Organizational Chart and Team Assignments
+            </p>
+            <button
+                type='button'
+                class='btn btn-outline-secondary btn-sm'
+                @click='dismissInfo'
+            >
+                Do not remind me
+            </button>
+        </TablerBorder>
 
-        <div class='card mb-3'>
-            <div class='card-header py-2 small fw-semibold'>
-                New resource assignment
-            </div>
-            <div class='card-body'>
-                <div class='row g-2'>
-                    <div class='col-md-6'>
-                        <label class='form-label small mb-1'>Resource Identifier</label>
-                        <input
-                            v-model='form.resourceIdentifier'
-                            type='text'
-                            class='form-control form-control-sm'
-                            placeholder='e.g. SO GROUND TEAM 1'
-                            autocomplete='off'
-                            :disabled='!activeMission || saving'
-                        >
-                    </div>
-                    <div class='col-md-6'>
-                        <label class='form-label small mb-1'>Resource</label>
-                        <select
-                            v-model='form.resource'
-                            class='form-select form-select-sm'
-                            :disabled='!activeMission || saving'
-                        >
-                            <option value=''>
-                                — Select resource —
-                            </option>
-                            <option
-                                v-for='resource in resourceTypeOptions'
-                                :key='resource'
-                                :value='resource'
-                            >
-                                {{ resource }}
-                            </option>
-                        </select>
-                    </div>
-                    <div class='col-md-6'>
-                        <label class='form-label small mb-1'>Agency</label>
-                        <select
-                            v-model='form.agency'
-                            class='form-select form-select-sm'
-                            :disabled='!activeMission || saving'
-                        >
-                            <option value=''>
-                                — Select agency —
-                            </option>
-                            <option
-                                v-for='agency in agencyOptions'
-                                :key='agency'
-                                :value='agency'
-                            >
-                                {{ agency }}
-                            </option>
-                        </select>
-                    </div>
-                    <div class='col-md-3'>
-                        <label class='form-label small mb-1'>Time Ordered</label>
-                        <input
-                            v-model='form.timeOrdered'
-                            type='datetime-local'
-                            class='form-control form-control-sm'
-                            :disabled='!activeMission || saving'
-                        >
-                    </div>
-                    <div class='col-md-3'>
-                        <label class='form-label small mb-1'>ETA</label>
-                        <input
-                            v-model.number='form.eta'
-                            type='number'
-                            min='0'
-                            step='1'
-                            class='form-control form-control-sm'
-                            placeholder='Hours'
-                            :disabled='!activeMission || saving'
-                        >
-                    </div>
-                    <div class='col-md-3'>
-                        <label class='form-label small mb-1'>Status</label>
-                        <select
-                            v-model='form.status'
-                            class='form-select form-select-sm'
-                            :disabled='!activeMission || saving'
-                        >
-                            <option
-                                v-for='opt in statusOptions'
-                                :key='opt.value'
-                                :value='opt.value'
-                            >
-                                {{ opt.label }}
-                            </option>
-                        </select>
-                    </div>
-                    <div class='col-md-3'>
-                        <label class='form-label small mb-1'>Time Arrived</label>
-                        <input
-                            v-model='form.timeArrived'
-                            type='datetime-local'
-                            class='form-control form-control-sm'
-                            :disabled='!activeMission || saving'
-                        >
-                    </div>
+        <TablerBorder
+            class='cloudtak-accent text-white mb-3'
+            :shadow='false'
+            :fill-height='false'
+            gap='sm'
+        >
+            <template #label>
+                <div
+                    class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='defaultAgencyExpanded'
+                    @click='defaultAgencyExpanded = !defaultAgencyExpanded'
+                    @keydown.enter.prevent='defaultAgencyExpanded = !defaultAgencyExpanded'
+                    @keydown.space.prevent='defaultAgencyExpanded = !defaultAgencyExpanded'
+                >
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Default Agency
+                    </p>
+                    <IconChevronDown
+                        class='ms-auto transition-transform text-white-50'
+                        :class='{ "rotate-180": defaultAgencyExpanded }'
+                        :size='18'
+                        stroke='1.5'
+                    />
                 </div>
+            </template>
+            <div v-show='defaultAgencyExpanded'>
+                <TablerInput
+                    v-model='defaultAgencyInput'
+                    label='Default Agency'
+                    placeholder='Your agency name'
+                    autocomplete='organization'
+                    :disabled='!activeMission || saving || savingDefaultAgency'
+                    :description='defaultAgencyHint'
+                    @blur='onDefaultAgencyBlur'
+                />
+            </div>
+        </TablerBorder>
 
-                <div class='d-flex flex-wrap gap-2 mt-3'>
-                    <button
-                        type='button'
-                        class='btn btn-primary btn-sm'
-                        :disabled='!canCreate || saving'
-                        @click='createAssignment'
+        <TablerBorder
+            class='cloudtak-accent text-white mb-3'
+            :shadow='false'
+            :fill-height='false'
+            gap='sm'
+        >
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0 d-flex align-items-center gap-2 w-100'>
+                    <span>New Resource Assignment</span>
+                    <span
+                        class='ms-auto d-inline-flex'
+                        @click.stop
                     >
-                        {{ saving ? 'Saving…' : 'Create assignment' }}
-                    </button>
-                    <button
-                        type='button'
-                        class='btn btn-outline-secondary btn-sm'
-                        :disabled='saving'
-                        @click='resetForm'
-                    >
-                        Clear form
-                    </button>
+                        <NavHelpButton help-key='resource-summary' />
+                    </span>
+                </p>
+            </template>
+
+            <div class='row g-2'>
+                <div class='col-md-6'>
+                    <TablerInput
+                        v-model='form.resourceIdentifier'
+                        label='Resource Identifier'
+                        placeholder='e.g. SO GROUND TEAM 1'
+                        autocomplete='off'
+                        :disabled='!activeMission || saving'
+                    />
+                </div>
+                <div class='col-md-6'>
+                    <TablerEnum
+                        v-model='formResourceLabel'
+                        label='Resource'
+                        :options='resourceFormOptions'
+                        :disabled='!activeMission || saving'
+                    />
+                </div>
+                <div class='col-md-6'>
+                    <TablerEnum
+                        v-model='formAgencyLabel'
+                        label='Agency'
+                        :options='agencyFormOptions'
+                        :disabled='!activeMission || saving'
+                    />
+                </div>
+                <div class='col-md-3'>
+                    <TablerInput
+                        v-model='form.timeOrdered'
+                        label='Time Ordered'
+                        type='datetime-local'
+                        :disabled='!activeMission || saving'
+                    />
+                </div>
+                <div class='col-md-3'>
+                    <TablerInput
+                        v-model='formEtaString'
+                        label='ETA'
+                        type='number'
+                        placeholder='Hours'
+                        :disabled='!activeMission || saving'
+                    />
+                </div>
+                <div class='col-md-3'>
+                    <TablerEnum
+                        v-model='formStatusLabel'
+                        label='Status'
+                        :options='statusLabelOptions'
+                        :disabled='!activeMission || saving'
+                    />
+                </div>
+                <div class='col-md-3'>
+                    <TablerInput
+                        v-model='form.timeArrived'
+                        label='Time Arrived'
+                        type='datetime-local'
+                        :disabled='!activeMission || saving'
+                    />
+                </div>
+                <div
+                    v-if='opLabelOptions.length > 1'
+                    class='col-md-3'
+                >
+                    <TablerEnum
+                        v-model='formOpLabel'
+                        label='Operational Period'
+                        :options='opLabelOptions'
+                        :disabled='!activeMission || saving'
+                    />
                 </div>
             </div>
-        </div>
 
-        <div
+            <div class='d-flex flex-wrap gap-2 mt-3'>
+                <button
+                    type='button'
+                    class='btn btn-primary btn-sm'
+                    :disabled='!canCreate || saving'
+                    @click='createAssignment'
+                >
+                    {{ saving ? 'Saving…' : 'Create assignment' }}
+                </button>
+                <button
+                    type='button'
+                    class='btn btn-outline-secondary btn-sm'
+                    :disabled='saving'
+                    @click='resetForm'
+                >
+                    Clear form
+                </button>
+            </div>
+        </TablerBorder>
+
+        <TablerBorder
             v-if='activeMission'
-            class='card'
+            class='cloudtak-accent text-white'
+            :shadow='false'
+            :fill-height='false'
+            gap='sm'
         >
-            <div class='card-header py-2 small fw-semibold d-flex align-items-center gap-2'>
-                <span>Mission resource assignments ({{ assignments.length }})</span>
-                <span
-                    v-if='loading'
-                    class='text-muted fw-normal'
-                >Loading…</span>
-            </div>
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0'>
+                    Mission Resource Assignments ({{ assignments.length }})
+                    <span
+                        v-if='loading'
+                        class='text-muted fw-normal text-lowercase'
+                    > — Loading…</span>
+                </p>
+            </template>
+
             <div
                 v-if='!assignments.length && !loading'
-                class='card-body text-muted small'
+                class='text-muted small'
             >
                 No assignments yet — create one above. They will be stored in mission_schema.json.
             </div>
@@ -198,10 +283,16 @@
                             <th style='width: 72px;'>
                                 ETA
                             </th>
-                            <th style='width: 96px;'>
+                            <th style='width: 110px;'>
                                 Status
                             </th>
                             <th>Time Arrived</th>
+                            <th
+                                v-if='opLabelOptions.length > 1'
+                                style='width: 100px;'
+                            >
+                                OP
+                            </th>
                             <th style='width: 72px;' />
                         </tr>
                     </thead>
@@ -211,93 +302,67 @@
                             :key='assignment.id'
                         >
                             <td>
-                                <input
-                                    :value='assignment.resourceIdentifier'
-                                    type='text'
-                                    class='form-control form-control-sm'
+                                <TablerInput
+                                    :model-value='assignment.resourceIdentifier'
                                     :disabled='saving'
-                                    @change='onFieldChange(assignment.id, "resourceIdentifier", ($event.target as HTMLInputElement).value)'
-                                >
+                                    @update:model-value='onFieldChange(assignment.id, "resourceIdentifier", String($event))'
+                                />
                             </td>
                             <td>
-                                <select
-                                    :value='assignment.resource'
-                                    class='form-select form-select-sm'
+                                <TablerEnum
+                                    :model-value='assignment.resource || "—"'
+                                    :options='rowResourceOptions'
                                     :disabled='saving'
-                                    @change='onFieldChange(assignment.id, "resource", ($event.target as HTMLSelectElement).value)'
-                                >
-                                    <option value=''>
-                                        —
-                                    </option>
-                                    <option
-                                        v-for='resource in resourceTypeOptions'
-                                        :key='resource'
-                                        :value='resource'
-                                    >
-                                        {{ resource }}
-                                    </option>
-                                </select>
+                                    @update:model-value='onFieldChange(assignment.id, "resource", $event === "—" ? "" : $event)'
+                                />
                             </td>
                             <td>
-                                <select
-                                    :value='assignment.agency'
-                                    class='form-select form-select-sm'
+                                <TablerEnum
+                                    :model-value='assignment.agency'
+                                    :options='rowAgencyOptions(assignment.agency)'
                                     :disabled='saving'
-                                    @change='onFieldChange(assignment.id, "agency", ($event.target as HTMLSelectElement).value)'
-                                >
-                                    <option
-                                        v-for='agency in rowAgencyOptions(assignment.agency)'
-                                        :key='agency'
-                                        :value='agency'
-                                    >
-                                        {{ agency }}
-                                    </option>
-                                </select>
+                                    @update:model-value='onFieldChange(assignment.id, "agency", $event)'
+                                />
                             </td>
                             <td>
-                                <input
-                                    :value='assignment.timeOrdered'
+                                <TablerInput
+                                    :model-value='assignment.timeOrdered'
                                     type='datetime-local'
-                                    class='form-control form-control-sm'
                                     :disabled='saving'
-                                    @change='onFieldChange(assignment.id, "timeOrdered", ($event.target as HTMLInputElement).value)'
-                                >
+                                    @update:model-value='onFieldChange(assignment.id, "timeOrdered", String($event))'
+                                />
                             </td>
                             <td>
-                                <input
-                                    :value='assignment.eta ?? ""'
+                                <TablerInput
+                                    :model-value='assignment.eta ?? ""'
                                     type='number'
-                                    min='0'
-                                    step='1'
-                                    class='form-control form-control-sm'
                                     :disabled='saving'
-                                    @change='onEtaChange(assignment.id, ($event.target as HTMLInputElement).value)'
-                                >
+                                    @update:model-value='onEtaChange(assignment.id, String($event))'
+                                />
                             </td>
                             <td>
-                                <select
-                                    :value='assignment.status'
-                                    class='form-select form-select-sm'
+                                <TablerEnum
+                                    :model-value='statusLabelFor(assignment.status)'
+                                    :options='statusLabelOptions'
                                     :disabled='saving'
-                                    @change='onStatusChange(assignment.id, ($event.target as HTMLSelectElement).value as ResourceAssignmentStatus)'
-                                >
-                                    <option
-                                        v-for='opt in statusOptions'
-                                        :key='opt.value'
-                                        :value='opt.value'
-                                    >
-                                        {{ opt.label }}
-                                    </option>
-                                </select>
+                                    @update:model-value='onStatusLabelChange(assignment.id, $event)'
+                                />
                             </td>
                             <td>
-                                <input
-                                    :value='assignment.timeArrived'
+                                <TablerInput
+                                    :model-value='assignment.timeArrived'
                                     type='datetime-local'
-                                    class='form-control form-control-sm'
                                     :disabled='saving'
-                                    @change='onFieldChange(assignment.id, "timeArrived", ($event.target as HTMLInputElement).value)'
-                                >
+                                    @update:model-value='onFieldChange(assignment.id, "timeArrived", String($event))'
+                                />
+                            </td>
+                            <td v-if='opLabelOptions.length > 1'>
+                                <TablerEnum
+                                    :model-value='opLabelFor(assignment.opNumber)'
+                                    :options='opLabelOptions'
+                                    :disabled='saving'
+                                    @update:model-value='onOpLabelChange(assignment.id, $event)'
+                                />
                             </td>
                             <td>
                                 <button
@@ -314,29 +379,42 @@
                     </tbody>
                 </table>
             </div>
-        </div>
+        </TablerBorder>
     </div>
 </template>
 
 <script setup lang='ts'>
 import { computed, onMounted, ref, watch } from 'vue';
+import { IconChevronDown, IconInfoCircle } from '@tabler/icons-vue';
+import {
+    TablerBorder,
+    TablerInput,
+    TablerEnum,
+    TablerInlineAlert,
+} from '@tak-ps/vue-tabler';
 import { useIncident } from '../../composables/useIncident.ts';
+import { usePluginSettings } from '../../composables/usePluginSettings.ts';
 import { useResourceAssignments } from '../../composables/useResourceAssignments.ts';
 import { formatD4hSyncTime, loadD4hMeta, loadD4hRoster } from '../../lib/d4hRoster.ts';
 import type { D4HRosterMeta } from '../../lib/d4hTypes.ts';
 import { nowDatetimeLocal } from '../../lib/incidentInfo.ts';
+import NavHelpButton from '../NavHelpButton.vue';
 import {
     buildAgencyOptions,
-    DEFAULT_AGENCY,
+    resolveEffectiveDefaultAgency,
     RESOURCE_ASSIGNMENT_STATUSES,
     RESOURCE_TYPE_OPTIONS,
     type ResourceAssignment,
     type ResourceAssignmentStatus,
 } from '../../lib/resourceAssignments.ts';
+import type { OpPeriodRegistryEntry } from '../../domain/entities.ts';
+import { currentOpPeriod } from '../../domain/registry.ts';
+import { createRegistryStore } from '../../lib/registryPersistence.ts';
 
-const { activeMission, requireActiveMission } = useIncident();
+const { activeMission, requireActiveMission, selectHTabGuarded } = useIncident();
 const {
     assignments,
+    defaultAgency,
     loading,
     saving,
     statusMessage,
@@ -346,11 +424,55 @@ const {
     addAssignment,
     removeAssignment,
     updateAssignment,
+    updateDefaultAgency,
 } = useResourceAssignments();
 
+const {
+    yourAgency,
+    useD4hAidingAgencies,
+    aidingAgencies,
+} = usePluginSettings();
+
+const RESOURCES_INFO_DISMISSED_KEY = 'incident-manager:resources-info-dismissed';
+const RESOURCE_PLACEHOLDER = '— Select resource —';
+const AGENCY_PLACEHOLDER = '— Select agency —';
+
+function loadInfoDismissed(): boolean {
+    try {
+        return localStorage.getItem(RESOURCES_INFO_DISMISSED_KEY) === 'true';
+    } catch {
+        return false;
+    }
+}
+
+const infoDismissed = ref(loadInfoDismissed());
+
+function dismissInfo(): void {
+    infoDismissed.value = true;
+    try {
+        localStorage.setItem(RESOURCES_INFO_DISMISSED_KEY, 'true');
+    } catch {
+        // ignore quota / private-mode errors
+    }
+}
+
+function restoreInfo(): void {
+    infoDismissed.value = false;
+    try {
+        localStorage.removeItem(RESOURCES_INFO_DISMISSED_KEY);
+    } catch {
+        // ignore quota / private-mode errors
+    }
+}
+
+const defaultAgencyExpanded = ref(true);
 const loadingRoster = ref(false);
+const savingDefaultAgency = ref(false);
 const meta = ref<D4HRosterMeta | null>(null);
-const agencyOptions = ref<string[]>(buildAgencyOptions([]));
+const d4hExternalResources = ref<{ id: number; name: string }[]>([]);
+const defaultAgencyInput = ref('');
+const agencyOptions = ref<string[]>([]);
+const lastEffectiveDefaultAgency = ref('');
 
 const form = ref<Omit<ResourceAssignment, 'id'>>({
     ...blankResourceAssignmentForm(),
@@ -359,6 +481,131 @@ const form = ref<Omit<ResourceAssignment, 'id'>>({
 
 const resourceTypeOptions = RESOURCE_TYPE_OPTIONS;
 const statusOptions = RESOURCE_ASSIGNMENT_STATUSES;
+const statusLabelOptions = statusOptions.map((opt) => opt.label);
+const rowResourceOptions = ['—', ...resourceTypeOptions];
+
+// ── Operational periods (Area Search phase) ────────────────────────────────
+const OP_NONE_LABEL = 'Initial Response';
+const opRegistry = ref<OpPeriodRegistryEntry[]>([]);
+const opLabelOptions = computed(() => [
+    OP_NONE_LABEL,
+    ...opRegistry.value.map((op) => `OP${op.opNumber}`),
+]);
+
+function opLabelFor(opNumber?: number | null): string {
+    return Number.isInteger(opNumber) && (opNumber as number) > 0 ? `OP${opNumber}` : OP_NONE_LABEL;
+}
+
+function opNumberFromLabel(label: string): number | null {
+    const match = /^OP(\d+)$/.exec(label);
+    return match ? Number(match[1]) : null;
+}
+
+const formOpLabel = computed({
+    get(): string { return opLabelFor(form.value.opNumber); },
+    set(label: string): void { form.value.opNumber = opNumberFromLabel(label); },
+});
+
+const opRegistryError = ref('');
+
+async function loadOpRegistry(): Promise<void> {
+    const mission = activeMission.value;
+    opRegistryError.value = '';
+    if (!mission?.mgmt) {
+        opRegistry.value = [];
+        return;
+    }
+    try {
+        opRegistry.value = await createRegistryStore(mission).load();
+        // Default new resources to the current (open) OP when one exists.
+        if (form.value.opNumber == null) {
+            const current = currentOpPeriod(opRegistry.value);
+            if (current) form.value.opNumber = current.opNumber;
+        }
+    } catch (err) {
+        opRegistry.value = [];
+        opRegistryError.value = `Operational periods unavailable: ${err instanceof Error ? err.message : String(err)}`;
+    }
+}
+
+async function onOpLabelChange(id: string, label: string): Promise<void> {
+    if (!activeMission.value) return;
+    await updateAssignment(activeMission.value, id, { opNumber: opNumberFromLabel(label) });
+}
+
+const resourceFormOptions = computed(() => [RESOURCE_PLACEHOLDER, ...resourceTypeOptions]);
+const agencyFormOptions = computed(() => [AGENCY_PLACEHOLDER, ...agencyOptions.value]);
+
+const formResourceLabel = computed({
+    get(): string {
+        return form.value.resource || RESOURCE_PLACEHOLDER;
+    },
+    set(label: string): void {
+        form.value.resource = label === RESOURCE_PLACEHOLDER ? '' : label;
+    },
+});
+
+const formAgencyLabel = computed({
+    get(): string {
+        return form.value.agency || AGENCY_PLACEHOLDER;
+    },
+    set(label: string): void {
+        form.value.agency = label === AGENCY_PLACEHOLDER ? '' : label;
+    },
+});
+
+const formStatusLabel = computed({
+    get(): string {
+        return statusLabelFor(form.value.status);
+    },
+    set(label: string): void {
+        const opt = statusOptions.find((entry) => entry.label === label);
+        if (opt) form.value.status = opt.value;
+    },
+});
+
+const formEtaString = computed({
+    get(): string {
+        return form.value.eta == null ? '' : String(form.value.eta);
+    },
+    set(raw: string | number): void {
+        const s = String(raw);
+        form.value.eta = s.trim() === '' || Number.isNaN(Number(s)) ? null : Number(s);
+    },
+});
+
+const d4hContextName = computed(() => (meta.value?.contextName ?? '').trim());
+
+const effectiveDefaultAgency = computed(() =>
+    resolveEffectiveDefaultAgency(
+        defaultAgency.value,
+        d4hContextName.value,
+        yourAgency.value,
+    ),
+);
+
+const pluginDefaultAgency = computed(() =>
+    resolveEffectiveDefaultAgency('', d4hContextName.value, yourAgency.value),
+);
+
+const defaultAgencyHint = computed(() => {
+    const override = defaultAgency.value.trim();
+    const settingsHome = yourAgency.value.trim();
+    const d4h = d4hContextName.value;
+    if (override) {
+        if (settingsHome && override !== settingsHome) {
+            return `Override active. Settings Your Agency: ${settingsHome}.`;
+        }
+        return 'Saved on this mission as default_agency in mission_schema.json.';
+    }
+    if (settingsHome) {
+        return 'Using Your Agency from Settings. Enter a different value to override on this mission.';
+    }
+    if (d4h) {
+        return `Using D4H team: ${d4h}. Set Your Agency in Settings, or enter a value above to override.`;
+    }
+    return 'Set Your Agency in Settings, or enter a name here to override on this mission.';
+});
 
 const canCreate = computed(() =>
     form.value.resourceIdentifier.trim().length > 0
@@ -366,10 +613,31 @@ const canCreate = computed(() =>
     && form.value.agency.trim().length > 0,
 );
 
+function statusLabelFor(status: ResourceAssignmentStatus): string {
+    return statusOptions.find((opt) => opt.value === status)?.label ?? 'Requested';
+}
+
+function rebuildAgencyOptions(): void {
+    const aidingNames = useD4hAidingAgencies.value
+        ? d4hExternalResources.value.map((r) => r.name)
+        : aidingAgencies.value;
+    agencyOptions.value = buildAgencyOptions(aidingNames, effectiveDefaultAgency.value);
+}
+
+function applyEffectiveDefaultToForm(force = false): void {
+    const effective = effectiveDefaultAgency.value;
+    if (!effective) return;
+    if (force || !form.value.agency.trim() || form.value.agency === lastEffectiveDefaultAgency.value) {
+        form.value.agency = effective;
+    }
+    lastEffectiveDefaultAgency.value = effective;
+}
+
 function resetForm(): void {
     form.value = {
         ...blankResourceAssignmentForm(),
         timeOrdered: nowDatetimeLocal(),
+        agency: effectiveDefaultAgency.value,
     };
 }
 
@@ -378,12 +646,28 @@ async function refreshAgencies(): Promise<void> {
     try {
         const roster = await loadD4hRoster();
         meta.value = roster?.meta ?? await loadD4hMeta();
-        agencyOptions.value = buildAgencyOptions(roster?.externalResources ?? []);
-        if (!agencyOptions.value.includes(form.value.agency)) {
-            form.value.agency = DEFAULT_AGENCY;
-        }
+        d4hExternalResources.value = roster?.externalResources ?? [];
+        rebuildAgencyOptions();
+        applyEffectiveDefaultToForm();
     } finally {
         loadingRoster.value = false;
+    }
+}
+
+async function onDefaultAgencyBlur(): Promise<void> {
+    if (!activeMission.value) return;
+    const next = defaultAgencyInput.value.trim();
+    const schema = defaultAgency.value.trim();
+    if (next === schema) return;
+    if (!schema && next === pluginDefaultAgency.value) return;
+
+    savingDefaultAgency.value = true;
+    try {
+        await updateDefaultAgency(activeMission.value, next);
+        rebuildAgencyOptions();
+        applyEffectiveDefaultToForm(true);
+    } finally {
+        savingDefaultAgency.value = false;
     }
 }
 
@@ -405,6 +689,7 @@ async function createAssignment(): Promise<void> {
         eta,
         status: form.value.status,
         timeArrived: form.value.timeArrived.trim(),
+        opNumber: form.value.opNumber ?? null,
     });
 
     resetForm();
@@ -432,9 +717,10 @@ async function onFieldChange(
     await updateAssignment(activeMission.value, id, { [field]: value });
 }
 
-async function onEtaChange(id: string, raw: string): Promise<void> {
+async function onEtaChange(id: string, raw: string | number): Promise<void> {
     if (!activeMission.value) return;
-    const eta = raw.trim() === '' || Number.isNaN(Number(raw)) ? null : Number(raw);
+    const s = String(raw);
+    const eta = s.trim() === '' || Number.isNaN(Number(s)) ? null : Number(s);
     await updateAssignment(activeMission.value, id, { eta });
 }
 
@@ -443,9 +729,34 @@ async function onStatusChange(id: string, status: ResourceAssignmentStatus): Pro
     await updateAssignment(activeMission.value, id, { status });
 }
 
-watch(() => activeMission.value?.guid, (guid) => {
-    void loadForMission(guid ? activeMission.value : null);
+async function onStatusLabelChange(id: string, label: string): Promise<void> {
+    const opt = statusOptions.find((entry) => entry.label === label);
+    if (!opt) return;
+    await onStatusChange(id, opt.value);
+}
+
+watch(() => activeMission.value?.guid, async (guid) => {
+    await loadForMission(guid ? activeMission.value : null);
+    defaultAgencyInput.value = effectiveDefaultAgency.value;
+    applyEffectiveDefaultToForm(true);
+    await loadOpRegistry();
 }, { immediate: true });
+
+watch(defaultAgency, () => {
+    defaultAgencyInput.value = effectiveDefaultAgency.value;
+    rebuildAgencyOptions();
+    applyEffectiveDefaultToForm();
+});
+
+watch(effectiveDefaultAgency, (value) => {
+    defaultAgencyInput.value = value;
+    rebuildAgencyOptions();
+    applyEffectiveDefaultToForm();
+});
+
+watch([useD4hAidingAgencies, aidingAgencies], () => {
+    rebuildAgencyOptions();
+});
 
 onMounted(() => {
     void refreshAgencies();
@@ -456,5 +767,13 @@ onMounted(() => {
 .resources-table-scroll {
     max-height: 50vh;
     overflow: auto;
+}
+
+.rotate-180 {
+    transform: rotate(-180deg);
+}
+
+.transition-transform {
+    transition: transform 0.2s ease-out;
 }
 </style>

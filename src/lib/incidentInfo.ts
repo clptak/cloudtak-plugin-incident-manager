@@ -1,15 +1,22 @@
 /** Initial / incident information log keyword and field parsing. */
 
+import { parseCoordinates, type LatLng } from './coords.ts';
 import { kwValue } from './subjectInfo.ts';
 
 export const INITIAL_INFO_KEYWORD = 'initial-information';
 
 /** Activity number — e.g. A12345678 */
-export const ACTIVITY_NUMBER_RE = /A\d\d0\d\d\d\d\d/g;
-/** Department report number — e.g. R1234567 */
-export const REPORT_NUMBER_RE = /S\d\d0\d\d\d\d/g;
+export const ACTIVITY_NUMBER_RE = /A\d{8}/g;
+/** Department report number — e.g. S1234567 */
+export const REPORT_NUMBER_RE = /S\d{7}/g;
 /** State mission number — e.g. 2025-12345 */
 export const DEMA_MISSION_RE = /^20\d\d-\d\d\d\d\d$/;
+
+const CFS_EVENT_ID_RE = /Event ID\s*\n\s*(A\d{8})\b/i;
+const CFS_CASE_NUMBERS_RE = /Case Numbers\s*\n\s*(S\d{7})\b/i;
+const CFS_CREATED_RE = /Created\s*\n\s*(\d{2}:\d{2}:\d{2})\s{2}(\d{2}\/\d{2}\/\d{2})/i;
+const CFS_DISPATCHED_RE = /Dispatched\s*\n\s*(\d{2}:\d{2}:\d{2})\s{2}(\d{2}\/\d{2}\/\d{2})/i;
+const CFS_ADDRESS_RE = /Address\s*\n\s*([^\n]+)/i;
 
 export interface IncidentInfoForm {
     incidentName: string;
@@ -28,6 +35,18 @@ export interface IncidentInfoForm {
 export interface CadIdentifiers {
     activityNumber: string | null;
     reportNumber: string | null;
+}
+
+/** Labeled CFS header fields extracted from pasted call notes. */
+export interface CfsHeaderFields {
+    activityNumber: string | null;
+    reportNumber: string | null;
+    /** datetime-local value from Created (YYYY-MM-DDTHH:MM) — Time Reported Missing */
+    callCreated: string | null;
+    /** datetime-local value from Dispatched (YYYY-MM-DDTHH:MM) */
+    assignmentDateTime: string | null;
+    /** Decimal degrees from Address LL(...), if present */
+    callLocation: LatLng | null;
 }
 
 export interface MissionLogLike {
@@ -91,8 +110,64 @@ export function suggestIncidentName(subjectNames: string[]): string {
     return '';
 }
 
+/**
+ * Convert CFS Dispatched `HH:MM:SS  MM/DD/YY` to datetime-local `YYYY-MM-DDTHH:MM`.
+ * Two-digit years map to 20xx.
+ */
+export function dispatchedToDatetimeLocal(time: string, date: string): string | null {
+    const tm = time.trim().match(/^(\d{2}):(\d{2}):(\d{2})$/);
+    const dm = date.trim().match(/^(\d{2})\/(\d{2})\/(\d{2})$/);
+    if (!tm || !dm) return null;
+    const year = 2000 + parseInt(dm[3], 10);
+    const month = dm[1];
+    const day = dm[2];
+    return `${year}-${month}-${day}T${tm[1]}:${tm[2]}`;
+}
+
+/** Extract labeled Event ID, Case Numbers, Created, Dispatched, and Address LL from CFS text. */
+export function parseCfsHeaderFields(cadText: string): CfsHeaderFields {
+    const eventMatch = cadText.match(CFS_EVENT_ID_RE);
+    const caseMatch = cadText.match(CFS_CASE_NUMBERS_RE);
+    const createdMatch = cadText.match(CFS_CREATED_RE);
+    const dispatchedMatch = cadText.match(CFS_DISPATCHED_RE);
+    const addressMatch = cadText.match(CFS_ADDRESS_RE);
+
+    let callCreated: string | null = null;
+    if (createdMatch) {
+        callCreated = dispatchedToDatetimeLocal(createdMatch[1], createdMatch[2]);
+    }
+
+    let assignmentDateTime: string | null = null;
+    if (dispatchedMatch) {
+        assignmentDateTime = dispatchedToDatetimeLocal(dispatchedMatch[1], dispatchedMatch[2]);
+    }
+
+    let callLocation: LatLng | null = null;
+    if (addressMatch?.[1]) {
+        const line = addressMatch[1].trim();
+        if (/\bLL\s*\(/i.test(line)) {
+            callLocation = parseCoordinates(line);
+        }
+    }
+
+    return {
+        activityNumber: eventMatch?.[1] ?? null,
+        reportNumber: caseMatch?.[1] ?? null,
+        callCreated,
+        assignmentDateTime,
+        callLocation,
+    };
+}
+
 /** Extract activity and department report numbers from raw CFS / call notes text. */
 export function parseCadIdentifiers(cadText: string): CadIdentifiers {
+    const labeled = parseCfsHeaderFields(cadText);
+    if (labeled.activityNumber || labeled.reportNumber) {
+        return {
+            activityNumber: labeled.activityNumber,
+            reportNumber: labeled.reportNumber,
+        };
+    }
     ACTIVITY_NUMBER_RE.lastIndex = 0;
     REPORT_NUMBER_RE.lastIndex = 0;
     const activity = cadText.match(ACTIVITY_NUMBER_RE)?.[0] ?? null;
@@ -112,7 +187,7 @@ export function blankIncidentInfoForm(): IncidentInfoForm {
         incidentId: '',
         demaMission: '',
         icCoordinator: '',
-        incidentConclusionTime: nowDatetimeLocal(),
+        incidentConclusionTime: '',
         assignmentText: '',
         assignmentDateTime: nowDatetimeLocal(),
     };
@@ -128,7 +203,7 @@ export function fieldsFromLog(keywords?: unknown): IncidentInfoForm {
         incidentId: kwValue(normalized, 'incidentId:'),
         demaMission: kwValue(normalized, 'demaMission:'),
         icCoordinator: kwValue(normalized, 'icCoordinator:'),
-        incidentConclusionTime: conclusionIso ? isoToDatetimeLocal(conclusionIso) : nowDatetimeLocal(),
+        incidentConclusionTime: conclusionIso ? isoToDatetimeLocal(conclusionIso) : '',
         assignmentText: kwValue(normalized, 'assignmentText:'),
         assignmentDateTime: assignmentIso ? isoToDatetimeLocal(assignmentIso) : nowDatetimeLocal(),
     };
@@ -314,15 +389,21 @@ export function initialInfoDetailRows(form: IncidentInfoForm): IncidentDetailRow
     return rows;
 }
 
-/** Fill empty activity / report fields from parsed CFS identifiers. */
+/**
+ * Overwrite Activity Number, Department Report Number, and Assignment Date/Time
+ * from parsed CFS header fields when values are present.
+ */
 export function applyParsedCadToForm(
     form: IncidentInfoForm,
-    parsed: CadIdentifiers,
+    parsed: CadIdentifiers & { assignmentDateTime?: string | null },
 ): void {
-    if (!form.eventId.trim() && parsed.activityNumber) {
+    if (parsed.activityNumber) {
         form.eventId = parsed.activityNumber;
     }
-    if (!form.incidentId.trim() && parsed.reportNumber) {
+    if (parsed.reportNumber) {
         form.incidentId = parsed.reportNumber;
+    }
+    if (parsed.assignmentDateTime) {
+        form.assignmentDateTime = parsed.assignmentDateTime;
     }
 }

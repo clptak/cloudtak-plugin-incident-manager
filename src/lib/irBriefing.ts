@@ -1,18 +1,21 @@
 /** IR Briefing form model and mission data loading. */
 
 import Subscription from '../../../../src/base/subscription.ts';
-import { formatCoordPair } from '../../../../src/base/utils/coordinateFormat.ts';
-import { latestIncidentInfoFromLogs } from './incidentInfo.ts';
+import { formatCoordPair } from '../../../../src/utils/coordinateFormat.ts';
+import type { ActiveMission } from '../composables/useIncident.ts';
 import { parseCoordinates } from './coords.ts';
+import { loadSchemaSubscription } from './incidentSubscription.ts';
 import { resolveMissionIppLocation } from './missionIpp.ts';
+import { incidentFormFromSchema, loadMissionSchema, type MissionSchema } from './missionSchema.ts';
 import {
     blankSubjectForm,
     effectiveSubjectAge,
     fieldsFromLog,
-    parseSubjectsFromLogs,
+    formatSubjectYesNo,
     subjectNumberFromLog,
     type SubjectForm,
 } from './subjectInfo.ts';
+import { resolveSubjects } from './subjectsPersistence.ts';
 
 export const DEFAULT_SAFETY_MESSAGE = [
     'Stay warm.',
@@ -127,8 +130,8 @@ function subjectToColumn(f: SubjectForm): BriefingSubjectColumn {
         height: f.subjectHeight.trim(),
         weight: f.subjectWeight.trim(),
         hairColor: f.subjectHairColor.trim(),
-        facialHair: f.subjectFacialHair.trim(),
-        glasses: f.subjectGlasses.trim(),
+        facialHair: formatSubjectYesNo(f.subjectFacialHair),
+        glasses: formatSubjectYesNo(f.subjectGlasses),
         distinguishingMarks: f.subjectDistinguishingMarks.trim(),
         clothing: f.subjectClothing.trim(),
         footwear: f.subjectFootwear.trim(),
@@ -161,8 +164,11 @@ export async function resolveIppLatLng(
     return parseCoordinates(location);
 }
 
-function subjectsByNumber(logs: { keywords?: string[] }[]): Map<string, SubjectForm> {
-    const parsed = parseSubjectsFromLogs(logs);
+function subjectsByNumber(
+    schema: MissionSchema,
+    logs: { keywords?: string[] }[],
+): Map<string, SubjectForm> {
+    const parsed = resolveSubjects(schema, logs);
     const map = new Map<string, SubjectForm>();
     for (const s of parsed) map.set(s.subjectCaseID, s);
     return map;
@@ -178,18 +184,20 @@ export async function loadIrBriefingFromMission(
     missionGuid: string,
     missionToken?: string,
     missionName?: string,
+    /** Full active mission — schema reads route to the mgmt sync when present. */
+    activeMission?: ActiveMission,
 ): Promise<LoadedIrBriefing> {
     const form = blankIrBriefingForm();
     const sources: IrBriefingSources = { ippLatLng: null };
 
-    const sub = await Subscription.load(missionGuid, { token: missionToken ?? '' });
+    const sub = await Subscription.load(missionGuid, { missiontoken: missionToken || undefined, reload: false });
     const logs = await sub.log.list({ refresh: true });
 
-    const incident = latestIncidentInfoFromLogs(logs);
-    if (incident) {
-        form.incidentCommander = incident.fields.icCoordinator.trim();
-        form.incidentName = incident.fields.incidentName.trim();
-    }
+    const schemaSub = activeMission?.mgmt ? await loadSchemaSubscription(activeMission) : sub;
+    const { schema } = await loadMissionSchema(schemaSub);
+    const incident = incidentFormFromSchema(schema);
+    form.incidentCommander = incident.icCoordinator.trim();
+    form.incidentName = incident.incidentName.trim();
     if (!form.incidentName && missionName) form.incidentName = missionName;
 
     form.operationalPeriod = operationalPeriodFromKeywords(sub.meta.keywords);
@@ -200,7 +208,7 @@ export async function loadIrBriefingFromMission(
         form.initialPlanningPoint = formatIppAsUtm(ippLatLng.lat, ippLatLng.lng);
     }
 
-    const byNumber = subjectsByNumber(logs);
+    const byNumber = subjectsByNumber(schema, logs);
     BRIEFING_SUBJECT_NUMBERS.forEach((num, i) => {
         const subject = byNumber.get(num) ?? blankSubjectForm(num);
         form.subjects[i] = subjectToColumn(subject);

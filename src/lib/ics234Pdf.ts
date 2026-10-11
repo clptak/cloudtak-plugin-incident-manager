@@ -9,6 +9,7 @@ import {
     type ObjectiveRow,
 } from './incidentPost.ts';
 import { formatDatetimeForPdf } from './ics234Datetime.ts';
+import { toPdfWinAnsiText } from './pdfWinAnsiText.ts';
 
 export interface Ics234Header {
     incidentName: string;
@@ -180,7 +181,7 @@ function drawGridLines(page: PDFPage): void {
 }
 
 function wrapLines(text: string, font: PDFFont, maxWidth: number): string[] {
-    const normalized = String(text ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+    const normalized = toPdfWinAnsiText(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
     if (!normalized) return [];
 
     const lines: string[] = [];
@@ -233,7 +234,7 @@ function drawSingleLine(
     text: string,
     rect: Rect,
 ): void {
-    const trimmed = text.trim();
+    const trimmed = toPdfWinAnsiText(text).trim();
     if (!trimmed) return;
     page.drawText(trimmed, {
         x: rect.x + CELL_PAD,

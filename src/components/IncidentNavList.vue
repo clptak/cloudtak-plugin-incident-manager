@@ -9,6 +9,16 @@
     >
         {{ createOpenNav.label }}
     </button>
+    <button
+        type='button'
+        class='incident-nav-item'
+        :class='{ active: activeKey === settingsNav.key && activeHTab === "main" }'
+        :data-bs-dismiss='mobile ? "offcanvas" : undefined'
+        :data-bs-target='mobile ? "#incident-manager-nav" : undefined'
+        @click='onSelect(settingsNav.key)'
+    >
+        {{ settingsNav.label }}
+    </button>
 
     <template
         v-for='section in navSections'
@@ -21,28 +31,49 @@
             @toggle='emit("toggleSection", section.key)'
         />
         <template v-if='sectionExpanded[section.key] !== false'>
-            <button
-                v-for='item in section.items'
+            <template
+                v-for='(item, index) in section.items'
                 :key='item.key'
-                type='button'
-                class='incident-nav-item incident-nav-sub'
-                :class='{ active: activeKey === item.key && activeHTab === "main" }'
-                :data-bs-dismiss='mobile ? "offcanvas" : undefined'
-                :data-bs-target='mobile ? "#incident-manager-nav" : undefined'
-                @click='onSelect(item.key)'
             >
-                {{ item.label }}
-            </button>
+                <div
+                    v-if='navGroupHeading(section.items, index)'
+                    class='incident-nav-group'
+                >
+                    {{ navGroupHeading(section.items, index) }}
+                </div>
+                <div
+                    class='incident-nav-item-row'
+                    :class='{ "incident-nav-item-row--with-help": !!item.helpKey }'
+                >
+                    <button
+                        type='button'
+                        class='incident-nav-item incident-nav-sub'
+                        :class='{ active: activeKey === item.key && activeHTab === "main" }'
+                        :data-bs-dismiss='mobile ? "offcanvas" : undefined'
+                        :data-bs-target='mobile ? "#incident-manager-nav" : undefined'
+                        @click='onSelect(item.key)'
+                    >
+                        {{ item.label }}
+                    </button>
+                    <NavHelpButton
+                        v-if='item.helpKey'
+                        :help-key='item.helpKey'
+                    />
+                </div>
+            </template>
         </template>
     </template>
 </template>
 
 <script setup lang='ts'>
+import { computed } from 'vue';
 import NavSectionHeader from './NavSectionHeader.vue';
+import NavHelpButton from './NavHelpButton.vue';
 import {
     CREATE_OPEN_NAV,
-    NAV_SECTIONS,
-    type NavSection,
+    SETTINGS_NAV,
+    navGroupHeading,
+    visibleNavSections,
 } from '../lib/incidentNav.ts';
 import { useIncident } from '../composables/useIncident.ts';
 
@@ -58,9 +89,9 @@ const emit = defineEmits<{
 }>();
 
 const createOpenNav = CREATE_OPEN_NAV;
-const navSections: NavSection[] = NAV_SECTIONS;
-
-const { selectKeyGuarded } = useIncident();
+const settingsNav = SETTINGS_NAV;
+const { selectKeyGuarded, isSearchIncident } = useIncident();
+const navSections = computed(() => visibleNavSections(isSearchIncident.value));
 
 function onSelect(key: string): void {
     selectKeyGuarded(key);

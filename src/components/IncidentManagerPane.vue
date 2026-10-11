@@ -1,5 +1,5 @@
 <template>
-    <div class='incident-manager-pane d-flex flex-column gap-2 p-2 p-md-3 h-100 w-100 overflow-hidden min-height-0'>
+    <div class='incident-manager-pane d-flex flex-column gap-2 px-3 py-3 h-100 w-100 overflow-hidden min-height-0'>
         <!-- Mobile: offcanvas nav -->
         <div
             id='incident-manager-nav'
@@ -67,22 +67,13 @@
                     </span>
                 </div>
 
-                <ul class='nav nav-tabs incident-h-tabs flex-shrink-0 mb-2 mb-md-3 flex-nowrap overflow-auto'>
-                    <li
-                        v-for='tab in hTabs'
-                        :key='tab.key'
-                        class='nav-item'
-                    >
-                        <button
-                            type='button'
-                            class='nav-link text-nowrap'
-                            :class='{ active: activeHTab === tab.key }'
-                            @click='selectHTabGuarded(tab.key)'
-                        >
-                            {{ tab.label }}
-                        </button>
-                    </li>
-                </ul>
+                <div class='incident-h-tabs flex-shrink-0 mb-2 mb-md-3 overflow-auto'>
+                    <TablerPillGroup
+                        :model-value='activeHTab'
+                        :options='hTabOptions'
+                        @update:model-value='selectHTabGuarded'
+                    />
+                </div>
 
                 <div
                     class='tab-content flex-grow-1 min-height-0'
@@ -93,10 +84,10 @@
                     <!-- Main: shows the active vertical pane -->
                     <div v-if='activeHTab === "main"'>
                         <CreateOpenPane v-if='activeKey === "create-open"' />
+                        <SettingsPane v-else-if='activeKey === "settings"' />
                         <ResourcesTab v-else-if='activeKey === "resources"' />
                         <AssignmentsTab v-else-if='activeKey === "work-assignments"' />
-                        <CasiePane v-else-if='activeKey === "casie"' />
-                        <WrapUpPane v-else-if='activeKey === "generate-report-template"' />
+                        <WrapUpPane v-else-if='activeKey === "generate-closing-package"' />
                         <LoggerPane
                             v-else
                             :sub='activeKey'
@@ -104,10 +95,16 @@
                     </div>
 
                     <DashboardTab v-if='activeHTab === "dashboard"' />
-                    <TaskTab v-if='activeHTab === "task"' />
+                    <TaskTab v-if='activeHTab === "task" && isSearchMission' />
+                    <ClueLog v-if='activeHTab === "clues" && isSearchMission' />
+                    <CasiePane v-if='activeHTab === "casie" && isSearchMission' />
                     <OrganizationTab
                         v-if='activeHTab === "organization"'
                         class='h-100 min-height-0'
+                    />
+                    <LoggerPane
+                        v-if='activeHTab === "risk-assessment"'
+                        sub='risk-assessment'
                     />
                 </div>
             </div>
@@ -118,24 +115,28 @@
 
 <script setup lang='ts'>
 import { onMounted, defineAsyncComponent, computed, ref, watch } from 'vue';
-import { TablerIconButton } from '@tak-ps/vue-tabler';
+import { TablerIconButton, TablerPillGroup } from '@tak-ps/vue-tabler';
 import { IconMenu2 } from '@tabler/icons-vue';
 import IncidentNavList from './IncidentNavList.vue';
 import MissionRequiredModal from './MissionRequiredModal.vue';
 import './incidentSideNav.css';
+import './incidentModal.css';
 import {
     ALL_NAV_ITEMS,
     NAV_SECTIONS,
     sectionKeyForNavItem,
 } from '../lib/incidentNav.ts';
+import { SEARCH_ONLY_HTAB_KEYS } from '../lib/incidentType.ts';
 import { useIncident } from '../composables/useIncident.ts';
 
 const CreateOpenPane = defineAsyncComponent(() => import('./panes/CreateOpenPane.vue'));
+const SettingsPane = defineAsyncComponent(() => import('./panes/SettingsPane.vue'));
 const LoggerPane = defineAsyncComponent(() => import('./panes/LoggerPane.vue'));
 const CasiePane = defineAsyncComponent(() => import('./panes/CasiePane.vue'));
 const WrapUpPane = defineAsyncComponent(() => import('./panes/WrapUpPane.vue'));
 const DashboardTab = defineAsyncComponent(() => import('./panes/DashboardTab.vue'));
 const TaskTab = defineAsyncComponent(() => import('./panes/TaskTab.vue'));
+const ClueLog = defineAsyncComponent(() => import('./panes/logger/ClueLog.vue'));
 const AssignmentsTab = defineAsyncComponent(() => import('./panes/AssignmentsTab.vue'));
 const OrganizationTab = defineAsyncComponent(() => import('./panes/OrganizationTab.vue'));
 const ResourcesTab = defineAsyncComponent(() => import('./panes/ResourcesTab.vue'));
@@ -177,18 +178,29 @@ const hTabs = [
     { key: 'main', label: 'Main' },
     { key: 'dashboard', label: 'Dashboard' },
     { key: 'task', label: 'Tasks' },
+    { key: 'clues', label: 'Clues' },
+    { key: 'casie', label: 'CASIE' },
     { key: 'organization', label: 'Organization' },
+    { key: 'risk-assessment', label: 'Risk Assessment' },
 ] as const;
 
 const {
     activeKey,
     activeHTab,
     activeMission,
+    isSearchMission,
     selectHTabGuarded,
     openNoMissionModal,
     isMissionRequiredView,
     restoreActiveMissionOnMap,
 } = useIncident();
+
+const hTabOptions = computed(() => hTabs
+    .filter((tab) => isSearchMission.value || !SEARCH_ONLY_HTAB_KEYS.has(tab.key))
+    .map((tab) => ({
+        value: tab.key,
+        label: tab.label,
+    })));
 
 const sectionExpanded = ref(loadSectionExpandedFromSession());
 
@@ -232,6 +244,52 @@ watch([activeKey, activeHTab], () => {
 });
 
 onMounted(() => {
-    void restoreActiveMissionOnMap();
+    // Floating promise: a restore failure must never stop the pane mounting,
+    // but it also must not vanish silently — surface it in the console.
+    restoreActiveMissionOnMap().catch((err) => {
+        console.warn('Incident Manager: restoring the last incident failed.', err);
+    });
 });
 </script>
+
+<style scoped>
+.incident-manager-pane {
+    /* Match Mission Info insets; Tabler form surfaces are primary-tinted */
+    --tabler-input-bg: var(--cloudtak-inset-bg);
+    --tblr-bg-forms: var(--cloudtak-inset-bg);
+    --tblr-card-bg: var(--cloudtak-inset-bg);
+    --bs-card-bg: var(--cloudtak-inset-bg);
+}
+
+/*
+ * FloatingPane does not get MainMenu's `.cloudtak-bg → panel-bg` remap.
+ * Solid dark `.cloudtak-bg` (#283547) and Bootstrap `.card` read as blue-grey
+ * slabs. Paint them with inset tokens so sections match Mission Logs tone.
+ * Note: `bg-opacity-*` does nothing on `.cloudtak-bg` (solid !important hex).
+ */
+.incident-manager-pane :deep(.cloudtak-bg) {
+    background-color: var(--cloudtak-inset-bg) !important;
+    border-color: var(--cloudtak-inset-border);
+}
+
+.incident-manager-pane :deep(.card) {
+    background-color: var(--cloudtak-inset-bg) !important;
+    border-color: var(--cloudtak-inset-border);
+}
+
+.incident-manager-pane :deep(.card-header) {
+    background-color: transparent !important;
+}
+
+.incident-manager-pane :deep(.list-group-item) {
+    background-color: var(--cloudtak-inset-bg) !important;
+    border-color: var(--cloudtak-inset-border);
+}
+
+.incident-manager-pane :deep(.alert-info) {
+    --tblr-alert-color: var(--tblr-body-color);
+    background-color: var(--cloudtak-inset-bg) !important;
+    border-color: var(--cloudtak-inset-border) !important;
+    color: var(--tblr-body-color) !important;
+}
+</style>

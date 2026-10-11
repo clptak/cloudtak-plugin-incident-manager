@@ -1,24 +1,32 @@
 <template>
-    <div class='card mt-4'>
-        <div class='card-header py-2 d-flex align-items-center justify-content-between'>
-            <h3 class='card-title mb-0'>
-                {{ title }}
-            </h3>
-            <button
-                type='button'
-                class='btn btn-sm btn-outline-secondary'
-                @click='$emit("close")'
-            >
-                Close
-            </button>
-        </div>
-        <div class='card-body'>
-            <slot />
-        </div>
-    </div>
+    <TablerBorder
+        class='cloudtak-accent text-white mt-4'
+        :fill-height='false'
+        :shadow='false'
+        gap='sm'
+    >
+        <template #label>
+            <div class='d-flex align-items-center justify-content-between w-100'>
+                <p class='text-uppercase text-white-50 small mb-0'>
+                    {{ title }}
+                </p>
+                <button
+                    type='button'
+                    class='btn btn-sm btn-outline-secondary'
+                    @click='$emit("close")'
+                >
+                    Close
+                </button>
+            </div>
+        </template>
+
+        <slot />
+    </TablerBorder>
 </template>
 
 <script setup lang='ts'>
+import { TablerBorder } from '@tak-ps/vue-tabler';
+
 defineProps<{ title: string }>();
 defineEmits<{ close: [] }>();
 </script>

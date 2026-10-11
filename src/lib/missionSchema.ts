@@ -21,6 +21,30 @@ import { fetchMissionFileText, uploadMissionFile } from './missionUpload.ts';
 /** Legacy log keyword from earlier builds; only used when migrating stored schema. */
 export const MISSION_SCHEMA_KEYWORD = 'mission-schema';
 export const MISSION_SCHEMA_FILENAME = 'mission_schema.json';
+/** Per-mission schema files end with this suffix (legacy name still readable). */
+export const MISSION_SCHEMA_SUFFIX = '_DataSync.json';
+
+function sanitizeFilePart(value: string): string {
+    return value.trim().replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ');
+}
+
+/**
+ * Unique per-mission schema filename:
+ *   `{Department Report #} {Search Name}_DataSync.json`
+ * falling back to the CAD activity number when there is no report number, and
+ * to the legacy `mission_schema.json` when neither identifiers nor a search
+ * name exist yet.
+ */
+export function missionSchemaFilename(schema: MissionSchema): string {
+    const report = String(schema.cad_data?.report_number ?? '').trim()
+        || String(schema.incident_id ?? '').trim();
+    const activity = String(schema.cad_data?.activity_number ?? '').trim();
+    const id = report || activity;
+    const searchName = String(schema.incident_response?.incident_name ?? '').trim()
+        || String(schema.tak_mission ?? '').trim();
+    const base = sanitizeFilePart([id, searchName].filter(Boolean).join(' '));
+    return base ? `${base}${MISSION_SCHEMA_SUFFIX}` : MISSION_SCHEMA_FILENAME;
+}
 
 export interface MissionLogEntry {
     source: string;
@@ -34,6 +58,13 @@ export interface MissionLogEntry {
     lon: string | number;
 }
 
+/** A search segment registered against a mission polygon CoT uid. */
+export interface SegmentRecord {
+    callsign: string;
+    created: string;
+    [key: string]: unknown;
+}
+
 export interface MissionSchema {
     event_id: string;
     incident_id: string;
@@ -42,6 +73,8 @@ export interface MissionSchema {
     coordinates: [number, number];
     sar_coordinators: string;
     assisting_agencies: string;
+    /** Per-mission default agency override (Resources tab); falls back to D4H contextName when empty. */
+    default_agency: string;
     subject_located: Record<string, unknown>;
     tak_missions: unknown[];
     caltopo_maps: unknown[];
@@ -73,7 +106,11 @@ export interface MissionSchema {
     incident_response: {
         incident_name: string;
         incident_id: string;
-        indicent_datetime: string;
+        incident_datetime: string;
+        /** IPP decimal degrees; empty object until Search Area sets it. */
+        ipp_coordinates?: { lat?: number; lng?: number; lon?: number } | Record<string, unknown>;
+        /** LKP or PLS. */
+        ipp_type?: string;
         [key: string]: unknown;
     };
     assignment: {
@@ -82,6 +119,12 @@ export interface MissionSchema {
     };
     /** Assignments tab org chart (HastyTeam tree); stored in mission_schema.json. */
     assignments_org_chart?: Record<string, unknown>;
+    /** Risk assessments keyed by assignment CoT uid (tactic_assessments map). */
+    risk?: Record<string, unknown>;
+    /** Search segments keyed by CoT feature UUID. */
+    segments?: Record<string, SegmentRecord>;
+    /** ROW (Rest of the World) exclusion polygons keyed by CoT feature UUID. */
+    row_segments?: Record<string, SegmentRecord>;
     [key: string]: unknown;
 }
 
@@ -133,8 +176,16 @@ export function defaultMissionSchema(): MissionSchema {
     return JSON.parse(JSON.stringify(missionSchemaTemplate)) as MissionSchema;
 }
 
+/** Prefer corrected key; accept legacy typo from older mission files. */
+export function incidentDatetimeFromSchema(schema: MissionSchema): string {
+    const ir = schema.incident_response as Record<string, unknown>;
+    const modern = typeof ir.incident_datetime === 'string' ? ir.incident_datetime.trim() : '';
+    const legacy = typeof ir.indicent_datetime === 'string' ? ir.indicent_datetime.trim() : '';
+    return modern || legacy;
+}
+
 export function incidentFormFromSchema(schema: MissionSchema): IncidentInfoForm {
-    const conclusionIso = schema.incident_response.indicent_datetime || '';
+    const conclusionIso = incidentDatetimeFromSchema(schema);
     const assignment = schema.assignment ?? { text: '', datetime: '' };
     const assignmentIso = assignment.datetime || '';
     return {
@@ -143,7 +194,7 @@ export function incidentFormFromSchema(schema: MissionSchema): IncidentInfoForm 
         incidentId: schema.incident_id || schema.cad_data.report_number || schema.incident_response.incident_id || '',
         demaMission: schema.dema_mission_number || '',
         icCoordinator: schema.sar_coordinators || '',
-        incidentConclusionTime: conclusionIso ? isoToDatetimeLocal(conclusionIso) : nowDatetimeLocal(),
+        incidentConclusionTime: conclusionIso ? isoToDatetimeLocal(conclusionIso) : '',
         assignmentText: assignment.text || '',
         assignmentDateTime: assignmentIso ? isoToDatetimeLocal(assignmentIso) : nowDatetimeLocal(),
     };
@@ -167,7 +218,7 @@ export function resolveIncidentInfoForm(
         form.incidentId = fillIfEmpty(form.incidentId, f.incidentId);
         form.demaMission = fillIfEmpty(form.demaMission, f.demaMission);
         form.icCoordinator = fillIfEmpty(form.icCoordinator, f.icCoordinator);
-        if (!schema.incident_response.indicent_datetime) {
+        if (!incidentDatetimeFromSchema(schema)) {
             form.incidentConclusionTime = f.incidentConclusionTime;
         }
     }
@@ -254,7 +305,8 @@ export function applyIncidentFormToSchema(
     schema.cad_data.report_number = report;
     schema.incident_response.incident_name = form.incidentName.trim();
     schema.incident_response.incident_id = report;
-    schema.incident_response.indicent_datetime = conclusion;
+    schema.incident_response.incident_datetime = conclusion;
+    delete (schema.incident_response as Record<string, unknown>).indicent_datetime;
 
     if (!schema.assignment) {
         schema.assignment = { text: '', datetime: '' };
@@ -283,6 +335,26 @@ export function applyCadIdsToSchema(schema: MissionSchema, parsed: CadIdentifier
         schema.incident_id = parsed.reportNumber;
         schema.cad_data.report_number = parsed.reportNumber;
         schema.incident_response.incident_id = parsed.reportNumber;
+    }
+}
+
+/** Persist CFS Created / Dispatched as datetime-local strings on call_timestamps. */
+export function applyCfsTimestampsToSchema(
+    schema: MissionSchema,
+    timestamps: { callCreated?: string | null; callDispatched?: string | null },
+): void {
+    if (!schema.cad_data.call_timestamps) {
+        schema.cad_data.call_timestamps = {
+            call_created: '',
+            call_dispatched: '',
+            call_cleared: '',
+        };
+    }
+    if (timestamps.callCreated) {
+        schema.cad_data.call_timestamps.call_created = timestamps.callCreated;
+    }
+    if (timestamps.callDispatched) {
+        schema.cad_data.call_timestamps.call_dispatched = timestamps.callDispatched;
     }
 }
 
@@ -342,6 +414,7 @@ export function appendMpsRowsToSchema(
 }
 
 function isMissionSchemaContentName(name: string | undefined): boolean {
+    if (name?.endsWith(MISSION_SCHEMA_SUFFIX)) return true;
     if (!name) return false;
     return name === MISSION_SCHEMA_FILENAME
         || name.endsWith(`/${MISSION_SCHEMA_FILENAME}`)
@@ -437,14 +510,15 @@ export async function saveMissionSchema(
     const hashBeforeUpload = findLatestSchemaContent(await sub.contents.list())?.hash;
 
     const missionToken = opts?.missionToken;
-    const uploadHash = await uploadMissionFile(sub.guid, MISSION_SCHEMA_FILENAME, bytes, {
+    const filename = missionSchemaFilename(schema);
+    const uploadHash = await uploadMissionFile(sub.guid, filename, bytes, {
         missionToken,
     });
 
     if (sub.fetch) await sub.fetch();
 
     let latest = uploadHash
-        ? { hash: uploadHash, name: MISSION_SCHEMA_FILENAME }
+        ? { hash: uploadHash, name: filename }
         : await waitForLatestSchemaContent(sub, hashBeforeUpload);
 
     if (!latest?.hash) {

@@ -1,19 +1,21 @@
 context/*
 skills/*
 node_modules/
+cloudtak-plugin-incident-manager
 .DS_Store
-docs/build-plan.md
-docs/ICS-234-CG-Work-Analysis-Matrix.pdf
-docs/Subject_form.html
-docs/Search Urgency Info Boxes.md
-docs/label-info-popup-pattern.md
-docs/incident-post-limits.md
-docs/WC4_Establishing_Search_Area.md
-docs/ics form 201_incident briefing_v3.pdf
-docs/Lost Person Form CCSO Fillable.pdf
-docs/Sign In Roster Form 062818 2.pdf
-docs/*.pdf
-docs/*.md
-docs/*.txt
-sar-publications-scraper.js
-docs/publications.json
+docs-archive/
+node sar-publications-scraper.js
+skills/cloudtak-infra-analysis/SKILLS.md
+CASIE_support/*
+FindEm-compressed.pdf
+ISMManual-Unlocked-unlocked-compressed.pdf
+ISMManual Unlocked-unlocked-compressed.pdf
+IRIC-compressed.pdf
+incident_workflow.md
+takserver-api.json
+scripts/phase0-spike.mjs
+src/components/panes/logger/fuse_hidden*
+
+# Per-deployment settings compiled into the web bundle. Copy from the examples.
+config.local.ts
+deployment/*

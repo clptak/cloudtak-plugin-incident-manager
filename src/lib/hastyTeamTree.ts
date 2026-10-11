@@ -1,3 +1,5 @@
+import type { ResourceAssignmentStatus } from './resourceAssignments.ts';
+
 export type AssignmentNodeType = 'team' | 'member' | 'position' | 'role';
 
 export type RoleCategory = 'incident-command' | 'rescue-management';
@@ -19,7 +21,7 @@ export interface AssignmentNodeSelf {
     agency?: string;
     timeOrdered?: string;
     eta?: number | null;
-    assignmentStatus?: 'current' | 'planned';
+    assignmentStatus?: ResourceAssignmentStatus;
     timeArrived?: string;
     roleCategory?: RoleCategory;
     roleKey?: string;
@@ -53,7 +55,7 @@ export type PendingPaletteDrop =
         agency: string;
         timeOrdered: string;
         eta: number | null;
-        status: 'current' | 'planned';
+        status: ResourceAssignmentStatus;
         timeArrived: string;
         assignmentUid?: string;
         assignmentCallsign?: string;
