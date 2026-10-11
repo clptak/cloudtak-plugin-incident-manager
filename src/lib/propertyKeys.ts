@@ -8,7 +8,11 @@
  */
 
 export const META_SCHEMA_KEY = 'meta.schema';
-export const SCHEMA_VERSION = '2';
+/**
+ * Key layout version. 2: one key per schema field. 3: busy collections split
+ * into per-record `c.*` keys (schemaCollections.ts). Saves upgrade 2 to 3.
+ */
+export const SCHEMA_VERSION = '3';
 
 /** 32-bit FNV-1a as 8 hex chars - stable across browser and Node. */
 export function shortHash(input: string): string {

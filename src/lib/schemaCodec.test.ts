@@ -5,7 +5,7 @@ import { createMemoryPropertyServer } from './memoryPropertyTransport.ts';
 import { createMissionPropertyClient, MissionPropertyError } from './missionProperties.ts';
 import type { MissionSchema } from './missionSchema.ts';
 import { decodeSchema, diffEncoded, encodeSchema } from './schemaCodec.ts';
-import { createSchemaPropertyBackend, findConflicts, SchemaConflictError } from './schemaPropertyBackend.ts';
+import { createSchemaPropertyBackend, findConflicts, inParallel, SchemaConflictError } from './schemaPropertyBackend.ts';
 import { createPropertyDebriefStore } from './propertyStores.ts';
 
 const GUID = 'meta-guid';
@@ -318,3 +318,21 @@ test('backend: correcting one debrief rewrites only its key; deleting one remove
     const final = debriefsOf((await backend.load(GUID))!.schema);
     assert.deepEqual(final.map((d) => [d.resource, d.pod]), [['GT1', 35], ['GT5', 20]]);
 });
+
+test('inParallel: runs every task, at most `limit` at once, and rethrows the first failure', async () => {
+    let running = 0;
+    let peak = 0;
+    const done: number[] = [];
+    const tasks = Array.from({ length: 20 }, (_, i) => async () => {
+        running++;
+        peak = Math.max(peak, running);
+        await new Promise((r) => setTimeout(r, 1));
+        running--;
+        done.push(i);
+    });
+    await inParallel(tasks, 4);
+    assert.equal(done.length, 20);
+    assert.ok(peak <= 4);
+    await assert.rejects(inParallel([async () => { throw new Error('boom'); }, async () => {}]), /boom/);
+});
+
