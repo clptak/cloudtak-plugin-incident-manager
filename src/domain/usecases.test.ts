@@ -7,7 +7,10 @@ import {
     attachTrackLog,
     checkInSubscriber,
     closeOperationalPeriod,
+    correctDebrief,
+    deleteDebrief,
     detachTrackLog,
+    findSameResourceDebrief,
     openOperationalPeriod,
     publishAssignments,
     recordDebrief,
@@ -67,6 +70,15 @@ function fakeDebriefStore(initial: DebriefRecord[] = []) {
             if (tracks.length) next.tracks = tracks;
             else delete next.tracks;
             records[index] = next;
+        },
+        async replace(key, record) {
+            const index = records.findIndex((r) => debriefKey(r) === key);
+            if (index === -1) throw new Error(`No debrief matching ${key}`);
+            records[index] = record;
+        },
+        async remove(key) {
+            const index = records.findIndex((r) => debriefKey(r) === key);
+            if (index !== -1) records.splice(index, 1);
         },
     };
     return Object.assign(store, { records });
@@ -144,6 +156,63 @@ test('recordDebrief: validates and appends', async () => {
     await assert.rejects(() => recordDebrief(store, { opNumber: 1, segmentUid: '', pod: 55 }));
     await assert.rejects(() => recordDebrief(store, { opNumber: 1, segmentUid: 's1', pod: 120 }));
     await assert.rejects(() => recordDebrief(store, { opNumber: 1, segmentUid: 's1', pod: 50, coverage: 0 }));
+});
+
+// --- duplicate / correction ----------------------------------------------------
+
+const GT1_FIRST: DebriefRecord = {
+    opNumber: 1, segmentUid: 's1', pod: 50, resource: 'Ground Team 1', recordedAt: '2026-10-11T16:28:29.951Z',
+};
+
+test('findSameResourceDebrief: same OP + segment + resource (case/space-insensitive), newest first', async () => {
+    const later = { ...GT1_FIRST, pod: 40, recordedAt: '2026-10-11T17:00:00.000Z' };
+    const store = fakeDebriefStore([
+        GT1_FIRST,
+        later,
+        { ...GT1_FIRST, resource: 'Ground Team 2', recordedAt: '2026-10-11T16:28:31.638Z' },
+        { ...GT1_FIRST, opNumber: 2, recordedAt: '2026-10-11T18:00:00.000Z' },
+        { ...GT1_FIRST, segmentUid: 's2', recordedAt: '2026-10-11T18:00:00.000Z' },
+    ]);
+    const found = await findSameResourceDebrief(store, { opNumber: 1, segmentUid: 's1', pod: 30, resource: '  ground team 1 ' });
+    assert.equal(found?.recordedAt, later.recordedAt);
+    assert.equal(await findSameResourceDebrief(store, { opNumber: 1, segmentUid: 's1', pod: 30, resource: 'Ground Team 3' }), null);
+});
+
+test('findSameResourceDebrief: no resource entered never matches', async () => {
+    const store = fakeDebriefStore([{ opNumber: 1, segmentUid: 's1', pod: 50 }]);
+    assert.equal(await findSameResourceDebrief(store, { opNumber: 1, segmentUid: 's1', pod: 30 }), null);
+});
+
+test('correctDebrief: replaces values in place, keeps identity and tracks, stamps correctedAt', async () => {
+    const track = { uid: 'trk-1', name: 'TRK 01', source: 'map', points: 230, lengthMi: 6.39 };
+    const store = fakeDebriefStore([{ ...GT1_FIRST, tracks: [track], notes: 'old note' }]);
+    const key = debriefKey(GT1_FIRST);
+    await correctDebrief(store, key, { opNumber: 1, segmentUid: 's1', pod: 30, resource: 'Ground Team 1' }, NOW);
+    assert.equal(store.records.length, 1);
+    const r = store.records[0];
+    assert.equal(r.pod, 30);
+    assert.equal(r.notes, undefined);
+    assert.equal(r.recordedAt, GT1_FIRST.recordedAt);
+    assert.equal(r.correctedAt, '2026-08-06T20:00:00.000Z');
+    assert.deepEqual(r.tracks, [track]);
+    assert.equal(debriefKey(r), key);
+});
+
+test('correctDebrief: validates, and refuses when the record is gone', async () => {
+    const store = fakeDebriefStore([GT1_FIRST]);
+    await assert.rejects(() => correctDebrief(store, debriefKey(GT1_FIRST), { ...GT1_FIRST, pod: 120 }), /POD/);
+    await assert.rejects(
+        () => correctDebrief(fakeDebriefStore(), debriefKey(GT1_FIRST), GT1_FIRST),
+        /no longer in the incident record/,
+    );
+});
+
+test('deleteDebrief: removes only that record; already gone is fine', async () => {
+    const other = { ...GT1_FIRST, resource: 'Ground Team 2' };
+    const store = fakeDebriefStore([GT1_FIRST, other]);
+    await deleteDebrief(store, debriefKey(GT1_FIRST));
+    await deleteDebrief(store, debriefKey(GT1_FIRST));
+    assert.deepEqual(store.records, [other]);
 });
 
 test('publishAssignments: republishes polygons into the OP sync and records the list', async () => {

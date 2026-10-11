@@ -184,3 +184,42 @@ test('debriefs: setTracks throws when the record is gone', async () => {
         /no longer in the incident record/,
     );
 });
+
+test('debriefs: replace overwrites the same key when the resource is unchanged', async () => {
+    const { srv, client } = setup();
+    const store = createPropertyDebriefStore(client());
+    const a = debrief({ resource: 'GT1' });
+    await store.append(a);
+    await store.replace(debriefKey(a), { ...a, pod: 30, correctedAt: '2026-10-11T17:00:00Z' });
+    const keys = [...srv.store.keys()];
+    assert.deepEqual(keys, [debriefPropertyKey(a)]);
+    assert.equal((await store.load())[0].pod, 30);
+});
+
+test('debriefs: replace with a new resource moves the record to its new key', async () => {
+    const { srv, client } = setup();
+    const store = createPropertyDebriefStore(client());
+    const a = debrief({ resource: 'GT1' });
+    await store.append(a);
+    const moved = { ...a, resource: 'GT3' };
+    await store.replace(debriefKey(a), moved);
+    assert.deepEqual([...srv.store.keys()], [debriefPropertyKey(moved)]);
+});
+
+test('debriefs: replace throws when the record is gone; remove does not', async () => {
+    const { client } = setup();
+    const store = createPropertyDebriefStore(client());
+    await assert.rejects(store.replace(debriefKey(debrief()), debrief()), /no longer in the incident record/);
+    await store.remove(debriefKey(debrief()));
+});
+
+test('debriefs: remove deletes only that key', async () => {
+    const { srv, client } = setup();
+    const store = createPropertyDebriefStore(client());
+    const a = debrief({ resource: 'GT1' });
+    const b = debrief({ resource: 'GT2' });
+    await store.append(a);
+    await store.append(b);
+    await store.remove(debriefKey(a));
+    assert.deepEqual([...srv.store.keys()], [debriefPropertyKey(b)]);
+});

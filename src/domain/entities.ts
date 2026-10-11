@@ -123,6 +123,11 @@ export interface DebriefRecord {
     tracks?: TrackLogRef[];
     /** ISO timestamp. */
     recordedAt?: string;
+    /**
+     * ISO timestamp of the last correction (Replace or Edit). `recordedAt`
+     * never changes - it is part of the record's identity (debriefKey).
+     */
+    correctedAt?: string;
 }
 
 /**

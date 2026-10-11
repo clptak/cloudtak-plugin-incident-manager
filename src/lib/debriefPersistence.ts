@@ -19,7 +19,36 @@ export function debriefsFromSchema(schema: MissionSchema): DebriefRecord[] {
     return raw.map(debriefRecordFromValue).filter((r): r is DebriefRecord => r !== null);
 }
 
+function findOrThrow(records: DebriefRecord[], key: string): number {
+    const index = records.findIndex((r) => debriefKey(r) === key);
+    if (index === -1) {
+        throw new Error(
+            'That completed assignment is no longer in the incident record — '
+            + 'refresh and try again.',
+        );
+    }
+    return index;
+}
+
 export function createDebriefStore(mission: ActiveMission): DebriefStore {
+    /**
+     * Re-read the schema, let `change` produce the new debrief list (or null
+     * for "nothing to do"), and save. On Mission Properties the save is a diff,
+     * so only the debrief keys that actually changed are written.
+     */
+    async function rewrite(change: (records: DebriefRecord[]) => DebriefRecord[] | null): Promise<void> {
+        const sub = await loadSchemaSubscription(mission);
+        const loaded = await loadMissionSchema(sub);
+        const next = change(debriefsFromSchema(loaded.schema));
+        if (!next) return;
+        (loaded.schema.incident_response as Record<string, unknown>).debriefs = next;
+        await saveMissionSchema(sub, loaded.schema, {
+            contentHash: loaded.contentHash,
+            legacyLogId: loaded.legacyLogId,
+            missionToken: schemaMissionToken(sub, mission),
+        });
+    }
+
     return {
         async load(): Promise<DebriefRecord[]> {
             const sub = await loadSchemaSubscription(mission);
@@ -28,18 +57,10 @@ export function createDebriefStore(mission: ActiveMission): DebriefStore {
         },
 
         async append(record: DebriefRecord): Promise<void> {
-            const sub = await loadSchemaSubscription(mission);
-            const loaded = await loadMissionSchema(sub);
-            const existing = debriefsFromSchema(loaded.schema);
-            (loaded.schema.incident_response as Record<string, unknown>).debriefs = [
+            await rewrite((existing) => [
                 ...existing,
                 { ...record, recordedAt: record.recordedAt ?? new Date().toISOString() },
-            ];
-            await saveMissionSchema(sub, loaded.schema, {
-                contentHash: loaded.contentHash,
-                legacyLogId: loaded.legacyLogId,
-                missionToken: schemaMissionToken(sub, mission),
-            });
+            ]);
         },
 
         /**
@@ -49,26 +70,27 @@ export function createDebriefStore(mission: ActiveMission): DebriefStore {
          * already published a CoT and needs to know it is unreferenced.
          */
         async setTracks(key: string, tracks: TrackLogRef[]): Promise<void> {
-            const sub = await loadSchemaSubscription(mission);
-            const loaded = await loadMissionSchema(sub);
-            const existing = debriefsFromSchema(loaded.schema);
-            const index = existing.findIndex((r) => debriefKey(r) === key);
-            if (index === -1) {
-                throw new Error(
-                    'That completed assignment is no longer in the incident record — '
-                    + 'refresh and attach the track again.',
-                );
-            }
-            const next = { ...existing[index] };
-            if (tracks.length) next.tracks = tracks;
-            else delete next.tracks;
-            existing[index] = next;
+            await rewrite((existing) => {
+                const index = findOrThrow(existing, key);
+                const next = { ...existing[index] };
+                if (tracks.length) next.tracks = tracks;
+                else delete next.tracks;
+                existing[index] = next;
+                return existing;
+            });
+        },
 
-            (loaded.schema.incident_response as Record<string, unknown>).debriefs = existing;
-            await saveMissionSchema(sub, loaded.schema, {
-                contentHash: loaded.contentHash,
-                legacyLogId: loaded.legacyLogId,
-                missionToken: schemaMissionToken(sub, mission),
+        async replace(key: string, record: DebriefRecord): Promise<void> {
+            await rewrite((existing) => {
+                existing[findOrThrow(existing, key)] = record;
+                return existing;
+            });
+        },
+
+        async remove(key: string): Promise<void> {
+            await rewrite((existing) => {
+                const kept = existing.filter((r) => debriefKey(r) !== key);
+                return kept.length === existing.length ? null : kept;
             });
         },
     };

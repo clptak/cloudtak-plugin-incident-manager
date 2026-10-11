@@ -59,6 +59,13 @@ export interface DebriefStore {
      * silently dropping an attached track would strand a published CoT.
      */
     setTracks(key: string, tracks: TrackLogRef[]): Promise<void>;
+    /**
+     * Overwrite the record identified by `key` with `record`. Throws when no
+     * record matches (someone else deleted it) rather than re-creating it.
+     */
+    replace(key: string, record: DebriefRecord): Promise<void>;
+    /** Delete the record identified by `key`. Already gone is not an error. */
+    remove(key: string): Promise<void>;
 }
 
 /** A track ready to publish into an OP sync. */

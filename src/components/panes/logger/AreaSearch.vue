@@ -578,6 +578,7 @@
                         <select
                             v-model='debriefForm.segmentUid'
                             class='form-select form-select-sm'
+                            :disabled='!!editingKey'
                         >
                             <option value=''>
                                 — select {{ targetNoun.toLowerCase() }} —
@@ -613,6 +614,7 @@
                         <select
                             v-model.number='debriefForm.opNumber'
                             class='form-select form-select-sm'
+                            :disabled='!!editingKey'
                         >
                             <option
                                 v-for='op in registry'
@@ -656,13 +658,67 @@
                         />
                     </div>
                 </div>
-                <button
-                    class='btn btn-primary mt-2'
-                    :disabled='busy || !debriefForm.segmentUid'
-                    @click='onRecordDebrief'
+                <div class='d-flex align-items-center gap-2 mt-2'>
+                    <button
+                        class='btn btn-primary'
+                        :disabled='busy || !debriefForm.segmentUid'
+                        @click='onRecordDebrief()'
+                    >
+                        {{ editingKey ? 'Save Correction' : 'Record Completed Assignment' }}
+                    </button>
+                    <button
+                        v-if='editingKey'
+                        class='btn btn-link btn-sm'
+                        :disabled='busy'
+                        @click='cancelEdit'
+                    >
+                        Cancel edit
+                    </button>
+                </div>
+
+                <!-- ── Same resource already debriefed this segment this OP ── -->
+                <div
+                    v-if='duplicatePrompt'
+                    class='cloudtak-accent border border-warning rounded-3 mt-3 p-3'
                 >
-                    Record Completed Assignment
-                </button>
+                    <p class='text-uppercase text-warning small mb-1'>
+                        {{ duplicatePrompt.existing.resource }} already has a debrief on
+                        {{ duplicatePrompt.existing.label || segmentLabel(duplicatePrompt.existing.segmentUid) }}
+                        in OP{{ duplicatePrompt.existing.opNumber }}
+                    </p>
+                    <p class='form-text mt-0 mb-2'>
+                        Recorded {{ shortDt(duplicatePrompt.existing.recordedAt || '') }}<span
+                            v-if='duplicatePrompt.existing.pod !== undefined'
+                        > · POD {{ duplicatePrompt.existing.pod }}%</span><span
+                            v-if='duplicatePrompt.existing.coverage !== undefined'
+                        > ({{ Math.round(duplicatePrompt.existing.coverage * 100) }}% completed)</span>.
+                        Each debrief counts as a separate search in the POD rollup, so a
+                        correction entered as a new debrief would be counted twice.
+                    </p>
+                    <div class='d-flex flex-wrap gap-2'>
+                        <button
+                            class='btn btn-primary btn-sm'
+                            :disabled='busy'
+                            @click='onDuplicateReplace'
+                        >
+                            {{ busy ? 'Working…' : 'Replace it' }}
+                        </button>
+                        <button
+                            class='btn btn-outline-secondary btn-sm'
+                            :disabled='busy'
+                            @click='onDuplicateAddAnother'
+                        >
+                            Add as another sortie
+                        </button>
+                        <button
+                            class='btn btn-link btn-sm'
+                            :disabled='busy'
+                            @click='duplicatePrompt = null'
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
 
                 <!-- ── Incomplete-segment split (ISM) — inline, map stays usable ── -->
                 <div
@@ -793,9 +849,30 @@
                                     v-if='d.resource'
                                     class='text-muted'
                                 > · {{ d.resource }}</span>
+                                <span
+                                    v-if='d.correctedAt'
+                                    class='text-warning'
+                                    :title='`Corrected ${shortDt(d.correctedAt)}`'
+                                > · corrected</span>
                             </span>
                             <button
-                                class='btn btn-link btn-sm p-0 ms-auto d-flex align-items-center gap-1'
+                                class='btn btn-link btn-sm p-0 ms-auto'
+                                :disabled='busy'
+                                title='Correct this completed assignment'
+                                @click='startEdit(d)'
+                            >
+                                edit
+                            </button>
+                            <button
+                                class='btn btn-link btn-sm p-0 text-danger'
+                                :disabled='busy'
+                                title='Delete this completed assignment'
+                                @click='deletingKey = debriefKeyOf(d)'
+                            >
+                                delete
+                            </button>
+                            <button
+                                class='btn btn-link btn-sm p-0 d-flex align-items-center gap-1'
                                 :disabled='trackBusy'
                                 title='Attach a GPS track log to this completed assignment'
                                 @click='toggleTrackPanel(d)'
@@ -805,6 +882,31 @@
                                     :stroke-width='2'
                                 />
                                 <span class='d-none d-md-inline'>Attach GPS Track Log</span>
+                            </button>
+                        </div>
+
+                        <div
+                            v-if='deletingKey === debriefKeyOf(d)'
+                            class='small d-flex flex-wrap align-items-center gap-2 ps-3 py-1'
+                        >
+                            <span class='text-danger'>
+                                Delete this completed assignment?<span
+                                    v-if='d.tracks?.length'
+                                > Its track lines stay in the OP sync.</span>
+                            </span>
+                            <button
+                                class='btn btn-danger btn-sm py-0'
+                                :disabled='busy'
+                                @click='onDeleteDebrief(d)'
+                            >
+                                Delete
+                            </button>
+                            <button
+                                class='btn btn-link btn-sm p-0'
+                                :disabled='busy'
+                                @click='deletingKey = null'
+                            >
+                                Cancel
                             </button>
                         </div>
 
@@ -1010,7 +1112,10 @@ import {
     attachTrackLog,
     checkInSubscriber,
     closeOperationalPeriod,
+    correctDebrief,
+    deleteDebrief,
     detachTrackLog,
+    findSameResourceDebrief,
     openOperationalPeriod,
     publishAssignments,
     recordDebrief,
@@ -1183,9 +1288,16 @@ const opResourceOptions = computed(() => {
         .map((r) => r.resourceIdentifier.trim());
 });
 /** Same idea for the debrief form, but keyed to the OP selected there. */
-const debriefResourceOptions = computed(() => resources.value
-    .filter((r) => r.opNumber === debriefForm.opNumber && r.resourceIdentifier.trim() && isActiveResource(r))
-    .map((r) => r.resourceIdentifier.trim()));
+const debriefResourceOptions = computed(() => {
+    const options = resources.value
+        .filter((r) => r.opNumber === debriefForm.opNumber && r.resourceIdentifier.trim() && isActiveResource(r))
+        .map((r) => r.resourceIdentifier.trim());
+    // A record being corrected may name a resource since demobilized - keep it
+    // selectable, or the dropdown would silently blank it.
+    const current = debriefForm.resource.trim();
+    if (options.length && current && !options.includes(current)) options.push(current);
+    return options;
+});
 const assignedThisOp = computed(() => new Set(
     assignments.value
         .filter((a) => a.opNumber === currentOp.value?.opNumber)
@@ -1581,6 +1693,12 @@ async function onAcceptClue(): Promise<void> {
 
 // ── Incomplete-segment split prompt (ISM) ──────────────────────────────
 const splitPrompt = ref<{ label: string; completedPct: number } | null>(null);
+/** debriefKey of the record the form is correcting, or null when recording new. */
+const editingKey = ref<string | null>(null);
+/** Same resource already debriefed this segment this OP - Replace or add? */
+const duplicatePrompt = ref<{ key: string; existing: DebriefRecord } | null>(null);
+/** debriefKey of the row showing its inline delete confirmation. */
+const deletingKey = ref<string | null>(null);
 const splitRetainedPct = ref('');
 const splitNewName = ref('');
 
@@ -1770,20 +1888,122 @@ function buildDebriefRecord(): DebriefRecord {
     return record;
 }
 
+function resetDebriefForm(): void {
+    debriefForm.pod = '';
+    debriefForm.coverage = '';
+    debriefForm.notes = '';
+    editingKey.value = null;
+    duplicatePrompt.value = null;
+}
+
 async function saveDebriefRecord(record: DebriefRecord, note: string): Promise<void> {
     const mission = activeMission.value;
     if (!mission?.mgmt) return;
     await recordDebrief(createDebriefStore(mission), record);
     notice.value = note;
-    debriefForm.pod = '';
-    debriefForm.coverage = '';
-    debriefForm.notes = '';
+    resetDebriefForm();
     debriefs.value = await createDebriefStore(mission).load();
 }
 
-async function onRecordDebrief(): Promise<void> {
+/** Overwrite an existing debrief (Replace from the duplicate prompt, or Edit). */
+async function saveCorrection(key: string): Promise<void> {
     const mission = activeMission.value;
     if (!mission?.mgmt) return;
+    busy.value = true;
+    error.value = ''; notice.value = '';
+    try {
+        const store = createDebriefStore(mission);
+        const saved = await correctDebrief(store, key, buildDebriefRecord());
+        notice.value = saved.pod !== undefined
+            ? `Corrected ${segmentLabel(saved.segmentUid)}: POD ${saved.pod}%.`
+            : `Corrected the completed assignment for ${segmentLabel(saved.segmentUid)}.`;
+        resetDebriefForm();
+        debriefs.value = await store.load();
+    } catch (err) {
+        error.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        busy.value = false;
+    }
+}
+
+function startEdit(record: DebriefRecord): void {
+    splitPrompt.value = null;
+    duplicatePrompt.value = null;
+    deletingKey.value = null;
+    editingKey.value = debriefKey(record);
+    debriefForm.opNumber = record.opNumber;
+    debriefForm.segmentUid = record.segmentUid;
+    debriefForm.pod = record.pod !== undefined ? String(record.pod) : '';
+    debriefForm.coverage = record.coverage !== undefined ? String(Math.round(record.coverage * 100)) : '';
+    debriefForm.resource = record.resource ?? '';
+    debriefForm.notes = record.notes ?? '';
+}
+
+function cancelEdit(): void {
+    resetDebriefForm();
+}
+
+async function onDuplicateReplace(): Promise<void> {
+    if (!duplicatePrompt.value) return;
+    // A correction keeps the record's segment - no ISM split, coverage as entered.
+    await saveCorrection(duplicatePrompt.value.key);
+}
+
+async function onDuplicateAddAnother(): Promise<void> {
+    duplicatePrompt.value = null;
+    await onRecordDebrief({ skipDuplicateCheck: true });
+}
+
+async function onDeleteDebrief(record: DebriefRecord): Promise<void> {
+    const mission = activeMission.value;
+    if (!mission?.mgmt) return;
+    busy.value = true;
+    error.value = ''; notice.value = '';
+    try {
+        const key = debriefKey(record);
+        const store = createDebriefStore(mission);
+        await deleteDebrief(store, key);
+        if (editingKey.value === key) resetDebriefForm();
+        if (trackPanel.value?.key === key) trackPanel.value = null;
+        deletingKey.value = null;
+        notice.value = `Deleted the completed assignment for ${record.label || segmentLabel(record.segmentUid)}.`;
+        debriefs.value = await store.load();
+    } catch (err) {
+        error.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        busy.value = false;
+    }
+}
+
+async function onRecordDebrief(opts: { skipDuplicateCheck?: boolean } = {}): Promise<void> {
+    const mission = activeMission.value;
+    if (!mission?.mgmt) return;
+
+    if (editingKey.value) {
+        await saveCorrection(editingKey.value);
+        return;
+    }
+
+    // Same resource already debriefed on this segment this OP? Read fresh, so
+    // an entry made a moment ago in another window is caught too.
+    if (!opts.skipDuplicateCheck && debriefForm.resource.trim()) {
+        busy.value = true;
+        error.value = ''; notice.value = '';
+        try {
+            const candidate = buildDebriefRecord();
+            const existing = await findSameResourceDebrief(createDebriefStore(mission), candidate);
+            if (existing) {
+                splitPrompt.value = null;
+                duplicatePrompt.value = { key: debriefKey(existing), existing };
+                return;
+            }
+        } catch (err) {
+            error.value = err instanceof Error ? err.message : String(err);
+            return;
+        } finally {
+            busy.value = false;
+        }
+    }
 
     // Incomplete segment → ISM split prompt before recording. Search only:
     // splitting redistributes POA between parent and remainder, which is a

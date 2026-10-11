@@ -20,6 +20,7 @@ import type {
     SegmentGeometrySource,
     TrackLogPublisher,
 } from './ports.ts';
+import { correctedDebrief, sameResourceDebriefs } from './debrief.ts';
 import { closeRegistryEntry, nextOpNumber, opSyncName, upsertRegistryEntry } from './registry.ts';
 import {
     debriefKey,
@@ -169,23 +170,65 @@ export async function checkInSubscriber(
     await gateway.setSubscriberRole(op, { ...subscriber, role: 'MISSION_SUBSCRIBER' });
 }
 
+function validateDebrief(record: DebriefRecord, fn: string): void {
+    if (!record.segmentUid.trim()) throw new Error(`${fn}: segmentUid required`);
+    // POD is search-only. Absent is legal (non-search incidents report what was
+    // worked, not how thoroughly); present-but-nonsense is not.
+    if (record.pod !== undefined
+        && (!Number.isFinite(record.pod) || record.pod < 0 || record.pod > 100)) {
+        throw new Error(`${fn}: POD must be 0–100`);
+    }
+    if (record.coverage !== undefined
+        && (!Number.isFinite(record.coverage) || record.coverage <= 0 || record.coverage > 1)) {
+        throw new Error(`${fn}: coverage must be in (0, 1]`);
+    }
+}
+
 /** Record a debrief POD for (part of) a segment. */
 export async function recordDebrief(
     store: DebriefStore,
     record: DebriefRecord,
 ): Promise<void> {
-    if (!record.segmentUid.trim()) throw new Error('recordDebrief: segmentUid required');
-    // POD is search-only. Absent is legal (non-search incidents report what was
-    // worked, not how thoroughly); present-but-nonsense is not.
-    if (record.pod !== undefined
-        && (!Number.isFinite(record.pod) || record.pod < 0 || record.pod > 100)) {
-        throw new Error('recordDebrief: POD must be 0–100');
-    }
-    if (record.coverage !== undefined
-        && (!Number.isFinite(record.coverage) || record.coverage <= 0 || record.coverage > 1)) {
-        throw new Error('recordDebrief: coverage must be in (0, 1]');
-    }
+    validateDebrief(record, 'recordDebrief');
     await store.append(record);
+}
+
+/**
+ * The newest debrief already recorded by this resource on this segment in
+ * this OP, read fresh from the store (so an entry made a moment ago in
+ * another window counts), or null.
+ */
+export async function findSameResourceDebrief(
+    store: DebriefStore,
+    record: DebriefRecord,
+): Promise<DebriefRecord | null> {
+    return sameResourceDebriefs(await store.load(), record)[0] ?? null;
+}
+
+/**
+ * Correct an existing debrief in place (Replace / Edit): one record, so the
+ * POD rollup counts it once. Keeps its identity and attached tracks and
+ * stamps `correctedAt`. Throws when the record is gone.
+ */
+export async function correctDebrief(
+    store: DebriefStore,
+    key: string,
+    update: DebriefRecord,
+    now: () => Date = () => new Date(),
+): Promise<DebriefRecord> {
+    validateDebrief(update, 'correctDebrief');
+    const existing = (await store.load()).find((r) => debriefKey(r) === key);
+    if (!existing) {
+        throw new Error('That completed assignment is no longer in the incident record — refresh and try again.');
+    }
+    const next = correctedDebrief(existing, update, now().toISOString());
+    await store.replace(key, next);
+    return next;
+}
+
+/** Delete a debrief. Attached track CoTs stay in the OP sync. */
+export async function deleteDebrief(store: DebriefStore, key: string): Promise<void> {
+    await store.remove(key);
 }
 
 export interface TrackLogDeps {
