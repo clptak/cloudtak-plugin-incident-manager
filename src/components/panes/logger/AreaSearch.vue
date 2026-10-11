@@ -200,7 +200,7 @@
                     :op='iapOp'
                     :registry='registry'
                     :category='iapCategory'
-                    @close='iapOp = null'
+                    @close='closeIap'
                 />
             </TablerBorder>
 
@@ -1385,6 +1385,7 @@ async function refresh(): Promise<void> {
         } else if (registry.value.length) {
             debriefForm.opNumber = registry.value[registry.value.length - 1].opNumber;
         }
+        await reopenRememberedIap();
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
     } finally {
@@ -1539,6 +1540,44 @@ async function onGenerateIap(op: OpPeriodRegistryEntry): Promise<void> {
     error.value = ''; notice.value = '';
     iapCategory.value = await incidentCategory();
     iapOp.value = op;
+    rememberOpenIap(mission.guid, op.guid);
+}
+
+/**
+ * Remember which IAP is open (this browser tab only), so it comes back open
+ * after "Reload" on the updated-by-another-manager banner, or when returning
+ * to this screen.
+ */
+function openIapKey(missionGuid: string): string {
+    return `incident-manager:open-iap:${missionGuid}`;
+}
+
+function rememberOpenIap(missionGuid: string, opGuid: string | null): void {
+    try {
+        if (opGuid) sessionStorage.setItem(openIapKey(missionGuid), opGuid);
+        else sessionStorage.removeItem(openIapKey(missionGuid));
+    } catch {
+        // Private mode / storage blocked: the IAP just won't reopen by itself.
+    }
+}
+
+function closeIap(): void {
+    iapOp.value = null;
+    const mission = activeMission.value;
+    if (mission) rememberOpenIap(mission.guid, null);
+}
+
+async function reopenRememberedIap(): Promise<void> {
+    const mission = activeMission.value;
+    if (!mission?.mgmt || iapOp.value) return;
+    let opGuid: string | null = null;
+    try {
+        opGuid = sessionStorage.getItem(openIapKey(mission.guid));
+    } catch {
+        return;
+    }
+    const op = opGuid ? registry.value.find((e) => e.guid === opGuid) : undefined;
+    if (op) await onGenerateIap(op);
 }
 
 /** Make sure the OP mission renders as a map overlay on this device. */
