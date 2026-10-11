@@ -19,7 +19,15 @@ import { decodeSchema, diffEncoded, encodeSchema } from './schemaCodec.ts';
 
 export type ClientFactory = (missionGuid: string, missionToken?: string) => MissionPropertyClient;
 
+export type SchemaStorage = 'unsupported' | 'file' | 'keys';
+
 export interface SchemaPropertyBackend {
+    /**
+     * Where this mission's schema lives: `keys` (has meta.schema), `file`
+     * (server supports Mission Properties but the incident is not migrated) or
+     * `unsupported` (TAK Server older than 5.9).
+     */
+    storage(missionGuid: string): Promise<SchemaStorage>;
     /** The schema from keys, or null when this mission is not on keys (use the file). */
     load(missionGuid: string): Promise<{ schema: MissionSchema; invalid: string[] } | null>;
     /** Saves via keys and returns true, or returns false when the mission is not on keys. */
@@ -64,6 +72,12 @@ export function createSchemaPropertyBackend(clientFor: ClientFactory): SchemaPro
     }
 
     return {
+        async storage(missionGuid) {
+            const props = await readAll(missionGuid);
+            if (!props) return 'unsupported';
+            return props.has(META_SCHEMA_KEY) ? 'keys' : 'file';
+        },
+
         async load(missionGuid) {
             const props = await readAll(missionGuid);
             if (!props || !props.has(META_SCHEMA_KEY)) return null;

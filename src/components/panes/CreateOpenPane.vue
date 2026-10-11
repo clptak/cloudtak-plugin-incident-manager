@@ -435,6 +435,7 @@ import { usePluginSettings } from '../../composables/usePluginSettings.ts';
 import { SUBJECT_TYPE_PLACEHOLDER } from '../../lib/subjectTypes.ts';
 import { flyToCoords } from '../../lib/flyToFeature.ts';
 import { pushPointToMission } from '../../lib/missionFeatures.ts';
+import { startSchemaOnProperties } from '../../lib/missionSchema.ts';
 
 const mapStore = useMapStore();
 const { setActiveMission, setDraftIncidentType, activeMission } = useIncident();
@@ -792,6 +793,19 @@ async function createMission(): Promise<void> {
         status.value = mgmt
             ? `Created DataSyncs "${res.data.name}" + "${mgmt.name}" (planning).`
             : `Created DataSync "${res.data.name}" — no management channels selected; planning data will be visible on the field channels.`;
+
+        // TAK Server 5.9+: keep planning data as Mission Properties on the
+        // management sync from the start. Non-fatal - on failure or an older
+        // server the incident simply stays on mission_schema.json.
+        if (mgmt) {
+            try {
+                if (await startSchemaOnProperties(mgmt.guid, mgmt.missionToken)) {
+                    status.value += ' Planning data is stored as Mission Properties.';
+                }
+            } catch (err) {
+                console.warn('Could not start incident on Mission Properties; using mission_schema.json', err);
+            }
+        }
 
         // Optional Caltopo map via the caltopo-sync plugin
         if (form.createCaltopo) {

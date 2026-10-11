@@ -73,6 +73,11 @@
                 </button>
             </div>
 
+            <SchemaStorageCard
+                :mission='activeMission'
+                @migrated='refresh'
+            />
+
             <div class='small text-muted mb-2'>
                 {{ activeMission.name }} — showing {{ displayRows.length }} of {{ rows.length }} entr{{ rows.length === 1 ? 'y' : 'ies' }}
             </div>
@@ -526,6 +531,7 @@ import { IconChevronDown } from '@tabler/icons-vue';
 import { TablerBorder, TablerInlineAlert } from '@tak-ps/vue-tabler';
 import type { DBSubscriptionLog } from '../../../../../src/database.ts';
 import { useIncident } from '../../composables/useIncident.ts';
+import SchemaStorageCard from '../SchemaStorageCard.vue';
 import { registryFromSchemaValue } from '../../domain/registry.ts';
 import { listTrackedClues, type TrackedClue } from '../../lib/clueLog.ts';
 import { listAllIncidentLogs, loadSchemaSubscription } from '../../lib/incidentSubscription.ts';

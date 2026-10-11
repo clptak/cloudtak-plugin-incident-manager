@@ -240,6 +240,19 @@ test('backend: the step-2 debrief store and the schema view see the same records
     assert.equal((await store.load()).length, 4);
 });
 
+test('backend: storage() reports unsupported, file, then keys after migrate', async () => {
+    const { backend } = backendWith();
+    assert.equal(await backend.storage(GUID), 'file');
+    await backend.migrate(GUID, sampleSchema());
+    assert.equal(await backend.storage(GUID), 'keys');
+
+    const old = createSchemaPropertyBackend((missionGuid) => createMissionPropertyClient({
+        missionGuid,
+        transport: async () => ({ status: 404, text: 'Not Found' }),
+    }));
+    assert.equal(await old.storage(GUID), 'unsupported');
+});
+
 test('backend: correcting one debrief rewrites only its key; deleting one removes only its key', async () => {
     const { srv, backend } = backendWith();
     await backend.migrate(GUID, sampleSchema());

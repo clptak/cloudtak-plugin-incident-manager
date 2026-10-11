@@ -28,6 +28,18 @@ import { createSchemaPropertyBackend } from './schemaPropertyBackend.ts';
 export const schemaPropertyBackend = createSchemaPropertyBackend((missionGuid, missionToken) =>
     createMissionPropertyClient({ missionGuid, missionToken, transport: cloudtakPropertyTransport }));
 
+/**
+ * Start a brand-new incident's management sync on Mission Properties when the
+ * server supports them. Returns false (and changes nothing) on older servers.
+ * meta.schema is written last, so a failure part-way leaves the incident on
+ * mission_schema.json as before.
+ */
+export async function startSchemaOnProperties(missionGuid: string, missionToken?: string): Promise<boolean> {
+    if (await schemaPropertyBackend.storage(missionGuid) !== 'file') return false;
+    await schemaPropertyBackend.migrate(missionGuid, defaultMissionSchema(), missionToken);
+    return true;
+}
+
 /** Legacy log keyword from earlier builds; only used when migrating stored schema. */
 export const MISSION_SCHEMA_KEYWORD = 'mission-schema';
 export const MISSION_SCHEMA_FILENAME = 'mission_schema.json';
