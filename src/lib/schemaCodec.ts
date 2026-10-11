@@ -8,6 +8,7 @@
  *   op.<n>.debrief.<segment>.<id>       one incident_response.debriefs[] entry each
  *   s.<field>                           every other top-level field, as JSON
  *   s.incident-response.<field>         every other incident_response field, as JSON
+ *   c.<collection>.<id>                 one record of a busy collection (schemaCollections.ts)
  *
  * Section keys use the schema's own field names with "_" written as "-" (an
  * underscore is a wildcard in the server's prefix filter). Every field gets
@@ -28,6 +29,7 @@ import {
     opNumberFromMissionKey,
     SCHEMA_VERSION,
 } from './propertyKeys.ts';
+import { extractCollections, isCollectionKey, mergeCollections } from './schemaCollections.ts';
 
 const SECTION = 's.';
 const IR_FIELD = 'incident_response';
@@ -49,10 +51,22 @@ function isRecord(value: unknown): value is Record<string, unknown> {
     return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
-export function encodeSchema(schema: MissionSchema): Map<string, string> {
+/**
+ * `layout: 2` writes the previous layout (no per-record `c.*` keys); it exists
+ * so tests can build an incident as older builds stored it.
+ */
+export function encodeSchema(input: MissionSchema, opts: { layout?: 2 | 3 } = {}): Map<string, string> {
     const out = new Map<string, string>();
     const rest: Record<string, unknown> = {};
-    out.set(META_SCHEMA_KEY, SCHEMA_VERSION);
+    const layout = opts.layout ?? 3;
+    out.set(META_SCHEMA_KEY, layout === 2 ? '2' : SCHEMA_VERSION);
+
+    // Per-record keys first, on a private copy; what they could not place is
+    // left in the copy and encoded below with its field.
+    const schema = structuredClone(input) as Record<string, unknown>;
+    if (layout === 3) {
+        for (const [key, value] of extractCollections(schema)) out.set(key, value);
+    }
 
     for (const [field, value] of Object.entries(schema)) {
         if (value === undefined) continue;
@@ -132,9 +146,14 @@ export function decodeSchema(props: Iterable<[string, string]>): DecodeResult {
     const debriefs: unknown[] = [];
     const invalid: string[] = [];
     let rest: Record<string, unknown> = {};
+    const collectionProps: Array<[string, string]> = [];
 
     for (const [key, raw] of props) {
         if (key === META_SCHEMA_KEY) continue;
+        if (isCollectionKey(key)) {
+            collectionProps.push([key, raw]);
+            continue;
+        }
         let value: unknown;
         try {
             value = JSON.parse(raw);
@@ -166,7 +185,17 @@ export function decodeSchema(props: Iterable<[string, string]>): DecodeResult {
         if (k !== 'tak_missions' && k !== IR_FIELD) schema[k] = v;
     }
 
+    mergeCollections(schema, collectionProps, invalid);
     return { schema: schema as MissionSchema, invalid };
+}
+
+/** Keys this codec owns (everything decodeSchema reads). */
+export function isSchemaKey(key: string): boolean {
+    return key === META_SCHEMA_KEY
+        || key.startsWith(SECTION)
+        || isCollectionKey(key)
+        || opNumberFromMissionKey(key) !== null
+        || isDebriefKey(key);
 }
 
 /** Keys to write and delete to move the server from `before` to `after`. */

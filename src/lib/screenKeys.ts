@@ -4,8 +4,12 @@
  * the open screen edits raise it) and by save-conflict messages.
  *
  * Keys are the schemaCodec layout: `s.<field>` and
- * `s.incident-response.<field>`, with "_" written as "-".
+ * `s.incident-response.<field>`, with "_" written as "-", plus the per-record
+ * `c.<collection>.` keys (schemaCollections.ts). An entry ending in "." is a
+ * prefix and matches every key under it.
  */
+
+import { isVolatileKey } from './schemaCollections.ts';
 
 const IR = 's.incident-response.';
 
@@ -22,25 +26,25 @@ export function screenId(activeKey: string, activeHTab: string): string {
 export const SCREEN_EDIT_KEYS: Record<string, string[]> = {
     'initial-information': [
         's.event-id', 's.incident-id', 's.dema-mission-number', 's.sar-coordinators',
-        's.cad-data', 's.assignment',
+        's.cad-data', 'c.cad-remarks.', 'c.cad-logs.', 's.assignment',
         `${IR}incident-name`, `${IR}incident-id`, `${IR}incident-datetime`,
     ],
     'subject-info': [`${IR}subjects`],
-    'search-area': [`${IR}ipp-coordinates`, `${IR}ipp-type`, 's.row-segments'],
-    'segmentation': ['s.segments', 's.row-segments'],
+    'search-area': [`${IR}ipp-coordinates`, `${IR}ipp-type`, 's.row-segments', 'c.row-segments.'],
+    'segmentation': ['s.segments', 'c.segments.', 's.row-segments', 'c.row-segments.'],
     'initial-consensus': [`${IR}casie`],
     'search-urgency': [`${IR}urgency-rating`],
     'search-scenarios': [`${IR}scenarios`],
-    'risk-assessment': ['s.risk', `${IR}work-assignments`],
+    'risk-assessment': ['s.risk', `${IR}work-assignments`, 'c.work-assignments.'],
     'incident-post': [`${IR}incident-post`],
-    'resources': [`${IR}resource-assignments`, 's.default-agency'],
-    'work-assignments': [`${IR}work-assignments`],
+    'resources': [`${IR}resource-assignments`, 'c.resources.', 's.default-agency'],
+    'work-assignments': [`${IR}work-assignments`, 'c.work-assignments.'],
     // The IAP builder lives on this screen; its lists refresh by themselves.
-    'operational-periods': [`${IR}iap-plans`],
+    'operational-periods': [`${IR}iap-plans`, 'c.iap.'],
     'htab:casie': [`${IR}casie`, `${IR}casie-scenarios`],
-    'htab:organization': ['s.assignments-org-chart', `${IR}resource-assignments`],
-    'htab:clues': [`${IR}clues`],
-    'htab:risk-assessment': ['s.risk', `${IR}work-assignments`],
+    'htab:organization': ['s.assignments-org-chart', `${IR}resource-assignments`, 'c.resources.'],
+    'htab:clues': [`${IR}clues`, 'c.clues.'],
+    'htab:risk-assessment': ['s.risk', `${IR}work-assignments`, 'c.work-assignments.'],
 };
 
 const LABELS: Record<string, string> = {
@@ -73,9 +77,24 @@ const LABELS: Record<string, string> = {
     [`${IR}op-assignments`]: 'Assignments',
 };
 
+const COLLECTION_LABELS: Record<string, string> = {
+    'segments': 'Segments',
+    'row-segments': 'ROW segments',
+    'resources': 'Resources',
+    'work-assignments': 'Work Assignments',
+    'op-assignments': 'Assignments',
+    'clues': 'Clues',
+    'cad-remarks': 'CAD notes',
+    'cad-logs': 'CAD notes',
+};
+
 /** A readable name for one key. */
 export function keyLabel(key: string): string {
     if (LABELS[key]) return LABELS[key];
+    const iap = /^c\.iap\.([^.]+)/.exec(key);
+    if (iap) return `OP${iap[1]} IAP`;
+    const coll = /^c\.([^.]+)\./.exec(key);
+    if (coll && COLLECTION_LABELS[coll[1]]) return COLLECTION_LABELS[coll[1]];
     const op = /^op\.(\d+)\.mission$/.exec(key);
     if (op) return `OP${op[1]}`;
     const debrief = /^op\.(\d+)\.debrief\./.exec(key);
@@ -89,20 +108,28 @@ export function keyLabels(keys: Iterable<string>): string[] {
     return [...new Set([...keys].map(keyLabel))];
 }
 
-/** The keys among `changed` that the screen edits. */
+function matches(entry: string, key: string): boolean {
+    return entry.endsWith('.') ? key.startsWith(entry) : key === entry;
+}
+
+/** The keys among `changed` that the screen edits (timestamps alone don't count). */
 export function screenChangedKeys(screen: string, changed: string[]): string[] {
     const edits = SCREEN_EDIT_KEYS[screen];
     if (!edits) return [];
-    return changed.filter((key) => edits.includes(key));
+    return changed.filter((key) => !isVolatileKey(key) && edits.some((entry) => matches(entry, key)));
 }
 
 /** Prefixes whose changes the Operational Periods lists reload for. */
 export const OP_LIST_PREFIXES = [
     'op.',
     's.segments',
+    'c.segments.',
     's.row-segments',
+    'c.row-segments.',
     `${IR}op-assignments`,
+    'c.op-assignments.',
     `${IR}resource-assignments`,
+    'c.resources.',
     `${IR}casie`,
 ];
 

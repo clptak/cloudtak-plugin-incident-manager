@@ -20,7 +20,8 @@ import { MissionPropertyError, type MissionPropertyClient } from './missionPrope
 import { keyLabels } from './screenKeys.ts';
 import type { MissionSchema } from './missionSchema.ts';
 import { META_SCHEMA_KEY, SCHEMA_VERSION } from './propertyKeys.ts';
-import { decodeSchema, diffEncoded, encodeSchema } from './schemaCodec.ts';
+import { decodeSchema, diffEncoded, encodeSchema, isSchemaKey } from './schemaCodec.ts';
+import { isVolatileKey } from './schemaCollections.ts';
 
 /** Another manager changed keys this save would overwrite. Nothing was written. */
 export class SchemaConflictError extends Error {
@@ -49,9 +50,32 @@ export function findConflicts(
     current: Map<string, string>,
 ): string[] {
     return touched.filter((key) => {
+        if (isVolatileKey(key)) return false;
         const now = current.get(key) ?? null;
         return now !== (before.get(key) ?? null) && now !== (after.get(key) ?? null);
     });
+}
+
+/**
+ * Run writes a few at a time: a first save after the layout upgrade can be a
+ * hundred-plus keys. Each key is independent; the first failure is thrown
+ * after the in-flight writes settle.
+ */
+export async function inParallel(tasks: Array<() => Promise<unknown>>, limit = 8): Promise<void> {
+    let next = 0;
+    let failure: unknown = null;
+    async function worker(): Promise<void> {
+        while (next < tasks.length && failure === null) {
+            const task = tasks[next++];
+            try {
+                await task();
+            } catch (err) {
+                failure ??= err;
+            }
+        }
+    }
+    await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, worker));
+    if (failure !== null) throw failure;
 }
 
 export type ClientFactory = (missionGuid: string, missionToken?: string) => MissionPropertyClient;
@@ -103,9 +127,34 @@ export function createSchemaPropertyBackend(clientFor: ClientFactory): SchemaPro
         after: Map<string, string>,
     ): Promise<number> {
         const { set, remove } = diffEncoded(before, after);
-        for (const [key, value] of set) await client.set(key, value);
-        for (const key of remove) await client.delete(key);
+        await inParallel(set.map(([key, value]) => () => client.set(key, value)));
+        await inParallel(remove.map((key) => () => client.delete(key)));
         return set.length + remove.length;
+    }
+
+    /**
+     * Bring an incident written in an older key layout up to SCHEMA_VERSION:
+     * decode it, re-encode it, write the difference, then bump meta.schema
+     * last. Runs on the first save (which carries the write token), never on
+     * load. Returns the server's keys as they now are.
+     */
+    async function upgradeIfNeeded(
+        missionGuid: string,
+        props: Map<string, string>,
+        missionToken?: string,
+    ): Promise<Map<string, string>> {
+        const version = props.get(META_SCHEMA_KEY);
+        if (version === undefined || version === SCHEMA_VERSION) return props;
+        const owned = new Map([...props].filter(([key]) => isSchemaKey(key)));
+        const target = encodeSchema(decodeSchema(props).schema);
+        const client = clientFor(missionGuid, missionToken);
+        const { set, remove } = diffEncoded(owned, target);
+        await inParallel(set.filter(([key]) => key !== META_SCHEMA_KEY).map(([key, value]) => () => client.set(key, value)));
+        await inParallel(remove.map((key) => () => client.delete(key)));
+        await client.set(META_SCHEMA_KEY, SCHEMA_VERSION);
+        const next = new Map([...props].filter(([key]) => !isSchemaKey(key)));
+        for (const [key, value] of target) next.set(key, value);
+        return next;
     }
 
     return {
@@ -132,13 +181,15 @@ export function createSchemaPropertyBackend(clientFor: ClientFactory): SchemaPro
                 // the mission is already on keys, diffing against the server.
                 const props = await readAll(missionGuid);
                 if (!props || !props.has(META_SCHEMA_KEY)) return false;
-                before = encodeSchema(decodeSchema(props).schema);
+                const current = await upgradeIfNeeded(missionGuid, props, missionToken);
+                before = encodeSchema(decodeSchema(current).schema);
             } else {
                 const { set, remove } = diffEncoded(before, after);
                 const touched = [...set.map(([key]) => key), ...remove];
                 if (touched.length) {
-                    const current = await readAll(missionGuid);
-                    if (current) {
+                    const props = await readAll(missionGuid);
+                    if (props) {
+                        const current = await upgradeIfNeeded(missionGuid, props, missionToken);
                         const conflicts = findConflicts(touched, before, after, current);
                         if (conflicts.length) throw new SchemaConflictError(conflicts);
                     }
@@ -155,12 +206,9 @@ export function createSchemaPropertyBackend(clientFor: ClientFactory): SchemaPro
                 throw new Error('This incident is already stored as mission properties - not migrating again');
             }
             const encoded = encodeSchema(schema);
-            let written = 0;
-            for (const [key, value] of encoded) {
-                if (key === META_SCHEMA_KEY) continue;
-                await client.set(key, value);
-                written++;
-            }
+            const entries = [...encoded].filter(([key]) => key !== META_SCHEMA_KEY);
+            await inParallel(entries.map(([key, value]) => () => client.set(key, value)));
+            const written = entries.length;
             await client.set(META_SCHEMA_KEY, SCHEMA_VERSION);
             unsupported.delete(missionGuid);
             return { written: written + 1 };

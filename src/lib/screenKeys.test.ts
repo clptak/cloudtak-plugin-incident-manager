@@ -31,8 +31,17 @@ test('every screen key is a key the codec can produce from the shipped template'
         if (!(f in s)) (s as Record<string, unknown>)[f] = {};
     }
     const keys = new Set(encodeSchema(s).keys());
+    const collections = new Set(['segments', 'row-segments', 'resources', 'work-assignments', 'op-assignments',
+        'clues', 'iap', 'cad-remarks', 'cad-logs']);
     for (const [screen, list] of Object.entries(SCREEN_EDIT_KEYS)) {
-        for (const key of list) assert.ok(keys.has(key), `${screen}: ${key} is not a codec key`);
+        for (const key of list) {
+            if (key.endsWith('.')) {
+                assert.match(key, /^c\.[a-z-]+\.$/, `${screen}: ${key}`);
+                assert.ok(collections.has(key.slice(2, -1)), `${screen}: ${key} is not a collection`);
+            } else {
+                assert.ok(keys.has(key), `${screen}: ${key} is not a codec key`);
+            }
+        }
     }
 });
 
@@ -41,6 +50,18 @@ test('screenChangedKeys: only what the open screen edits', () => {
     assert.deepEqual(screenChangedKeys('subject-info', changed), ['s.incident-response.subjects']);
     assert.deepEqual(screenChangedKeys('initial-information', changed), ['s.cad-data']);
     assert.deepEqual(screenChangedKeys('htab:dashboard', changed), []);
+});
+
+test('screenChangedKeys: collection prefixes match their records; IAP timestamps alone do not', () => {
+    assert.deepEqual(screenChangedKeys('segmentation', ['c.segments.abc', 'c.resources.r1']), ['c.segments.abc']);
+    assert.deepEqual(screenChangedKeys('operational-periods', ['c.iap.1.updated']), []);
+    assert.deepEqual(screenChangedKeys('operational-periods', ['c.iap.1.objectives', 'c.iap.1.updated']), ['c.iap.1.objectives']);
+});
+
+test('keyLabel: collection keys', () => {
+    assert.equal(keyLabel('c.segments.abc'), 'Segments');
+    assert.equal(keyLabel('c.iap.2.objectives'), 'OP2 IAP');
+    assert.deepEqual(keyLabels(['c.cad-remarks.a', 'c.cad-logs.b']), ['CAD notes']);
 });
 
 test('keyLabel: known sections, op keys, and a readable fallback', () => {
@@ -54,5 +75,7 @@ test('keyLabel: known sections, op keys, and a readable fallback', () => {
 test('touchesPrefixes: OP list reloads on registry, debriefs and segments, not on unrelated keys', () => {
     assert.ok(touchesPrefixes(['op.1.debrief.a.b'], OP_LIST_PREFIXES));
     assert.ok(touchesPrefixes(['s.segments'], OP_LIST_PREFIXES));
+    assert.ok(touchesPrefixes(['c.segments.abc'], OP_LIST_PREFIXES));
+    assert.ok(touchesPrefixes(['c.op-assignments.1-x'], OP_LIST_PREFIXES));
     assert.ok(!touchesPrefixes(['s.incident-response.subjects'], OP_LIST_PREFIXES));
 });
