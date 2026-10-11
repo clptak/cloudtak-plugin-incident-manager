@@ -63,7 +63,10 @@ export function encodeSchema(input: MissionSchema, opts: { layout?: 2 | 3 } = {}
 
     // Per-record keys first, on a private copy; what they could not place is
     // left in the copy and encoded below with its field.
-    const schema = structuredClone(input) as Record<string, unknown>;
+    // JSON copy, not structuredClone: screens hand in Vue reactive objects
+    // (Proxies), which structuredClone refuses. Every value ends up as JSON
+    // in a key anyway, so nothing is lost.
+    const schema = JSON.parse(JSON.stringify(input)) as Record<string, unknown>;
     if (layout === 3) {
         for (const [key, value] of extractCollections(schema)) out.set(key, value);
     }
