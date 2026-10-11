@@ -1097,6 +1097,8 @@
 
 <script setup lang='ts'>
 import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { useIncidentChanges } from '../../../composables/useIncidentChanges.ts';
+import { OP_LIST_PREFIXES, touchesPrefixes } from '../../../lib/screenKeys.ts';
 import { IconRoute } from '@tabler/icons-vue';
 import { TablerBorder, TablerEnum, TablerInlineAlert, TablerInput } from '@tak-ps/vue-tabler';
 import OverlayManager from '../../../../../../src/base/overlay.ts';
@@ -1389,6 +1391,37 @@ async function refresh(): Promise<void> {
         loadingRegistry.value = false;
     }
 }
+
+/**
+ * Reload just the lists (OPs, segments, debriefs, assignments, resources)
+ * after another manager changed them. Leaves the forms, notices and errors
+ * alone, so nothing being typed is lost.
+ */
+let listReload: Promise<void> | null = null;
+async function reloadLists(): Promise<void> {
+    const mission = activeMission.value;
+    if (!mission?.mgmt || listReload) return;
+    listReload = (async () => {
+        try {
+            registry.value = await createRegistryStore(mission).load();
+            const sub = await loadSchemaSubscription(mission);
+            const { schema } = await loadMissionSchema(sub);
+            segments.value = segmentsFromSchema(schema);
+            debriefs.value = await createDebriefStore(mission).load();
+            assignments.value = await createAssignmentStore(mission).load();
+            resources.value = (await loadResourceAssignmentsFromMission(mission)).assignments;
+        } catch {
+            // Background refresh: the next change or a manual refresh retries.
+        } finally {
+            listReload = null;
+        }
+    })();
+    await listReload;
+}
+
+useIncidentChanges((changes) => {
+    if (touchesPrefixes(changes.map((c) => c.key), OP_LIST_PREFIXES)) void reloadLists();
+});
 
 async function refreshSubscribers(): Promise<void> {
     const op = currentOp.value;

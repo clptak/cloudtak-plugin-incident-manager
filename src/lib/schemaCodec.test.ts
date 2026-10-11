@@ -5,7 +5,7 @@ import { createMemoryPropertyServer } from './memoryPropertyTransport.ts';
 import { createMissionPropertyClient, MissionPropertyError } from './missionProperties.ts';
 import type { MissionSchema } from './missionSchema.ts';
 import { decodeSchema, diffEncoded, encodeSchema } from './schemaCodec.ts';
-import { createSchemaPropertyBackend } from './schemaPropertyBackend.ts';
+import { createSchemaPropertyBackend, findConflicts, SchemaConflictError } from './schemaPropertyBackend.ts';
 import { createPropertyDebriefStore } from './propertyStores.ts';
 
 const GUID = 'meta-guid';
@@ -196,16 +196,58 @@ test('backend: two managers appending debriefs at the same time both keep theirs
     assert.deepEqual(debriefs.debriefs.map((d) => d.resource), ['GT1', 'GT2', 'GT5', 'GT6', 'GT7']);
 });
 
-test('backend: same-section edits are last-writer-wins', async () => {
-    const { backend } = backendWith();
+test('backend: a same-section edit over someone else\'s is refused and writes nothing', async () => {
+    const { srv, backend } = backendWith();
     await backend.migrate(GUID, sampleSchema());
     const a = (await backend.load(GUID))!.schema;
     const b = (await backend.load(GUID))!.schema;
     (a.incident_response as Record<string, unknown>).incident_name = 'From A';
     (b.incident_response as Record<string, unknown>).incident_name = 'From B';
+    (b as Record<string, unknown>).default_agency = 'B agency';
     await backend.save(GUID, a);
-    await backend.save(GUID, b);
+    const before = srv.calls.length;
+    await assert.rejects(backend.save(GUID, b), (err: unknown) =>
+        err instanceof SchemaConflictError
+        && err.keys.join() === 's.incident-response.incident-name'
+        && /Initial Information/.test(err.message));
+    assert.equal(srv.calls.slice(before).filter((c) => c.method !== 'GET').length, 0);
+    const now = (await backend.load(GUID))!.schema;
+    assert.equal((now.incident_response as Record<string, unknown>).incident_name, 'From A');
+});
+
+test('backend: after a reload the same edit goes through', async () => {
+    const { backend } = backendWith();
+    await backend.migrate(GUID, sampleSchema());
+    const a = (await backend.load(GUID))!.schema;
+    const b = (await backend.load(GUID))!.schema;
+    (a.incident_response as Record<string, unknown>).incident_name = 'From A';
+    await backend.save(GUID, a);
+    (b.incident_response as Record<string, unknown>).incident_name = 'From B';
+    await assert.rejects(backend.save(GUID, b), SchemaConflictError);
+    const fresh = (await backend.load(GUID))!.schema;
+    (fresh.incident_response as Record<string, unknown>).incident_name = 'From B';
+    await backend.save(GUID, fresh);
     assert.equal(((await backend.load(GUID))!.schema.incident_response as Record<string, unknown>).incident_name, 'From B');
+});
+
+test('backend: saving twice from one copy is not a conflict with itself', async () => {
+    const { backend } = backendWith();
+    await backend.migrate(GUID, sampleSchema());
+    const a = (await backend.load(GUID))!.schema;
+    (a.incident_response as Record<string, unknown>).incident_name = 'One';
+    await backend.save(GUID, a);
+    (a.incident_response as Record<string, unknown>).incident_name = 'Two';
+    await backend.save(GUID, a);
+    assert.equal(((await backend.load(GUID))!.schema.incident_response as Record<string, unknown>).incident_name, 'Two');
+});
+
+test('findConflicts: someone else\'s change conflicts; the same value or an untouched key does not', () => {
+    const before = new Map([['k', '1'], ['j', '1']]);
+    const after = new Map([['k', '2'], ['j', '2']]);
+    assert.deepEqual(findConflicts(['k', 'j'], before, after, new Map([['k', '9'], ['j', '2']])), ['k']);
+    assert.deepEqual(findConflicts(['k'], before, after, new Map([['k', '1']])), []);
+    assert.deepEqual(findConflicts(['k'], before, new Map(), new Map()), []);
+    assert.deepEqual(findConflicts(['k'], before, new Map(), new Map([['k', '5']])), ['k']);
 });
 
 test('backend: saving a schema it did not hand out diffs against the server', async () => {

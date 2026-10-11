@@ -8,14 +8,51 @@
  * Saves are diffs: the backend remembers the encoded form of each schema
  * object it handed out, and on save writes only the keys that changed since
  * then. Two managers editing different sections (or different debriefs / OP
- * periods) therefore no longer overwrite each other. Two edits to the same
- * key are still last-writer-wins.
+ * periods) therefore no longer overwrite each other.
+ *
+ * Two edits to the same key are refused rather than silently overwritten:
+ * before writing, a save checks each key it is about to change against the
+ * server. If another manager changed one of them since this copy was loaded,
+ * the save throws SchemaConflictError and writes nothing.
  */
 
 import { MissionPropertyError, type MissionPropertyClient } from './missionProperties.ts';
+import { keyLabels } from './screenKeys.ts';
 import type { MissionSchema } from './missionSchema.ts';
 import { META_SCHEMA_KEY, SCHEMA_VERSION } from './propertyKeys.ts';
 import { decodeSchema, diffEncoded, encodeSchema } from './schemaCodec.ts';
+
+/** Another manager changed keys this save would overwrite. Nothing was written. */
+export class SchemaConflictError extends Error {
+    readonly keys: string[];
+
+    constructor(keys: string[]) {
+        const what = keyLabels(keys).join(', ');
+        super(
+            `Another manager changed ${what} after you opened this screen, so your save was stopped `
+            + 'to avoid overwriting their change. Reload to see it, then make your edit again.',
+        );
+        this.name = 'SchemaConflictError';
+        this.keys = keys;
+    }
+}
+
+/**
+ * Keys this save would change that someone else changed since `before` was
+ * taken. A key already holding the value we are about to write is not a
+ * conflict (the same edit made twice).
+ */
+export function findConflicts(
+    touched: string[],
+    before: Map<string, string>,
+    after: Map<string, string>,
+    current: Map<string, string>,
+): string[] {
+    return touched.filter((key) => {
+        const now = current.get(key) ?? null;
+        return now !== (before.get(key) ?? null) && now !== (after.get(key) ?? null);
+    });
+}
 
 export type ClientFactory = (missionGuid: string, missionToken?: string) => MissionPropertyClient;
 
@@ -88,6 +125,7 @@ export function createSchemaPropertyBackend(clientFor: ClientFactory): SchemaPro
 
         async save(missionGuid, schema, missionToken) {
             let before = snapshots.get(schema);
+            const after = encodeSchema(schema);
             if (!before) {
                 // A schema object this backend did not hand out (a fresh
                 // default, or one loaded from the file): only save via keys if
@@ -95,8 +133,17 @@ export function createSchemaPropertyBackend(clientFor: ClientFactory): SchemaPro
                 const props = await readAll(missionGuid);
                 if (!props || !props.has(META_SCHEMA_KEY)) return false;
                 before = encodeSchema(decodeSchema(props).schema);
+            } else {
+                const { set, remove } = diffEncoded(before, after);
+                const touched = [...set.map(([key]) => key), ...remove];
+                if (touched.length) {
+                    const current = await readAll(missionGuid);
+                    if (current) {
+                        const conflicts = findConflicts(touched, before, after, current);
+                        if (conflicts.length) throw new SchemaConflictError(conflicts);
+                    }
+                }
             }
-            const after = encodeSchema(schema);
             await write(clientFor(missionGuid, missionToken), before, after);
             snapshots.set(schema, after);
             return true;
