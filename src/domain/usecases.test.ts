@@ -6,12 +6,14 @@ import {
     attachTrackFile,
     attachTrackLog,
     checkInSubscriber,
+    activateOperationalPeriod,
     closeOperationalPeriod,
     correctDebrief,
     deleteDebrief,
     detachTrackLog,
     findSameResourceDebrief,
     openOperationalPeriod,
+    planOperationalPeriod,
     publishAssignments,
     recordDebrief,
     TRACK_LOG_FOLDER,
@@ -129,6 +131,61 @@ test('openOperationalPeriod: replaces Create-form OP-00 instead of stacking OP1'
     });
     assert.equal(entry.name, '2026-09-21_search_foo_OP-01');
     assert.equal(entry.opNumber, 1);
+});
+
+// --- planning lifecycle ---------------------------------------------------------
+
+const MGMT = ['MGMT'];
+const FIELD_AND_MGMT = ['FIELD', 'MGMT'];
+
+test('planOperationalPeriod: created on management channels only, field channels kept for activation', async () => {
+    const registry = fakeRegistry([{ opNumber: 1, name: 'X - OP1', guid: 'g1', status: 'open', channels: FIELD_AND_MGMT }]);
+    const gateway = fakeGateway();
+    const op = await planOperationalPeriod({ registry, gateway, now: NOW }, {
+        incidentName: 'X', managementChannels: MGMT, channels: FIELD_AND_MGMT,
+    });
+    assert.equal(op.opNumber, 2);
+    assert.equal(op.status, 'planning');
+    assert.deepEqual((gateway.calls.find((c) => c.method === 'create')!.args[0] as { channels: string[] }).channels, MGMT);
+    assert.deepEqual(op.channels, MGMT);
+    assert.deepEqual([...op.plannedChannels!].sort(), FIELD_AND_MGMT);
+    assert.equal(registry.entries.find((e) => e.opNumber === 1)?.status, 'open');
+    assert.equal(registry.entries.find((e) => e.opNumber === 2)?.status, 'planning');
+});
+
+test('planOperationalPeriod: refuses without management channels, without a field channel, or while planning', async () => {
+    const deps = { registry: fakeRegistry(), gateway: fakeGateway() };
+    await assert.rejects(planOperationalPeriod(deps, { incidentName: 'X', managementChannels: [], channels: FIELD_AND_MGMT }), /management channels/);
+    await assert.rejects(planOperationalPeriod(deps, { incidentName: 'X', managementChannels: MGMT, channels: MGMT }), /field channel/);
+    await planOperationalPeriod(deps, { incidentName: 'X', managementChannels: MGMT, channels: FIELD_AND_MGMT });
+    await assert.rejects(planOperationalPeriod(deps, { incidentName: 'X', managementChannels: MGMT, channels: FIELD_AND_MGMT }), /already being planned/);
+    await assert.rejects(openOperationalPeriod(deps, { incidentName: 'X', channels: FIELD_AND_MGMT }), /activate it instead/);
+});
+
+test('activateOperationalPeriod: applies the planned channels; the previous OP stays open', async () => {
+    const registry = fakeRegistry([{ opNumber: 1, name: 'X - OP1', guid: 'g1', status: 'open', channels: FIELD_AND_MGMT }]);
+    const gateway = fakeGateway();
+    const deps = { registry, gateway, now: NOW };
+    const planned = await planOperationalPeriod(deps, { incidentName: 'X', managementChannels: MGMT, channels: FIELD_AND_MGMT });
+    const active = await activateOperationalPeriod(deps, planned);
+    assert.equal(active.status, 'open');
+    assert.deepEqual([...active.channels].sort(), FIELD_AND_MGMT);
+    assert.equal(active.plannedChannels, undefined);
+    assert.equal(active.activatedAt, '2026-08-06T20:00:00.000Z');
+    const set = gateway.calls.find((c) => c.method === 'setChannels')!;
+    assert.deepEqual([...(set.args[1] as string[])].sort(), FIELD_AND_MGMT);
+    assert.deepEqual(registry.entries.map((e) => [e.opNumber, e.status]), [[1, 'open'], [2, 'open']]);
+    await assert.rejects(activateOperationalPeriod(deps, active), /not being planned/);
+});
+
+test('activateOperationalPeriod: a failed channel change leaves the OP in planning', async () => {
+    const registry = fakeRegistry();
+    const gateway = fakeGateway();
+    const deps = { registry, gateway };
+    const planned = await planOperationalPeriod(deps, { incidentName: 'X', managementChannels: MGMT, channels: FIELD_AND_MGMT });
+    gateway.setChannels = async () => { throw new Error('TAK Server did not apply the channel change'); };
+    await assert.rejects(activateOperationalPeriod(deps, planned), /did not apply/);
+    assert.equal(registry.entries[0].status, 'planning');
 });
 
 test('openOperationalPeriod: validates inputs', async () => {

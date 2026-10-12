@@ -12,10 +12,27 @@ import Subscription from '../../../../src/base/subscription.ts';
 import { server } from '../../../../src/std.ts';
 import type { OpPeriodRegistryEntry } from '../domain/entities.ts';
 import type { OpPeriodGateway } from '../domain/ports.ts';
+import { sameChannels } from '../domain/registry.ts';
 import { ensureMissionFolder } from './folder.ts';
 
 function authHeaders(op: OpPeriodRegistryEntry): Record<string, string> {
     return op.ownerToken ? { MissionAuthorization: op.ownerToken } : {};
+}
+
+/** A mission's groups from a Marti response (array, single string, or absent). */
+function groupsOf(mission: unknown): string[] | null {
+    const groups = (mission as { groups?: unknown } | undefined)?.groups;
+    if (Array.isArray(groups)) return groups.filter((g): g is string => typeof g === 'string');
+    if (typeof groups === 'string' && groups) return [groups];
+    return null;
+}
+
+async function currentGroups(op: OpPeriodRegistryEntry): Promise<string[] | null> {
+    const res = await server.GET('/api/marti/missions/{:guid}', {
+        params: { path: { ':guid': op.guid }, query: { changes: false, logs: false } },
+        headers: authHeaders(op),
+    });
+    return res.error ? null : groupsOf(res.data);
 }
 
 export function createOpPeriodGateway(): OpPeriodGateway {
@@ -103,6 +120,21 @@ export function createOpPeriodGateway(): OpPeriodGateway {
                 body: { groups: channels },
             });
             if (res.error) throw new Error(res.error.message);
+            // TAK Server can answer 200 and leave the groups as they were
+            // (caller not the mission owner, or not in every group being set).
+            // Trust only what the mission reports back.
+            const applied = groupsOf(res.data) ?? await currentGroups(op);
+            if (!applied || !sameChannels(applied, channels)) {
+                const why = op.ownerToken
+                    ? 'You must be a member of every channel being set, and the OP owner token must be valid.'
+                    : 'No owner token is saved for this OP, and your own subscription to it does not carry '
+                        + 'owner rights. Close and reopen the OP from the account that created it, or change '
+                        + 'its channels as a TAK admin.';
+                throw new Error(
+                    `TAK Server did not apply the channel change to ${op.name} `
+                    + `(asked for ${channels.join(', ')}; it has ${applied?.join(', ') || 'unknown'}). ${why}`,
+                );
+            }
         },
 
         async ensureFolder(op, name) {

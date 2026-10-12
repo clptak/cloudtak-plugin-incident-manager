@@ -58,38 +58,116 @@
                     <div
                         v-for='op in registry'
                         :key='op.guid'
-                        class='cloudtak-accent border rounded-3 mb-2 px-3 py-2 d-flex align-items-center gap-2'
+                        class='cloudtak-accent border rounded-3 mb-2 px-3 py-2'
                     >
-                        <strong>OP{{ op.opNumber }}</strong>
-                        <span class='text-muted small'>{{ op.name }}</span>
-                        <span
-                            class='badge ms-1'
-                            :class='op.status === "closed" ? "bg-secondary-lt text-secondary" : "bg-success-lt text-success"'
-                        >{{ op.status }}</span>
-                        <span
-                            v-if='currentOp && op.guid === currentOp.guid'
-                            class='badge bg-blue-lt text-blue'
-                        >current</span>
-                        <span class='text-muted small ms-auto'>
-                            {{ op.openedAt ? shortDt(op.openedAt) : '' }}
-                            {{ op.closedAt ? `→ ${shortDt(op.closedAt)}` : '' }}
-                        </span>
-                        <button
-                            class='btn btn-link btn-sm p-0'
-                            :disabled='busy'
-                            title='Generate the Incident Action Plan PDF for this operational period'
-                            @click='onGenerateIap(op)'
+                        <div class='d-flex flex-wrap align-items-center gap-2'>
+                            <strong>OP{{ op.opNumber }}</strong>
+                            <span class='text-muted small'>{{ op.name }}</span>
+                            <span
+                                class='badge ms-1'
+                                :class='statusBadgeClass(op.status)'
+                                :title='op.status === "planning" ? "Management channels only - field users cannot see this OP yet" : ""'
+                            >{{ op.status }}</span>
+                            <span
+                                v-if='currentOp && op.guid === currentOp.guid'
+                                class='badge bg-blue-lt text-blue'
+                                title='Assignments, roster and IPP below apply to this OP'
+                            >working</span>
+                            <span class='text-muted small ms-auto'>
+                                {{ op.openedAt ? shortDt(op.openedAt) : '' }}
+                                {{ op.activatedAt ? `· active ${shortDt(op.activatedAt)}` : '' }}
+                                {{ op.closedAt ? `→ ${shortDt(op.closedAt)}` : '' }}
+                            </span>
+                            <button
+                                v-if='op.status !== "closed" && !(currentOp && op.guid === currentOp.guid)'
+                                class='btn btn-link btn-sm p-0'
+                                :disabled='busy'
+                                title='Make this the OP that assignments, roster and IPP below apply to'
+                                @click='workingOpGuid = op.guid'
+                            >
+                                Work on
+                            </button>
+                            <button
+                                class='btn btn-link btn-sm p-0'
+                                :disabled='busy'
+                                title='Generate the Incident Action Plan PDF for this operational period'
+                                @click='onGenerateIap(op)'
+                            >
+                                IAP
+                            </button>
+                            <button
+                                v-if='op.status !== "closed"'
+                                class='btn btn-link btn-sm p-0'
+                                :disabled='busy'
+                                @click='makeMapActive(op.guid, op.name)'
+                            >
+                                Set active
+                            </button>
+                            <button
+                                v-if='op.status === "planning"'
+                                class='btn btn-link btn-sm p-0 text-success'
+                                :disabled='busy'
+                                @click='confirmOp = { kind: "activate", guid: op.guid }'
+                            >
+                                Activate
+                            </button>
+                            <button
+                                v-if='op.status !== "closed"'
+                                class='btn btn-link btn-sm p-0 text-danger'
+                                :disabled='busy'
+                                @click='confirmOp = { kind: "close", guid: op.guid }'
+                            >
+                                Close
+                            </button>
+                        </div>
+
+                        <!-- Inline confirmations (no browser dialogs) -->
+                        <div
+                            v-if='confirmOp && confirmOp.guid === op.guid'
+                            class='small d-flex flex-wrap align-items-center gap-2 mt-2'
                         >
-                            IAP
-                        </button>
-                        <button
-                            v-if='op.status !== "closed"'
-                            class='btn btn-link btn-sm p-0'
-                            :disabled='busy'
-                            @click='makeMapActive(op.guid, op.name)'
-                        >
-                            Set active
-                        </button>
+                            <template v-if='confirmOp.kind === "activate"'>
+                                <span class='text-success'>
+                                    Open OP{{ op.opNumber }} to the field? Channels become
+                                    <strong>{{ (op.plannedChannels || op.channels).join(', ') }}</strong>.
+                                    <span v-if='activeOps.length'>
+                                        OP{{ activeOps.map((o) => o.opNumber).join(', OP') }} stays open until someone closes it.
+                                    </span>
+                                </span>
+                                <button
+                                    class='btn btn-success btn-sm py-0'
+                                    :disabled='busy'
+                                    @click='onActivateOp(op)'
+                                >
+                                    {{ busy ? 'Working…' : `Activate OP${op.opNumber}` }}
+                                </button>
+                            </template>
+                            <template v-else>
+                                <span class='text-danger'>
+                                    <template v-if='op.status === "planning"'>
+                                        Close OP{{ op.opNumber }} without opening it to the field?
+                                    </template>
+                                    <template v-else>
+                                        Close OP{{ op.opNumber }}? Field channels are removed —
+                                        volunteers lose access and visibility (fades as server caches expire).
+                                    </template>
+                                </span>
+                                <button
+                                    class='btn btn-danger btn-sm py-0'
+                                    :disabled='busy'
+                                    @click='onCloseOp(op)'
+                                >
+                                    {{ busy ? 'Working…' : `Close OP${op.opNumber}` }}
+                                </button>
+                            </template>
+                            <button
+                                class='btn btn-link btn-sm p-0'
+                                :disabled='busy'
+                                @click='confirmOp = null'
+                            >
+                                Cancel
+                            </button>
+                        </div>
                     </div>
                     <div class='form-text mb-1'>
                         Active mission = where new markers, clues, and logs land.
@@ -103,7 +181,7 @@
                     </div>
 
                     <div
-                        v-if='!currentOp'
+                        v-if='!planningOp'
                         class='mt-3'
                     >
                         <label class='form-label'>Channels for OP{{ nextOp }}</label>
@@ -141,16 +219,31 @@
                                 Set one in Settings.
                             </template>
                         </div>
-                        <button
-                            class='btn btn-primary mt-2'
-                            :disabled='busy || !opChannels.length'
-                            @click='onOpenOp'
-                        >
-                            {{ busy ? 'Working…' : `Open OP${nextOp}` }}
-                        </button>
+                        <div class='d-flex flex-wrap gap-2 mt-2'>
+                            <button
+                                class='btn btn-primary'
+                                :disabled='busy || !opChannels.length'
+                                @click='onPlanOp'
+                            >
+                                {{ busy ? 'Working…' : `Plan OP${nextOp}` }}
+                            </button>
+                            <button
+                                class='btn btn-outline-primary'
+                                :disabled='busy || !opChannels.length'
+                                @click='onOpenOp'
+                            >
+                                {{ busy ? 'Working…' : `Open OP${nextOp} now` }}
+                            </button>
+                        </div>
+                        <div class='form-text'>
+                            <strong>Plan</strong> creates OP{{ nextOp }} on the management channels only, so the
+                            IAP, resources and assignments can be prepared before the field sees it;
+                            <strong>Activate</strong> it when it starts. <strong>Open now</strong> gives the
+                            field access immediately.
+                        </div>
                     </div>
                     <div
-                        v-else
+                        v-if='currentOp'
                         class='mt-3'
                     >
                         <button
@@ -167,17 +260,6 @@
                         >
                             Add Influence of Clue
                         </button>
-                        <button
-                            class='btn btn-outline-danger'
-                            :disabled='busy'
-                            @click='onCloseOp'
-                        >
-                            {{ busy ? 'Working…' : `Close OP${currentOp.opNumber}` }}
-                        </button>
-                        <div class='form-text'>
-                            Closing removes field channels from the OP sync — volunteers lose
-                            access and visibility (fades as server caches expire).
-                        </div>
                     </div>
                 </template>
             </TablerBorder>
@@ -1108,17 +1190,19 @@ import GroupSelect from '../../../../../../src/components/CloudTAK/util/GroupSel
 import { useIncident } from '../../../composables/useIncident.ts';
 import { usePluginSettings } from '../../../composables/usePluginSettings.ts';
 import type { DebriefRecord, OpAssignment, OpPeriodRegistryEntry } from '../../../domain/entities.ts';
-import { currentOpPeriod, nextOpNumber } from '../../../domain/registry.ts';
+import { currentOpPeriod, isFieldActive, nextOpNumber, planningOpPeriod } from '../../../domain/registry.ts';
 import {
     attachTrackFile,
     attachTrackLog,
     checkInSubscriber,
+    activateOperationalPeriod,
     closeOperationalPeriod,
     correctDebrief,
     deleteDebrief,
     detachTrackLog,
     findSameResourceDebrief,
     openOperationalPeriod,
+    planOperationalPeriod,
     publishAssignments,
     recordDebrief,
 } from '../../../domain/usecases.ts';
@@ -1274,7 +1358,28 @@ function opCreateKeywords(): string[] {
     return keywords;
 }
 
-const currentOp = computed(() => currentOpPeriod(registry.value));
+/** The OP the field currently works in (never a planning OP). */
+const activeOp = computed(() => currentOpPeriod(registry.value));
+const activeOps = computed(() => registry.value.filter(isFieldActive));
+const planningOp = computed(() => planningOpPeriod(registry.value));
+/** OP chosen with "Work on"; null = default. */
+const workingOpGuid = ref<string | null>(null);
+/**
+ * The OP that assignments, roster, clues and IPP on this screen apply to:
+ * the one picked with "Work on", else the field's current OP, else the OP
+ * being planned.
+ */
+const currentOp = computed(() => {
+    const picked = registry.value.find((e) => e.guid === workingOpGuid.value && e.status !== 'closed');
+    return picked ?? activeOp.value ?? planningOp.value;
+});
+const confirmOp = ref<{ kind: 'activate' | 'close'; guid: string } | null>(null);
+
+function statusBadgeClass(status: string): string {
+    if (status === 'closed') return 'bg-secondary-lt text-secondary';
+    if (status === 'planning') return 'bg-warning-lt text-warning';
+    return 'bg-success-lt text-success';
+}
 const nextOp = computed(() => nextOpNumber(registry.value));
 const segmentUids = computed(() => Object.keys(segments.value));
 const resources = ref<ResourceAssignment[]>([]);
@@ -1379,7 +1484,8 @@ async function refresh(): Promise<void> {
         if (!currentOp.value) await loadMissionTemplates();
 
         if (currentOp.value) {
-            debriefForm.opNumber = currentOp.value.opNumber;
+            // Debriefs belong to the OP the field worked, not the one being planned.
+            debriefForm.opNumber = (activeOp.value ?? currentOp.value).opNumber;
             await ensureOpOverlay(currentOp.value);
             await refreshSubscribers();
         } else if (registry.value.length) {
@@ -1437,6 +1543,63 @@ async function refreshSubscribers(): Promise<void> {
     }
 }
 
+/** Create the next OP on management channels only (hidden from the field). */
+async function onPlanOp(): Promise<void> {
+    const mission = activeMission.value;
+    if (!mission?.mgmt) return;
+    busy.value = true;
+    error.value = ''; notice.value = '';
+    try {
+        if (!missionTemplates.value.length) await loadMissionTemplates();
+        const keywords = opCreateKeywords();
+        const managementChannels = await missionChannels(mission.mgmt.guid);
+        const entry = await planOperationalPeriod(
+            { registry: createRegistryStore(mission), gateway },
+            {
+                incidentName: mission.name,
+                managementChannels,
+                channels: opChannels.value,
+                keywords: keywords.length ? keywords : undefined,
+            },
+        );
+        await ensureOpOverlay(entry);
+        workingOpGuid.value = entry.guid;
+        notice.value = `Planning ${entry.name} on ${entry.channels.join(', ')} only. `
+            + 'Field users will see it when you activate it.';
+        await refresh();
+    } catch (err) {
+        error.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        busy.value = false;
+    }
+}
+
+/** Open a planning OP to the field. The current OP stays open. */
+async function onActivateOp(op: OpPeriodRegistryEntry): Promise<void> {
+    const mission = activeMission.value;
+    if (!mission?.mgmt) return;
+    busy.value = true;
+    error.value = ''; notice.value = '';
+    try {
+        const entry = await activateOperationalPeriod({ registry: createRegistryStore(mission), gateway }, op);
+        let ippNote = '';
+        try {
+            const ippUid = await publishIppToOp(mission, entry);
+            ippNote = ippUid ? ' IPP published.' : '';
+        } catch (ippErr) {
+            ippNote = ` IPP publish failed: ${ippErr instanceof Error ? ippErr.message : String(ippErr)}`;
+        }
+        confirmOp.value = null;
+        workingOpGuid.value = entry.guid;
+        notice.value = `Activated ${entry.name}: field channels ${entry.channels.join(', ')}.${ippNote}`;
+        await refresh();
+    } catch (err) {
+        error.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        busy.value = false;
+    }
+}
+
 async function onOpenOp(): Promise<void> {
     const mission = activeMission.value;
     if (!mission?.mgmt) return;
@@ -1473,10 +1636,9 @@ async function onOpenOp(): Promise<void> {
     }
 }
 
-async function onCloseOp(): Promise<void> {
+async function onCloseOp(op: OpPeriodRegistryEntry): Promise<void> {
     const mission = activeMission.value;
-    const op = currentOp.value;
-    if (!mission?.mgmt || !op) return;
+    if (!mission?.mgmt) return;
     busy.value = true;
     error.value = ''; notice.value = '';
     try {
@@ -1487,7 +1649,9 @@ async function onCloseOp(): Promise<void> {
             op,
             { retainChannels: retain },
         );
-        notice.value = `Closed ${closed.name}; volunteers demoted and field channels removed.`;
+        notice.value = `Closed ${closed.name}; field channels removed.`;
+        confirmOp.value = null;
+        if (workingOpGuid.value === op.guid) workingOpGuid.value = null;
         await refresh();
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);

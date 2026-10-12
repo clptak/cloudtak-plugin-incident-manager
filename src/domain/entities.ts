@@ -10,6 +10,11 @@
  * unit tests run under Node's native type stripping (`npm test`).
  */
 
+/**
+ * planning: created on management channels only - field users cannot see it.
+ * open: active, field channels on. closed: field channels removed.
+ * Closing is always a manual action, never a side effect of activating the next OP.
+ */
 export type OpStatus = 'planning' | 'open' | 'debriefing' | 'closed';
 
 /**
@@ -30,8 +35,14 @@ export interface OpPeriodRegistryEntry {
      * (Phase 0 finding). Lives Sworn-side only.
      */
     ownerToken?: string;
-    /** ISO timestamps. */
+    /**
+     * Channels to apply when a planning OP is activated (field + management).
+     * While planning, `channels` holds the management channels only.
+     */
+    plannedChannels?: string[];
+    /** ISO timestamps. openedAt = sync created; activatedAt = field channels added. */
     openedAt?: string;
+    activatedAt?: string;
     closedAt?: string;
 }
 
