@@ -1,7 +1,7 @@
 # ADR-003: POA lock is explicit, and debrief corrections mark a lock stale
 
 ## Status
-Accepted (debrief corrections implemented; POA lock not yet built)
+Accepted (implemented)
 
 ## Date
 2026-10-11
@@ -31,7 +31,7 @@ Two problems came up while testing concurrent edits:
   recorded time and attached tracks, and gains `correctedAt`. Delete removes
   the record; attached track lines stay in the OP DataSync.
 
-**POA lock** (to be built):
+**POA lock** (CASIE tab, `src/domain/poaLock.ts`):
 - Locking the POA is an explicit planning action for an upcoming OP, stored
   under its own key (`op.<n>.poa.<lockedAt>`). It records the POA values and
   exactly which debriefs it was computed from, with a fingerprint of each.
@@ -39,6 +39,12 @@ Two problems came up while testing concurrent edits:
   replaced, edited or deleted, the lock is shown as **stale** ("based on a
   debrief that changed since — re-lock?"). Planning decides whether to
   re-lock; nothing changes the locked values automatically.
+- A lock for OP *n* uses the Initial Consensus plus every debrief and clue
+  recorded for OPs before *n*. It also goes stale when one of those is added
+  late, or when the consensus or segments change. Only what moves the POA
+  counts: attaching a track, renaming a debrief's label, or a correction that
+  keeps the same POD and coverage does not make a lock stale.
+- Re-locking writes a new key; earlier locks for the OP are kept.
 
 ## Alternatives Considered
 

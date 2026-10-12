@@ -63,6 +63,8 @@
         />
 
         <template v-if='loaded && inputs.hasConsensus'>
+            <PoaLockCard :inputs='inputs' />
+
             <!-- ── Per-OP history (WinCASIE tabular view) ─────────────── -->
             <TablerBorder
                 class='cloudtak-accent text-white mb-3'
@@ -841,6 +843,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { IconChevronDown } from '@tabler/icons-vue';
 import { TablerBorder, TablerInlineAlert, TablerInput } from '@tak-ps/vue-tabler';
 import { useIncident } from '../../composables/useIncident.ts';
+import PoaLockCard from '../PoaLockCard.vue';
 import type { DebriefRecord } from '../../domain/entities.ts';
 import {
     computeOpHistory,
