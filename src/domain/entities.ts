@@ -10,7 +10,7 @@
  * unit tests run under Node's native type stripping (`npm test`).
  */
 
-export type OpStatus = 'open' | 'debriefing' | 'closed';
+export type OpStatus = 'planning' | 'open' | 'debriefing' | 'closed';
 
 /**
  * One entry of the incident registry persisted in the management sync's

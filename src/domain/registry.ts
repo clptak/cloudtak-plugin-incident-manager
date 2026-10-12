@@ -6,7 +6,7 @@
 
 import type { OpPeriodRegistryEntry, OpStatus } from './entities.ts';
 
-const STATUSES: OpStatus[] = ['open', 'debriefing', 'closed'];
+const STATUSES: OpStatus[] = ['planning', 'open', 'debriefing', 'closed'];
 
 function asString(value: unknown, fallback = ''): string {
     return typeof value === 'string' ? value : fallback;
@@ -103,11 +103,18 @@ export function opSyncName(incidentName: string, opNumber: number): string {
     return `${stem} - OP${opNumber}`;
 }
 
-/** The single open (or debriefing) OP with the highest number, if any. */
+/** The single open (or debriefing) OP with the highest number, if any. A planning OP is not current. */
 export function currentOpPeriod(
     entries: OpPeriodRegistryEntry[],
 ): OpPeriodRegistryEntry | null {
-    const active = entries.filter((e) => e.status !== 'closed');
+    const active = entries.filter((e) => e.status === 'open' || e.status === 'debriefing');
     if (!active.length) return null;
     return active.reduce((best, e) => (e.opNumber > best.opNumber ? e : best));
+}
+
+/** The OP being planned, if any (at most one at a time). */
+export function planningOpPeriod(
+    entries: OpPeriodRegistryEntry[],
+): OpPeriodRegistryEntry | null {
+    return entries.find((e) => e.status === 'planning') ?? null;
 }
