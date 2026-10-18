@@ -23,6 +23,8 @@ export interface CaltopoCreateRequest {
     missionGuid: string;
     /** Optional human title for the Caltopo map (defaults to missionName) */
     title?: string;
+    /** Activity / DR number, used as the call-location marker title */
+    activityNumber?: string;
     /** Optional center, decimal degrees */
     lat?: number;
     lng?: number;

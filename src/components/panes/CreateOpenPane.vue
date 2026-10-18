@@ -565,7 +565,10 @@ const selectedTemplate = ref<string | null>(null);
 const templateKeywords = ref<string[]>([]);
 const templateCardEls = ref<(HTMLElement | null)[]>([]);
 
-const caltopoReady = computed(() => caltopoAvailable());
+const caltopoReady = ref(false);
+watch(expandedCard, (card) => {
+    if (card === 'create') caltopoReady.value = caltopoAvailable();
+});
 
 const showSubjectType = computed(() =>
     ['search', 'rescue', 'recovery', 'other'].includes(resolvedIncidentType())
@@ -808,19 +811,26 @@ async function createMission(): Promise<void> {
             }
         }
 
-        // Optional Caltopo map via the caltopo-sync plugin
+        // Optional Caltopo map via the caltopo-sync plugin. A failure here
+        // (missing credentials, proxy error) must not undo the DataSync create.
         if (form.createCaltopo) {
-            const caltopo = await createCaltopoMap({
-                missionName: res.data.name,
-                missionGuid: res.data.guid,
-                title: res.data.name,
-                lat: parsedCoords.value?.lat,
-                lng: parsedCoords.value?.lng,
-            });
-            if (caltopo) {
-                status.value += ` Caltopo map: ${caltopo.url || caltopo.mapId}.`;
-            } else {
-                status.value += ' Caltopo creation skipped (provider not available).';
+            try {
+                const caltopo = await createCaltopoMap({
+                    missionName: res.data.name,
+                    missionGuid: res.data.guid,
+                    title: res.data.name,
+                    activityNumber: form.activityNumber,
+                    lat: parsedCoords.value?.lat,
+                    lng: parsedCoords.value?.lng,
+                });
+                if (caltopo) {
+                    status.value += ` Caltopo map: ${caltopo.url || caltopo.mapId}.`;
+                } else {
+                    status.value += ' Caltopo creation skipped (provider not available).';
+                }
+            } catch (err) {
+                const message = err instanceof Error ? err.message : String(err);
+                status.value += ` Caltopo map was not created: ${message}`;
             }
         }
 
