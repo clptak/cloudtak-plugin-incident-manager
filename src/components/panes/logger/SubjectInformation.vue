@@ -179,18 +179,10 @@
                         </div>
                         <div class='col-md-4'>
                             <TablerEnum
-                                :model-value='subjectTypeLabelFor(draft.form.subjectType)'
-                                label='Subject Type'
-                                :options='subjectTypeOptionsFor(draft.form.subjectType)'
-                                @update:model-value='onSubjectTypeLabelChange(draft, $event)'
-                            />
-                        </div>
-                        <div class='col-md-4'>
-                            <TablerEnum
-                                :model-value='categoryLabelFor(draft.form.subjectCategory)'
-                                label='Category'
-                                :options='CATEGORY_OPTIONS'
-                                @update:model-value='onCategoryLabelChange(draft, $event)'
+                                :model-value='subjectProfileLabelFor(draft.form.subjectProfile)'
+                                label='Subject Profile'
+                                :options='subjectProfileOptionsFor(draft.form.subjectProfile)'
+                                @update:model-value='onSubjectProfileLabelChange(draft, $event)'
                             />
                         </div>
 
@@ -429,7 +421,6 @@ import { useIncident } from '../../../composables/useIncident.ts';
 import { usePluginSettings } from '../../../composables/usePluginSettings.ts';
 import {
     SUBJECT_NUMBERS,
-    SUBJECT_CATEGORIES as CATEGORIES,
     blankSubjectForm,
     buildSubjectContent,
     buildSubjectKeywords,
@@ -442,7 +433,7 @@ import {
     subjectNumberFromLog,
     type SubjectForm,
 } from '../../../lib/subjectInfo.ts';
-import { SUBJECT_TYPE_PLACEHOLDER } from '../../../lib/subjectTypes.ts';
+import { SUBJECT_PROFILE_PLACEHOLDER } from '../../../lib/subjectProfiles.ts';
 import {
     resolveSubjects,
     saveSubjectsToMission,
@@ -451,7 +442,7 @@ import { loadMissionSchema } from '../../../lib/missionSchema.ts';
 import { loadIncidentSubscription, loadSchemaSubscription } from '../../../lib/incidentSubscription.ts';
 
 const { activeMission, requireActiveMission } = useIncident();
-const { enumOptions: subjectTypeEnumOptions } = usePluginSettings();
+const { enumOptions: subjectProfileEnumOptions } = usePluginSettings();
 
 const MAX_SUBJECTS = SUBJECT_NUMBERS.length;
 
@@ -470,7 +461,6 @@ const REPORTED_BY = [
 ] as const;
 
 const GENDER_OPTIONS = ['Select Gender', 'Male', 'Female', 'Other'];
-const CATEGORY_OPTIONS = ['Select Category', ...CATEGORIES.map((c) => c.label)];
 const YES_NO_OPTIONS = ['—', 'Yes', 'No'];
 const REPORTED_BY_OPTIONS = ['Select Who Reported Subject Missing', ...REPORTED_BY];
 const PHOTO_PLACEHOLDER = 'Select Photo From DataSync';
@@ -577,29 +567,16 @@ function onGenderLabelChange(draft: SubjectDraft, label: string): void {
     else draft.form.subjectGender = '';
 }
 
-function subjectTypeOptionsFor(current: string): string[] {
-    return subjectTypeEnumOptions(current);
+function subjectProfileOptionsFor(current: string): string[] {
+    return subjectProfileEnumOptions(current);
 }
 
-function subjectTypeLabelFor(value: string): string {
-    return value || SUBJECT_TYPE_PLACEHOLDER;
+function subjectProfileLabelFor(value: string): string {
+    return value || SUBJECT_PROFILE_PLACEHOLDER;
 }
 
-function onSubjectTypeLabelChange(draft: SubjectDraft, label: string): void {
-    draft.form.subjectType = label === SUBJECT_TYPE_PLACEHOLDER ? '' : label;
-}
-
-function categoryLabelFor(value: string): string {
-    if (!value) return 'Select Category';
-    return CATEGORIES.find((c) => c.value === value)?.label ?? 'Select Category';
-}
-
-function onCategoryLabelChange(draft: SubjectDraft, label: string): void {
-    if (label === 'Select Category') {
-        draft.form.subjectCategory = '';
-        return;
-    }
-    draft.form.subjectCategory = CATEGORIES.find((c) => c.label === label)?.value ?? '';
+function onSubjectProfileLabelChange(draft: SubjectDraft, label: string): void {
+    draft.form.subjectProfile = label === SUBJECT_PROFILE_PLACEHOLDER ? '' : label;
 }
 
 function yesNoLabel(value: boolean | null): string {
@@ -630,10 +607,7 @@ function draftSummary(f: SubjectForm): string {
     if (hasValue(f.subjectName)) return f.subjectName.trim();
     const age = effectiveAge(f);
     if (age) return `Age ${age}`;
-    if (hasValue(f.subjectType)) return f.subjectType;
-    if (hasValue(f.subjectCategory)) {
-        return CATEGORIES.find((c) => c.value === f.subjectCategory)?.label ?? f.subjectCategory;
-    }
+    if (hasValue(f.subjectProfile)) return f.subjectProfile;
     return '';
 }
 

@@ -13,67 +13,70 @@ import {
     type ResolvedDeployment,
 } from './pluginSettings.ts';
 import {
-    DEFAULT_SUBJECT_TYPES,
-    MAX_SUBJECT_TYPES,
-    mergeSubjectTypes,
-    normalizeSubjectTypes,
-    parseSubjectTypesText,
+    DEFAULT_SUBJECT_PROFILES,
+    MAX_SUBJECT_PROFILES,
+    mergeSubjectProfiles,
+    normalizeSubjectProfiles,
+    parseSubjectProfilesText,
     parseAidingAgenciesText,
-    subjectTypeEnumOptions,
-    SUBJECT_TYPE_PLACEHOLDER,
-} from './subjectTypes.ts';
+    subjectProfileEnumOptions,
+    SUBJECT_PROFILE_PLACEHOLDER,
+} from './subjectProfiles.ts';
 
-test('normalizeSubjectTypes trims, drops blanks, and de-dupes case-insensitively', () => {
+test('normalizeSubjectProfiles trims, drops blanks, and de-dupes case-insensitively', () => {
     assert.deepEqual(
-        normalizeSubjectTypes([' Hiker ', '', 'hiker', 'Hunter', 'HUNTER']),
+        normalizeSubjectProfiles([' Hiker ', '', 'hiker', 'Hunter', 'HUNTER']),
         ['Hiker', 'Hunter'],
     );
 });
 
-test('normalizeSubjectTypes caps at MAX_SUBJECT_TYPES', () => {
-    const labels = Array.from({ length: MAX_SUBJECT_TYPES + 10 }, (_, i) => `Type ${i}`);
-    assert.equal(normalizeSubjectTypes(labels).length, MAX_SUBJECT_TYPES);
+test('normalizeSubjectProfiles caps at MAX_SUBJECT_PROFILES', () => {
+    const labels = Array.from({ length: MAX_SUBJECT_PROFILES + 10 }, (_, i) => `Type ${i}`);
+    assert.equal(normalizeSubjectProfiles(labels).length, MAX_SUBJECT_PROFILES);
 });
 
-test('parseSubjectTypesText reads a JSON string array', () => {
-    const parsed = parseSubjectTypesText('["Hiker", "Hunter", "Hiker"]');
+test('parseSubjectProfilesText reads a JSON string array', () => {
+    const parsed = parseSubjectProfilesText('["Hiker", "Hunter", "Hiker"]');
     assert.equal(parsed.ok, true);
     if (parsed.ok) assert.deepEqual(parsed.value, ['Hiker', 'Hunter']);
 });
 
-test('parseSubjectTypesText reads { subjectTypes }', () => {
-    const parsed = parseSubjectTypesText('{ "subjectTypes": ["Child", "Elderly"] }');
+test('parseSubjectProfilesText reads { subjectProfiles } and legacy { subjectTypes }', () => {
+    const parsed = parseSubjectProfilesText('{ "subjectProfiles": ["Child", "Elderly"] }');
     assert.equal(parsed.ok, true);
     if (parsed.ok) assert.deepEqual(parsed.value, ['Child', 'Elderly']);
+    const legacy = parseSubjectProfilesText('{ "subjectTypes": ["Hunter"] }');
+    assert.equal(legacy.ok, true);
+    if (legacy.ok) assert.deepEqual(legacy.value, ['Hunter']);
 });
 
-test('parseSubjectTypesText reads CSV / newline lists', () => {
-    const parsed = parseSubjectTypesText('Hiker, Hunter\nChild');
+test('parseSubjectProfilesText reads CSV / newline lists', () => {
+    const parsed = parseSubjectProfilesText('Hiker, Hunter\nChild');
     assert.equal(parsed.ok, true);
     if (parsed.ok) assert.deepEqual(parsed.value, ['Hiker', 'Hunter', 'Child']);
 });
 
-test('parseSubjectTypesText rejects empty and invalid JSON', () => {
-    assert.equal(parseSubjectTypesText('').ok, false);
-    assert.equal(parseSubjectTypesText('   ').ok, false);
-    const bad = parseSubjectTypesText('{ not json');
+test('parseSubjectProfilesText rejects empty and invalid JSON', () => {
+    assert.equal(parseSubjectProfilesText('').ok, false);
+    assert.equal(parseSubjectProfilesText('   ').ok, false);
+    const bad = parseSubjectProfilesText('{ not json');
     assert.equal(bad.ok, false);
     if (!bad.ok) assert.match(bad.error, /not valid JSON/);
-    const missing = parseSubjectTypesText('{ "foo": [] }');
+    const missing = parseSubjectProfilesText('{ "foo": [] }');
     assert.equal(missing.ok, false);
 });
 
-test('mergeSubjectTypes appends new labels and keeps first spelling', () => {
+test('mergeSubjectProfiles appends new labels and keeps first spelling', () => {
     assert.deepEqual(
-        mergeSubjectTypes(['Hiker', 'Hunter'], ['hunter', 'Climber']),
+        mergeSubjectProfiles(['Hiker', 'Hunter'], ['hunter', 'Climber']),
         ['Hiker', 'Hunter', 'Climber'],
     );
 });
 
-test('subjectTypeEnumOptions keeps a deleted current value', () => {
+test('subjectProfileEnumOptions keeps a deleted current value', () => {
     assert.deepEqual(
-        subjectTypeEnumOptions(['Hiker'], 'Custom Type'),
-        [SUBJECT_TYPE_PLACEHOLDER, 'Hiker', 'Custom Type'],
+        subjectProfileEnumOptions(['Hiker'], 'Custom Type'),
+        [SUBJECT_PROFILE_PLACEHOLDER, 'Hiker', 'Custom Type'],
     );
 });
 
@@ -149,21 +152,31 @@ test('parseLpbTableJson rejects invalid JSON', () => {
 
 test('parseStoredPluginSettings uses defaults and validates lpbTable', () => {
     const missing = parseStoredPluginSettings(null);
-    assert.deepEqual(missing.subjectTypes, DEFAULT_SUBJECT_TYPES);
+    assert.deepEqual(missing.subjectProfiles, DEFAULT_SUBJECT_PROFILES);
     assert.equal(missing.lpbTable, null);
 
     const custom = parseStoredPluginSettings({
-        subjectTypes: ['Climber', 'Hiker'],
+        subjectProfiles: ['Climber', 'Hiker'],
         lpbTable: [validLpbRow],
     });
-    assert.deepEqual(custom.subjectTypes, ['Climber', 'Hiker']);
+    assert.deepEqual(custom.subjectProfiles, ['Climber', 'Hiker']);
     assert.equal(custom.lpbTable?.[0].category, 'Hiker');
 
     const badLpb = parseStoredPluginSettings({
-        subjectTypes: ['Hiker'],
+        subjectProfiles: ['Hiker'],
         lpbTable: [{ category: 'Nope' }],
     });
     assert.equal(badLpb.lpbTable, null);
+});
+
+test('parseStoredPluginSettings reads a legacy subjectTypes list', () => {
+    const legacy = parseStoredPluginSettings({ subjectTypes: ['Hunter', 'Child'] });
+    assert.deepEqual(legacy.subjectProfiles, ['Hunter', 'Child']);
+    const current = parseStoredPluginSettings({
+        subjectProfiles: ['Hiker'],
+        subjectTypes: ['Hunter'],
+    });
+    assert.deepEqual(current.subjectProfiles, ['Hiker']);
 });
 
 test('parseStoredPluginSettings reads agency settings', () => {
@@ -228,7 +241,7 @@ const deployed: ResolvedDeployment = {
     wisarUrl: 'https://wisar.example.org',
     useD4hAidingAgencies: false,
     useD4hPersonnel: false,
-    subjectTypes: ['Climber', 'Hiker'],
+    subjectProfiles: ['Climber', 'Hiker'],
     aidingAgencies: ['Forest Service', 'Sheriff'],
     personnel: [{ id: 1, name: 'Smith, Jane', ref: '42' }],
     lpbTable: [validLpbRow],
@@ -246,12 +259,12 @@ test('deploymentFromConfig reads scalars and staged list files', () => {
         yourAgency: '  County SAR  ',
         wisarUrl: 'https://wisar.example.org/api/v1/',
         useD4hPersonnel: false,
-        subjectTypesFile: 'subject-types.json',
+        subjectProfilesFile: 'subject-profiles.json',
         aidingAgenciesFile: '../secret.json',
         personnelFile: 'personnel.csv',
         lpbTableFile: 'missing.json',
     }, {
-        'subject-types.json': '{ "subjectTypes": ["Child", "Elderly"] }',
+        'subject-profiles.json': '{ "subjectProfiles": ["Child", "Elderly"] }',
         'secret.json': '["Nope"]',
         'personnel.csv': 'id,name,callsign\n7,Ada Lovelace,ADA\n',
         'bad-lpb.json': '{ "category": "Nope" }',
@@ -260,10 +273,19 @@ test('deploymentFromConfig reads scalars and staged list files', () => {
     assert.equal(resolved.wisarUrl, 'https://wisar.example.org');
     assert.equal(resolved.useD4hPersonnel, false);
     assert.equal(resolved.useD4hAidingAgencies, undefined);
-    assert.deepEqual(resolved.subjectTypes, ['Child', 'Elderly']);
+    assert.deepEqual(resolved.subjectProfiles, ['Child', 'Elderly']);
     assert.equal(resolved.aidingAgencies, undefined);
     assert.deepEqual(resolved.personnel, [{ id: 7, name: 'Ada Lovelace', callsign: 'ADA' }]);
     assert.equal(resolved.lpbTable, undefined);
+});
+
+test('deploymentFromConfig still reads a legacy subjectTypes file', () => {
+    const resolved = deploymentFromConfig({
+        subjectTypesFile: 'subject-types.json',
+    }, {
+        'subject-types.json': '{ "subjectTypes": ["Hunter"] }',
+    });
+    assert.deepEqual(resolved.subjectProfiles, ['Hunter']);
 });
 
 test('deploymentFromConfig ignores an invalid staged file', () => {
@@ -279,7 +301,7 @@ test('applyDeploymentDefaults fills blanks from deployment and lets saved values
     const fresh = applyDeploymentDefaults(null, deployed);
     assert.equal(fresh.yourAgency, 'County SAR');
     assert.equal(fresh.useD4hAidingAgencies, false);
-    assert.deepEqual(fresh.subjectTypes, ['Climber', 'Hiker']);
+    assert.deepEqual(fresh.subjectProfiles, ['Climber', 'Hiker']);
     assert.equal(fresh.lpbTable?.[0].category, 'Hiker');
 
     const overridden = applyDeploymentDefaults({
@@ -299,7 +321,7 @@ test('applyDeploymentDefaults fills blanks from deployment and lets saved values
     assert.deepEqual(overridden.aidingAgencies, []);
     assert.deepEqual(overridden.personnel, []);
     assert.equal(overridden.lpbTable, null);
-    assert.deepEqual(overridden.subjectTypes, ['Climber', 'Hiker']);
+    assert.deepEqual(overridden.subjectProfiles, ['Climber', 'Hiker']);
 });
 
 test('settingsForStorage drops strings and lists that match deployment', () => {
@@ -309,7 +331,7 @@ test('settingsForStorage drops strings and lists that match deployment', () => {
     assert.equal(stored.searchOpTemplateId, '');
     assert.equal(stored.wisarUrl, '');
     assert.equal(stored.useD4hAidingAgencies, false);
-    assert.equal('subjectTypes' in stored, false);
+    assert.equal('subjectProfiles' in stored, false);
     assert.equal('aidingAgencies' in stored, false);
     assert.equal('personnel' in stored, false);
     assert.equal('lpbTable' in stored, false);
@@ -329,9 +351,18 @@ test('omitted storage keys load the deployment value again', () => {
     const again = applyDeploymentDefaults(stored, deployed);
     assert.equal(again.yourAgency, 'County SAR');
     assert.equal(again.wisarUrl, 'https://wisar.example.org');
-    assert.deepEqual(again.subjectTypes, ['Climber', 'Hiker']);
+    assert.deepEqual(again.subjectProfiles, ['Climber', 'Hiker']);
     assert.equal(again.lpbTable?.[0].category, 'Hiker');
     assert.equal(again.useD4hPersonnel, false);
+});
+
+test('applyDeploymentDefaults reads a legacy subjectTypes list', () => {
+    const loaded = applyDeploymentDefaults({ subjectTypes: ['Hunter'] }, {
+        yourAgency: '',
+        searchOpTemplateId: '',
+        wisarUrl: '',
+    });
+    assert.deepEqual(loaded.subjectProfiles, ['Hunter']);
 });
 
 test('hasDeploymentDefaults is true when a string or staged list is present', () => {

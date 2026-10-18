@@ -7,7 +7,7 @@ import type { DeploymentConfig } from './src/lib/deploymentDefaults.ts';
  * These values are compiled into the web bundle. Anyone who can load CloudTAK
  * can read them. Do not put per-user secrets here.
  *
- * Aiding agencies, personnel, subject types, and the LPB table are files, not
+ * Aiding agencies, personnel, subject profiles, and the LPB table are files, not
  * inline arrays. Copy what you need from deployment.example/ into deployment/
  * (also gitignored). The basenames below are what the build looks up. An empty
  * string skips that list. Basenames only — no directories.
@@ -23,6 +23,6 @@ export const deploymentDefaults: DeploymentConfig = {
     wisarUrl: '',
     aidingAgenciesFile: 'aiding-agencies.json',
     personnelFile: 'personnel.json',
-    subjectTypesFile: 'subject-types.json',
+    subjectProfilesFile: 'subject-profiles.json',
     lpbTableFile: 'lpb-table.json',
 };

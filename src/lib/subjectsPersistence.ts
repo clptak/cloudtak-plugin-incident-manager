@@ -1,4 +1,8 @@
-/** Persist subject information in mission_schema.json (incident_response.subjects array). */
+/**
+ * Persist subject information on incident_response.subjects.
+ * TAK Server 5.9+ stores that array as the Mission Property
+ * s.incident-response.subjects; older servers keep it in mission_schema.json.
+ */
 
 import type { ActiveMission } from '../composables/useIncident.ts';
 import { loadSchemaSubscription, schemaMissionToken } from './incidentSubscription.ts';
@@ -10,6 +14,7 @@ import {
 } from './missionSchema.ts';
 import {
     blankSubjectForm,
+    legacySubjectProfile,
     parseSubjectYesNo,
     parseSubjectsFromLogs,
     type ParsedSubject,
@@ -31,8 +36,7 @@ const STRING_INFO_KEYS = [
     'subjectDateOfBirth',
     'subjectAge',
     'subjectGender',
-    'subjectCategory',
-    'subjectType',
+    'subjectProfile',
     'subjectDescription',
     'subjectHeight',
     'subjectWeight',
@@ -70,6 +74,7 @@ export function subjectFormFromInitialInformation(
             form[key] = value;
         }
     }
+    form.subjectProfile = legacySubjectProfile(raw);
     form.subjectFacialHair = parseSubjectYesNo(raw.subjectFacialHair);
     form.subjectGlasses = parseSubjectYesNo(raw.subjectGlasses);
     if (!form.subjectCaseID) form.subjectCaseID = '01';

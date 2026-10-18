@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue';
 import bundledAzlpb from '../data/azlpb_table.json';
 import {
-    deploymentSubjectTypes,
+    deploymentSubjectProfiles,
     loadPluginSettings,
     parseWisarUrl,
     savePluginSettings,
@@ -11,10 +11,10 @@ import {
 import type { D4HMember } from '../lib/d4hTypes.ts';
 import { normalizePersonnel } from '../lib/personnel.ts';
 import {
-    DEFAULT_SUBJECT_TYPES,
-    normalizeSubjectTypes,
-    subjectTypeEnumOptions,
-} from '../lib/subjectTypes.ts';
+    DEFAULT_SUBJECT_PROFILES,
+    normalizeSubjectProfiles,
+    subjectProfileEnumOptions,
+} from '../lib/subjectProfiles.ts';
 import { resolveWisarUrl } from '../lib/wisar.ts';
 
 const BUNDLED_LPB_TABLE = bundledAzlpb as AzlpbEntry[];
@@ -23,11 +23,11 @@ const state = ref<PluginSettings>(loadPluginSettings());
 
 function persist(next: PluginSettings): void {
     state.value = {
-        subjectTypes: normalizeSubjectTypes(next.subjectTypes),
+        subjectProfiles: normalizeSubjectProfiles(next.subjectProfiles),
         lpbTable: next.lpbTable,
         yourAgency: next.yourAgency.trim(),
         useD4hAidingAgencies: next.useD4hAidingAgencies,
-        aidingAgencies: normalizeSubjectTypes(next.aidingAgencies),
+        aidingAgencies: normalizeSubjectProfiles(next.aidingAgencies),
         useD4hPersonnel: next.useD4hPersonnel,
         personnel: normalizePersonnel(next.personnel),
         searchOpTemplateId: next.searchOpTemplateId.trim(),
@@ -37,7 +37,7 @@ function persist(next: PluginSettings): void {
 }
 
 export function usePluginSettings() {
-    const subjectTypes = computed(() => state.value.subjectTypes);
+    const subjectProfiles = computed(() => state.value.subjectProfiles);
     const lpbTable = computed(() => state.value.lpbTable ?? BUNDLED_LPB_TABLE);
     const lpbIsCustom = computed(() => state.value.lpbTable !== null);
     const lpbCategoryCount = computed(() => lpbTable.value.length);
@@ -52,13 +52,13 @@ export function usePluginSettings() {
     /** The WiSAR server to use: the override, else the branch default. */
     const wisarBaseUrl = computed(() => resolveWisarUrl(state.value.wisarUrl));
 
-    function setSubjectTypes(types: string[]): void {
-        persist({ ...state.value, subjectTypes: types });
+    function setSubjectProfiles(profiles: string[]): void {
+        persist({ ...state.value, subjectProfiles: profiles });
     }
 
-    function resetSubjectTypes(): void {
-        const staged = deploymentSubjectTypes();
-        setSubjectTypes([...(staged ?? DEFAULT_SUBJECT_TYPES)]);
+    function resetSubjectProfiles(): void {
+        const staged = deploymentSubjectProfiles();
+        setSubjectProfiles([...(staged ?? DEFAULT_SUBJECT_PROFILES)]);
     }
 
     function setLpbTable(table: AzlpbEntry[] | null): void {
@@ -98,11 +98,11 @@ export function usePluginSettings() {
     }
 
     function enumOptions(current = ''): string[] {
-        return subjectTypeEnumOptions(subjectTypes.value, current);
+        return subjectProfileEnumOptions(subjectProfiles.value, current);
     }
 
     return {
-        subjectTypes,
+        subjectProfiles,
         lpbTable,
         lpbIsCustom,
         lpbCategoryCount,
@@ -114,8 +114,8 @@ export function usePluginSettings() {
         searchOpTemplateId,
         wisarUrl,
         wisarBaseUrl,
-        setSubjectTypes,
-        resetSubjectTypes,
+        setSubjectProfiles,
+        resetSubjectProfiles,
         setLpbTable,
         resetLpbTable,
         setYourAgency,

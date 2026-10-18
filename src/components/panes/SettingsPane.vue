@@ -553,19 +553,19 @@
             </p>
         </TablerBorder>
 
-        <!-- ══ Subject Types ══ -->
+        <!-- ══ Subject Profiles ══ -->
         <div
-            v-if='expandedCard !== "subject-types"'
+            v-if='expandedCard !== "subject-profiles"'
             class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
             role='button'
             tabindex='0'
             :aria-expanded='false'
-            @click='toggleCard("subject-types")'
-            @keydown.enter.prevent='toggleCard("subject-types")'
-            @keydown.space.prevent='toggleCard("subject-types")'
+            @click='toggleCard("subject-profiles")'
+            @keydown.enter.prevent='toggleCard("subject-profiles")'
+            @keydown.space.prevent='toggleCard("subject-profiles")'
         >
             <p class='text-uppercase text-white-50 small mb-0'>
-                Subject Types
+                Subject Profiles
             </p>
             <IconChevronDown
                 class='ms-auto transition-transform text-white-50 rotate-180'
@@ -586,12 +586,12 @@
                     role='button'
                     tabindex='0'
                     :aria-expanded='true'
-                    @click='toggleCard("subject-types")'
-                    @keydown.enter.prevent='toggleCard("subject-types")'
-                    @keydown.space.prevent='toggleCard("subject-types")'
+                    @click='toggleCard("subject-profiles")'
+                    @keydown.enter.prevent='toggleCard("subject-profiles")'
+                    @keydown.space.prevent='toggleCard("subject-profiles")'
                 >
                     <p class='text-uppercase text-white-50 small mb-0'>
-                        Subject Types
+                        Subject Profiles
                     </p>
                     <IconChevronDown
                         class='ms-auto transition-transform text-white-50'
@@ -607,25 +607,25 @@
             </p>
 
             <NumberedTextList
-                v-model='draftTypes'
-                :max='MAX_SUBJECT_TYPES'
-                item-label='Subject Type'
-                max-hint='Maximum of 80 subject types.'
+                v-model='draftProfiles'
+                :max='MAX_SUBJECT_PROFILES'
+                item-label='Subject Profile'
+                max-hint='Maximum of 80 subject profiles.'
             />
 
             <div class='d-flex flex-wrap gap-2 mt-3'>
                 <button
                     type='button'
                     class='btn btn-primary'
-                    :disabled='!subjectTypesDirty'
-                    @click='saveSubjectTypes'
+                    :disabled='!subjectProfilesDirty'
+                    @click='saveSubjectProfiles'
                 >
                     Save
                 </button>
                 <button
                     type='button'
                     class='btn btn-outline-secondary'
-                    @click='resetSubjectTypesToDefaults'
+                    @click='resetSubjectProfilesToDefaults'
                 >
                     Reset to defaults
                 </button>
@@ -637,7 +637,9 @@
                 Upload list
             </p>
             <p class='text-muted small mb-2'>
-                JSON array, <code>{ "subjectTypes": [...] }</code>, or CSV / one type per line.
+                JSON array, <code>{ "subjectProfiles": [...] }</code>
+                (older files may use <code>{ "subjectTypes": [...] }</code>),
+                or CSV / one profile per line.
             </p>
             <input
                 ref='subjectFileInput'
@@ -657,25 +659,25 @@
                 <button
                     type='button'
                     class='btn btn-outline-primary'
-                    :disabled='!pendingSubjectTypes.length'
-                    @click='mergeUploadedSubjectTypes'
+                    :disabled='!pendingSubjectProfiles.length'
+                    @click='mergeUploadedSubjectProfiles'
                 >
                     Merge
                 </button>
                 <button
                     type='button'
                     class='btn btn-outline-primary'
-                    :disabled='!pendingSubjectTypes.length'
-                    @click='replaceUploadedSubjectTypes'
+                    :disabled='!pendingSubjectProfiles.length'
+                    @click='replaceUploadedSubjectProfiles'
                 >
                     Replace
                 </button>
             </div>
             <p
-                v-if='pendingSubjectTypes.length'
+                v-if='pendingSubjectProfiles.length'
                 class='form-text mb-0 mt-2'
             >
-                Parsed {{ pendingSubjectTypes.length }} type{{ pendingSubjectTypes.length === 1 ? '' : 's' }}
+                Parsed {{ pendingSubjectProfiles.length }} profile{{ pendingSubjectProfiles.length === 1 ? '' : 's' }}
                 from {{ pendingSubjectFileName }}.
             </p>
             <TablerInlineAlert
@@ -928,11 +930,11 @@ import {
 import { wisarClientFor } from '../../composables/useWisar.ts';
 import {
     MAX_AIDING_AGENCIES,
-    MAX_SUBJECT_TYPES,
-    mergeSubjectTypes,
+    MAX_SUBJECT_PROFILES,
+    mergeSubjectProfiles,
     parseAidingAgenciesText,
-    parseSubjectTypesText,
-} from '../../lib/subjectTypes.ts';
+    parseSubjectProfilesText,
+} from '../../lib/subjectProfiles.ts';
 import {
     chooseFileTarget,
     clearFileTarget,
@@ -943,7 +945,7 @@ import {
 
 const deploymentConfigured = hasDeploymentDefaults();
 
-type SettingsCard = 'folder' | 'your-agency' | 'aiding-agencies' | 'personnel' | 'search-op-template' | 'subject-types' | 'lpb' | 'wisar';
+type SettingsCard = 'folder' | 'your-agency' | 'aiding-agencies' | 'personnel' | 'search-op-template' | 'subject-profiles' | 'lpb' | 'wisar';
 const expandedCard = ref<SettingsCard | null>('folder');
 
 function toggleCard(card: SettingsCard): void {
@@ -951,7 +953,7 @@ function toggleCard(card: SettingsCard): void {
 }
 
 const {
-    subjectTypes,
+    subjectProfiles,
     lpbIsCustom,
     lpbCategoryCount,
     yourAgency,
@@ -962,8 +964,8 @@ const {
     searchOpTemplateId,
     wisarUrl,
     wisarBaseUrl,
-    setSubjectTypes,
-    resetSubjectTypes,
+    setSubjectProfiles,
+    resetSubjectProfiles,
     setLpbTable,
     resetLpbTable,
     setYourAgency,
@@ -975,14 +977,14 @@ const {
     setWisarUrl,
 } = usePluginSettings();
 
-const draftTypes = ref<string[]>([...subjectTypes.value]);
+const draftProfiles = ref<string[]>([...subjectProfiles.value]);
 const draftYourAgency = ref(yourAgency.value);
 const draftAidingAgencies = ref<string[]>([...aidingAgencies.value]);
 const subjectFileInput = ref<HTMLInputElement | null>(null);
 const agencyFileInput = ref<HTMLInputElement | null>(null);
 const personnelFileInput = ref<HTMLInputElement | null>(null);
 const lpbFileInput = ref<HTMLInputElement | null>(null);
-const pendingSubjectTypes = ref<string[]>([]);
+const pendingSubjectProfiles = ref<string[]>([]);
 const pendingSubjectFileName = ref('');
 const subjectUploadError = ref('');
 const pendingAidingAgencies = ref<string[]>([]);
@@ -1040,8 +1042,8 @@ async function onClearFolder(): Promise<void> {
 
 void refreshFolder();
 
-watch(subjectTypes, (types) => {
-    draftTypes.value = [...types];
+watch(subjectProfiles, (profiles) => {
+    draftProfiles.value = [...profiles];
 });
 
 watch(yourAgency, (name) => {
@@ -1052,9 +1054,9 @@ watch(aidingAgencies, (names) => {
     draftAidingAgencies.value = [...names];
 });
 
-const subjectTypesDirty = computed(() =>
-    JSON.stringify(draftTypes.value.map((t) => t.trim()).filter(Boolean))
-        !== JSON.stringify(subjectTypes.value),
+const subjectProfilesDirty = computed(() =>
+    JSON.stringify(draftProfiles.value.map((t) => t.trim()).filter(Boolean))
+        !== JSON.stringify(subjectProfiles.value),
 );
 
 const yourAgencyDirty = computed(() =>
@@ -1162,7 +1164,7 @@ async function onAgencyFileChange(event: Event): Promise<void> {
 
 function mergeUploadedAgencies(): void {
     if (!pendingAidingAgencies.value.length) return;
-    setAidingAgencies(mergeSubjectTypes(draftAidingAgencies.value, pendingAidingAgencies.value));
+    setAidingAgencies(mergeSubjectProfiles(draftAidingAgencies.value, pendingAidingAgencies.value));
     pendingAidingAgencies.value = [];
     pendingAgencyFileName.value = '';
     agencyUploadError.value = '';
@@ -1296,14 +1298,14 @@ onMounted(() => {
     void refreshMissionTemplates();
 });
 
-function saveSubjectTypes(): void {
-    setSubjectTypes(draftTypes.value);
-    draftTypes.value = [...subjectTypes.value];
+function saveSubjectProfiles(): void {
+    setSubjectProfiles(draftProfiles.value);
+    draftProfiles.value = [...subjectProfiles.value];
 }
 
-function resetSubjectTypesToDefaults(): void {
-    resetSubjectTypes();
-    pendingSubjectTypes.value = [];
+function resetSubjectProfilesToDefaults(): void {
+    resetSubjectProfiles();
+    pendingSubjectProfiles.value = [];
     pendingSubjectFileName.value = '';
     subjectUploadError.value = '';
 }
@@ -1320,37 +1322,37 @@ async function onSubjectFileChange(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     input.value = '';
-    pendingSubjectTypes.value = [];
+    pendingSubjectProfiles.value = [];
     pendingSubjectFileName.value = '';
     subjectUploadError.value = '';
     if (!file) return;
 
     try {
         const text = await file.text();
-        const parsed = parseSubjectTypesText(text);
+        const parsed = parseSubjectProfilesText(text);
         if (!parsed.ok) {
             subjectUploadError.value = parsed.error;
             return;
         }
-        pendingSubjectTypes.value = parsed.value;
+        pendingSubjectProfiles.value = parsed.value;
         pendingSubjectFileName.value = file.name;
     } catch (err) {
         subjectUploadError.value = err instanceof Error ? err.message : String(err);
     }
 }
 
-function mergeUploadedSubjectTypes(): void {
-    if (!pendingSubjectTypes.value.length) return;
-    setSubjectTypes(mergeSubjectTypes(draftTypes.value, pendingSubjectTypes.value));
-    pendingSubjectTypes.value = [];
+function mergeUploadedSubjectProfiles(): void {
+    if (!pendingSubjectProfiles.value.length) return;
+    setSubjectProfiles(mergeSubjectProfiles(draftProfiles.value, pendingSubjectProfiles.value));
+    pendingSubjectProfiles.value = [];
     pendingSubjectFileName.value = '';
     subjectUploadError.value = '';
 }
 
-function replaceUploadedSubjectTypes(): void {
-    if (!pendingSubjectTypes.value.length) return;
-    setSubjectTypes(pendingSubjectTypes.value);
-    pendingSubjectTypes.value = [];
+function replaceUploadedSubjectProfiles(): void {
+    if (!pendingSubjectProfiles.value.length) return;
+    setSubjectProfiles(pendingSubjectProfiles.value);
+    pendingSubjectProfiles.value = [];
     pendingSubjectFileName.value = '';
     subjectUploadError.value = '';
 }
