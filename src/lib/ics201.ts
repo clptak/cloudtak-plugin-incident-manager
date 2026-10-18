@@ -934,7 +934,9 @@ export async function loadIcs201FromMission(
         formatUtm: formatIppAsUtm,
         markerLookup: () => resolveIppLatLng(missionGuid, missionToken),
     });
-    sources.ippLatLng = ipp?.latLng ?? null;
+    // Used for the weather lookup: falls back to the best known point when
+    // the IPP text itself is not coordinates (UTM, a description, ...).
+    sources.ippLatLng = ipp?.weatherLatLng ?? null;
     sources.ippSource = ipp?.source ?? '';
     sources.ippText = ipp?.text ?? '';
     if (ipp) form.initialPlanningPoint = ipp.text;

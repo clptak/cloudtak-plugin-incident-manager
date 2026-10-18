@@ -12,7 +12,15 @@ export interface IppLatLng {
 
 export interface DefaultIpp {
     text: string;
+    /** Coordinates of `text` itself; null when the text is not coordinates. */
     latLng: IppLatLng | null;
+    /**
+     * Coordinates for the weather lookup. Same as `latLng` when the text
+     * parses; otherwise the best other point we have (the subject's DataSync
+     * marker, then the Search Area IPP, then the map marker), so typing UTM or
+     * a description does not switch weather off.
+     */
+    weatherLatLng: IppLatLng | null;
     source: string;
 }
 
@@ -35,14 +43,28 @@ export function subjectIppRaw(subject: Pick<SubjectForm, 'subjectIpp' | 'subject
     return (semi >= 0 ? fromTak.slice(0, semi) : fromTak).trim();
 }
 
+/** Coordinates of the subject's DataSync marker, if one was picked. */
+export function subjectMarkerLatLng(subject: Pick<SubjectForm, 'subjectIppFromTak'>): IppLatLng | null {
+    const fromTak = subject.subjectIppFromTak.trim();
+    if (!fromTak) return null;
+    const semi = fromTak.indexOf(';');
+    return parseCoordinates((semi >= 0 ? fromTak.slice(0, semi) : fromTak).trim());
+}
+
+/** Subject numbers sort numerically; anything non-numeric goes last. */
+function caseOrder(id: string): number {
+    const n = Number.parseInt(id, 10);
+    return Number.isFinite(n) ? n : Number.MAX_SAFE_INTEGER;
+}
+
 /** Lowest subject number that has an IPP. */
-export function ippFromSubjects(subjects: IppSubject[]): { text: string; number: string } | null {
-    const ordered = [...subjects].sort(
-        (a, b) => Number.parseInt(a.subjectCaseID, 10) - Number.parseInt(b.subjectCaseID, 10),
-    );
+export function ippFromSubjects(
+    subjects: IppSubject[],
+): { text: string; number: string; markerLatLng: IppLatLng | null } | null {
+    const ordered = [...subjects].sort((a, b) => caseOrder(a.subjectCaseID) - caseOrder(b.subjectCaseID));
     for (const subject of ordered) {
         const text = subjectIppRaw(subject);
-        if (text) return { text, number: subject.subjectCaseID };
+        if (text) return { text, number: subject.subjectCaseID, markerLatLng: subjectMarkerLatLng(subject) };
     }
     return null;
 }
@@ -81,24 +103,29 @@ export function schemaIppLatLng(schema: IppSchema): IppLatLng | null {
     return { lat, lng };
 }
 
-function subjectsOnSchema(schema: IppSchema): IppSubject[] {
+/**
+ * Subjects as Subject Information stores them. Mirrors subjectsFromSchema()
+ * in subjectsPersistence.ts (not imported: it pulls in CloudTAK browser
+ * modules): a record without a case number is subject '01', and a later
+ * record for the same number replaces an earlier one.
+ */
+export function subjectsOnSchema(schema: IppSchema): IppSubject[] {
     const ir = asRecord(schema.incident_response);
     const raw = ir?.subjects;
     if (!Array.isArray(raw)) return [];
-    const subjects: IppSubject[] = [];
+    const byNumber = new Map<string, IppSubject>();
     for (const entry of raw) {
         const rec = asRecord(entry);
         const info = asRecord(rec?.initial_information);
         if (!info) continue;
-        const id = typeof info.subjectCaseID === 'string' ? info.subjectCaseID : '';
-        if (!id) continue;
-        subjects.push({
+        const id = typeof info.subjectCaseID === 'string' && info.subjectCaseID ? info.subjectCaseID : '01';
+        byNumber.set(id, {
             subjectCaseID: id,
             subjectIpp: typeof info.subjectIpp === 'string' ? info.subjectIpp : '',
             subjectIppFromTak: typeof info.subjectIppFromTak === 'string' ? info.subjectIppFromTak : '',
         });
     }
-    return subjects;
+    return [...byNumber.values()];
 }
 
 export async function resolveDefaultIpp(opts: {
@@ -110,25 +137,33 @@ export async function resolveDefaultIpp(opts: {
     const stored = subjectsOnSchema(opts.schema);
     const subjects = stored.length ? stored : parseSubjectsFromLogs(opts.logs ?? []);
     const fromSubject = ippFromSubjects(subjects);
+    const area = schemaIppLatLng(opts.schema);
+    const lookupMarker = async () => (opts.markerLookup ? await opts.markerLookup() : null);
+
     if (fromSubject) {
         const field = toIppField(fromSubject.text, opts.formatUtm);
-        return { ...field, source: `Subject ${fromSubject.number}` };
+        const weatherLatLng = field.latLng
+            ?? fromSubject.markerLatLng
+            ?? area
+            ?? await lookupMarker();
+        return { ...field, weatherLatLng, source: `Subject ${fromSubject.number}` };
     }
 
-    const area = schemaIppLatLng(opts.schema);
     if (area) {
         return {
             text: opts.formatUtm(area.lat, area.lng),
             latLng: area,
+            weatherLatLng: area,
             source: 'Search Area IPP',
         };
     }
 
-    const marker = opts.markerLookup ? await opts.markerLookup() : null;
+    const marker = await lookupMarker();
     if (!marker) return null;
     return {
         text: opts.formatUtm(marker.lat, marker.lng),
         latLng: marker,
+        weatherLatLng: marker,
         source: 'Map marker',
     };
 }
