@@ -1,4 +1,4 @@
-/** Browser-local plugin preferences (subject types, custom LPB table). */
+/** Browser-local plugin preferences (subject profiles, custom LPB table). */
 
 import type { D4HMember } from './d4hTypes.ts';
 import { loadDeploymentBundle, type DeploymentConfig } from './deploymentDefaults.ts';
@@ -8,12 +8,12 @@ import {
     parsePersonnelText,
 } from './personnel.ts';
 import {
-    DEFAULT_SUBJECT_TYPES,
-    normalizeSubjectTypes,
+    DEFAULT_SUBJECT_PROFILES,
+    normalizeSubjectProfiles,
     parseAidingAgenciesText,
-    parseSubjectTypesText,
+    parseSubjectProfilesText,
     type ParseResult,
-} from './subjectTypes.ts';
+} from './subjectProfiles.ts';
 import { normalizeBaseUrl } from './wisar.ts';
 
 export const PLUGIN_SETTINGS_KEY = 'incident-manager:settings';
@@ -39,7 +39,7 @@ export interface AzlpbEntry {
 }
 
 export interface PluginSettings {
-    subjectTypes: string[];
+    subjectProfiles: string[];
     /** `null` means use the bundled Arizona LPB table. */
     lpbTable: AzlpbEntry[] | null;
     yourAgency: string;
@@ -57,7 +57,7 @@ export interface PluginSettings {
 
 export function defaultPluginSettings(): PluginSettings {
     return {
-        subjectTypes: [...DEFAULT_SUBJECT_TYPES],
+        subjectProfiles: [...DEFAULT_SUBJECT_PROFILES],
         lpbTable: null,
         yourAgency: '',
         useD4hAidingAgencies: true,
@@ -164,7 +164,7 @@ export interface ResolvedDeployment {
     useD4hPersonnel?: boolean;
     aidingAgencies?: string[];
     personnel?: D4HMember[];
-    subjectTypes?: string[];
+    subjectProfiles?: string[];
     lpbTable?: AzlpbEntry[];
 }
 
@@ -176,6 +176,15 @@ const SHARED_STRING_KEYS = [
 
 function trimmed(value: unknown): string {
     return typeof value === 'string' ? value.trim() : '';
+}
+
+/** Prefer subjectProfiles; fall back to a legacy subjectTypes array. */
+function storedProfileList(rec: Record<string, unknown>): string[] | undefined {
+    const value = Array.isArray(rec.subjectProfiles) ? rec.subjectProfiles
+        : Array.isArray(rec.subjectTypes) ? rec.subjectTypes
+            : undefined;
+    if (!value) return undefined;
+    return value.filter((item): item is string => typeof item === 'string');
 }
 
 function sameJson(a: unknown, b: unknown): boolean {
@@ -203,10 +212,10 @@ export function deploymentFromConfig(config: DeploymentConfig, files: Record<str
         resolved.useD4hPersonnel = config.useD4hPersonnel;
     }
 
-    const subjects = stagedText(files, config.subjectTypesFile);
+    const subjects = stagedText(files, config.subjectProfilesFile ?? config.subjectTypesFile);
     if (subjects !== undefined) {
-        const parsed = parseSubjectTypesText(subjects);
-        if (parsed.ok) resolved.subjectTypes = parsed.value;
+        const parsed = parseSubjectProfilesText(subjects);
+        if (parsed.ok) resolved.subjectProfiles = parsed.value;
     }
     const agencies = stagedText(files, config.aidingAgenciesFile);
     if (agencies !== undefined) {
@@ -241,16 +250,16 @@ export function hasDeploymentDefaults(deployed: ResolvedDeployment = resolveDepl
     if (trimmed(deployed.yourAgency)) return true;
     if (trimmed(deployed.searchOpTemplateId)) return true;
     if (trimmed(deployed.wisarUrl)) return true;
-    if (deployed.subjectTypes?.length) return true;
+    if (deployed.subjectProfiles?.length) return true;
     if (deployed.aidingAgencies?.length) return true;
     if (deployed.personnel?.length) return true;
     if (deployed.lpbTable?.length) return true;
     return false;
 }
 
-/** Staged subject types, when a deployment file parsed. */
-export function deploymentSubjectTypes(): string[] | undefined {
-    return resolveDeployment().subjectTypes;
+/** Staged subject profiles, when a deployment file parsed. */
+export function deploymentSubjectProfiles(): string[] | undefined {
+    return resolveDeployment().subjectProfiles;
 }
 
 /**
@@ -272,7 +281,7 @@ export function applyDeploymentDefaults(
     if (typeof deployed.useD4hPersonnel === 'boolean') {
         settings.useD4hPersonnel = deployed.useD4hPersonnel;
     }
-    if (deployed.subjectTypes) settings.subjectTypes = [...deployed.subjectTypes];
+    if (deployed.subjectProfiles) settings.subjectProfiles = [...deployed.subjectProfiles];
     if (deployed.aidingAgencies) settings.aidingAgencies = [...deployed.aidingAgencies];
     if (deployed.personnel) settings.personnel = deployed.personnel.map((member) => ({ ...member }));
     if (deployed.lpbTable) settings.lpbTable = deployed.lpbTable.map((row) => ({ ...row }));
@@ -295,13 +304,13 @@ export function applyDeploymentDefaults(
     if (typeof rec.useD4hPersonnel === 'boolean') {
         settings.useD4hPersonnel = rec.useD4hPersonnel;
     }
-    if (Array.isArray(rec.subjectTypes)) {
-        const strings = rec.subjectTypes.filter((item): item is string => typeof item === 'string');
-        settings.subjectTypes = normalizeSubjectTypes(strings);
+    const storedProfiles = storedProfileList(rec);
+    if (storedProfiles) {
+        settings.subjectProfiles = normalizeSubjectProfiles(storedProfiles);
     }
     if (Array.isArray(rec.aidingAgencies)) {
         const strings = rec.aidingAgencies.filter((item): item is string => typeof item === 'string');
-        settings.aidingAgencies = normalizeSubjectTypes(strings);
+        settings.aidingAgencies = normalizeSubjectProfiles(strings);
     }
     if (Array.isArray(rec.personnel)) {
         const members: D4HMember[] = [];
@@ -334,8 +343,8 @@ export function settingsForStorage(
         useD4hPersonnel: settings.useD4hPersonnel,
         searchOpTemplateId: settings.searchOpTemplateId.trim(),
         wisarUrl: parseWisarUrl(settings.wisarUrl) ?? '',
-        subjectTypes: normalizeSubjectTypes(settings.subjectTypes),
-        aidingAgencies: normalizeSubjectTypes(settings.aidingAgencies),
+        subjectProfiles: normalizeSubjectProfiles(settings.subjectProfiles),
+        aidingAgencies: normalizeSubjectProfiles(settings.aidingAgencies),
         personnel: normalizePersonnel(settings.personnel),
         lpbTable: settings.lpbTable,
     };
@@ -346,8 +355,8 @@ export function settingsForStorage(
             stored[key] = '';
         }
     }
-    if (deployed.subjectTypes && sameJson(stored.subjectTypes, deployed.subjectTypes)) {
-        delete stored.subjectTypes;
+    if (deployed.subjectProfiles && sameJson(stored.subjectProfiles, deployed.subjectProfiles)) {
+        delete stored.subjectProfiles;
     }
     if (deployed.aidingAgencies && sameJson(stored.aidingAgencies, deployed.aidingAgencies)) {
         delete stored.aidingAgencies;
@@ -367,9 +376,9 @@ export function parseStoredPluginSettings(raw: unknown): PluginSettings {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return defaults;
     const rec = raw as Record<string, unknown>;
 
-    if (Array.isArray(rec.subjectTypes)) {
-        const strings = rec.subjectTypes.filter((item): item is string => typeof item === 'string');
-        defaults.subjectTypes = normalizeSubjectTypes(strings);
+    const storedProfiles = storedProfileList(rec);
+    if (storedProfiles) {
+        defaults.subjectProfiles = normalizeSubjectProfiles(storedProfiles);
     }
 
     if (rec.lpbTable === null) {
@@ -389,7 +398,7 @@ export function parseStoredPluginSettings(raw: unknown): PluginSettings {
 
     if (Array.isArray(rec.aidingAgencies)) {
         const strings = rec.aidingAgencies.filter((item): item is string => typeof item === 'string');
-        defaults.aidingAgencies = normalizeSubjectTypes(strings);
+        defaults.aidingAgencies = normalizeSubjectProfiles(strings);
     }
 
     if (typeof rec.useD4hPersonnel === 'boolean') {

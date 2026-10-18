@@ -80,13 +80,13 @@
                         />
                     </div>
                     <div
-                        v-if='showSubjectType'
+                        v-if='showSubjectProfile'
                         class='col-md-3'
                     >
                         <TablerEnum
-                            v-model='subjectTypeLabel'
-                            label='Subject Type'
-                            :options='subjectTypeOptions'
+                            v-model='subjectProfileLabel'
+                            label='Subject Profile'
+                            :options='subjectProfileOptions'
                         />
                     </div>
                 </div>
@@ -433,14 +433,14 @@ import { localDateString } from '../../lib/localTime.ts';
 import { createCaltopoMap, caltopoAvailable } from '../../lib/caltopo.ts';
 import { useIncident } from '../../composables/useIncident.ts';
 import { usePluginSettings } from '../../composables/usePluginSettings.ts';
-import { SUBJECT_TYPE_PLACEHOLDER } from '../../lib/subjectTypes.ts';
+import { SUBJECT_PROFILE_PLACEHOLDER } from '../../lib/subjectProfiles.ts';
 import { flyToCoords } from '../../lib/flyToFeature.ts';
 import { pushPointToMission } from '../../lib/missionFeatures.ts';
 import { startSchemaOnProperties } from '../../lib/missionSchema.ts';
 
 const mapStore = useMapStore();
 const { setActiveMission, setDraftIncidentType, activeMission } = useIncident();
-const { enumOptions: subjectTypeEnumOptions } = usePluginSettings();
+const { enumOptions: subjectProfileEnumOptions } = usePluginSettings();
 
 type CreateOpenCard = 'create' | 'open';
 const expandedCard = ref<CreateOpenCard | null>(null);
@@ -481,14 +481,14 @@ const incidentTypeLabel = computed({
     },
 });
 
-const subjectTypeOptions = computed(() => subjectTypeEnumOptions(form.subjectType));
+const subjectProfileOptions = computed(() => subjectProfileEnumOptions(form.subjectProfile));
 
-const subjectTypeLabel = computed({
+const subjectProfileLabel = computed({
     get(): string {
-        return form.subjectType || SUBJECT_TYPE_PLACEHOLDER;
+        return form.subjectProfile || SUBJECT_PROFILE_PLACEHOLDER;
     },
     set(label: string): void {
-        form.subjectType = label === SUBJECT_TYPE_PLACEHOLDER ? '' : label;
+        form.subjectProfile = label === SUBJECT_PROFILE_PLACEHOLDER ? '' : label;
     },
 });
 
@@ -525,7 +525,7 @@ const form = reactive({
     activityNumber: '',
     date: localDateString(),
     incidentType: '',
-    subjectType: '',
+    subjectProfile: '',
     locationInfo: '',
     coords: '',
     operationalPeriod: '',
@@ -570,7 +570,7 @@ watch(expandedCard, (card) => {
     if (card === 'create') caltopoReady.value = caltopoAvailable();
 });
 
-const showSubjectType = computed(() =>
+const showSubjectProfile = computed(() =>
     ['search', 'rescue', 'recovery', 'other'].includes(resolvedIncidentType())
 );
 
@@ -584,7 +584,7 @@ const derivedName = computed(() => buildMissionName({
     activityNumber: form.activityNumber,
     date: form.date,
     incidentType: resolvedIncidentType(),
-    subjectType: showSubjectType.value ? form.subjectType : '',
+    subjectProfile: showSubjectProfile.value ? form.subjectProfile : '',
     locationInfo: form.locationInfo,
 }));
 
@@ -598,7 +598,7 @@ function buildKeywords(): string[] {
     if (form.activityNumber) kw.push(`activityNumber:${form.activityNumber}`);
     const type = resolvedIncidentType();
     if (type) kw.push(`incidentType:${type}`);
-    if (showSubjectType.value && form.subjectType) kw.push(`subjectType:${form.subjectType}`);
+    if (showSubjectProfile.value && form.subjectProfile) kw.push(`subjectProfile:${form.subjectProfile}`);
     if (form.operationalPeriod) kw.push(`operationalPeriod:${form.operationalPeriod}`);
     if (parsedCoords.value) kw.push(`coords:${parsedCoords.value.lat},${parsedCoords.value.lng}`);
     for (const keyword of templateKeywords.value) {

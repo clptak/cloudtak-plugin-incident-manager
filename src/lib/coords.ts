@@ -70,13 +70,13 @@ export function buildMissionName(opts: {
     activityNumber?: string;
     date?: string;
     incidentType?: string;
-    subjectType?: string;
+    subjectProfile?: string;
     locationInfo?: string;
 }): string {
     const activity = (opts.activityNumber || '').trim();
     const date = opts.date || localDateString();
     const incident = opts.incidentType || 'mission';
-    const subject = opts.subjectType || '';
+    const subject = opts.subjectProfile || '';
     let location = (opts.locationInfo || '').trim();
     if (location) location = location.replace(/\s+/g, '_').slice(0, 80);
 

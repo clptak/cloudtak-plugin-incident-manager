@@ -15,6 +15,8 @@ export interface DeploymentConfig {
     /** Basename under deployment/. Custom roster used when D4H personnel is off. */
     personnelFile?: string;
     /** Basename under deployment/. */
+    subjectProfilesFile?: string;
+    /** @deprecated Read when subjectProfilesFile is unset. */
     subjectTypesFile?: string;
     /** Basename under deployment/. Replaces the bundled Arizona LPB table. */
     lpbTableFile?: string;

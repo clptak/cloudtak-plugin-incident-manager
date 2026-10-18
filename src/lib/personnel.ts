@@ -1,7 +1,7 @@
 /** Custom personnel roster (Settings) using the D4H member fields this plugin reads. */
 
 import type { D4HMember } from './d4hTypes.ts';
-import type { ParseResult } from './subjectTypes.ts';
+import type { ParseResult } from './subjectProfiles.ts';
 
 export const MAX_PERSONNEL = 500;
 

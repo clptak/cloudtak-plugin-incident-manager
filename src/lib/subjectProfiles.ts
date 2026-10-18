@@ -1,9 +1,9 @@
-/** Default and user-editable Subject Type labels (Create | Open + Subject Information). */
+/** Default and user-editable Subject Profile labels (Create | Open + Subject Information). */
 
-export const MAX_SUBJECT_TYPES = 80;
+export const MAX_SUBJECT_PROFILES = 80;
 export const MAX_AIDING_AGENCIES = 80;
 
-export const DEFAULT_SUBJECT_TYPES = [
+export const DEFAULT_SUBJECT_PROFILES = [
     'Hiker', 'Hunter', 'Climber', 'Canyoneering', 'Camper',
     'Child', 'Mountain Biker', 'Autistic', 'Mental Health', 'Boater',
     'Vehicle', 'Fisherman', 'Dementia', 'Alzheimers', 'Base Jumper',
@@ -13,14 +13,14 @@ export const DEFAULT_SUBJECT_TYPES = [
     'Mushroom Gatherer', 'Pinon Nut Picker', 'Woodcutter', 'Other',
 ];
 
-export const SUBJECT_TYPE_PLACEHOLDER = '— Select —';
+export const SUBJECT_PROFILE_PLACEHOLDER = '— Select —';
 
 export type ParseResult<T> =
     | { ok: true; value: T }
     | { ok: false; error: string };
 
 /** Trim, drop blanks, de-dupe case-insensitively (keep first spelling), cap length. */
-export function normalizeSubjectTypes(labels: string[]): string[] {
+export function normalizeSubjectProfiles(labels: string[]): string[] {
     const seen = new Set<string>();
     const out: string[] = [];
     for (const raw of labels) {
@@ -30,14 +30,14 @@ export function normalizeSubjectTypes(labels: string[]): string[] {
         if (seen.has(key)) continue;
         seen.add(key);
         out.push(label);
-        if (out.length >= MAX_SUBJECT_TYPES) break;
+        if (out.length >= MAX_SUBJECT_PROFILES) break;
     }
     return out;
 }
 
 /** Merge incoming labels onto an existing list (incoming wins order for new items). */
-export function mergeSubjectTypes(existing: string[], incoming: string[]): string[] {
-    return normalizeSubjectTypes([...existing, ...incoming]);
+export function mergeSubjectProfiles(existing: string[], incoming: string[]): string[] {
+    return normalizeSubjectProfiles([...existing, ...incoming]);
 }
 
 function stringsFromUnknownArray(value: unknown[]): ParseResult<string[]> {
@@ -96,14 +96,14 @@ export function parseStringListText(
         }
         const result = parseStringListJson(parsed, objectKeys);
         if (!result.ok) return result;
-        const labels = normalizeSubjectTypes(result.value);
+        const labels = normalizeSubjectProfiles(result.value);
         if (!labels.length) {
             return { ok: false, error: emptyError };
         }
         return { ok: true, value: labels };
     }
 
-    const labels = normalizeSubjectTypes(parseStringListCsv(text));
+    const labels = normalizeSubjectProfiles(parseStringListCsv(text));
     if (!labels.length) {
         return { ok: false, error: emptyError };
     }
@@ -111,10 +111,15 @@ export function parseStringListText(
 }
 
 /**
- * Parse a JSON array / `{ subjectTypes }` object, or CSV/text (newlines and commas).
+ * Parse a JSON array, `{ subjectProfiles }`, or the legacy `{ subjectTypes }`
+ * object, or CSV/text (newlines and commas).
  */
-export function parseSubjectTypesText(raw: string): ParseResult<string[]> {
-    return parseStringListText(raw, ['subjectTypes'], 'No subject types found in the file.');
+export function parseSubjectProfilesText(raw: string): ParseResult<string[]> {
+    return parseStringListText(
+        raw,
+        ['subjectProfiles', 'subjectTypes'],
+        'No subject profiles found in the file.',
+    );
 }
 
 /** Parse a JSON array / `{ agencies }` / `{ aidingAgencies }` object, or CSV/text. */
@@ -127,8 +132,8 @@ export function parseAidingAgenciesText(raw: string): ParseResult<string[]> {
 }
 
 /** Enum options including a placeholder and a saved value that is no longer in the list. */
-export function subjectTypeEnumOptions(types: string[], current = ''): string[] {
-    const options = [...types];
+export function subjectProfileEnumOptions(profiles: string[], current = ''): string[] {
+    const options = [...profiles];
     if (current && !options.includes(current)) options.push(current);
-    return [SUBJECT_TYPE_PLACEHOLDER, ...options];
+    return [SUBJECT_PROFILE_PLACEHOLDER, ...options];
 }

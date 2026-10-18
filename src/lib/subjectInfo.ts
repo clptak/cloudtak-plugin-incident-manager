@@ -4,16 +4,17 @@ export const SUBJECT_KEYWORD = 'subject-information';
 
 export const SUBJECT_NUMBERS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10'] as const;
 
-export const SUBJECT_CATEGORIES = [
-    { value: 'hiker', label: 'Hiker' },
-    { value: 'hunter', label: 'Hunter' },
-    { value: 'child', label: 'Child' },
-    { value: 'elderly', label: 'Elderly' },
-    { value: 'mental_illness', label: 'Mental Illness' },
-    { value: 'alzheimer_dementia', label: "Alzheimer's/Dementia" },
-    { value: 'substance_abuse', label: 'Substance Abuse' },
-    { value: 'other', label: 'Other' },
-] as const;
+/** Labels for the removed Category field. Read-only, so old records still resolve. */
+const LEGACY_CATEGORY_LABELS: Record<string, string> = {
+    hiker: 'Hiker',
+    hunter: 'Hunter',
+    child: 'Child',
+    elderly: 'Elderly',
+    mental_illness: 'Mental Illness',
+    alzheimer_dementia: "Alzheimer's/Dementia",
+    substance_abuse: 'Substance Abuse',
+    other: 'Other',
+};
 
 export interface SubjectForm {
     subjectCaseID: string;
@@ -21,8 +22,7 @@ export interface SubjectForm {
     subjectDateOfBirth: string;
     subjectAge: string;
     subjectGender: string;
-    subjectCategory: string;
-    subjectType: string;
+    subjectProfile: string;
     subjectDescription: string;
     subjectHeight: string;
     subjectWeight: string;
@@ -62,8 +62,28 @@ export function displaySubjectNumber(n: string): string {
     return String(Number.parseInt(n, 10));
 }
 
-export function categoryLabel(value: string): string {
-    return SUBJECT_CATEGORIES.find((c) => c.value === value)?.label ?? value;
+export interface LegacySubjectProfileInput {
+    subjectProfile?: unknown;
+    subjectType?: unknown;
+    subjectCategory?: unknown;
+}
+
+function stringValue(value: unknown): string {
+    return typeof value === 'string' ? value.trim() : '';
+}
+
+/**
+ * First non-empty of subjectProfile, the old subjectType, then the old
+ * category value mapped to its label (unknown values pass through).
+ */
+export function legacySubjectProfile(raw: LegacySubjectProfileInput): string {
+    const profile = stringValue(raw.subjectProfile);
+    if (profile) return profile;
+    const type = stringValue(raw.subjectType);
+    if (type) return type;
+    const category = stringValue(raw.subjectCategory);
+    if (!category) return '';
+    return LEGACY_CATEGORY_LABELS[category] ?? category;
 }
 
 /** Age in whole years from a `YYYY-MM-DD` date-of-birth string (browser-local calendar). */
@@ -126,8 +146,7 @@ export function blankSubjectForm(subjectCaseID = '01'): SubjectForm {
         subjectDateOfBirth: '',
         subjectAge: '',
         subjectGender: '',
-        subjectCategory: '',
-        subjectType: '',
+        subjectProfile: '',
         subjectDescription: '',
         subjectHeight: '',
         subjectWeight: '',
@@ -171,8 +190,11 @@ export function fieldsFromLog(keywords?: string[]): SubjectForm {
         subjectDateOfBirth: kwValue(keywords, 'dob:'),
         subjectAge: kwValue(keywords, 'age:'),
         subjectGender: kwValue(keywords, 'gender:'),
-        subjectCategory: kwValue(keywords, 'category:'),
-        subjectType: kwValue(keywords, 'subjectType:'),
+        subjectProfile: legacySubjectProfile({
+            subjectProfile: kwValue(keywords, 'subjectProfile:'),
+            subjectType: kwValue(keywords, 'subjectType:'),
+            subjectCategory: kwValue(keywords, 'category:'),
+        }),
         subjectDescription: kwValue(keywords, 'description:'),
         subjectHeight: kwValue(keywords, 'height:'),
         subjectWeight: kwValue(keywords, 'weight:'),
@@ -202,8 +224,7 @@ export function hasFilledSubjectFields(f: SubjectForm): boolean {
         f.subjectDateOfBirth,
         f.subjectAge,
         f.subjectGender,
-        f.subjectCategory,
-        f.subjectType,
+        f.subjectProfile,
         f.subjectDescription,
         f.subjectHeight,
         f.subjectWeight,
@@ -235,8 +256,7 @@ function buildParts(f: SubjectForm): string[] {
     const age = effectiveSubjectAge(f);
     if (age) parts.push(`Age: ${age}`);
     if (hasValue(f.subjectGender)) parts.push(`Gender: ${f.subjectGender}`);
-    if (hasValue(f.subjectCategory)) parts.push(`Category: ${categoryLabel(f.subjectCategory)}`);
-    if (hasValue(f.subjectType)) parts.push(`Subject Type: ${f.subjectType}`);
+    if (hasValue(f.subjectProfile)) parts.push(`Subject Profile: ${f.subjectProfile}`);
     if (hasValue(f.subjectDescription)) parts.push(`Description: ${f.subjectDescription.trim()}`);
     if (hasValue(f.subjectHeight)) parts.push(`Height: ${f.subjectHeight.trim()}`);
     if (hasValue(f.subjectWeight)) parts.push(`Weight: ${f.subjectWeight.trim()}`);
@@ -273,8 +293,7 @@ export function buildSubjectKeywords(f: SubjectForm): string[] {
     const age = effectiveSubjectAge(f);
     if (age) kws.push(`age:${age}`);
     if (hasValue(f.subjectGender)) kws.push(`gender:${f.subjectGender}`);
-    if (hasValue(f.subjectCategory)) kws.push(`category:${f.subjectCategory}`);
-    if (hasValue(f.subjectType)) kws.push(`subjectType:${f.subjectType}`);
+    if (hasValue(f.subjectProfile)) kws.push(`subjectProfile:${f.subjectProfile}`);
     if (hasValue(f.subjectDescription)) kws.push(`description:${f.subjectDescription.trim()}`);
     if (hasValue(f.subjectHeight)) kws.push(`height:${f.subjectHeight.trim()}`);
     if (hasValue(f.subjectWeight)) kws.push(`weight:${f.subjectWeight.trim()}`);
@@ -343,10 +362,7 @@ export function subjectDetailRows(s: SubjectForm): SubjectDetailRow[] {
     const age = effectiveSubjectAge(s);
     if (age) rows.push({ label: 'Age', value: age });
     if (hasValue(s.subjectGender)) rows.push({ label: 'Gender', value: s.subjectGender });
-    if (hasValue(s.subjectCategory)) {
-        rows.push({ label: 'Category', value: categoryLabel(s.subjectCategory) });
-    }
-    if (hasValue(s.subjectType)) rows.push({ label: 'Subject Type', value: s.subjectType });
+    if (hasValue(s.subjectProfile)) rows.push({ label: 'Subject Profile', value: s.subjectProfile });
     if (hasValue(s.subjectDescription)) rows.push({ label: 'Description', value: s.subjectDescription.trim() });
     if (hasValue(s.subjectHeight)) rows.push({ label: 'Height', value: s.subjectHeight.trim() });
     if (hasValue(s.subjectWeight)) rows.push({ label: 'Weight', value: s.subjectWeight.trim() });
