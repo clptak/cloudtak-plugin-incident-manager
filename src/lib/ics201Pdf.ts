@@ -17,6 +17,7 @@ import {
     type Ics201Sources,
 } from './ics201.ts';
 import { toPdfWinAnsiText } from './pdfWinAnsiText.ts';
+import { localDateString } from './localTime.ts';
 
 export const ICS201_MISSION_FILENAME = 'ICS-201.pdf';
 
@@ -703,7 +704,7 @@ export async function buildIcs201Pdf(
 }
 
 export function defaultIcs201Filename(incidentName: string): string {
-    const stamp = new Date().toISOString().slice(0, 10);
+    const stamp = localDateString();
     const base = incidentName.trim().replace(/[^\w.-]+/g, '_').replace(/_+/g, '_').slice(0, 80) || 'incident';
     return `ICS-201_${base}_${stamp}.pdf`;
 }

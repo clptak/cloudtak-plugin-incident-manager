@@ -332,6 +332,7 @@ import { loadSchemaSubscription, schemaMission } from '../../../lib/incidentSubs
 import { useIncident } from '../../../composables/useIncident.ts';
 import { loadIcs201FromMission } from '../../../lib/ics201.ts';
 import { nowBriefingDate, nowBriefingTime } from '../../../lib/irBriefing.ts';
+import { localDateTimeLabel } from '../../../lib/localTime.ts';
 import { downloadPdfBytes, uploadMissionFile } from '../../../lib/missionUpload.ts';
 import {
     buildSearchScenario,
@@ -478,9 +479,7 @@ const statusError = ref(false);
 const contentHash = ref<string | undefined>();
 
 function fmtDtg(raw?: string): string {
-    if (!raw) return '';
-    const ms = Date.parse(raw);
-    return Number.isNaN(ms) ? raw : new Date(ms).toISOString().replace('T', ' ').slice(0, 19) + 'Z';
+    return localDateTimeLabel(raw);
 }
 
 function scenarioKeyFromLog(keywords?: string[]): string | null {

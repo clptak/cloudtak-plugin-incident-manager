@@ -12,6 +12,7 @@ import type { PDFFont, PDFPage, RGB } from '../vendor/pdf-lib.esm.min.js';
 import templateUrl from '../assets/sar-briefing-template.pdf?url';
 import type { BriefingSubjectColumn, IrBriefingForm } from './irBriefing.ts';
 import { toPdfWinAnsiText } from './pdfWinAnsiText.ts';
+import { localDateString } from './localTime.ts';
 
 export const SAR_BRIEFING_MODERN_MISSION_FILENAME = 'SAR-Briefing-New.pdf';
 
@@ -537,7 +538,7 @@ export async function buildSarBriefingModernPdf(form: IrBriefingForm): Promise<U
 }
 
 export function defaultSarBriefingModernFilename(incidentName: string): string {
-    const stamp = new Date().toISOString().slice(0, 10);
+    const stamp = localDateString();
     const base = incidentName.trim().replace(/[^\w.-]+/g, '_').replace(/_+/g, '_').slice(0, 80) || 'incident';
     return `SAR-Briefing-New_${base}_${stamp}.pdf`;
 }
