@@ -56,10 +56,23 @@
                 </div>
                 <div class='col-md-6'>
                     <TablerInput
-                        v-model='form.initialPlanningPoint'
+                        :model-value='form.initialPlanningPoint'
                         label='Initial Planning Point'
-                        :disabled='true'
+                        @update:model-value='onIppInput'
                     />
+                    <div
+                        v-if='sources.ippSource'
+                        class='form-text'
+                    >
+                        Default from {{ sources.ippSource }}
+                        <button
+                            type='button'
+                            class='btn btn-link btn-sm p-0 align-baseline'
+                            @click='useDefaultIpp'
+                        >
+                            Use {{ sources.ippSource }}
+                        </button>
+                    </div>
                 </div>
             </div>
         </TablerBorder>
@@ -661,6 +674,7 @@ import {
     type Ics201Form,
     type Ics201Sources,
 } from '../../../lib/ics201.ts';
+import { parseCoordinates } from '../../../lib/coords.ts';
 import { fetchWeatherSummary } from '../../../lib/irBriefingWeather.ts';
 import {
     buildIcs201Pdf,
@@ -674,9 +688,28 @@ const { activeMission, requireActiveMission } = useIncident();
 const form = reactive<Ics201Form>(blankIcs201Form());
 const sources = reactive<Ics201Sources>({
     ippLatLng: null,
+    ippSource: '',
+    ippText: '',
     missionName: '',
     missionGuid: '',
 });
+const ippDefaultText = ref('');
+const ippEdited = ref(false);
+
+function onIppInput(value: string): void {
+    form.initialPlanningPoint = value;
+    ippEdited.value = true;
+}
+
+function useDefaultIpp(): void {
+    form.initialPlanningPoint = ippDefaultText.value;
+    ippEdited.value = false;
+}
+
+function weatherLatLng(): { lat: number; lng: number } | null {
+    if (!ippEdited.value) return sources.ippLatLng;
+    return parseCoordinates(form.initialPlanningPoint) ?? sources.ippLatLng;
+}
 const loading = ref(false);
 const refreshing = ref(false);
 const saving = ref(false);
@@ -757,13 +790,11 @@ const visibleResources = computed(() => {
 });
 
 async function loadWeatherIfNeeded(preserveExisting: boolean): Promise<void> {
-    if (!sources.ippLatLng) return;
+    const coords = weatherLatLng();
+    if (!coords) return;
     if (preserveExisting && form.weatherSummary.trim()) return;
     try {
-        form.weatherSummary = await fetchWeatherSummary(
-            sources.ippLatLng.lng,
-            sources.ippLatLng.lat,
-        );
+        form.weatherSummary = await fetchWeatherSummary(coords.lng, coords.lat);
     } catch {
         if (!preserveExisting) form.weatherSummary = '';
     }
@@ -774,8 +805,12 @@ async function loadAll(preserveUserFields = false): Promise<void> {
         Object.assign(form, blankIcs201Form());
         ensureObjectiveEditors();
         sources.ippLatLng = null;
+        sources.ippSource = '';
+        sources.ippText = '';
         sources.missionName = '';
         sources.missionGuid = '';
+        ippDefaultText.value = '';
+        ippEdited.value = false;
         return;
     }
 
@@ -821,11 +856,14 @@ async function loadAll(preserveUserFields = false): Promise<void> {
             activeMission.value,
         );
         sources.ippLatLng = loaded.sources.ippLatLng;
+        sources.ippSource = loaded.sources.ippSource;
+        sources.ippText = loaded.sources.ippText;
         sources.missionName = loaded.sources.missionName;
         sources.missionGuid = loaded.sources.missionGuid;
+        ippDefaultText.value = loaded.sources.ippText;
 
         if (preserveUserFields && preserved) {
-            Object.assign(form, mergeIcs201Sources(form, loaded.form));
+            Object.assign(form, mergeIcs201Sources(form, loaded.form, ippEdited.value));
             form.date = preserved.date;
             form.time = preserved.time;
             form.weatherSummary = preserved.weatherSummary;
@@ -857,6 +895,7 @@ async function loadAll(preserveUserFields = false): Promise<void> {
             form.resources = preserved.resources;
             form.logId = preserved.logId ?? loaded.form.logId;
         } else {
+            ippEdited.value = false;
             Object.assign(form, loaded.form);
         }
 

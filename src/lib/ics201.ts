@@ -15,6 +15,7 @@ import {
     normalizeLogKeywords,
     type MissionLogLike,
 } from './incidentInfo.ts';
+import { ippAfterSavedForm, resolveDefaultIpp, resolveDisplayedIpp } from './defaultIpp.ts';
 import {
     formatIppAsUtm,
     nowBriefingDate,
@@ -115,6 +116,10 @@ export interface Ics201Form {
 
 export interface Ics201Sources {
     ippLatLng: { lat: number; lng: number } | null;
+    /** "Subject 01", "Search Area IPP", or "Map marker". Empty when none resolved. */
+    ippSource: string;
+    /** Resolver text, before any user edit or saved form value. */
+    ippText: string;
     missionName: string;
     missionGuid: string;
 }
@@ -883,6 +888,8 @@ export async function loadIcs201FromMission(
     const form = blankIcs201Form();
     const sources: Ics201Sources = {
         ippLatLng: null,
+        ippSource: '',
+        ippText: '',
         missionName: missionName ?? '',
         missionGuid,
     };
@@ -921,11 +928,16 @@ export async function loadIcs201FromMission(
     }
     if (!form.incidentName && missionName) form.incidentName = missionName;
 
-    const ippLatLng = await resolveIppLatLng(missionGuid, missionToken);
-    sources.ippLatLng = ippLatLng;
-    if (ippLatLng) {
-        form.initialPlanningPoint = formatIppAsUtm(ippLatLng.lat, ippLatLng.lng);
-    }
+    const ipp = await resolveDefaultIpp({
+        schema,
+        logs,
+        formatUtm: formatIppAsUtm,
+        markerLookup: () => resolveIppLatLng(missionGuid, missionToken),
+    });
+    sources.ippLatLng = ipp?.latLng ?? null;
+    sources.ippSource = ipp?.source ?? '';
+    sources.ippText = ipp?.text ?? '';
+    if (ipp) form.initialPlanningPoint = ipp.text;
 
     const objectiveRows = loadObjectiveRowsFromLogs(logs);
     const postObjectives = objectivesFromPost(objectiveRows);
@@ -993,9 +1005,10 @@ export async function loadIcs201FromMission(
         }
         const number = incident.incidentId.trim() || incident.eventId.trim();
         if (number) form.incidentNumber = number;
-        if (ippLatLng) {
-            form.initialPlanningPoint = formatIppAsUtm(ippLatLng.lat, ippLatLng.lng);
-        }
+        const savedIpp = typeof saved.form.initialPlanningPoint === 'string'
+            ? saved.form.initialPlanningPoint
+            : '';
+        form.initialPlanningPoint = ippAfterSavedForm(savedIpp, ipp?.text ?? '');
         if (!form.incidentCommanders.trim() && orgChart.incidentCommanders) {
             form.incidentCommanders = orgChart.incidentCommanders;
         }
@@ -1040,7 +1053,7 @@ export async function loadIcs201FromMission(
 }
 
 /** Refresh auto-filled sources while preserving user-edited fields. */
-export function mergeIcs201Sources(current: Ics201Form, loaded: Ics201Form): Ics201Form {
+export function mergeIcs201Sources(current: Ics201Form, loaded: Ics201Form, keepIpp = false): Ics201Form {
     const keepObjectives = objectivesListsHaveContent(
         current.currentObjectives,
         current.plannedObjectives,
@@ -1049,7 +1062,11 @@ export function mergeIcs201Sources(current: Ics201Form, loaded: Ics201Form): Ics
         ...current,
         incidentName: loaded.incidentName || current.incidentName,
         incidentNumber: loaded.incidentNumber || current.incidentNumber,
-        initialPlanningPoint: loaded.initialPlanningPoint || current.initialPlanningPoint,
+        initialPlanningPoint: resolveDisplayedIpp(
+            current.initialPlanningPoint,
+            loaded.initialPlanningPoint,
+            keepIpp,
+        ),
         preparedByName: current.preparedByName.trim()
             ? current.preparedByName
             : loaded.preparedByName,
