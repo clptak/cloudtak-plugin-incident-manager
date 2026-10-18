@@ -429,6 +429,7 @@ import OverlayManager from '../../../../../src/base/overlay.ts';
 import GroupSelect from '../../../../../src/components/CloudTAK/util/GroupSelect.vue';
 import OpenExistingMission from './OpenExistingMission.vue';
 import { buildMissionName, parseCoordinates } from '../../lib/coords.ts';
+import { localDateString } from '../../lib/localTime.ts';
 import { createCaltopoMap, caltopoAvailable } from '../../lib/caltopo.ts';
 import { useIncident } from '../../composables/useIncident.ts';
 import { usePluginSettings } from '../../composables/usePluginSettings.ts';
@@ -522,7 +523,7 @@ const operationalPeriodLabel = computed({
 
 const form = reactive({
     activityNumber: '',
-    date: new Date().toISOString().slice(0, 10),
+    date: localDateString(),
     incidentType: '',
     subjectType: '',
     locationInfo: '',

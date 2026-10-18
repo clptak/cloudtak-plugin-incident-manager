@@ -1255,6 +1255,7 @@ import { createOpPeriodGateway } from '../../../lib/opPeriodGateway.ts';
 import { createRegistryStore } from '../../../lib/registryPersistence.ts';
 import { segmentsFromSchema, type SegmentMap } from '../../../lib/segmentsPersistence.ts';
 import { letterScaleClass, letterScaleLegendClass } from '../../../lib/letterScale.ts';
+import { localDateTimeLabel } from '../../../lib/localTime.ts';
 import '../../letterScale.css';
 
 const { activeMission, isSearchIncident } = useIncident();
@@ -1421,7 +1422,7 @@ const debriefForm = reactive({
 });
 
 function shortDt(iso: string): string {
-    return iso.slice(0, 16).replace('T', ' ');
+    return localDateTimeLabel(iso);
 }
 
 function roleLabel(role: string): string {

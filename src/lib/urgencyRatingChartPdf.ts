@@ -6,6 +6,7 @@
 import { PDFDocument, StandardFonts, rgb } from '../vendor/pdf-lib.esm.min.js';
 import type { PDFFont, PDFPage, RGB } from '../vendor/pdf-lib.esm.min.js';
 import { toPdfWinAnsiText } from './pdfWinAnsiText.ts';
+import { localDateString } from './localTime.ts';
 import {
     urgencyLevelFromTotal,
     type UrgencyFactorKey,
@@ -670,7 +671,7 @@ export async function buildUrgencyRatingChartPdf(
 }
 
 export function defaultUrgencyRatingChartFilename(incidentName: string): string {
-    const stamp = new Date().toISOString().slice(0, 10);
+    const stamp = localDateString();
     const base = incidentName.trim().replace(/[^\w.-]+/g, '_').replace(/_+/g, '_').slice(0, 80) || 'incident';
     return `Urgency-Rating-Chart_${base}_${stamp}.pdf`;
 }

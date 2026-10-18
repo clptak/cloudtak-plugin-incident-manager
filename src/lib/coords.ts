@@ -1,3 +1,5 @@
+import { localDateString } from './localTime.ts';
+
 /**
  * Multi-format coordinate parser, ported from a legacy SAR TAK app.
  * Supports: MPS Hexagon (lon,lat), decimal degrees, DMS, decimal minutes (DM).
@@ -72,7 +74,7 @@ export function buildMissionName(opts: {
     locationInfo?: string;
 }): string {
     const activity = (opts.activityNumber || '').trim();
-    const date = opts.date || new Date().toISOString().slice(0, 10);
+    const date = opts.date || localDateString();
     const incident = opts.incidentType || 'mission';
     const subject = opts.subjectType || '';
     let location = (opts.locationInfo || '').trim();

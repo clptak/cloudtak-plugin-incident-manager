@@ -216,7 +216,7 @@
                                     {{ clue.sourceLabel }}
                                 </td>
                                 <td class='text-muted text-nowrap'>
-                                    {{ clue.at ? clue.at.slice(0, 16).replace('T', ' ') : '' }}
+                                    {{ localDateTimeLabel(clue.at) }}
                                 </td>
                             </tr>
                         </tbody>
@@ -568,6 +568,7 @@ import { resolveSubjects } from '../../lib/subjectsPersistence.ts';
 import { loadWorkAssignmentsFromMission } from '../../lib/workAssignmentPersistence.ts';
 import type { WorkAssignment } from '../../lib/workAssignments.ts';
 import { entryHasRespondents, type TacticRiskMap } from '../../lib/tacticRisk.ts';
+import { localDateTimeLabel } from '../../lib/localTime.ts';
 import { tacticAssessmentsFromSchema } from '../../lib/tacticRiskPersistence.ts';
 
 const { activeMission, requireActiveMission } = useIncident();

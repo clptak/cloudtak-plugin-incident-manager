@@ -154,6 +154,7 @@ import { buildPoaLock, poaLockStaleness, type PoaLock, type PoaLockInputs } from
 import { nextOpNumber, planningOpPeriod } from '../domain/registry.ts';
 import type { RollupInputs } from '../lib/rollupPersistence.ts';
 import { listPoaLocks, poaLocksSupported, savePoaLock } from '../lib/poaLockPersistence.ts';
+import { localDateTimeLabel } from '../lib/localTime.ts';
 
 const props = defineProps<{ inputs: RollupInputs }>();
 
@@ -223,7 +224,7 @@ function differs(a: number | undefined, b: number | undefined): boolean {
 }
 
 function shortDt(iso: string): string {
-    return iso.slice(0, 16).replace('T', ' ');
+    return localDateTimeLabel(iso);
 }
 
 async function loadLocks(): Promise<void> {

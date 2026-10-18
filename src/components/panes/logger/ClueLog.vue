@@ -270,6 +270,7 @@ import {
 import { clueSources } from '../../../lib/clueLog.ts';
 import { flyToFeature } from '../../../lib/flyToFeature.ts';
 import { createRegistryStore } from '../../../lib/registryPersistence.ts';
+import { localDateTimeLabel } from '../../../lib/localTime.ts';
 
 const { activeMission } = useIncident();
 
@@ -296,7 +297,7 @@ const logTargetLabel = computed(() =>
     currentOp.value ? currentOp.value.name : activeMission.value?.name ?? '');
 
 function shortDt(iso: string): string {
-    return iso ? iso.slice(0, 16).replace('T', ' ') : '';
+    return localDateTimeLabel(iso);
 }
 
 async function refresh(): Promise<void> {

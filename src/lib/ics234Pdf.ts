@@ -10,6 +10,7 @@ import {
 } from './incidentPost.ts';
 import { formatDatetimeForPdf } from './ics234Datetime.ts';
 import { toPdfWinAnsiText } from './pdfWinAnsiText.ts';
+import { localDateString } from './localTime.ts';
 
 export interface Ics234Header {
     incidentName: string;
@@ -332,7 +333,7 @@ export async function buildIcs234Pdf(
 }
 
 export function defaultIcs234Filename(incidentName: string): string {
-    const stamp = new Date().toISOString().slice(0, 10);
+    const stamp = localDateString();
     const base = incidentName.trim().replace(/[^\w.-]+/g, '_').replace(/_+/g, '_').slice(0, 80) || 'incident';
     return `ICS-234-CG_${base}_${stamp}.pdf`;
 }

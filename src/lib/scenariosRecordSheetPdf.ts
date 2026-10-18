@@ -6,6 +6,7 @@
 import { PDFDocument, StandardFonts, rgb } from '../vendor/pdf-lib.esm.min.js';
 import type { PDFFont, PDFPage } from '../vendor/pdf-lib.esm.min.js';
 import { toPdfWinAnsiText } from './pdfWinAnsiText.ts';
+import { localDateString } from './localTime.ts';
 import {
     sortScenariosByPriority,
     type SearchScenario,
@@ -419,7 +420,7 @@ export async function buildScenariosRecordSheetPdf(
 }
 
 export function defaultScenariosRecordSheetFilename(incidentName: string): string {
-    const stamp = new Date().toISOString().slice(0, 10);
+    const stamp = localDateString();
     const base = incidentName.trim().replace(/[^\w.-]+/g, '_').replace(/_+/g, '_').slice(0, 80) || 'incident';
     return `Scenarios-Record-Sheet_${base}_${stamp}.pdf`;
 }

@@ -29,6 +29,7 @@ import { consensusFromSchema } from './casiePersistence.ts';
 import { segmentsFromSchema } from './segmentsPersistence.ts';
 import { describeSave, saveGeneratedFile } from './fileTarget.ts';
 import { buildStoreZip, buildWc3Files, safeWc3Basename } from './wc3Export.ts';
+import { localDateString, localDateTimeLabel } from './localTime.ts';
 
 /** All DataSyncs belonging to the incident. */
 export function demobSources(
@@ -98,6 +99,7 @@ export async function buildDemobPackage(
     const manifest: ManifestEntry[] = [];
     const failures: string[] = [];
     const generatedAt = new Date().toISOString();
+    const generatedLabel = localDateTimeLabel(generatedAt);
 
     const schemaSub = await loadSchemaSubscription(mission);
     const { schema } = await loadMissionSchema(schemaSub);
@@ -190,10 +192,10 @@ export async function buildDemobPackage(
             const lines = [
                 `# ${incidentName} — Incident Log`,
                 incidentNumber ? `Report #: ${incidentNumber}` : '',
-                `Generated: ${generatedAt}`,
+                `Generated: ${generatedLabel}`,
                 '',
                 ...sorted.map((l) => {
-                    const when = String(l.dtg || l.created || '').slice(0, 16).replace('T', ' ');
+                    const when = localDateTimeLabel(String(l.dtg || l.created || ''));
                     return `- ${when} — ${String(l.content ?? '').replace(/\n/g, ' ')}`;
                 }),
             ].filter((l) => l !== '');
@@ -209,14 +211,14 @@ export async function buildDemobPackage(
     entries.unshift({
         path: 'MANIFEST.txt',
         data: enc.encode(buildManifest({
-            incidentName, incidentNumber, generatedAt,
+            incidentName, incidentNumber, generatedAt: generatedLabel,
             variant: options.variant, entries: manifest, retained,
         })),
     });
 
     const blob = buildStoreZip(entries);
     const bytes = new Uint8Array(await blob.arrayBuffer());
-    const stamp = generatedAt.slice(0, 10);
+    const stamp = localDateString(new Date(generatedAt));
     return {
         filename: `${safeName(`${incidentNumber} ${incidentName}`.trim())}-demob-${stamp}.zip`,
         bytes,
