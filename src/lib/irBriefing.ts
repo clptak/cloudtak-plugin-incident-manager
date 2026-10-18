@@ -4,6 +4,7 @@ import Subscription from '../../../../src/base/subscription.ts';
 import { formatCoordPair } from '../../../../src/utils/coordinateFormat.ts';
 import type { ActiveMission } from '../composables/useIncident.ts';
 import { parseCoordinates } from './coords.ts';
+import { resolveDefaultIpp, resolveDisplayedIpp } from './defaultIpp.ts';
 import { loadSchemaSubscription } from './incidentSubscription.ts';
 import { resolveMissionIppLocation } from './missionIpp.ts';
 import { incidentFormFromSchema, loadMissionSchema, type MissionSchema } from './missionSchema.ts';
@@ -63,6 +64,10 @@ export interface IrBriefingForm {
 
 export interface IrBriefingSources {
     ippLatLng: { lat: number; lng: number } | null;
+    /** "Subject 01", "Search Area IPP", or "Map marker". Empty when none resolved. */
+    ippSource: string;
+    /** Resolver text, before any user edit or saved form value. */
+    ippText: string;
 }
 
 function pad2(n: number): string {
@@ -188,7 +193,7 @@ export async function loadIrBriefingFromMission(
     activeMission?: ActiveMission,
 ): Promise<LoadedIrBriefing> {
     const form = blankIrBriefingForm();
-    const sources: IrBriefingSources = { ippLatLng: null };
+    const sources: IrBriefingSources = { ippLatLng: null, ippSource: '', ippText: '' };
 
     const sub = await Subscription.load(missionGuid, { missiontoken: missionToken || undefined, reload: false });
     const logs = await sub.log.list({ refresh: true });
@@ -202,11 +207,16 @@ export async function loadIrBriefingFromMission(
 
     form.operationalPeriod = operationalPeriodFromKeywords(sub.meta.keywords);
 
-    const ippLatLng = await resolveIppLatLng(missionGuid, missionToken);
-    sources.ippLatLng = ippLatLng;
-    if (ippLatLng) {
-        form.initialPlanningPoint = formatIppAsUtm(ippLatLng.lat, ippLatLng.lng);
-    }
+    const ipp = await resolveDefaultIpp({
+        schema,
+        logs,
+        formatUtm: formatIppAsUtm,
+        markerLookup: () => resolveIppLatLng(missionGuid, missionToken),
+    });
+    sources.ippLatLng = ipp?.latLng ?? null;
+    sources.ippSource = ipp?.source ?? '';
+    sources.ippText = ipp?.text ?? '';
+    if (ipp) form.initialPlanningPoint = ipp.text;
 
     const byNumber = subjectsByNumber(schema, logs);
     BRIEFING_SUBJECT_NUMBERS.forEach((num, i) => {
@@ -221,13 +231,18 @@ export async function loadIrBriefingFromMission(
 export function mergeIrBriefingSources(
     current: IrBriefingForm,
     loaded: IrBriefingForm,
+    keepIpp = false,
 ): IrBriefingForm {
     return {
         ...current,
         briefingDate: loaded.briefingDate,
         briefingTime: loaded.briefingTime,
         incidentCommander: loaded.incidentCommander,
-        initialPlanningPoint: loaded.initialPlanningPoint,
+        initialPlanningPoint: resolveDisplayedIpp(
+            current.initialPlanningPoint,
+            loaded.initialPlanningPoint,
+            keepIpp,
+        ),
         subjects: loaded.subjects,
         incidentName: loaded.incidentName,
         operationalPeriod: loaded.operationalPeriod || current.operationalPeriod,

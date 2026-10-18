@@ -48,10 +48,23 @@
                 </div>
                 <div class='col-12'>
                     <TablerInput
-                        v-model='form.initialPlanningPoint'
+                        :model-value='form.initialPlanningPoint'
                         label='Initial Planning Point (UTM/Map Datum)'
-                        :disabled='true'
+                        @update:model-value='onIppInput'
                     />
+                    <div
+                        v-if='ippSource'
+                        class='form-text'
+                    >
+                        Default from {{ ippSource }}
+                        <button
+                            type='button'
+                            class='btn btn-link btn-sm p-0 align-baseline'
+                            @click='useDefaultIpp'
+                        >
+                            Use {{ ippSource }}
+                        </button>
+                    </div>
                 </div>
             </div>
         </TablerBorder>
@@ -349,6 +362,7 @@ import {
     defaultSarBriefingModernFilename,
     SAR_BRIEFING_MODERN_MISSION_FILENAME,
 } from '../../../lib/sarBriefingModernPdf.ts';
+import { parseCoordinates } from '../../../lib/coords.ts';
 import { downloadPdfBytes, uploadMissionFile } from '../../../lib/missionUpload.ts';
 
 const { activeMission, requireActiveMission } = useIncident();
@@ -365,6 +379,24 @@ const status = ref('');
 const statusError = ref(false);
 
 let ippLatLng: { lat: number; lng: number } | null = null;
+const ippSource = ref('');
+const ippDefaultText = ref('');
+const ippEdited = ref(false);
+
+function onIppInput(value: string): void {
+    form.initialPlanningPoint = value;
+    ippEdited.value = true;
+}
+
+function useDefaultIpp(): void {
+    form.initialPlanningPoint = ippDefaultText.value;
+    ippEdited.value = false;
+}
+
+function weatherLatLng(): { lat: number; lng: number } | null {
+    if (!ippEdited.value) return ippLatLng;
+    return parseCoordinates(form.initialPlanningPoint) ?? ippLatLng;
+}
 
 const subjectRows: Array<{ key: keyof IrBriefingForm['subjects'][number]; label: string }> = [
     { key: 'name', label: 'Name' },
@@ -384,10 +416,11 @@ const subjectRows: Array<{ key: keyof IrBriefingForm['subjects'][number]; label:
 ];
 
 async function loadWeatherIfNeeded(preserveExisting: boolean): Promise<void> {
-    if (!ippLatLng) return;
+    const coords = weatherLatLng();
+    if (!coords) return;
     if (preserveExisting && form.weatherSummary.trim()) return;
     try {
-        form.weatherSummary = await fetchWeatherSummary(ippLatLng.lng, ippLatLng.lat);
+        form.weatherSummary = await fetchWeatherSummary(coords.lng, coords.lat);
     } catch {
         if (!preserveExisting) form.weatherSummary = '';
     }
@@ -397,6 +430,9 @@ async function loadAll(preserveBriefingFields = false): Promise<void> {
     if (!activeMission.value) {
         Object.assign(form, blankIrBriefingForm());
         ippLatLng = null;
+        ippSource.value = '';
+        ippDefaultText.value = '';
+        ippEdited.value = false;
         return;
     }
 
@@ -422,9 +458,11 @@ async function loadAll(preserveBriefingFields = false): Promise<void> {
             activeMission.value,
         );
         ippLatLng = loaded.sources.ippLatLng;
+        ippSource.value = loaded.sources.ippSource;
+        ippDefaultText.value = loaded.sources.ippText;
 
         if (preserveBriefingFields) {
-            Object.assign(form, mergeIrBriefingSources(form, loaded.form));
+            Object.assign(form, mergeIrBriefingSources(form, loaded.form, ippEdited.value));
             if (briefingOnly) {
                 form.situationSummary = briefingOnly.situationSummary;
                 form.actionsTaken = briefingOnly.actionsTaken;
@@ -435,6 +473,7 @@ async function loadAll(preserveBriefingFields = false): Promise<void> {
                 form.safetyMessage = briefingOnly.safetyMessage;
             }
         } else {
+            ippEdited.value = false;
             Object.assign(form, loaded.form);
             if (!form.safetyMessage.trim()) {
                 form.safetyMessage = blankIrBriefingForm().safetyMessage;
