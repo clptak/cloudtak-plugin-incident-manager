@@ -6,6 +6,7 @@ import {
     ippFromSubjects,
     resolveDefaultIpp,
     resolveDisplayedIpp,
+    subjectsOnSchema,
     toIppField,
 } from './defaultIpp.ts';
 
@@ -95,4 +96,73 @@ test('an edited IPP is kept; a saved ICS 201 IPP is kept on reload', () => {
     assert.equal(resolveDisplayedIpp('UTM(1,2)', 'UTM(3,4)', false), 'UTM(3,4)');
     assert.equal(ippAfterSavedForm('saved IPP', 'UTM(1,2)'), 'saved IPP');
     assert.equal(ippAfterSavedForm('  ', 'UTM(1,2)'), 'UTM(1,2)');
+});
+
+test('a stored subject without a case number is subject 01; a later record for a number replaces the earlier', () => {
+    const subjects = subjectsOnSchema({
+        incident_response: {
+            subjects: [
+                { initial_information: { subjectIpp: '36.1, -112.1' } },
+                { initial_information: { subjectCaseID: '02', subjectIpp: 'old' } },
+                { initial_information: { subjectCaseID: '02', subjectIpp: 'new' } },
+            ],
+        },
+    });
+    assert.deepEqual(subjects.map((x) => [x.subjectCaseID, x.subjectIpp]), [['01', '36.1, -112.1'], ['02', 'new']]);
+    assert.equal(ippFromSubjects(subjects)?.number, '01');
+});
+
+test('non-numeric case numbers sort after numbered subjects', () => {
+    const picked = ippFromSubjects([subject('X', 'x-ipp'), subject('02', 'two')]);
+    assert.equal(picked?.number, '02');
+});
+
+test('typed text that is not coordinates keeps weather on the DataSync marker', async () => {
+    const ipp = await resolveDefaultIpp({
+        schema: {
+            incident_response: {
+                ipp_coordinates: { lat: 1, lng: 2 },
+                subjects: [{
+                    initial_information: {
+                        subjectCaseID: '01',
+                        subjectIpp: '12S 431234 3881234',
+                        subjectIppFromTak: '36.05432 ,-112.12345;uid-1',
+                    },
+                }],
+            },
+        },
+        formatUtm,
+        markerLookup: async () => ({ lat: 9, lng: 9 }),
+    });
+    assert.equal(ipp?.text, '12S 431234 3881234');
+    assert.equal(ipp?.latLng, null);
+    assert.deepEqual(ipp?.weatherLatLng, { lat: 36.05432, lng: -112.12345 });
+});
+
+test('weather falls back to the Search Area IPP, then the map marker, when the subject has no coordinates', async () => {
+    const schemaWith = (extra: Record<string, unknown>) => ({
+        incident_response: {
+            ...extra,
+            subjects: [{ initial_information: { subjectCaseID: '01', subjectIpp: 'by the trailhead' } }],
+        },
+    });
+    let lookups = 0;
+    const markerLookup = async () => { lookups++; return { lat: 9, lng: 9 }; };
+
+    const area = await resolveDefaultIpp({ schema: schemaWith({ ipp_coordinates: { lat: 1, lng: 2 } }), formatUtm, markerLookup });
+    assert.deepEqual(area?.weatherLatLng, { lat: 1, lng: 2 });
+    assert.equal(lookups, 0);
+
+    const marker = await resolveDefaultIpp({ schema: schemaWith({}), formatUtm, markerLookup });
+    assert.equal(marker?.text, 'by the trailhead');
+    assert.deepEqual(marker?.weatherLatLng, { lat: 9, lng: 9 });
+});
+
+test('weather uses the IPP itself when it is coordinates', async () => {
+    const ipp = await resolveDefaultIpp({
+        schema: { incident_response: { subjects: [{ initial_information: { subjectCaseID: '01', subjectIpp: '36.2, -112.2' } }] } },
+        formatUtm,
+        markerLookup: async () => ({ lat: 9, lng: 9 }),
+    });
+    assert.deepEqual(ipp?.weatherLatLng, { lat: 36.2, lng: -112.2 });
 });
