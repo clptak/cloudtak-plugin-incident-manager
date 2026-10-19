@@ -19,3 +19,4 @@ src/components/panes/logger/fuse_hidden*
 # Per-deployment settings compiled into the web bundle. Copy from the examples.
 config.local.ts
 deployment/*
+graphify-out/
