@@ -6,7 +6,7 @@
  * original is intentionally omitted (mission folders are out of scope here).
  */
 
-import { parseCadIdentifiers } from './incidentInfo.ts';
+import { parseCadIdentifiers, parseCfsHeaderFields, type CfsHeaderFields } from './incidentInfo.ts';
 
 export interface MpsRow {
     source: 'CAD';
@@ -243,5 +243,27 @@ export function getMpsRows(cadText: string, options?: MpsParseOptions): MpsParse
         activityNumber: cadIds.activityNumber,
         reportNumber: cadIds.reportNumber,
         rows: annotateRemarks(mergedRows, eventId),
+    };
+}
+
+/** A pasted CAD call, parsed once for every screen that imports it. */
+export interface CadImport {
+    header: CfsHeaderFields;
+    /** Timestamped Remarks entries (become CAD notes). */
+    rows: MpsRow[];
+    /** Event ID (header first, then the Remarks parser's fallback). */
+    activityNumber: string | null;
+    /** Case Number. */
+    reportNumber: string | null;
+}
+
+export function parseCadImport(cadText: string): CadImport {
+    const header = parseCfsHeaderFields(cadText);
+    const res = getMpsRows(cadText);
+    return {
+        header,
+        rows: res.rows,
+        activityNumber: header.activityNumber ?? res.activityNumber,
+        reportNumber: header.reportNumber ?? res.reportNumber,
     };
 }
