@@ -44,6 +44,8 @@ export interface OpPeriodRegistryEntry {
     openedAt?: string;
     activatedAt?: string;
     closedAt?: string;
+    /** CloudTAK Core Event for this OP's field work (ADR-004); created at activation. */
+    fieldEventId?: string;
 }
 
 /** A search segment (or split child) known to the incident. */

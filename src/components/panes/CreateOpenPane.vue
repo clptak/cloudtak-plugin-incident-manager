@@ -99,6 +99,21 @@
                             >
                                 Fill form
                             </button>
+                            <TablerToggle
+                                v-model='createEvent'
+                                class='mb-0'
+                                label='Create Event'
+                                :disabled='!cadText.trim()'
+                            />
+                            <button
+                                type='button'
+                                class='btn btn-outline-secondary btn-sm'
+                                :disabled='!cadText.trim() || eventOnlyBusy || loading'
+                                title='Create the incident event now, without a DataSync'
+                                @click='onCreateEventOnly'
+                            >
+                                {{ eventOnlyBusy ? 'Creating event…' : 'Create event only' }}
+                            </button>
                             <span
                                 v-if='cadResult'
                                 class='small'
@@ -107,8 +122,62 @@
                         </div>
                         <div class='form-text'>
                             Activity Number uses the Case Number when there is one, otherwise the Event ID.
-                            On create, the call is also imported into Initial Information.
+                            On create, the call is also imported into Initial Information<span v-if='createEvent'>,
+                                and the incident event is created on the Management Channels (or the
+                                existing event for this call is used)</span>.
+                            Create event only uses the Management Channels below.
                         </div>
+                    </div>
+                </div>
+
+                <!-- ── Attach to an existing incident event ── -->
+                <div
+                    v-if='!eventFromCad'
+                    class='mb-3'
+                >
+                    <div class='d-flex align-items-center gap-2'>
+                        <label
+                            class='form-label mb-0 small text-white-50 text-nowrap'
+                            for='incident-event-picker'
+                        >Incident event</label>
+                        <select
+                            id='incident-event-picker'
+                            v-model='pickedEventId'
+                            class='form-select form-select-sm'
+                            :disabled='eventsLoading'
+                            @change='onPickEvent'
+                        >
+                            <option value=''>
+                                {{ eventsLoading ? 'Loading events…' : '— None —' }}
+                            </option>
+                            <option
+                                v-for='event in pickerList'
+                                :key='event.id'
+                                :value='event.id'
+                            >
+                                {{ eventLabel(event) }}
+                            </option>
+                        </select>
+                        <button
+                            type='button'
+                            class='btn btn-sm btn-ghost-secondary'
+                            title='Reload events'
+                            :disabled='eventsLoading'
+                            @click='loadPickerEvents'
+                        >
+                            <IconRefresh
+                                :size='16'
+                                stroke='1.5'
+                            />
+                        </button>
+                    </div>
+                    <div class='form-text'>
+                        Optional: an active incident event this mission belongs to. Picking one fills
+                        Activity Number, Date, Location Coordinates and Subject Profile.
+                        <span
+                            v-if='eventsError'
+                            class='text-warning'
+                        >{{ eventsError }}</span>
                     </div>
                 </div>
 
@@ -469,7 +538,7 @@
 
 <script setup lang='ts'>
 import { ref, reactive, computed, watch, onMounted, nextTick } from 'vue';
-import { IconSearch, IconX, IconLayout, IconChevronDown } from '@tabler/icons-vue';
+import { IconSearch, IconX, IconLayout, IconChevronDown, IconRefresh } from '@tabler/icons-vue';
 import {
     TablerBorder,
     TablerInput,
@@ -494,6 +563,9 @@ import { pushPointToMission } from '../../lib/missionFeatures.ts';
 import { startSchemaOnProperties } from '../../lib/missionSchema.ts';
 import { importCadText, rememberCadText } from '../../lib/cadImport.ts';
 import { createMissionFieldsFromCfs, parseCfsHeaderFields } from '../../lib/incidentInfo.ts';
+import { createEventOnly, linkIncidentEvent, pickerEvents, type EventSummary } from '../../lib/coreEvents.ts';
+import { createFormFromEvent } from '../../domain/coreEvent.ts';
+import { localDateTimeLabel } from '../../lib/localTime.ts';
 
 const mapStore = useMapStore();
 const { setActiveMission, setDraftIncidentType, activeMission } = useIncident();
@@ -607,6 +679,84 @@ function fillFromCad(): void {
         missing.length ? `Not found: ${missing.join(', ')}.` : '',
     ].filter(Boolean).join(' ');
 }
+
+// ── Incident Core Event (ADR-004) ──
+/** Create (or reuse) the incident event from the pasted call on create. */
+const createEvent = ref(true);
+const eventOnlyBusy = ref(false);
+/** The event comes from the CAD call; otherwise an existing one may be picked. */
+const eventFromCad = computed(() => createEvent.value && !!cadText.value.trim());
+
+const pickerList = ref<EventSummary[]>([]);
+const pickedEventId = ref('');
+const eventsLoading = ref(false);
+const eventsError = ref('');
+let eventsLoaded = false;
+
+function eventLabel(event: EventSummary): string {
+    return event.started ? `${event.name} · ${localDateTimeLabel(event.started)}` : event.name;
+}
+
+async function loadPickerEvents(): Promise<void> {
+    eventsLoading.value = true;
+    eventsError.value = '';
+    try {
+        pickerList.value = await pickerEvents();
+        eventsLoaded = true;
+        if (pickedEventId.value && !pickerList.value.some((e) => e.id === pickedEventId.value)) {
+            pickedEventId.value = '';
+        }
+    } catch (err) {
+        eventsError.value = `Could not load events: ${err instanceof Error ? err.message : String(err)}`;
+    } finally {
+        eventsLoading.value = false;
+    }
+}
+
+/** Fill Activity Number, Date and Location Coordinates from the picked event. */
+function onPickEvent(): void {
+    const event = pickerList.value.find((e) => e.id === pickedEventId.value);
+    if (!event) return;
+    const fields = createFormFromEvent(event);
+    if (fields.activityNumber) form.activityNumber = fields.activityNumber;
+    if (fields.date) form.date = fields.date;
+    if (fields.coords) form.coords = fields.coords;
+    const profile = event.metadata?.subjectProfile;
+    if (typeof profile === 'string' && profile) form.subjectProfile = profile;
+}
+
+async function onCreateEventOnly(): Promise<void> {
+    status.value = '';
+    statusError.value = false;
+    if (!form.mgmtGroups.length) {
+        statusError.value = true;
+        status.value = 'Pick the Management Channels first - the incident event is shared with those only.';
+        return;
+    }
+    eventOnlyBusy.value = true;
+    try {
+        const { event, existing } = await createEventOnly({
+            cadText: cadText.value,
+            subjectProfile: form.subjectProfile || undefined,
+            channelNames: form.mgmtGroups,
+        });
+        status.value = existing
+            ? `An active event for this call already exists: "${event.name}". Nothing was created.`
+            : `Created event "${event.name}". Create a mission later and pick it under Incident event.`;
+        eventsLoaded = false;
+    } catch (err) {
+        statusError.value = true;
+        status.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        eventOnlyBusy.value = false;
+    }
+}
+
+watch([expandedCard, eventFromCad], () => {
+    if (expandedCard.value === 'create' && !eventFromCad.value && !eventsLoaded && !eventsLoading.value) {
+        void loadPickerEvents();
+    }
+});
 
 const form = reactive({
     activityNumber: '',
@@ -814,6 +964,9 @@ async function createMission(): Promise<void> {
     loading.value = true;
 
     try {
+        if (eventFromCad.value && !form.mgmtGroups.length) {
+            throw new Error('Create Event needs Management Channels - pick them, or turn Create Event off.');
+        }
         // Incident common map: field channels + management channels, so the IMT
         // always sees it even with the field channel toggled off (Phase 0 T3/T4).
         const commonGroups = [...new Set([...form.groups, ...form.mgmtGroups])];
@@ -916,6 +1069,30 @@ async function createMission(): Promise<void> {
                 const message = err instanceof Error ? err.message : String(err);
                 status.value += ` Initial Information was not filled from the CAD call: ${message}`;
             }
+        }
+
+        // Incident Core Event: the one for this CAD call (created when there
+        // is none), or the one picked. Non-fatal: the mission is created.
+        const eventSource = eventFromCad.value
+            ? { cadText: cadText.value, subjectProfile: form.subjectProfile || undefined, channelNames: form.mgmtGroups }
+            : pickedEventId.value ? { eventId: pickedEventId.value } : null;
+        if (eventSource && mgmt) {
+            try {
+                const { event, created } = await linkIncidentEvent({
+                    guid: res.data.guid,
+                    name: res.data.name,
+                    missionToken: res.data.token,
+                    mgmt,
+                }, eventSource);
+                status.value += created
+                    ? ` Created event "${event.name}".`
+                    : ` Attached to event "${event.name}".`;
+            } catch (err) {
+                const message = err instanceof Error ? err.message : String(err);
+                status.value += ` The incident event was not set up: ${message}`;
+            }
+        } else if (eventSource) {
+            status.value += ' No incident event: it needs a management sync (pick Management Channels).';
         }
 
         // Optional Caltopo map via the caltopo-sync plugin. A failure here

@@ -41,6 +41,8 @@ export function registryEntryFromValue(raw: unknown): OpPeriodRegistryEntry | nu
     if (activatedAt) entry.activatedAt = activatedAt;
     const closedAt = asString(rec.closedAt).trim();
     if (closedAt) entry.closedAt = closedAt;
+    const fieldEventId = asString(rec.fieldEventId).trim();
+    if (fieldEventId) entry.fieldEventId = fieldEventId;
     if (Array.isArray(rec.plannedChannels)) {
         const planned = rec.plannedChannels.filter((c): c is string => typeof c === 'string');
         if (planned.length) entry.plannedChannels = planned;

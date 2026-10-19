@@ -1,0 +1,6 @@
+{
+  "default": { "type": "13061000001418000000", "icon": "", "marker-color": "#FFFFFF" },
+  "byCode": {
+    "SUICEMS": { "marker-color": "#FF0000" }
+  }
+}

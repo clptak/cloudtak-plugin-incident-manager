@@ -170,6 +170,8 @@
                 </div>
             </div>
 
+            <IncidentEventCard />
+
             <TablerBorder
                 v-if='trackedClues.length'
                 class='cloudtak-accent text-white mb-3'
@@ -527,6 +529,7 @@
 
 <script setup lang='ts'>
 import { ref, reactive, computed, watch, onMounted } from 'vue';
+import IncidentEventCard from '../IncidentEventCard.vue';
 import { useIncidentChanges } from '../../composables/useIncidentChanges.ts';
 import { IconChevronDown } from '@tabler/icons-vue';
 import { TablerBorder, TablerInlineAlert } from '@tak-ps/vue-tabler';
