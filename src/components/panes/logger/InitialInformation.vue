@@ -346,6 +346,7 @@
 
 <script setup lang='ts'>
 import { ref, computed, reactive, watch, onMounted } from 'vue';
+import { syncIncidentEventIds } from '../../../lib/coreEvents.ts';
 import { IconChevronDown } from '@tabler/icons-vue';
 import {
     TablerBorder,
@@ -562,6 +563,16 @@ async function saveIncidentInfo(): Promise<void> {
         legacySchemaLogId.value = undefined;
         missionSchema.value = schema;
         incidentStatus.value = `Saved incident information to mission_schema.json on ${activeMission.value.name}.`;
+        // Case Number and DEMA number onto the incident event (ADR-004). The
+        // incident is saved either way; an event problem is only reported.
+        try {
+            if (await syncIncidentEventIds(activeMission.value, {
+                caseNumber: incidentForm.incidentId,
+                dema: incidentForm.demaMission,
+            })) incidentStatus.value += ' Incident event updated.';
+        } catch (eventErr) {
+            incidentStatus.value += ` The incident event was not updated: ${eventErr instanceof Error ? eventErr.message : String(eventErr)}`;
+        }
     } catch (err) {
         incidentStatusError.value = true;
         incidentStatus.value = err instanceof Error ? err.message : String(err);

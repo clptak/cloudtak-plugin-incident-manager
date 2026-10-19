@@ -8,6 +8,8 @@ nav:
       - 'ADR-001 Incident data on Mission Properties': decisions/ADR-001-incident-data-on-mission-properties.md
       - 'ADR-002 Operational period lifecycle': decisions/ADR-002-operational-period-lifecycle.md
       - 'ADR-003 POA lock and debrief corrections': decisions/ADR-003-poa-lock-and-debrief-corrections.md
+      - 'ADR-004 Incident Core Events': decisions/ADR-004-incident-core-events.md
+  - 'Event icons': event-icons.md
 
 theme:
   name: mkdocs

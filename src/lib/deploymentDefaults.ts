@@ -20,6 +20,14 @@ export interface DeploymentConfig {
     subjectTypesFile?: string;
     /** Basename under deployment/. Replaces the bundled Arizona LPB table. */
     lpbTableFile?: string;
+    /**
+     * Basename under deployment/. Optional symbol map for incident Core Events,
+     * keyed by CAD Type code (docs/event-icons.md). Unset: every event uses
+     * type 13061000001418000000 with a white marker.
+     */
+    eventIconsFile?: string;
+    /** UTC offset of the times in pasted CAD calls, e.g. "-07:00" (the default). */
+    cadUtcOffset?: string;
 }
 
 export interface DeploymentBundle {

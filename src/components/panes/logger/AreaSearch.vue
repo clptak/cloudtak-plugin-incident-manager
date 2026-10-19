@@ -1187,7 +1187,7 @@ import OverlayManager from '../../../../../../src/base/overlay.ts';
 import { useMapStore } from '../../../../../../src/stores/map.ts';
 import { server } from '../../../../../../src/std.ts';
 import GroupSelect from '../../../../../../src/components/CloudTAK/util/GroupSelect.vue';
-import { useIncident } from '../../../composables/useIncident.ts';
+import { useIncident, type ActiveMission } from '../../../composables/useIncident.ts';
 import { usePluginSettings } from '../../../composables/usePluginSettings.ts';
 import type { DebriefRecord, OpAssignment, OpPeriodRegistryEntry } from '../../../domain/entities.ts';
 import { currentOpPeriod, isFieldActive, nextOpNumber, planningOpPeriod } from '../../../domain/registry.ts';
@@ -1253,6 +1253,7 @@ import {
 } from '../../../lib/missionTemplates.ts';
 import { createOpPeriodGateway } from '../../../lib/opPeriodGateway.ts';
 import { createRegistryStore } from '../../../lib/registryPersistence.ts';
+import { attachOpToIncidentEvent, endFieldEvent, startFieldEvent } from '../../../lib/coreEvents.ts';
 import { segmentsFromSchema, type SegmentMap } from '../../../lib/segmentsPersistence.ts';
 import { letterScaleClass, letterScaleLegendClass } from '../../../lib/letterScale.ts';
 import { localDateTimeLabel } from '../../../lib/localTime.ts';
@@ -1545,6 +1546,29 @@ async function refreshSubscribers(): Promise<void> {
 }
 
 /** Create the next OP on management channels only (hidden from the field). */
+/**
+ * Incident Core Events (ADR-004) for an OP step. Never fails the step: the
+ * OP is already done, so a problem comes back as a note for the notice.
+ */
+async function opEventNote(
+    mission: ActiveMission,
+    op: OpPeriodRegistryEntry,
+    steps: { attach?: boolean; start?: boolean; end?: boolean },
+): Promise<string> {
+    const notes: string[] = [];
+    try {
+        if (steps.attach && await attachOpToIncidentEvent(mission, op)) notes.push('Added to the incident event.');
+        if (steps.start && mission.mgmt) {
+            const event = await startFieldEvent(mission, op, await missionChannels(mission.mgmt.guid));
+            if (event) notes.push(`Field event "${event.name}" created.`);
+        }
+        if (steps.end && await endFieldEvent(op)) notes.push('Field event ended.');
+    } catch (err) {
+        notes.push(`Event not updated: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    return notes.length ? ` ${notes.join(' ')}` : '';
+}
+
 async function onPlanOp(): Promise<void> {
     const mission = activeMission.value;
     if (!mission?.mgmt) return;
@@ -1565,8 +1589,9 @@ async function onPlanOp(): Promise<void> {
         );
         await ensureOpOverlay(entry);
         workingOpGuid.value = entry.guid;
+        const eventNote = await opEventNote(mission, entry, { attach: true });
         notice.value = `Planning ${entry.name} on ${entry.channels.join(', ')} only. `
-            + 'Field users will see it when you activate it.';
+            + `Field users will see it when you activate it.${eventNote}`;
         await refresh();
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
@@ -1590,9 +1615,10 @@ async function onActivateOp(op: OpPeriodRegistryEntry): Promise<void> {
         } catch (ippErr) {
             ippNote = ` IPP publish failed: ${ippErr instanceof Error ? ippErr.message : String(ippErr)}`;
         }
+        const eventNote = await opEventNote(mission, entry, { attach: true, start: true });
         confirmOp.value = null;
         workingOpGuid.value = entry.guid;
-        notice.value = `Activated ${entry.name}: field channels ${entry.channels.join(', ')}.${ippNote}`;
+        notice.value = `Activated ${entry.name}: field channels ${entry.channels.join(', ')}.${ippNote}${eventNote}`;
         await refresh();
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
@@ -1628,7 +1654,8 @@ async function onOpenOp(): Promise<void> {
         } catch (ippErr) {
             ippNote = ` IPP publish failed: ${ippErr instanceof Error ? ippErr.message : String(ippErr)}`;
         }
-        notice.value = `Opened ${entry.name}.${ippNote}`;
+        const eventNote = await opEventNote(mission, entry, { attach: true, start: true });
+        notice.value = `Opened ${entry.name}.${ippNote}${eventNote}`;
         await refresh();
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
@@ -1650,7 +1677,8 @@ async function onCloseOp(op: OpPeriodRegistryEntry): Promise<void> {
             op,
             { retainChannels: retain },
         );
-        notice.value = `Closed ${closed.name}; field channels removed.`;
+        const eventNote = await opEventNote(mission, op, { end: true });
+        notice.value = `Closed ${closed.name}; field channels removed.${eventNote}`;
         confirmOp.value = null;
         if (workingOpGuid.value === op.guid) workingOpGuid.value = null;
         await refresh();

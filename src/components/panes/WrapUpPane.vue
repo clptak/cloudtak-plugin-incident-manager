@@ -1,159 +1,163 @@
 <template>
-    <TablerBorder
-        class='cloudtak-accent text-white'
-        :fill-height='false'
-        :shadow='false'
-        gap='sm'
-    >
-        <template #label>
-            <p class='text-uppercase text-white-50 small mb-0 d-flex align-items-center gap-2 w-100'>
-                <span>Create Patrol Report Template</span>
-                <span class='badge bg-blue-lt ms-auto'>Patrol Report</span>
-            </p>
-        </template>
+    <div>
+        <IncidentEventCard />
+        <TablerBorder
+            class='cloudtak-accent text-white'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0 d-flex align-items-center gap-2 w-100'>
+                    <span>Create Patrol Report Template</span>
+                    <span class='badge bg-blue-lt ms-auto'>Patrol Report</span>
+                </p>
+            </template>
 
-        <p class='text-muted small mb-0'>
-            Produces a patrol report (.md) from the active DataSync mission's log entries.
-        </p>
-
-        <div>
-            <button
-                class='btn btn-primary'
-                :disabled='loading'
-                @click='onGenerate'
-            >
-                {{ loading ? 'Generating…' : 'Generate from active mission' }}
-            </button>
-
-            <TablerInlineAlert
-                v-if='!activeMission'
-                class='mt-2'
-                severity='warning'
-                title='Mission Required'
-                description='No active mission. Select one in Create | Open first.'
-            />
-            <p
-                v-else
-                class='form-text mt-2 mb-0'
-            >
-                Active DataSync: <strong>{{ activeMission.name }}</strong>
-            </p>
-            <TablerInlineAlert
-                v-if='error'
-                class='mt-2'
-                severity='danger'
-                title='Error'
-                :description='error'
-            />
-        </div>
-
-        <!-- ── Demobilization package ─────────────────────────────── -->
-        <div class='cloudtak-accent border rounded-3 mt-3 p-3'>
-            <p class='text-uppercase text-white-50 small mb-1'>
-                Demobilization Package
-            </p>
-            <p class='text-muted small mb-2'>
-                Bundles the complete case file into one zip: a mission archive for every
-                DataSync (common map, MGMT, each OP), the incident schema, the WinCASIE
-                export, every operational-period IAP, and a manifest.
+            <p class='text-muted small mb-0'>
+                Produces a patrol report (.md) from the active DataSync mission's log entries.
             </p>
 
-            <div class='row g-2'>
-                <div class='col-md-5'>
-                    <label class='form-label'>Closeout</label>
-                    <select
-                        v-model='demob.variant'
-                        class='form-select form-select-sm'
-                    >
-                        <option value='closed'>
-                            Search closed — archive everything
-                        </option>
-                        <option value='limited-continuous'>
-                            Limited continuous search — keep common map live
-                        </option>
-                    </select>
-                </div>
-                <div class='col-md-7 d-flex flex-wrap align-items-end gap-3'>
-                    <label class='form-check mb-0'>
-                        <input
-                            v-model='demob.includeArchives'
-                            type='checkbox'
-                            class='form-check-input'
-                        >
-                        <span class='form-check-label small'>Mission archives</span>
-                    </label>
-                    <label class='form-check mb-0'>
-                        <input
-                            v-model='demob.includeIaps'
-                            type='checkbox'
-                            class='form-check-input'
-                        >
-                        <span class='form-check-label small'>IAPs</span>
-                    </label>
-                    <label class='form-check mb-0'>
-                        <input
-                            v-model='demob.includeCasieExport'
-                            type='checkbox'
-                            class='form-check-input'
-                        >
-                        <span class='form-check-label small'>CASIE export</span>
-                    </label>
-                    <label class='form-check mb-0'>
-                        <input
-                            v-model='demob.includeReport'
-                            type='checkbox'
-                            class='form-check-input'
-                        >
-                        <span class='form-check-label small'>Incident log</span>
-                    </label>
-                </div>
+            <div>
+                <button
+                    class='btn btn-primary'
+                    :disabled='loading'
+                    @click='onGenerate'
+                >
+                    {{ loading ? 'Generating…' : 'Generate from active mission' }}
+                </button>
+
+                <TablerInlineAlert
+                    v-if='!activeMission'
+                    class='mt-2'
+                    severity='warning'
+                    title='Mission Required'
+                    description='No active mission. Select one in Create | Open first.'
+                />
+                <p
+                    v-else
+                    class='form-text mt-2 mb-0'
+                >
+                    Active DataSync: <strong>{{ activeMission.name }}</strong>
+                </p>
+                <TablerInlineAlert
+                    v-if='error'
+                    class='mt-2'
+                    severity='danger'
+                    title='Error'
+                    :description='error'
+                />
             </div>
 
-            <button
-                class='btn btn-primary btn-sm mt-3'
-                :disabled='packaging || !activeMission'
-                @click='onBuildPackage'
-            >
-                {{ packaging ? 'Packaging…' : 'Build demobilization package' }}
-            </button>
-            <span
-                v-if='packageStatus'
-                class='ms-2 small'
-                :class='packageError ? "text-danger" : "text-muted"'
-            >{{ packageStatus }}</span>
-        </div>
+            <!-- ── Demobilization package ─────────────────────────────── -->
+            <div class='cloudtak-accent border rounded-3 mt-3 p-3'>
+                <p class='text-uppercase text-white-50 small mb-1'>
+                    Demobilization Package
+                </p>
+                <p class='text-muted small mb-2'>
+                    Bundles the complete case file into one zip: a mission archive for every
+                    DataSync (common map, MGMT, each OP), the incident schema, the WinCASIE
+                    export, every operational-period IAP, and a manifest.
+                </p>
 
-        <div v-if='report'>
-            <div class='d-flex align-items-center mb-2'>
-                <h4 class='mb-0 text-white'>
-                    Report Preview
-                </h4>
-                <div class='ms-auto btn-list'>
-                    <button
-                        class='btn btn-success btn-sm'
-                        @click='download'
-                    >
-                        Download .md
-                    </button>
-                    <button
-                        class='btn btn-outline-secondary btn-sm'
-                        @click='copy'
-                    >
-                        {{ copied ? 'Copied' : 'Copy' }}
-                    </button>
+                <div class='row g-2'>
+                    <div class='col-md-5'>
+                        <label class='form-label'>Closeout</label>
+                        <select
+                            v-model='demob.variant'
+                            class='form-select form-select-sm'
+                        >
+                            <option value='closed'>
+                                Search closed — archive everything
+                            </option>
+                            <option value='limited-continuous'>
+                                Limited continuous search — keep common map live
+                            </option>
+                        </select>
+                    </div>
+                    <div class='col-md-7 d-flex flex-wrap align-items-end gap-3'>
+                        <label class='form-check mb-0'>
+                            <input
+                                v-model='demob.includeArchives'
+                                type='checkbox'
+                                class='form-check-input'
+                            >
+                            <span class='form-check-label small'>Mission archives</span>
+                        </label>
+                        <label class='form-check mb-0'>
+                            <input
+                                v-model='demob.includeIaps'
+                                type='checkbox'
+                                class='form-check-input'
+                            >
+                            <span class='form-check-label small'>IAPs</span>
+                        </label>
+                        <label class='form-check mb-0'>
+                            <input
+                                v-model='demob.includeCasieExport'
+                                type='checkbox'
+                                class='form-check-input'
+                            >
+                            <span class='form-check-label small'>CASIE export</span>
+                        </label>
+                        <label class='form-check mb-0'>
+                            <input
+                                v-model='demob.includeReport'
+                                type='checkbox'
+                                class='form-check-input'
+                            >
+                            <span class='form-check-label small'>Incident log</span>
+                        </label>
+                    </div>
                 </div>
+
+                <button
+                    class='btn btn-primary btn-sm mt-3'
+                    :disabled='packaging || !activeMission'
+                    @click='onBuildPackage'
+                >
+                    {{ packaging ? 'Packaging…' : 'Build demobilization package' }}
+                </button>
+                <span
+                    v-if='packageStatus'
+                    class='ms-2 small'
+                    :class='packageError ? "text-danger" : "text-muted"'
+                >{{ packageStatus }}</span>
             </div>
-            <TablerInput
-                v-model='report'
-                class='report-textarea'
-                :rows='16'
-            />
-        </div>
-    </TablerBorder>
+
+            <div v-if='report'>
+                <div class='d-flex align-items-center mb-2'>
+                    <h4 class='mb-0 text-white'>
+                        Report Preview
+                    </h4>
+                    <div class='ms-auto btn-list'>
+                        <button
+                            class='btn btn-success btn-sm'
+                            @click='download'
+                        >
+                            Download .md
+                        </button>
+                        <button
+                            class='btn btn-outline-secondary btn-sm'
+                            @click='copy'
+                        >
+                            {{ copied ? 'Copied' : 'Copy' }}
+                        </button>
+                    </div>
+                </div>
+                <TablerInput
+                    v-model='report'
+                    class='report-textarea'
+                    :rows='16'
+                />
+            </div>
+        </TablerBorder>
+    </div>
 </template>
 
 <script setup lang='ts'>
 import { ref } from 'vue';
+import IncidentEventCard from '../IncidentEventCard.vue';
 import {
     TablerBorder,
     TablerInput,

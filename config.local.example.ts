@@ -12,6 +12,9 @@ import type { DeploymentConfig } from './src/lib/deploymentDefaults.ts';
  * (also gitignored). The basenames below are what the build looks up. An empty
  * string skips that list. Basenames only — no directories.
  *
+ * Copy deployment.example/event-icons.json and set eventIconsFile only when
+ * incident events should get symbols by CAD Type.
+ *
  * Copy deployment.example/lpb-table.json only when this CloudTAK should replace
  * the bundled Arizona statistical-distance table. The sample is a single row.
  */
@@ -25,4 +28,7 @@ export const deploymentDefaults: DeploymentConfig = {
     personnelFile: 'personnel.json',
     subjectProfilesFile: 'subject-profiles.json',
     lpbTableFile: 'lpb-table.json',
+    // Optional: symbols for incident Core Events by CAD Type (docs/event-icons.md).
+    eventIconsFile: '',
+    cadUtcOffset: '-07:00',
 };
