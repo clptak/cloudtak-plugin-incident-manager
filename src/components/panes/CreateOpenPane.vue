@@ -57,6 +57,61 @@
                     Creates a DataSync (TAK Mission) via the CloudTAK API. Optionally creates a paired Caltopo map.
                 </p>
 
+                <!-- ── Paste CAD call (CFS) ── -->
+                <div class='border rounded-3 mb-3'>
+                    <div
+                        class='d-flex align-items-center px-3 py-2 cursor-pointer user-select-none'
+                        role='button'
+                        tabindex='0'
+                        :aria-expanded='cadExpanded'
+                        @click='cadExpanded = !cadExpanded'
+                        @keydown.enter.prevent='cadExpanded = !cadExpanded'
+                        @keydown.space.prevent='cadExpanded = !cadExpanded'
+                    >
+                        <span class='small text-white-50'>Paste CAD call</span>
+                        <span
+                            v-if='!cadExpanded && cadText.trim()'
+                            class='small text-white-50 ms-2'
+                        >(pasted)</span>
+                        <IconChevronDown
+                            class='ms-auto transition-transform text-white-50'
+                            :class='{ "rotate-180": !cadExpanded }'
+                            :size='18'
+                            stroke='1.5'
+                        />
+                    </div>
+                    <div
+                        v-if='cadExpanded'
+                        class='px-3 pb-3'
+                    >
+                        <TablerInput
+                            v-model='cadText'
+                            label='CAD call text'
+                            :rows='8'
+                            placeholder='Paste the full call (Type, Address, … Event ID, Case Numbers, Created, Dispatched …).'
+                        />
+                        <div class='d-flex flex-wrap align-items-center gap-2 mt-2'>
+                            <button
+                                type='button'
+                                class='btn btn-outline-primary btn-sm'
+                                :disabled='!cadText.trim()'
+                                @click='fillFromCad'
+                            >
+                                Fill form
+                            </button>
+                            <span
+                                v-if='cadResult'
+                                class='small'
+                                :class='cadResultError ? "text-warning" : "text-success"'
+                            >{{ cadResult }}</span>
+                        </div>
+                        <div class='form-text'>
+                            Activity Number uses the Case Number when there is one, otherwise the Event ID.
+                            On create, the call is also imported into Initial Information.
+                        </div>
+                    </div>
+                </div>
+
                 <div class='row g-2'>
                     <div class='col-md-3'>
                         <TablerInput
@@ -437,6 +492,8 @@ import { SUBJECT_PROFILE_PLACEHOLDER } from '../../lib/subjectProfiles.ts';
 import { flyToCoords } from '../../lib/flyToFeature.ts';
 import { pushPointToMission } from '../../lib/missionFeatures.ts';
 import { startSchemaOnProperties } from '../../lib/missionSchema.ts';
+import { importCadText, rememberCadText } from '../../lib/cadImport.ts';
+import { createMissionFieldsFromCfs, parseCfsHeaderFields } from '../../lib/incidentInfo.ts';
 
 const mapStore = useMapStore();
 const { setActiveMission, setDraftIncidentType, activeMission } = useIncident();
@@ -520,6 +577,36 @@ const operationalPeriodLabel = computed({
             : '';
     },
 });
+
+// ── Paste CAD call ──
+const cadExpanded = ref(false);
+const cadText = ref('');
+const cadResult = ref('');
+const cadResultError = ref(false);
+
+/** Fill Activity Number, Date and Location Coordinates from the pasted call. */
+function fillFromCad(): void {
+    const fields = createMissionFieldsFromCfs(parseCfsHeaderFields(cadText.value));
+    const filled: string[] = [];
+    const missing: string[] = [];
+    if (fields.activityNumber) {
+        form.activityNumber = fields.activityNumber;
+        filled.push('Activity Number');
+    } else missing.push('Activity Number');
+    if (fields.date) {
+        form.date = fields.date;
+        filled.push('Date');
+    } else missing.push('Date');
+    if (fields.coords) {
+        form.coords = fields.coords;
+        filled.push('Location Coordinates');
+    } else missing.push('Location Coordinates');
+    cadResultError.value = !filled.length;
+    cadResult.value = [
+        filled.length ? `Filled: ${filled.join(', ')}.` : '',
+        missing.length ? `Not found: ${missing.join(', ')}.` : '',
+    ].filter(Boolean).join(' ');
+}
 
 const form = reactive({
     activityNumber: '',
@@ -808,6 +895,26 @@ async function createMission(): Promise<void> {
                 }
             } catch (err) {
                 console.warn('Could not start incident on Mission Properties; using mission_schema.json', err);
+            }
+        }
+
+        // Pasted CAD call -> Initial Information. Must run after the incident
+        // is set up on Mission Properties (that step starts from a blank
+        // schema). Non-fatal: the mission is already created.
+        if (cadText.value.trim()) {
+            const created = {
+                guid: res.data.guid,
+                name: res.data.name,
+                missionToken: res.data.token,
+                mgmt,
+            };
+            rememberCadText(res.data.guid, cadText.value);
+            try {
+                await importCadText(created, cadText.value);
+                status.value += ' CAD call imported into Initial Information.';
+            } catch (err) {
+                const message = err instanceof Error ? err.message : String(err);
+                status.value += ` Initial Information was not filled from the CAD call: ${message}`;
             }
         }
 

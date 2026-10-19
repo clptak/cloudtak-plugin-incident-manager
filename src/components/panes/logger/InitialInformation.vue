@@ -352,8 +352,8 @@ import {
     TablerInput,
     TablerInlineAlert,
 } from '@tak-ps/vue-tabler';
-import { getMpsRows } from '../../../lib/mpsParser.ts';
-import type { MpsRow } from '../../../lib/mpsParser.ts';
+import { parseCadImport, type CadImport, type MpsRow } from '../../../lib/mpsParser.ts';
+import { applyCadToSchema, takeCadText } from '../../../lib/cadImport.ts';
 import {
     applyParsedCadToForm,
     blankIncidentInfoForm,
@@ -361,7 +361,7 @@ import {
     buildIncidentInfoKeywords,
     isValidDemaMission,
     latestIncidentInfoFromLogs,
-    parseCfsHeaderFields,
+    type CfsHeaderFields,
     suggestIncidentName,
     type IncidentInfoForm,
 } from '../../../lib/incidentInfo.ts';
@@ -373,15 +373,12 @@ import {
 import { pushPointToMission } from '../../../lib/missionFeatures.ts';
 import { SUBJECT_KEYWORD, kwValue } from '../../../lib/subjectInfo.ts';
 import {
-    applyCadIdsToSchema,
-    applyCfsTimestampsToSchema,
     applyIncidentFormToSchema,
     applyMissionContextToSchema,
     appendMpsRowsToSchema,
     incidentFormFromSchema,
     loadMissionSchema,
     mergeAssignmentIntoForm,
-    replaceMpsRowsInSchema,
     saveMissionSchema,
     type MissionSchema,
 } from '../../../lib/missionSchema.ts';
@@ -403,10 +400,6 @@ const rows = ref<MpsRow[]>([]);
 const selected = ref<boolean[]>([]);
 const parsedActivityNumber = ref<string | null>(null);
 const parsedReportNumber = ref<string | null>(null);
-const lastCfsTimestamps = ref<{
-    callCreated: string | null;
-    callDispatched: string | null;
-}>({ callCreated: null, callDispatched: null });
 const posting = ref(false);
 const showParsedModal = ref(false);
 const status = ref('');
@@ -604,10 +597,7 @@ async function sendIncidentInfoToDataSync(): Promise<void> {
     }
 }
 
-async function syncSchemaFromForm(
-    parsed?: { activityNumber: string | null; reportNumber: string | null },
-    parsedRows?: MpsRow[],
-): Promise<void> {
+async function syncSchemaFromForm(cad?: CadImport): Promise<void> {
     if (!activeMission.value) return;
     const sub = await loadSchemaSub();
     let schema = missionSchema.value;
@@ -619,14 +609,7 @@ async function syncSchemaFromForm(
         legacySchemaLogId.value = loaded.legacyLogId ?? legacySchemaLogId.value;
     }
     applyIncidentFormToSchema(incidentForm, schema, { preserveEmptyAssignment: true });
-    if (parsed) applyCadIdsToSchema(schema, parsed);
-    applyCfsTimestampsToSchema(schema, {
-        callCreated: lastCfsTimestamps.value.callCreated,
-        callDispatched: lastCfsTimestamps.value.callDispatched,
-    });
-    if (parsedRows?.length) {
-        replaceMpsRowsInSchema(schema, parsedRows, activeMission.value.name);
-    }
+    if (cad) applyCadToSchema(schema, cad, activeMission.value.name);
     applyMissionContextToSchema(schema, activeMission.value.name);
     const savedSchema = await saveMissionSchema(sub, schema, {
         contentHash: schemaContentHash.value,
@@ -641,22 +624,17 @@ async function syncSchemaFromForm(
 async function parse(): Promise<void> {
     status.value = '';
     statusError.value = false;
-    const header = parseCfsHeaderFields(cadText.value);
-    const res = getMpsRows(cadText.value);
-    const activityNumber = header.activityNumber ?? res.activityNumber;
-    const reportNumber = header.reportNumber ?? res.reportNumber;
-    rows.value = res.rows;
-    selected.value = res.rows.map(() => true);
+    const cad = parseCadImport(cadText.value);
+    const { header, activityNumber, reportNumber } = cad;
+    rows.value = cad.rows;
+    selected.value = cad.rows.map(() => true);
     parsedActivityNumber.value = activityNumber;
     parsedReportNumber.value = reportNumber;
-    lastCfsTimestamps.value = {
-        callCreated: header.callCreated,
-        callDispatched: header.assignmentDateTime,
-    };
     applyParsedCadToForm(incidentForm, {
         activityNumber,
         reportNumber,
         assignmentDateTime: header.assignmentDateTime,
+        closed: header.closed,
     });
     showParsedModal.value = true;
 
@@ -664,10 +642,7 @@ async function parse(): Promise<void> {
     if (statusError.value) return;
 
     try {
-        await syncSchemaFromForm({
-            activityNumber,
-            reportNumber,
-        }, res.rows);
+        await syncSchemaFromForm(cad);
         if (!rows.value.length) {
             statusError.value = true;
             status.value = activityNumber || reportNumber
@@ -687,7 +662,7 @@ async function parse(): Promise<void> {
 
 /** Prompt and push Address LL marker. Returns a short status suffix, or null. */
 async function maybeAddCallLocation(
-    header: ReturnType<typeof parseCfsHeaderFields>,
+    header: CfsHeaderFields,
     activityNumber: string | null,
 ): Promise<string | null> {
     if (!header.callLocation || !activeMission.value) return null;
@@ -781,8 +756,19 @@ async function postLogs(): Promise<void> {
     }
 }
 
-onMounted(() => { void loadIncidentInfo(); });
-watch(() => activeMission.value?.guid, () => { void loadIncidentInfo(); });
+/** Text pasted on Create Mission for this incident lands in the CFS box once. */
+function takePendingCadText(): void {
+    const guid = activeMission.value?.guid;
+    if (!guid || cadText.value.trim()) return;
+    const text = takeCadText(guid);
+    if (text) {
+        cadText.value = text;
+        cfsExpanded.value = true;
+    }
+}
+
+onMounted(() => { takePendingCadText(); void loadIncidentInfo(); });
+watch(() => activeMission.value?.guid, () => { takePendingCadText(); void loadIncidentInfo(); });
 </script>
 
 <style scoped>

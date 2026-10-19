@@ -12,11 +12,76 @@ export const REPORT_NUMBER_RE = /S\d{7}/g;
 /** State mission number — e.g. 2025-12345 */
 export const DEMA_MISSION_RE = /^20\d\d-\d\d\d\d\d$/;
 
+// Fallbacks for text that does not lay labels out one per line.
 const CFS_EVENT_ID_RE = /Event ID\s*\n\s*(A\d{8})\b/i;
 const CFS_CASE_NUMBERS_RE = /Case Numbers\s*\n\s*(S\d{7})\b/i;
-const CFS_CREATED_RE = /Created\s*\n\s*(\d{2}:\d{2}:\d{2})\s{2}(\d{2}\/\d{2}\/\d{2})/i;
-const CFS_DISPATCHED_RE = /Dispatched\s*\n\s*(\d{2}:\d{2}:\d{2})\s{2}(\d{2}\/\d{2}\/\d{2})/i;
+const CFS_CREATED_RE = /Created\s*\n\s*(\d{2}:\d{2}:\d{2})\s+(\d{2}\/\d{2}\/\d{2})/i;
+const CFS_DISPATCHED_RE = /Dispatched\s*\n\s*(\d{2}:\d{2}:\d{2})\s+(\d{2}\/\d{2}\/\d{2})/i;
 const CFS_ADDRESS_RE = /Address\s*\n\s*([^\n]+)/i;
+
+const EVENT_ID_VALUE_RE = /\bA\d{8}\b/;
+const CASE_NUMBER_VALUE_RE = /\bS\d{7}\b/;
+const CFS_TIME_VALUE_RE = /(\d{2}:\d{2}:\d{2})\s+(\d{2}\/\d{2}\/\d{2})/;
+
+/**
+ * Field labels of the CAD call (CFS) header, each on a line of its own with
+ * the value on the following line(s). A line counts as a label only when it
+ * is exactly one of these, so values such as "FLAG" or "default" never do.
+ */
+export const CFS_FIELD_LABELS = [
+    'Type', 'SubType', 'Address', 'Xstreet 1', 'Xstreet 2', 'Priority', 'Beat', 'Instructions',
+    'Caller Name', 'Caller Number', 'Caller Address', 'Caller Source',
+    'Event ID', 'Agency', 'DGroup', 'Geofences', 'Case Numbers',
+    'Created', 'Dispatched', 'Closed', 'Dispositions', 'Remarks',
+] as const;
+
+const LABEL_BY_KEY = new Map(CFS_FIELD_LABELS.map((label) => [label.toLowerCase(), label]));
+const SEPARATOR_RE = /^-{5,}$/;
+
+/**
+ * Every labelled field of a pasted CAD call, label -> value (trimmed; lines
+ * of a multi-line value joined with "\n"; '' when the field is blank). A
+ * value ends at the next label or a dashed separator, so a blank field never
+ * borrows the next field's value. Remarks is a section, not a field: it and
+ * everything after it is left to the Remarks parser.
+ */
+export function readCfsFields(cadText: string): Record<string, string> {
+    const fields: Record<string, string> = {};
+    let current: string | null = null;
+    let lines: string[] = [];
+    const flush = () => {
+        if (current) fields[current] = lines.map((l) => l.trim()).filter(Boolean).join('\n');
+    };
+    for (const raw of cadText.replace(/\r\n?/g, '\n').split('\n')) {
+        const line = raw.trim();
+        const label = LABEL_BY_KEY.get(line.toLowerCase());
+        if (label) {
+            flush();
+            if (label === 'Remarks') return fields;
+            if (label in fields) {
+                // A repeated label (e.g. in pasted remarks) starts nothing new.
+                current = null;
+                continue;
+            }
+            current = label;
+            lines = [];
+            continue;
+        }
+        if (SEPARATOR_RE.test(line)) {
+            flush();
+            current = null;
+            continue;
+        }
+        if (current) lines.push(line);
+    }
+    flush();
+    return fields;
+}
+
+function cfsTimeToDatetimeLocal(value: string | undefined): string | null {
+    const m = value?.match(CFS_TIME_VALUE_RE);
+    return m ? dispatchedToDatetimeLocal(m[1], m[2]) : null;
+}
 
 export interface IncidentInfoForm {
     incidentName: string;
@@ -45,8 +110,12 @@ export interface CfsHeaderFields {
     callCreated: string | null;
     /** datetime-local value from Dispatched (YYYY-MM-DDTHH:MM) */
     assignmentDateTime: string | null;
+    /** datetime-local value from Closed (YYYY-MM-DDTHH:MM) — Incident Conclusion Time */
+    closed: string | null;
     /** Decimal degrees from Address LL(...), if present */
     callLocation: LatLng | null;
+    /** Every labelled field as pasted (see readCfsFields). */
+    fields: Record<string, string>;
 }
 
 export interface MissionLogLike {
@@ -115,47 +184,75 @@ export function suggestIncidentName(subjectNames: string[]): string {
  * Two-digit years map to 20xx.
  */
 export function dispatchedToDatetimeLocal(time: string, date: string): string | null {
-    const tm = time.trim().match(/^(\d{2}):(\d{2}):(\d{2})$/);
+    const tm = time.trim().match(/^(\d{1,2}):(\d{2}):(\d{2})$/);
     const dm = date.trim().match(/^(\d{2})\/(\d{2})\/(\d{2})$/);
     if (!tm || !dm) return null;
     const year = 2000 + parseInt(dm[3], 10);
     const month = dm[1];
     const day = dm[2];
-    return `${year}-${month}-${day}T${tm[1]}:${tm[2]}`;
+    return `${year}-${month}-${day}T${tm[1].padStart(2, '0')}:${tm[2]}`;
 }
 
-/** Extract labeled Event ID, Case Numbers, Created, Dispatched, and Address LL from CFS text. */
+/**
+ * Extract Event ID, Case Numbers, Created, Dispatched, Closed and Address LL
+ * from CFS text. Labelled fields are read first (readCfsFields); the older
+ * regexes are a fallback for text laid out differently.
+ */
 export function parseCfsHeaderFields(cadText: string): CfsHeaderFields {
-    const eventMatch = cadText.match(CFS_EVENT_ID_RE);
-    const caseMatch = cadText.match(CFS_CASE_NUMBERS_RE);
-    const createdMatch = cadText.match(CFS_CREATED_RE);
-    const dispatchedMatch = cadText.match(CFS_DISPATCHED_RE);
-    const addressMatch = cadText.match(CFS_ADDRESS_RE);
+    const fields = readCfsFields(cadText);
+    const has = (label: string) => label in fields;
 
-    let callCreated: string | null = null;
-    if (createdMatch) {
-        callCreated = dispatchedToDatetimeLocal(createdMatch[1], createdMatch[2]);
-    }
+    const activityNumber = has('Event ID')
+        ? fields['Event ID'].match(EVENT_ID_VALUE_RE)?.[0] ?? null
+        : cadText.match(CFS_EVENT_ID_RE)?.[1] ?? null;
+    const reportNumber = has('Case Numbers')
+        ? fields['Case Numbers'].match(CASE_NUMBER_VALUE_RE)?.[0] ?? null
+        : cadText.match(CFS_CASE_NUMBERS_RE)?.[1] ?? null;
 
-    let assignmentDateTime: string | null = null;
-    if (dispatchedMatch) {
-        assignmentDateTime = dispatchedToDatetimeLocal(dispatchedMatch[1], dispatchedMatch[2]);
-    }
+    const fallbackTime = (re: RegExp) => {
+        const m = cadText.match(re);
+        return m ? dispatchedToDatetimeLocal(m[1], m[2]) : null;
+    };
+    const callCreated = has('Created') ? cfsTimeToDatetimeLocal(fields.Created) : fallbackTime(CFS_CREATED_RE);
+    const assignmentDateTime = has('Dispatched')
+        ? cfsTimeToDatetimeLocal(fields.Dispatched)
+        : fallbackTime(CFS_DISPATCHED_RE);
+    const closed = has('Closed') ? cfsTimeToDatetimeLocal(fields.Closed) : null;
 
-    let callLocation: LatLng | null = null;
-    if (addressMatch?.[1]) {
-        const line = addressMatch[1].trim();
-        if (/\bLL\s*\(/i.test(line)) {
-            callLocation = parseCoordinates(line);
-        }
-    }
+    const addressLine = has('Address')
+        ? fields.Address.split('\n')[0]
+        : cadText.match(CFS_ADDRESS_RE)?.[1]?.trim() ?? '';
+    const callLocation = /\bLL\s*\(/i.test(addressLine) ? parseCoordinates(addressLine) : null;
 
     return {
-        activityNumber: eventMatch?.[1] ?? null,
-        reportNumber: caseMatch?.[1] ?? null,
+        activityNumber,
+        reportNumber,
         callCreated,
         assignmentDateTime,
+        closed,
         callLocation,
+        fields,
+    };
+}
+
+/** What a pasted CAD call fills in on the Create Mission form. */
+export interface CreateMissionCadFields {
+    /** Case Number when present, else Event ID - drives the DataSync name. */
+    activityNumber: string | null;
+    /** YYYY-MM-DD from Dispatched, else Created. */
+    date: string | null;
+    /** "lat, lng" (decimal degrees, 5 places) from Address LL(...). */
+    coords: string | null;
+}
+
+export function createMissionFieldsFromCfs(header: CfsHeaderFields): CreateMissionCadFields {
+    const when = header.assignmentDateTime ?? header.callCreated;
+    return {
+        activityNumber: header.reportNumber ?? header.activityNumber,
+        date: when ? when.slice(0, 10) : null,
+        coords: header.callLocation
+            ? `${header.callLocation.lat.toFixed(5)}, ${header.callLocation.lng.toFixed(5)}`
+            : null,
     };
 }
 
@@ -395,8 +492,11 @@ export function initialInfoDetailRows(form: IncidentInfoForm): IncidentDetailRow
  */
 export function applyParsedCadToForm(
     form: IncidentInfoForm,
-    parsed: CadIdentifiers & { assignmentDateTime?: string | null },
+    parsed: CadIdentifiers & { assignmentDateTime?: string | null; closed?: string | null },
 ): void {
+    if (parsed.closed) {
+        form.incidentConclusionTime = parsed.closed;
+    }
     if (parsed.activityNumber) {
         form.eventId = parsed.activityNumber;
     }
