@@ -413,6 +413,60 @@
                     />
                 </div>
 
+                <div
+                    v-if='preplansReady'
+                    class='mb-3'
+                >
+                    <label class='form-label mb-1'>Preplans</label>
+                    <div class='text-secondary small mb-1'>
+                        Copied into the new mission as fresh objects, each in its own folder.
+                    </div>
+                    <div
+                        v-if='preplansLoading'
+                        class='text-secondary small'
+                    >
+                        Loading preplans…
+                    </div>
+                    <div
+                        v-else-if='preplansError'
+                        class='text-danger small'
+                        v-text='preplansError'
+                    />
+                    <div
+                        v-else-if='!preplanOptions.length'
+                        class='text-secondary small'
+                    >
+                        No preplans found in a "Preplan Library" DataSync.
+                    </div>
+                    <div
+                        v-else
+                        class='overflow-auto'
+                        style='max-height: 12rem'
+                    >
+                        <label
+                            v-for='preplan in preplanOptions'
+                            :key='preplan.hash'
+                            class='form-check mb-1'
+                        >
+                            <input
+                                v-model='form.preplans'
+                                class='form-check-input'
+                                type='checkbox'
+                                :value='preplan.hash'
+                            >
+                            <span
+                                class='form-check-label'
+                                v-text='preplan.name'
+                            />
+                            <span
+                                v-if='preplanLibraryCount > 1'
+                                class='text-secondary small ms-1'
+                                v-text='`(${preplan.library})`'
+                            />
+                        </label>
+                    </div>
+                </div>
+
                 <button
                     class='btn btn-success w-100'
                     :disabled='loading'
@@ -555,6 +609,7 @@ import OpenExistingMission from './OpenExistingMission.vue';
 import { buildMissionName, parseCoordinates } from '../../lib/coords.ts';
 import { localDateString } from '../../lib/localTime.ts';
 import { createCaltopoMap, caltopoAvailable } from '../../lib/caltopo.ts';
+import { listPreplans, loadPreplan, preplansAvailable, type PreplanSummary } from '../../lib/preplans.ts';
 import { useIncident } from '../../composables/useIncident.ts';
 import { usePluginSettings } from '../../composables/usePluginSettings.ts';
 import { SUBJECT_PROFILE_PLACEHOLDER } from '../../lib/subjectProfiles.ts';
@@ -772,6 +827,8 @@ const form = reactive({
     /** IMT-only channels for the Sworn-side management (planning) sync. */
     mgmtGroups: [] as string[],
     createCaltopo: false,
+    /** File hashes of the preplans to copy into the new mission. */
+    preplans: [] as string[],
 });
 
 if (!form.incidentType && activeMission.value?.incidentType) {
@@ -803,8 +860,34 @@ const templateKeywords = ref<string[]>([]);
 const templateCardEls = ref<(HTMLElement | null)[]>([]);
 
 const caltopoReady = ref(false);
+const preplansReady = ref(false);
+const preplansLoading = ref(false);
+const preplansError = ref('');
+const preplanOptions = ref<PreplanSummary[]>([]);
+const preplanLibraryCount = computed(() => new Set(preplanOptions.value.map((p) => p.library)).size);
+
+async function refreshPreplans(): Promise<void> {
+    preplansReady.value = preplansAvailable();
+    if (!preplansReady.value) return;
+
+    preplansLoading.value = true;
+    preplansError.value = '';
+    try {
+        preplanOptions.value = await listPreplans();
+        const known = new Set(preplanOptions.value.map((p) => p.hash));
+        form.preplans = form.preplans.filter((hash) => known.has(hash));
+    } catch (err) {
+        preplansError.value = `Could not list preplans: ${err instanceof Error ? err.message : String(err)}`;
+    } finally {
+        preplansLoading.value = false;
+    }
+}
+
 watch(expandedCard, (card) => {
-    if (card === 'create') caltopoReady.value = caltopoAvailable();
+    if (card === 'create') {
+        caltopoReady.value = caltopoAvailable();
+        void refreshPreplans();
+    }
 });
 
 const showSubjectProfile = computed(() =>
@@ -1117,6 +1200,33 @@ async function createMission(): Promise<void> {
                 status.value += ` Caltopo map was not created: ${message}`;
             }
         }
+
+        // Preplans via the preplans plugin, into the field (common) mission so
+        // every channel on the incident sees them. Each one is independent:
+        // a failure is reported and the rest still load.
+        for (const hash of form.preplans) {
+            const preplan = preplanOptions.value.find((p) => p.hash === hash);
+            if (!preplan) continue;
+            try {
+                const loaded = await loadPreplan({
+                    name: preplan.name,
+                    filename: preplan.filename,
+                    hash: preplan.hash,
+                    missionGuid: res.data.guid,
+                    missionToken: res.data.token,
+                });
+                if (!loaded) {
+                    status.value += ` Preplan "${preplan.name}" skipped (preplans plugin not available).`;
+                    continue;
+                }
+                status.value += ` Preplan "${preplan.name}": ${loaded.count} objects.`;
+                if (loaded.warning) status.value += ` ${loaded.warning}`;
+            } catch (err) {
+                const message = err instanceof Error ? err.message : String(err);
+                status.value += ` Preplan "${preplan.name}" was not loaded: ${message}`;
+            }
+        }
+        form.preplans = [];
 
         if (parsedCoords.value) {
             pendingLocation.value = {
