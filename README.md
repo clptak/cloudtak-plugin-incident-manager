@@ -102,6 +102,49 @@ docker compose build cloudtak-api --no-cache
 docker compose up -d
 ```
 
+### Deployment settings (`config.local.ts`)
+
+Shared settings for this CloudTAK go in `config.local.ts` in the plugin folder. They are compiled into the web bundle when the image is built. Without the file, the plugin uses its built-in defaults. Each user can still override most values in the plugin's Settings tab; those overrides are saved in that user's browser and a rebuild does not change them.
+
+`config.local.ts` and `deployment/` are gitignored and never committed, so `git pull` leaves them alone. A fresh clone does not have them, and neither does a plugin folder that an update script deletes and re-copies.
+
+Create it once, next to `config.local.example.ts`:
+
+```bash
+cd ~/tak-stack/CloudTAK/app/plugins/incident-manager   # adjust path if different
+cp config.local.example.ts config.local.ts
+nano config.local.ts
+```
+
+| Key | Purpose |
+|---|---|
+| `yourAgency` | Your agency name, used in Resources and documents |
+| `useD4hAidingAgencies`, `useD4hPersonnel` | Read agencies / personnel from the D4H plugin (`true`) or from staged files (`false`) |
+| `searchOpTemplateId` | DataSync template id for search OPs. Empty picks the template named SAR |
+| `wisarUrl` | WiSAR server for this CloudTAK |
+| `aidingAgenciesFile`, `personnelFile`, `subjectProfilesFile`, `lpbTableFile` | Basenames of list files you copy from `deployment.example/` into `deployment/`. A missing file is skipped |
+| `eventIconsFile` | Optional CAD Type symbol map ([docs/event-icons.md](docs/event-icons.md)) |
+| `cadUtcOffset` | UTC offset of times in pasted CAD calls (default `-07:00`) |
+| `defaultFieldChannels`, `defaultMgmtChannels` | Channels pre-selected on Create Mission ([docs/default-channels.md](docs/default-channels.md)) |
+
+Values in `config.local.ts` are readable by anyone who can load CloudTAK. Do not put secrets in it.
+
+### Updating on a tak-stack VPS: `scripts/vps-update.sh`
+
+Use this script instead of running `git pull` by hand. It backs up `config.local.ts` and `deployment/` to `~/tak-stack/plugin-config-backups/incident-manager/` and pulls the branch (fast-forward only). If either one is missing afterwards, it puts it back. It also lists any settings that are new in `config.local.example.ts`.
+
+```bash
+~/tak-stack/CloudTAK/app/plugins/incident-manager/scripts/vps-update.sh
+```
+
+To also rebuild and restart through `~/tak-stack/cloudtak-update.sh`, and then confirm the running image has `config.local.ts`:
+
+```bash
+~/tak-stack/CloudTAK/app/plugins/incident-manager/scripts/vps-update.sh --rebuild
+```
+
+Options: `--branch <name>` (default `ccso`), `--init` (create `config.local.ts` from the example when none exists), `-y` (no prompts). Set `STACK_DIR` if your stack is not `~/tak-stack`.
+
 ### Persist the plugin across future rebuilds (recommended)
 
 If you later run `./cloudtak.sh update` or `docker compose build` without re-supplying `WEB_PLUGINS`, the plugin will not be included in the rebuilt image. The most reliable approach is to persist it in `docker-compose.override.yml` next to your `docker-compose.yml`.
@@ -146,6 +189,7 @@ To update, change the pinned tag/commit in `WEB_PLUGINS`, rebuild the web/API se
 | `docker compose build` fails vue-tsc on incident-manager | VPS is building a stale local plugin copy (wrong branch/commit) | Update the local plugin checkout (see above), verify `DashboardTab.vue`, then rebuild with `--no-cache` |
 | Pane loads but mission actions fail | You are not subscribed / not authorized for the mission | Subscribe to the mission on the map (mission password if required) |
 | UI looks unchanged after rebuild | Browser cache | Hard refresh (Ctrl+Shift+R / Cmd+Shift+R) |
+| Deployment settings missing after a rebuild | `config.local.ts` was not in the plugin folder when the image was built | Run `scripts/vps-update.sh --rebuild`; it restores the file from its last backup and checks the running image |
 
 ## Optional integrations
 
