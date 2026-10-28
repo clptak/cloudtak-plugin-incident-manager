@@ -3,7 +3,9 @@ import bundledAzlpb from '../data/azlpb_table.json';
 import {
     deploymentSubjectProfiles,
     loadPluginSettings,
+    normalizeChannelNames,
     parseWisarUrl,
+    resolveDeployment,
     savePluginSettings,
     type AzlpbEntry,
     type PluginSettings,
@@ -32,6 +34,8 @@ function persist(next: PluginSettings): void {
         personnel: normalizePersonnel(next.personnel),
         searchOpTemplateId: next.searchOpTemplateId.trim(),
         wisarUrl: parseWisarUrl(next.wisarUrl) ?? '',
+        defaultFieldChannels: normalizeChannelNames(next.defaultFieldChannels),
+        defaultMgmtChannels: normalizeChannelNames(next.defaultMgmtChannels),
     };
     savePluginSettings(state.value);
 }
@@ -51,6 +55,8 @@ export function usePluginSettings() {
     const wisarUrl = computed(() => state.value.wisarUrl);
     /** The WiSAR server to use: the override, else the branch default. */
     const wisarBaseUrl = computed(() => resolveWisarUrl(state.value.wisarUrl));
+    const defaultFieldChannels = computed(() => state.value.defaultFieldChannels);
+    const defaultMgmtChannels = computed(() => state.value.defaultMgmtChannels);
 
     function setSubjectProfiles(profiles: string[]): void {
         persist({ ...state.value, subjectProfiles: profiles });
@@ -97,6 +103,24 @@ export function usePluginSettings() {
         persist({ ...state.value, wisarUrl: url });
     }
 
+    function setDefaultFieldChannels(names: string[]): void {
+        persist({ ...state.value, defaultFieldChannels: names });
+    }
+
+    function setDefaultMgmtChannels(names: string[]): void {
+        persist({ ...state.value, defaultMgmtChannels: names });
+    }
+
+    /** Back to the config.local.ts channels (none when the deployment sets none). */
+    function resetDefaultChannels(): void {
+        const deployed = resolveDeployment();
+        persist({
+            ...state.value,
+            defaultFieldChannels: [...(deployed.defaultFieldChannels ?? [])],
+            defaultMgmtChannels: [...(deployed.defaultMgmtChannels ?? [])],
+        });
+    }
+
     function enumOptions(current = ''): string[] {
         return subjectProfileEnumOptions(subjectProfiles.value, current);
     }
@@ -114,6 +138,8 @@ export function usePluginSettings() {
         searchOpTemplateId,
         wisarUrl,
         wisarBaseUrl,
+        defaultFieldChannels,
+        defaultMgmtChannels,
         setSubjectProfiles,
         resetSubjectProfiles,
         setLpbTable,
@@ -125,6 +151,9 @@ export function usePluginSettings() {
         setPersonnel,
         setSearchOpTemplateId,
         setWisarUrl,
+        setDefaultFieldChannels,
+        setDefaultMgmtChannels,
+        resetDefaultChannels,
         enumOptions,
     };
 }

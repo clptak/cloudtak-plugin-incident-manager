@@ -125,7 +125,23 @@
                             On create, the call is also imported into Initial Information<span v-if='createEvent'>,
                                 and the incident event is created on the Management Channels (or the
                                 existing event for this call is used)</span>.
-                            Create event only uses the Management Channels below.
+                        </div>
+                        <div class='small mt-1 d-flex flex-wrap align-items-center gap-2'>
+                            <span
+                                v-if='form.mgmtGroups.length'
+                                class='text-white-50'
+                            >Event channels: {{ form.mgmtGroups.join(', ') }}</span>
+                            <span
+                                v-else
+                                class='text-warning'
+                            >No Management Channels picked</span>
+                            <button
+                                type='button'
+                                class='btn btn-link btn-sm p-0'
+                                @click='scrollToMgmtChannels'
+                            >
+                                Change
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -369,6 +385,7 @@
                     <div class='col-12'>
                         <label class='form-label'>Field Channels</label>
                         <GroupSelect
+                            v-if='channelsReady'
                             v-model='form.groups'
                             :active='true'
                             direction='IN'
@@ -377,9 +394,13 @@
                             Volunteers &amp; field personnel — the incident common map is shared here.
                         </div>
                     </div>
-                    <div class='col-12'>
+                    <div
+                        ref='mgmtChannelsEl'
+                        class='col-12'
+                    >
                         <label class='form-label'>Management Channels</label>
                         <GroupSelect
+                            v-if='channelsReady'
                             v-model='form.mgmtGroups'
                             :active='true'
                             direction='IN'
@@ -620,11 +641,16 @@ import { importCadText, rememberCadText } from '../../lib/cadImport.ts';
 import { createMissionFieldsFromCfs, parseCfsHeaderFields } from '../../lib/incidentInfo.ts';
 import { createEventOnly, linkIncidentEvent, pickerEvents, type EventSummary } from '../../lib/coreEvents.ts';
 import { createFormFromEvent } from '../../domain/coreEvent.ts';
+import { availableDefaults } from '../../lib/channelDefaults.ts';
 import { localDateTimeLabel } from '../../lib/localTime.ts';
 
 const mapStore = useMapStore();
 const { setActiveMission, setDraftIncidentType, activeMission } = useIncident();
-const { enumOptions: subjectProfileEnumOptions } = usePluginSettings();
+const {
+    enumOptions: subjectProfileEnumOptions,
+    defaultFieldChannels,
+    defaultMgmtChannels,
+} = usePluginSettings();
 
 type CreateOpenCard = 'create' | 'open';
 const expandedCard = ref<CreateOpenCard | null>(null);
@@ -833,6 +859,31 @@ const form = reactive({
 
 if (!form.incidentType && activeMission.value?.incidentType) {
     form.incidentType = activeMission.value.incidentType;
+}
+
+// ── Default channels ──
+// GroupSelect reads its value only on mount, so the pickers wait for this.
+const channelsReady = ref(false);
+const mgmtChannelsEl = ref<HTMLElement | null>(null);
+
+async function applyDefaultChannels(): Promise<void> {
+    try {
+        if (defaultFieldChannels.value.length || defaultMgmtChannels.value.length) {
+            const channels = await mapStore.worker.profile.loadChannels();
+            if (!form.groups.length) form.groups = availableDefaults(defaultFieldChannels.value, channels);
+            if (!form.mgmtGroups.length) form.mgmtGroups = availableDefaults(defaultMgmtChannels.value, channels);
+        }
+    } catch (err) {
+        console.warn('[incident-manager] Could not pre-select default channels', err);
+    } finally {
+        channelsReady.value = true;
+    }
+}
+
+void applyDefaultChannels();
+
+function scrollToMgmtChannels(): void {
+    mgmtChannelsEl.value?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 const loading = ref(false);

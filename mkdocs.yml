@@ -10,6 +10,7 @@ nav:
       - 'ADR-003 POA lock and debrief corrections': decisions/ADR-003-poa-lock-and-debrief-corrections.md
       - 'ADR-004 Incident Core Events': decisions/ADR-004-incident-core-events.md
   - 'Event icons': event-icons.md
+  - 'Default channels': default-channels.md
 
 theme:
   name: mkdocs

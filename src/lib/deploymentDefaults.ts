@@ -28,6 +28,13 @@ export interface DeploymentConfig {
     eventIconsFile?: string;
     /** UTC offset of the times in pasted CAD calls, e.g. "-07:00" (the default). */
     cadUtcOffset?: string;
+    /** Exact TAK channel names pre-selected as Field Channels on Create Mission. */
+    defaultFieldChannels?: string[];
+    /**
+     * Exact TAK channel names pre-selected as Management Channels on Create
+     * Mission. The incident event from a pasted CAD call goes to these.
+     */
+    defaultMgmtChannels?: string[];
 }
 
 export interface DeploymentBundle {
