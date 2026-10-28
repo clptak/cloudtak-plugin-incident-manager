@@ -107,6 +107,101 @@
             </p>
         </TablerBorder>
 
+        <!-- ══ Default Channels ══ -->
+        <div
+            v-if='expandedCard !== "default-channels"'
+            class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
+            role='button'
+            tabindex='0'
+            :aria-expanded='false'
+            @click='toggleCard("default-channels")'
+            @keydown.enter.prevent='toggleCard("default-channels")'
+            @keydown.space.prevent='toggleCard("default-channels")'
+        >
+            <p class='text-uppercase text-white-50 small mb-0'>
+                Default Channels
+            </p>
+            <span
+                v-if='defaultChannelsSubtitle'
+                class='text-muted small ms-2 text-truncate'
+            >{{ defaultChannelsSubtitle }}</span>
+            <IconChevronDown
+                class='ms-auto transition-transform text-white-50 rotate-180'
+                :size='20'
+                stroke='1.5'
+            />
+        </div>
+        <TablerBorder
+            v-else
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <div
+                    class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                    role='button'
+                    tabindex='0'
+                    :aria-expanded='true'
+                    @click='toggleCard("default-channels")'
+                    @keydown.enter.prevent='toggleCard("default-channels")'
+                    @keydown.space.prevent='toggleCard("default-channels")'
+                >
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Default Channels
+                    </p>
+                    <IconChevronDown
+                        class='ms-auto transition-transform text-white-50'
+                        :size='20'
+                        stroke='1.5'
+                    />
+                </div>
+            </template>
+
+            <p class='text-muted small mb-3'>
+                Pre-selected on Create Mission. You can still add or remove channels for each incident.
+                The incident event from a pasted CAD call goes to the Management Channels.
+            </p>
+            <div
+                v-if='!userChannels'
+                class='text-muted small'
+            >
+                <span class='spinner-border spinner-border-sm me-1' />
+                Loading channels…
+            </div>
+            <template v-else>
+                <label class='form-label'>Field Channels</label>
+                <GroupSelect
+                    :key='`field-${channelPickerKey}`'
+                    :model-value='pickableFieldChannels'
+                    :active='true'
+                    direction='IN'
+                    @update:model-value='setDefaultFieldChannels'
+                />
+                <label class='form-label mt-2'>Management Channels</label>
+                <GroupSelect
+                    :key='`mgmt-${channelPickerKey}`'
+                    :model-value='pickableMgmtChannels'
+                    :active='true'
+                    direction='IN'
+                    @update:model-value='setDefaultMgmtChannels'
+                />
+            </template>
+            <div
+                v-if='deploymentHasChannels'
+                class='mt-2'
+            >
+                <button
+                    type='button'
+                    class='btn btn-outline-secondary btn-sm'
+                    @click='onResetDefaultChannels'
+                >
+                    Reset to deployment
+                </button>
+            </div>
+        </TablerBorder>
+
         <!-- ══ Your Agency ══ -->
         <div
             v-if='expandedCard !== "your-agency"'
@@ -902,6 +997,9 @@ import {
     TablerToggle,
 } from '@tak-ps/vue-tabler';
 import NumberedTextList from '../NumberedTextList.vue';
+import GroupSelect from '../../../../../src/components/CloudTAK/util/GroupSelect.vue';
+import { useMapStore } from '../../../../../src/stores/map.ts';
+import { availableDefaults, type ChannelLike } from '../../lib/channelDefaults.ts';
 import { usePluginSettings } from '../../composables/usePluginSettings.ts';
 import { loadD4hRoster } from '../../lib/d4hRoster.ts';
 import type { D4HMember } from '../../lib/d4hTypes.ts';
@@ -920,6 +1018,7 @@ import {
     hasDeploymentDefaults,
     parseLpbTableJson,
     parseWisarUrl,
+    resolveDeployment,
 } from '../../lib/pluginSettings.ts';
 import {
     WISAR_DEFAULT_URL,
@@ -945,7 +1044,7 @@ import {
 
 const deploymentConfigured = hasDeploymentDefaults();
 
-type SettingsCard = 'folder' | 'your-agency' | 'aiding-agencies' | 'personnel' | 'search-op-template' | 'subject-profiles' | 'lpb' | 'wisar';
+type SettingsCard = 'folder' | 'default-channels' | 'your-agency' | 'aiding-agencies' | 'personnel' | 'search-op-template' | 'subject-profiles' | 'lpb' | 'wisar';
 const expandedCard = ref<SettingsCard | null>('folder');
 
 function toggleCard(card: SettingsCard): void {
@@ -964,6 +1063,8 @@ const {
     searchOpTemplateId,
     wisarUrl,
     wisarBaseUrl,
+    defaultFieldChannels,
+    defaultMgmtChannels,
     setSubjectProfiles,
     resetSubjectProfiles,
     setLpbTable,
@@ -975,7 +1076,47 @@ const {
     setPersonnel,
     setSearchOpTemplateId,
     setWisarUrl,
+    setDefaultFieldChannels,
+    setDefaultMgmtChannels,
+    resetDefaultChannels,
 } = usePluginSettings();
+
+// GroupSelect reads its value only on mount; a new key shows a reset.
+const channelPickerKey = ref(0);
+const deploymentHasChannels = (() => {
+    const deployed = resolveDeployment();
+    return !!(deployed.defaultFieldChannels?.length || deployed.defaultMgmtChannels?.length);
+})();
+
+// Only channels this user can pick; a hidden name could never be un-ticked.
+const mapStore = useMapStore();
+const userChannels = ref<ChannelLike[] | null>(null);
+const pickableFieldChannels = computed(() =>
+    userChannels.value ? availableDefaults(defaultFieldChannels.value, userChannels.value) : defaultFieldChannels.value,
+);
+const pickableMgmtChannels = computed(() =>
+    userChannels.value ? availableDefaults(defaultMgmtChannels.value, userChannels.value) : defaultMgmtChannels.value,
+);
+
+async function loadUserChannels(): Promise<void> {
+    try {
+        userChannels.value = await mapStore.worker.profile.loadChannels();
+    } catch {
+        userChannels.value = [];
+    }
+}
+
+const defaultChannelsSubtitle = computed(() => {
+    const parts: string[] = [];
+    if (pickableMgmtChannels.value.length) parts.push(`Mgmt: ${pickableMgmtChannels.value.join(', ')}`);
+    if (pickableFieldChannels.value.length) parts.push(`Field: ${pickableFieldChannels.value.join(', ')}`);
+    return parts.join(' · ');
+});
+
+function onResetDefaultChannels(): void {
+    resetDefaultChannels();
+    channelPickerKey.value += 1;
+}
 
 const draftProfiles = ref<string[]>([...subjectProfiles.value]);
 const draftYourAgency = ref(yourAgency.value);
@@ -1294,6 +1435,7 @@ async function refreshMissionTemplates(): Promise<void> {
 }
 
 onMounted(() => {
+    void loadUserChannels();
     void refreshD4hAgencyCount();
     void refreshMissionTemplates();
 });

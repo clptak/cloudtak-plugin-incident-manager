@@ -31,4 +31,8 @@ export const deploymentDefaults: DeploymentConfig = {
     // Optional: symbols for incident Core Events by CAD Type (docs/event-icons.md).
     eventIconsFile: '',
     cadUtcOffset: '-07:00',
+    // Pre-selected on Create Mission (exact channel names). Users can still
+    // add or remove channels per incident, or change these in Settings.
+    defaultFieldChannels: [],
+    defaultMgmtChannels: [],
 };

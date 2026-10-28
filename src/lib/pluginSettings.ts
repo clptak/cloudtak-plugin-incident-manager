@@ -53,6 +53,10 @@ export interface PluginSettings {
     searchOpTemplateId: string;
     /** WiSAR server for this browser. Empty = the branch default (WISAR_DEFAULT_URL in lib/wisar.ts). */
     wisarUrl: string;
+    /** Channel names pre-selected as Field Channels on Create Mission. */
+    defaultFieldChannels: string[];
+    /** Channel names pre-selected as Management Channels on Create Mission. */
+    defaultMgmtChannels: string[];
 }
 
 export function defaultPluginSettings(): PluginSettings {
@@ -66,7 +70,21 @@ export function defaultPluginSettings(): PluginSettings {
         personnel: [],
         searchOpTemplateId: '',
         wisarUrl: '',
+        defaultFieldChannels: [],
+        defaultMgmtChannels: [],
     };
+}
+
+/** Strings only, trimmed, blanks dropped, exact-match de-dupe. Channel names are case-sensitive. */
+export function normalizeChannelNames(raw: unknown): string[] {
+    if (!Array.isArray(raw)) return [];
+    const names: string[] = [];
+    for (const item of raw) {
+        if (typeof item !== 'string') continue;
+        const name = item.trim();
+        if (name && !names.includes(name)) names.push(name);
+    }
+    return names;
 }
 
 /** Normalized WiSAR URL, '' for blank, or null when it isn't a usable http(s) URL. */
@@ -166,6 +184,8 @@ export interface ResolvedDeployment {
     personnel?: D4HMember[];
     subjectProfiles?: string[];
     lpbTable?: AzlpbEntry[];
+    defaultFieldChannels?: string[];
+    defaultMgmtChannels?: string[];
 }
 
 const SHARED_STRING_KEYS = [
@@ -232,6 +252,10 @@ export function deploymentFromConfig(config: DeploymentConfig, files: Record<str
         const parsed = parseLpbTableJson(lpb);
         if (parsed.ok) resolved.lpbTable = parsed.value;
     }
+    const fieldChannels = normalizeChannelNames(config.defaultFieldChannels);
+    if (fieldChannels.length) resolved.defaultFieldChannels = fieldChannels;
+    const mgmtChannels = normalizeChannelNames(config.defaultMgmtChannels);
+    if (mgmtChannels.length) resolved.defaultMgmtChannels = mgmtChannels;
     return resolved;
 }
 
@@ -254,6 +278,8 @@ export function hasDeploymentDefaults(deployed: ResolvedDeployment = resolveDepl
     if (deployed.aidingAgencies?.length) return true;
     if (deployed.personnel?.length) return true;
     if (deployed.lpbTable?.length) return true;
+    if (deployed.defaultFieldChannels?.length) return true;
+    if (deployed.defaultMgmtChannels?.length) return true;
     return false;
 }
 
@@ -285,6 +311,8 @@ export function applyDeploymentDefaults(
     if (deployed.aidingAgencies) settings.aidingAgencies = [...deployed.aidingAgencies];
     if (deployed.personnel) settings.personnel = deployed.personnel.map((member) => ({ ...member }));
     if (deployed.lpbTable) settings.lpbTable = deployed.lpbTable.map((row) => ({ ...row }));
+    if (deployed.defaultFieldChannels) settings.defaultFieldChannels = [...deployed.defaultFieldChannels];
+    if (deployed.defaultMgmtChannels) settings.defaultMgmtChannels = [...deployed.defaultMgmtChannels];
 
     if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return settings;
     const rec = stored as Record<string, unknown>;
@@ -328,6 +356,12 @@ export function applyDeploymentDefaults(
             settings.lpbTable = parsed.ok ? parsed.value : null;
         }
     }
+    if (Array.isArray(rec.defaultFieldChannels)) {
+        settings.defaultFieldChannels = normalizeChannelNames(rec.defaultFieldChannels);
+    }
+    if (Array.isArray(rec.defaultMgmtChannels)) {
+        settings.defaultMgmtChannels = normalizeChannelNames(rec.defaultMgmtChannels);
+    }
 
     return settings;
 }
@@ -347,6 +381,8 @@ export function settingsForStorage(
         aidingAgencies: normalizeSubjectProfiles(settings.aidingAgencies),
         personnel: normalizePersonnel(settings.personnel),
         lpbTable: settings.lpbTable,
+        defaultFieldChannels: normalizeChannelNames(settings.defaultFieldChannels),
+        defaultMgmtChannels: normalizeChannelNames(settings.defaultMgmtChannels),
     };
 
     for (const key of SHARED_STRING_KEYS) {
@@ -366,6 +402,12 @@ export function settingsForStorage(
     }
     if (deployed.lpbTable && sameJson(stored.lpbTable, deployed.lpbTable)) {
         delete stored.lpbTable;
+    }
+    if (deployed.defaultFieldChannels && sameJson(stored.defaultFieldChannels, deployed.defaultFieldChannels)) {
+        delete stored.defaultFieldChannels;
+    }
+    if (deployed.defaultMgmtChannels && sameJson(stored.defaultMgmtChannels, deployed.defaultMgmtChannels)) {
+        delete stored.defaultMgmtChannels;
     }
 
     return stored;
@@ -420,6 +462,14 @@ export function parseStoredPluginSettings(raw: unknown): PluginSettings {
 
     if (typeof rec.wisarUrl === 'string') {
         defaults.wisarUrl = parseWisarUrl(rec.wisarUrl) ?? '';
+    }
+
+    if (Array.isArray(rec.defaultFieldChannels)) {
+        defaults.defaultFieldChannels = normalizeChannelNames(rec.defaultFieldChannels);
+    }
+
+    if (Array.isArray(rec.defaultMgmtChannels)) {
+        defaults.defaultMgmtChannels = normalizeChannelNames(rec.defaultMgmtChannels);
     }
 
     return defaults;

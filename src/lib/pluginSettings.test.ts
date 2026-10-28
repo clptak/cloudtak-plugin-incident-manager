@@ -383,3 +383,54 @@ test('hasDeploymentDefaults is true when a string or staged list is present', ()
         aidingAgencies: ['NPS'],
     }), true);
 });
+
+test('deploymentFromConfig reads and normalizes default channel lists', () => {
+    const resolved = deploymentFromConfig({
+        defaultFieldChannels: [' SAR Members ', '', 'SAR Members', 7 as unknown as string],
+        defaultMgmtChannels: ['IMT', 'imt'],
+    });
+    assert.deepEqual(resolved.defaultFieldChannels, ['SAR Members']);
+    assert.deepEqual(resolved.defaultMgmtChannels, ['IMT', 'imt']);
+    assert.equal(deploymentFromConfig({ defaultMgmtChannels: [] }).defaultMgmtChannels, undefined);
+});
+
+test('default channels: deployment fills a missing key, a saved list or [] wins', () => {
+    const channels: ResolvedDeployment = {
+        yourAgency: '',
+        searchOpTemplateId: '',
+        wisarUrl: '',
+        defaultFieldChannels: ['SAR Members'],
+        defaultMgmtChannels: ['IMT'],
+    };
+    const fresh = applyDeploymentDefaults(null, channels);
+    assert.deepEqual(fresh.defaultFieldChannels, ['SAR Members']);
+    assert.deepEqual(fresh.defaultMgmtChannels, ['IMT']);
+
+    const saved = applyDeploymentDefaults({ defaultMgmtChannels: ['Command', 'IMT'], defaultFieldChannels: [] }, channels);
+    assert.deepEqual(saved.defaultMgmtChannels, ['Command', 'IMT']);
+    assert.deepEqual(saved.defaultFieldChannels, []);
+
+    const stored = settingsForStorage(fresh, channels);
+    assert.equal('defaultFieldChannels' in stored, false);
+    assert.equal('defaultMgmtChannels' in stored, false);
+    assert.deepEqual(applyDeploymentDefaults(stored, channels).defaultMgmtChannels, ['IMT']);
+
+    const custom = settingsForStorage(saved, channels);
+    assert.deepEqual(custom.defaultMgmtChannels, ['Command', 'IMT']);
+    assert.deepEqual(custom.defaultFieldChannels, []);
+});
+
+test('parseStoredPluginSettings reads default channel lists', () => {
+    const parsed = parseStoredPluginSettings({ defaultMgmtChannels: [' IMT ', 'IMT'], defaultFieldChannels: 'nope' });
+    assert.deepEqual(parsed.defaultMgmtChannels, ['IMT']);
+    assert.deepEqual(parsed.defaultFieldChannels, []);
+});
+
+test('hasDeploymentDefaults is true with only default channels', () => {
+    assert.equal(hasDeploymentDefaults({
+        yourAgency: '',
+        searchOpTemplateId: '',
+        wisarUrl: '',
+        defaultMgmtChannels: ['IMT'],
+    }), true);
+});
