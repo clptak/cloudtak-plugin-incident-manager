@@ -570,12 +570,11 @@
             title='No active mission'
             description='Select one in Create | Open first.'
         />
-        <div
+        <DataSyncDestination
             v-else
-            class='form-text'
-        >
-            Active DataSync: <strong>{{ activeMission.name }}</strong>
-        </div>
+            :mission='activeMission'
+            target='mgmt'
+        />
         <TablerInlineAlert
             v-if='status'
             class='mt-2'
@@ -654,6 +653,7 @@
 </template>
 
 <script setup lang='ts'>
+import DataSyncDestination from '../../DataSyncDestination.vue';
 import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { IconChevronDown, IconPlus, IconX } from '@tabler/icons-vue';
 import { TablerBorder, TablerInput, TablerInlineAlert } from '@tak-ps/vue-tabler';
@@ -1016,7 +1016,7 @@ async function addPdfToDataSync(): Promise<void> {
         );
         const sub = await loadSchemaSubscription(activeMission.value);
         await sub.fetch();
-        status.value = `Added ${ICS201_MISSION_FILENAME} to ${activeMission.value.name}.`;
+        status.value = `Added ${ICS201_MISSION_FILENAME} to ${schemaMission(activeMission.value).name}.`;
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);
