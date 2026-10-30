@@ -238,28 +238,128 @@
             </template>
 
             <div>
-                <TablerInput
-                    v-model='timeMissing'
-                    label='Time Missing'
-                    type='datetime-local'
-                />
-                <TablerInput
-                    v-model='timeReportedMissing'
-                    label='Time Reported Missing'
-                    type='datetime-local'
-                />
-                <TablerInput
-                    v-model.number='travelSpeed'
-                    label='Travel Speed (mph)'
-                    type='number'
-                    placeholder='e.g. 2.5'
-                />
+                <p class='text-uppercase text-white-50 small mb-1'>
+                    Elapsed Time
+                </p>
+                <div
+                    class='btn-group btn-group-sm mb-2'
+                    role='group'
+                    aria-label='Elapsed time source'
+                >
+                    <button
+                        type='button'
+                        class='btn'
+                        :class='elapsedMode === "times" ? "btn-primary" : "btn-outline-secondary"'
+                        @click='elapsedMode = "times"'
+                    >
+                        From times
+                    </button>
+                    <button
+                        type='button'
+                        class='btn'
+                        :class='elapsedMode === "duration" ? "btn-primary" : "btn-outline-secondary"'
+                        @click='elapsedMode = "duration"'
+                    >
+                        Enter duration
+                    </button>
+                </div>
+                <template v-if='elapsedMode === "times"'>
+                    <TablerInput
+                        v-model='timeMissing'
+                        label='Time Missing'
+                        type='datetime-local'
+                    />
+                    <TablerInput
+                        v-model='timeReportedMissing'
+                        label='Time Reported Missing'
+                        type='datetime-local'
+                    />
+                </template>
+                <template v-else>
+                    <div class='d-flex gap-2'>
+                        <div class='flex-grow-1'>
+                            <label class='form-label mb-1'>Hours</label>
+                            <input
+                                v-model='durationHours'
+                                type='number'
+                                class='form-control form-control-sm'
+                                min='0'
+                                step='1'
+                                placeholder='0'
+                                aria-label='Elapsed hours'
+                            >
+                        </div>
+                        <div class='flex-grow-1'>
+                            <label class='form-label mb-1'>Minutes</label>
+                            <input
+                                v-model='durationMinutes'
+                                type='number'
+                                class='form-control form-control-sm'
+                                min='0'
+                                max='59'
+                                step='5'
+                                placeholder='0'
+                                aria-label='Elapsed minutes'
+                            >
+                        </div>
+                    </div>
+                    <div class='form-text'>
+                        Use when the reporting party doesn't know when the subject went missing.
+                    </div>
+                </template>
+
+                <p class='text-uppercase text-white-50 small mb-1 mt-3'>
+                    Flat-Ground Travel Speed
+                </p>
+                <div class='d-flex gap-2 align-items-center'>
+                    <input
+                        v-model='speedText'
+                        type='number'
+                        class='form-control form-control-sm'
+                        :placeholder='speedUnit === "kmh" ? "1.6" : "1.0"'
+                        step='0.1'
+                        min='0.1'
+                        aria-label='Travel speed'
+                    >
+                    <div
+                        class='btn-group btn-group-sm'
+                        role='group'
+                        aria-label='Speed unit'
+                    >
+                        <button
+                            v-for='u in SPEED_UNITS'
+                            :key='u'
+                            type='button'
+                            class='btn'
+                            :class='speedUnit === u ? "btn-primary" : "btn-outline-secondary"'
+                            @click='setSpeedUnit(u)'
+                        >
+                            {{ unitLabel(u) }}
+                        </button>
+                    </div>
+                </div>
+                <div class='form-text'>
+                    Assumed radial speed away from the IPP.
+                </div>
+                <div class='d-flex flex-wrap gap-2 mt-2'>
+                    <button
+                        v-for='p in SPEED_PRESETS'
+                        :key='p.label'
+                        type='button'
+                        class='btn btn-sm btn-outline-secondary speed-preset d-flex flex-column align-items-center'
+                        @click='applySpeedPreset(p.mph)'
+                    >
+                        <span class='fw-bold'>{{ p.mph.toFixed(1) }} mph</span>
+                        <span class='small text-muted fw-normal'>{{ p.label }}</span>
+                    </button>
+                </div>
+
                 <div
                     v-if='theoreticalMiles'
-                    class='form-text'
+                    class='form-text mt-2'
                 >
                     Radius: <strong>{{ theoreticalMiles.toFixed(2) }} mi</strong>
-                    ({{ elapsedHours.toFixed(1) }} h elapsed × {{ travelSpeedMph }} mph)
+                    ({{ elapsedHours.toFixed(1) }} h elapsed × {{ speedText }} {{ unitLabel(speedUnit) }})
                 </div>
                 <div
                     v-if='theoreticalBlockReason'
@@ -1033,6 +1133,7 @@ import { createRegistryStore } from '../../../lib/registryPersistence.ts';
 import { currentOpPeriod } from '../../../domain/registry.ts';
 import { publishIppToOp } from '../../../lib/opAssignmentPersistence.ts';
 import NavHelpButton from '../../NavHelpButton.vue';
+import { MPH_TO_KMH, SPEED_PRESETS, convertSpeedText, unitLabel, type SpeedUnit } from '../../../lib/wisarTravelTime.ts';
 
 const SEARCH_AREA_KEYWORD = 'search-area';
 const SEARCH_AREA_FOLDER = 'Search Area';
@@ -1228,12 +1329,33 @@ const validCustomRanges = computed(() =>
 // Theoretical
 const timeMissing = ref('');
 const timeReportedMissing = ref('');
-const travelSpeed = ref(0);
+/** 'times' = Time Reported Missing − Time Missing; 'duration' = hours/minutes typed in. */
+const elapsedMode = ref<'times' | 'duration'>('times');
+const durationHours = ref('');
+const durationMinutes = ref('');
+const SPEED_UNITS: SpeedUnit[] = ['mph', 'kmh'];
+const speedText = ref('');
+const speedUnit = ref<SpeedUnit>('mph');
 const travelSpeedMph = computed(() => {
-    const n = Number(travelSpeed.value);
-    return Number.isFinite(n) && n > 0 ? n : 0;
+    const n = Number(speedText.value);
+    if (!Number.isFinite(n) || n <= 0) return 0;
+    return speedUnit.value === 'kmh' ? n / MPH_TO_KMH : n;
 });
+function setSpeedUnit(next: SpeedUnit): void {
+    speedText.value = convertSpeedText(String(speedText.value ?? ''), speedUnit.value, next);
+    speedUnit.value = next;
+}
+function applySpeedPreset(mph: number): void {
+    speedUnit.value = 'mph';
+    speedText.value = mph.toFixed(1);
+}
 const elapsedHours = computed(() => {
+    if (elapsedMode.value === 'duration') {
+        const h = Number(durationHours.value || 0);
+        const m = Number(durationMinutes.value || 0);
+        if (!Number.isFinite(h) || !Number.isFinite(m) || h < 0 || m < 0) return 0;
+        return h + m / 60;
+    }
     if (!timeMissing.value || !timeReportedMissing.value) return 0;
     const reported = new Date(timeReportedMissing.value).getTime();
     const missing = new Date(timeMissing.value).getTime();
@@ -1790,7 +1912,7 @@ const theoreticalBlockReason = computed(() => {
     if (!ippCenter.value && stepDone.value.ipp) {
         return 'IPP is set but its coordinates are not on the map yet — re-set the IPP or Refresh map objects.';
     }
-    if (timeMissing.value && timeReportedMissing.value && elapsedHours.value <= 0) {
+    if (elapsedMode.value === 'times' && timeMissing.value && timeReportedMissing.value && elapsedHours.value <= 0) {
         return 'Time Missing must be before Time Reported Missing.';
     }
     return '';
@@ -2254,6 +2376,11 @@ async function removeArea(area: SentArea): Promise<void> {
 </script>
 
 <style scoped>
+.speed-preset {
+    line-height: 1.2;
+    min-width: 5.5rem;
+}
+
 .rotate-180 {
     transform: rotate(-90deg);
 }
