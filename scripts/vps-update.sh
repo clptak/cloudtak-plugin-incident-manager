@@ -14,7 +14,7 @@
 #   4. With --rebuild: runs ~/tak-stack/cloudtak-update.sh rebuild + restart and
 #      checks the running image has config.local.ts.
 #
-# Options:  --branch <name>   branch to pull (default: ccso)
+# Options:  --branch <name>   branch to pull (default: multi-op)
 #           --rebuild         rebuild and restart CloudTAK after updating
 #           --init            create config.local.ts from the example if none exists
 #           -y | --yes        skip confirmations (also passed to cloudtak-update.sh)
@@ -26,7 +26,7 @@ set -Eeuo pipefail
 # Everything runs inside main(), so bash has read the whole file before
 # `git pull` can replace it.
 main() {
-    local branch="ccso" rebuild=0 init=0
+    local branch="multi-op" rebuild=0 init=0
     ASSUME_YES=0
     while [[ $# -gt 0 ]]; do
         case "$1" in
