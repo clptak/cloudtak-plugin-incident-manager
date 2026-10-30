@@ -180,12 +180,11 @@
                 title='No Active Mission'
                 description='Select one in Create | Open first.'
             />
-            <div
+            <DataSyncDestination
                 v-else
-                class='form-text'
-            >
-                Active DataSync: <strong>{{ activeMission.name }}</strong>
-            </div>
+                :mission='activeMission'
+                target='mgmt'
+            />
             <TablerInlineAlert
                 v-if='status'
                 class='mt-2'
@@ -325,6 +324,7 @@
 </template>
 
 <script setup lang='ts'>
+import DataSyncDestination from '../../DataSyncDestination.vue';
 import { reactive, ref, computed, onMounted, watch } from 'vue';
 import { IconChevronDown } from '@tabler/icons-vue';
 import { TablerBorder, TablerInput, TablerEnum, TablerInlineAlert } from '@tak-ps/vue-tabler';
@@ -728,7 +728,7 @@ async function onSave(): Promise<void> {
             scenarios,
             contentHash.value,
         );
-        status.value = `Saved ${scenarios.length} scenario${scenarios.length === 1 ? '' : 's'} to mission_schema.json on ${activeMission.value.name}.`;
+        status.value = `Saved ${scenarios.length} scenario${scenarios.length === 1 ? '' : 's'} to mission_schema.json on ${schemaMission(activeMission.value).name}.`;
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);
@@ -775,7 +775,7 @@ async function send(): Promise<void> {
         const parts: string[] = [];
         if (created) parts.push(`${created} new`);
         if (updated) parts.push(`${updated} updated`);
-        status.value = `Sent ${parts.join(', ') || '0'} to ${activeMission.value.name}`
+        status.value = `Sent ${parts.join(', ') || '0'} to ${schemaMission(activeMission.value).name}`
             + (failed ? `, ${failed} failed.` : '.');
         // Recall from the mission so saved letters move into "Already sent".
         if (didWrite) await loadSent();
@@ -832,7 +832,7 @@ async function addPdfToDataSync(): Promise<void> {
         );
         const sub = await loadSchemaSubscription(activeMission.value);
         await sub.fetch();
-        status.value = `Added ${SCENARIOS_RECORD_SHEET_MISSION_FILENAME} to ${activeMission.value.name}.`;
+        status.value = `Added ${SCENARIOS_RECORD_SHEET_MISSION_FILENAME} to ${schemaMission(activeMission.value).name}.`;
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);

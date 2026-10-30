@@ -240,12 +240,11 @@
             title='No active mission'
             description='Select one in Create | Open first.'
         />
-        <div
+        <DataSyncDestination
             v-else
-            class='form-text'
-        >
-            Active DataSync: <strong>{{ activeMission.name }}</strong>
-        </div>
+            :mission='activeMission'
+            target='field'
+        />
         <TablerInlineAlert
             v-if='status'
             class='mt-2'
@@ -340,6 +339,7 @@
 </template>
 
 <script setup lang='ts'>
+import DataSyncDestination from '../../DataSyncDestination.vue';
 import { ref, reactive, onMounted, watch } from 'vue';
 import { IconChevronDown } from '@tabler/icons-vue';
 import { TablerBorder, TablerInput, TablerInlineAlert } from '@tak-ps/vue-tabler';

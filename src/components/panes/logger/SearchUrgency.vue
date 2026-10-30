@@ -184,12 +184,11 @@
                 title='No Active Mission'
                 description='Select one in Create | Open first.'
             />
-            <div
+            <DataSyncDestination
                 v-else
-                class='form-text'
-            >
-                Active DataSync: <strong>{{ activeMission.name }}</strong>
-            </div>
+                :mission='activeMission'
+                target='mgmt'
+            />
             <TablerInlineAlert
                 v-if='status'
                 class='mt-2'
@@ -328,6 +327,7 @@
 </template>
 
 <script setup lang='ts'>
+import DataSyncDestination from '../../DataSyncDestination.vue';
 import { reactive, ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { IconInfoCircle, IconChevronDown } from '@tabler/icons-vue';
 import { TablerBorder, TablerInput, TablerInlineAlert } from '@tak-ps/vue-tabler';
@@ -600,7 +600,7 @@ async function onSave(): Promise<void> {
             rating,
             contentHash.value,
         );
-        status.value = `Saved urgency rating (${rating.level}) to mission_schema.json on ${activeMission.value.name}.`;
+        status.value = `Saved urgency rating (${rating.level}) to mission_schema.json on ${schemaMission(activeMission.value).name}.`;
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);
@@ -625,7 +625,7 @@ async function send(): Promise<void> {
             content,
             keywords: ['search-urgency', `urgency:${level.value.label}`, `total:${total.value}`],
         });
-        status.value = `Sent urgency rating (${level.value.label}) to ${activeMission.value.name}.`;
+        status.value = `Sent urgency rating (${level.value.label}) to ${schemaMission(activeMission.value).name}.`;
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);
@@ -679,7 +679,7 @@ async function addPdfToDataSync(): Promise<void> {
         );
         const sub = await loadSchemaSubscription(activeMission.value);
         await sub.fetch();
-        status.value = `Added ${URGENCY_RATING_CHART_MISSION_FILENAME} to ${activeMission.value.name}.`;
+        status.value = `Added ${URGENCY_RATING_CHART_MISSION_FILENAME} to ${schemaMission(activeMission.value).name}.`;
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);
