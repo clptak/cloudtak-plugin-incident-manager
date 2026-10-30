@@ -343,7 +343,7 @@
 import { ref, reactive, onMounted, watch } from 'vue';
 import { IconChevronDown } from '@tabler/icons-vue';
 import { TablerBorder, TablerInput, TablerInlineAlert } from '@tak-ps/vue-tabler';
-import { loadIncidentSubscription } from '../../../lib/incidentSubscription.ts';
+import { loadIncidentSubscription, missionAuthToken } from '../../../lib/incidentSubscription.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import {
     blankIrBriefingForm,
@@ -453,7 +453,7 @@ async function loadAll(preserveBriefingFields = false): Promise<void> {
 
         const loaded = await loadIrBriefingFromMission(
             activeMission.value.guid,
-            activeMission.value.token,
+            missionAuthToken(activeMission.value),
             activeMission.value.name,
             activeMission.value,
         );
@@ -579,7 +579,7 @@ async function addPdfToDataSync(): Promise<void> {
             activeMission.value.guid,
             SAR_BRIEFING_MISSION_FILENAME,
             bytes,
-            { missionToken: activeMission.value.token },
+            { missionToken: missionAuthToken(activeMission.value) },
         );
         const sub = await loadIncidentSubscription(activeMission.value);
         await sub.fetch();
@@ -603,7 +603,7 @@ async function addPdfNewToDataSync(): Promise<void> {
             activeMission.value.guid,
             SAR_BRIEFING_MODERN_MISSION_FILENAME,
             bytes,
-            { missionToken: activeMission.value.token },
+            { missionToken: missionAuthToken(activeMission.value) },
         );
         const sub = await loadIncidentSubscription(activeMission.value);
         await sub.fetch();
