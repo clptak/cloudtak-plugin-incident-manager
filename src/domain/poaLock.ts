@@ -24,7 +24,6 @@ export interface PoaLock {
     /** POA percent per segment uid, normalized with ROW. */
     poa: Record<string, number>;
     rowPoa: number;
-    cumulativePos: number;
     /** Segment names at lock time, so the lock still reads if segments are renamed. */
     labels: Record<string, string>;
     basis: {
@@ -122,7 +121,6 @@ export function buildPoaLock(
         lockedAt: (opts.now?.() ?? new Date()).toISOString(),
         poa: { ...history.final.poa },
         rowPoa: history.final.rowPoa,
-        cumulativePos: history.final.cumulativePos,
         labels,
         basis: basisFor(inputs, throughOp),
     };
@@ -183,7 +181,6 @@ export function poaLockFromValue(value: unknown): PoaLock | null {
         lockedAt: v.lockedAt,
         poa: v.poa as Record<string, number>,
         rowPoa: Number(v.rowPoa) || 0,
-        cumulativePos: Number(v.cumulativePos) || 0,
         labels: record(v.labels),
         basis: {
             consensus: typeof basis.consensus === 'string' ? basis.consensus : '',

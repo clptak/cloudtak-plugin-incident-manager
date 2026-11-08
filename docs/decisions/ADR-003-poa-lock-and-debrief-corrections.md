@@ -10,8 +10,8 @@ Accepted (implemented)
 Search incidents shift each segment's probability of area (POA) after every
 debrief: POA × (1 − POD/100), renormalized with the rest of the world (ROW).
 Debriefs on the same segment in the same OP combine as independent searches
-(cumulative POD = 1 − Π(1 − POD·coverage)), and cumulative probability of
-success compounds across OPs.
+(cumulative POD = 1 − Π(1 − POD·coverage)), and each segment's CPOD
+accumulates across OPs (Find'Em ch. 8.5–8.6 / Win CASIE III).
 
 Two problems came up while testing concurrent edits:
 

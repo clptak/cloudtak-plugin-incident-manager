@@ -6,9 +6,9 @@
  *
  * Sequential math (per operational period k):
  *   podEff(k,i)  = 100·(1 − Π miss) over OP-k records for segment i
- *   OPOS(k)      = Σᵢ POA(k−1,i) · podEff(k,i)/100          (period POS)
  *   POA(k,i)     = renormalized POA(k−1,i)·(1 − podEff(k,i)/100), with ROW
- *   cumPOS(k)    = 100·(1 − Π_{j≤k} (1 − OPOS(j)/100))
+ *   CPOD(k,i)    = 100·(1 − Π miss) over ALL records for segment i through OP k
+ * These match Find'Em ch. 8.5–8.6 / Win CASIE III (POA "shift" and CPOD).
  * The renormalized sequential replay composes exactly to the single-shot
  * `computeRollup` (verified by unit test), so no intermediate POA snapshot is
  * ever authoritative data.
@@ -63,10 +63,12 @@ export interface OpHistoryStep {
     rowPoa: number;
     /** Effective POD percent applied to each segment during this OP. */
     podEff: Record<string, number>;
-    /** This period's probability of success (percent). 0 for step 0. */
-    opos: number;
-    /** Cumulative POS percent through this OP. */
-    cumulativePos: number;
+    /**
+     * Cumulative POD percent per segment uid through this OP (Find'Em 8.5 /
+     * Win CASIE III Incident Status): 100·(1 − Π(1 − PODᵢ)) over every
+     * search of the segment so far, across all OPs. 0 = never searched.
+     */
+    cpod: Record<string, number>;
 }
 
 export interface OpHistory {
@@ -134,8 +136,7 @@ export function computeOpHistory(
         poa: { ...poa },
         rowPoa: row,
         podEff: {},
-        opos: 0,
-        cumulativePos: 0,
+        cpod: Object.fromEntries(uids.map((uid) => [uid, 0])),
     };
     const steps: OpHistoryStep[] = [step0];
 
@@ -145,21 +146,19 @@ export function computeOpHistory(
         ...clues.map((c) => c.opNumber).filter((n) => Number.isInteger(n) && n > 0),
     ])].sort((a, b) => a - b);
 
-    let missProduct = 1; // Π (1 − OPOS/100)
+    // Per-segment running miss probability, Π (1 − POD/100) across all OPs.
+    const segMiss: Record<string, number> = Object.fromEntries(uids.map((uid) => [uid, 1]));
     for (const opNumber of opNumbers) {
         const opRecords = records.filter((r) => r.opNumber === opNumber && known.has(r.segmentUid));
 
         const podEff: Record<string, number> = {};
         for (const uid of uids) {
             const segRecords = opRecords.filter((r) => r.segmentUid === uid);
-            if (segRecords.length) podEff[uid] = cumulativePod(segRecords);
+            if (segRecords.length) {
+                podEff[uid] = cumulativePod(segRecords);
+                segMiss[uid] *= 1 - podEff[uid] / 100;
+            }
         }
-
-        // Period POS on the entering POA
-        const opos = uids.reduce(
-            (acc, uid) => acc + (poa[uid] ?? 0) * ((podEff[uid] ?? 0) / 100),
-            0,
-        );
 
         // Shift + renormalize (ROW is never searched)
         const weights: Record<string, number> = {};
@@ -174,8 +173,6 @@ export function computeOpHistory(
             next[uid] = total > 0 ? round2((100 * weights[uid]) / total) : 0;
         }
         const nextRow = total > 0 ? round2((100 * row) / total) : 0;
-
-        missProduct *= 1 - opos / 100;
 
         poa = next;
         row = nextRow;
@@ -192,8 +189,7 @@ export function computeOpHistory(
             poa: { ...poa },
             rowPoa: row,
             podEff: Object.fromEntries(Object.entries(podEff).map(([k, v]) => [k, round2(v)])),
-            opos: round2(opos),
-            cumulativePos: round2(100 * (1 - missProduct)),
+            cpod: Object.fromEntries(uids.map((uid) => [uid, round2(100 * (1 - segMiss[uid]))])),
         });
     }
 

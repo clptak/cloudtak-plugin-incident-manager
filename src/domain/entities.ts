@@ -192,8 +192,6 @@ export interface SegmentRollup {
     initialPoa: number;
     /** Posterior POA percent after shifting + renormalization. */
     adjustedPoa: number;
-    /** Probability of success percent: initialPoa · cumulativePod / 100. */
-    pos: number;
 }
 
 export interface RollupResult {
@@ -202,8 +200,6 @@ export interface RollupResult {
         initialPoa: number;
         adjustedPoa: number;
     };
-    /** Overall cumulative POS percent: Σ segment POS. */
-    cumulativePos: number;
     /** ISO timestamp of computation. */
     computedAt: string;
 }
