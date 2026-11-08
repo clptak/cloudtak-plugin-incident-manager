@@ -14,7 +14,8 @@ IRIC-compressed.pdf
 incident_workflow.md
 takserver-api.json
 scripts/phase0-spike.mjs
-src/components/panes/logger/fuse_hidden*
+.fuse_hidden*
+.cursor/
 
 # Per-deployment settings compiled into the web bundle. Copy from the examples.
 config.local.ts
