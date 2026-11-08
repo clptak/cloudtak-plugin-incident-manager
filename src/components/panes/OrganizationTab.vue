@@ -180,7 +180,7 @@
                                 <TablerEnum
                                     class='mb-1'
                                     :model-value='memberLabelForSlot(icsSlots[pos.key])'
-                                    label='D4H Member'
+                                    :label='memberFieldLabel'
                                     :options='memberOptions'
                                     @update:model-value='onMemberLabelChangeForSlot(icsSlots[pos.key], $event)'
                                 />
@@ -244,7 +244,7 @@
                                 <TablerEnum
                                     class='mb-1'
                                     :model-value='memberLabelForSlot(rescueSlots[pos.key])'
-                                    label='D4H Member'
+                                    :label='memberFieldLabel'
                                     :options='memberOptions'
                                     @update:model-value='onMemberLabelChangeForSlot(rescueSlots[pos.key], $event)'
                                 />
@@ -520,7 +520,8 @@ const loadingOrgChart = ref(false);
 const savingOrgChart = ref(false);
 const persistStatus = ref('');
 
-const memberPlaceholder = computed(() => (useD4hPersonnel.value ? '— D4H —' : '— Select —'));
+const memberPlaceholder = computed(() => (useD4hPersonnel.value ? '— D4H —' : '— Roster —'));
+const memberFieldLabel = computed(() => (useD4hPersonnel.value ? 'D4H Member' : 'Member'));
 
 const emptyPersonnelTitle = computed(() =>
     useD4hPersonnel.value ? 'No D4H Roster' : 'No Personnel Roster',
