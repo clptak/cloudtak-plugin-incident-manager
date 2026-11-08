@@ -159,7 +159,7 @@ test('planOperationalPeriod: refuses without management channels, without a fiel
     await assert.rejects(planOperationalPeriod(deps, { incidentName: 'X', managementChannels: MGMT, channels: MGMT }), /field channel/);
     await planOperationalPeriod(deps, { incidentName: 'X', managementChannels: MGMT, channels: FIELD_AND_MGMT });
     await assert.rejects(planOperationalPeriod(deps, { incidentName: 'X', managementChannels: MGMT, channels: FIELD_AND_MGMT }), /already being planned/);
-    await assert.rejects(openOperationalPeriod(deps, { incidentName: 'X', channels: FIELD_AND_MGMT }), /activate it instead/);
+    await assert.rejects(openOperationalPeriod(deps, { incidentName: 'X', channels: FIELD_AND_MGMT }), /start it instead/);
 });
 
 test('activateOperationalPeriod: applies the planned channels; the previous OP stays open', async () => {

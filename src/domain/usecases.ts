@@ -76,7 +76,7 @@ export async function openOperationalPeriod(
     const entries = await deps.registry.load();
     const planning = planningOpPeriod(entries);
     if (planning) {
-        throw new Error(`OP${planning.opNumber} is being planned - activate it instead of opening another OP.`);
+        throw new Error(`OP${planning.opNumber} is being planned - start it instead of opening another OP.`);
     }
     const opNumber = nextOpNumber(entries);
 
@@ -134,7 +134,7 @@ export async function planOperationalPeriod(
     }
     const planned = [...new Set([...input.managementChannels, ...input.channels])];
     if (sameChannels(planned, input.managementChannels)) {
-        throw new Error('Pick at least one field channel for the OP to open to when it is activated.');
+        throw new Error('Pick at least one field channel for the OP to open to when it is started.');
     }
 
     const entries = await deps.registry.load();

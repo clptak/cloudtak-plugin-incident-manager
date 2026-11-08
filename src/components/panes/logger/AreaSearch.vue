@@ -75,7 +75,7 @@
                             >working</span>
                             <span class='text-muted small ms-auto'>
                                 {{ op.openedAt ? shortDt(op.openedAt) : '' }}
-                                {{ op.activatedAt ? `· active ${shortDt(op.activatedAt)}` : '' }}
+                                {{ op.activatedAt ? `· started ${shortDt(op.activatedAt)}` : '' }}
                                 {{ op.closedAt ? `→ ${shortDt(op.closedAt)}` : '' }}
                             </span>
                             <button
@@ -109,7 +109,7 @@
                                 :disabled='busy'
                                 @click='confirmOp = { kind: "activate", guid: op.guid }'
                             >
-                                Activate
+                                Start
                             </button>
                             <button
                                 v-if='op.status !== "closed"'
@@ -128,7 +128,7 @@
                         >
                             <template v-if='confirmOp.kind === "activate"'>
                                 <span class='text-success'>
-                                    Open OP{{ op.opNumber }} to the field? Channels become
+                                    Start OP{{ op.opNumber }}? Field channels become
                                     <strong>{{ (op.plannedChannels || op.channels).join(', ') }}</strong>.
                                     <span v-if='activeOps.length'>
                                         OP{{ activeOps.map((o) => o.opNumber).join(', OP') }} stays open until someone closes it.
@@ -139,7 +139,7 @@
                                     :disabled='busy'
                                     @click='onActivateOp(op)'
                                 >
-                                    {{ busy ? 'Working…' : `Activate OP${op.opNumber}` }}
+                                    {{ busy ? 'Working…' : `Start OP${op.opNumber}` }}
                                 </button>
                             </template>
                             <template v-else>
@@ -232,13 +232,13 @@
                                 :disabled='busy || !opChannels.length'
                                 @click='onOpenOp'
                             >
-                                {{ busy ? 'Working…' : `Open OP${nextOp} now` }}
+                                {{ busy ? 'Working…' : `Start OP${nextOp} now` }}
                             </button>
                         </div>
                         <div class='form-text'>
                             <strong>Plan</strong> creates OP{{ nextOp }} on the management channels only, so the
                             IAP, resources and assignments can be prepared before the field sees it;
-                            <strong>Activate</strong> it when it starts. <strong>Open now</strong> gives the
+                            <strong>Start</strong> it when the period begins. <strong>Start now</strong> gives the
                             field access immediately.
                         </div>
                     </div>
@@ -1591,7 +1591,7 @@ async function onPlanOp(): Promise<void> {
         workingOpGuid.value = entry.guid;
         const eventNote = await opEventNote(mission, entry, { attach: true });
         notice.value = `Planning ${entry.name} on ${entry.channels.join(', ')} only. `
-            + `Field users will see it when you activate it.${eventNote}`;
+            + `Field users will see it when you start it.${eventNote}`;
         await refresh();
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
@@ -1600,7 +1600,7 @@ async function onPlanOp(): Promise<void> {
     }
 }
 
-/** Open a planning OP to the field. The current OP stays open. */
+/** Start a planning OP: open it to the field. The current OP stays open. */
 async function onActivateOp(op: OpPeriodRegistryEntry): Promise<void> {
     const mission = activeMission.value;
     if (!mission?.mgmt) return;
@@ -1618,7 +1618,7 @@ async function onActivateOp(op: OpPeriodRegistryEntry): Promise<void> {
         const eventNote = await opEventNote(mission, entry, { attach: true, start: true });
         confirmOp.value = null;
         workingOpGuid.value = entry.guid;
-        notice.value = `Activated ${entry.name}: field channels ${entry.channels.join(', ')}.${ippNote}${eventNote}`;
+        notice.value = `Started ${entry.name}: field channels ${entry.channels.join(', ')}.${ippNote}${eventNote}`;
         await refresh();
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
@@ -1655,7 +1655,7 @@ async function onOpenOp(): Promise<void> {
             ippNote = ` IPP publish failed: ${ippErr instanceof Error ? ippErr.message : String(ippErr)}`;
         }
         const eventNote = await opEventNote(mission, entry, { attach: true, start: true });
-        notice.value = `Opened ${entry.name}.${ippNote}${eventNote}`;
+        notice.value = `Started ${entry.name}.${ippNote}${eventNote}`;
         await refresh();
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
