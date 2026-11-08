@@ -187,7 +187,7 @@ function saveSectionExpandedToSession(state: Record<string, boolean>): void {
 const hTabs = [
     { key: 'main', label: 'Main' },
     { key: 'dashboard', label: 'Dashboard' },
-    { key: 'task', label: 'Tasks' },
+    { key: 'task', label: 'Checklists' },
     { key: 'clues', label: 'Clues' },
     { key: 'casie', label: 'CASIE' },
     { key: 'organization', label: 'Organization' },
