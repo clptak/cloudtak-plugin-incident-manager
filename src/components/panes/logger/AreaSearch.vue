@@ -640,7 +640,7 @@
             >
                 <template #label>
                     <p class='text-uppercase text-white-50 small mb-0'>
-                        {{ isSearchIncident ? 'Add Complete Search Assignment' : 'Add Completed Assignment' }}
+                        {{ isSearchIncident ? 'Add Completed Search Assignment' : 'Add Completed Assignment' }}
                     </p>
                 </template>
 
