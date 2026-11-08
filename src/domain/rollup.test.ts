@@ -47,7 +47,7 @@ const ROW = 20;
 
 test('computeRollup: unsearched incident leaves POA unchanged', () => {
     const result = computeRollup(SEGMENTS, ROW, []);
-    assert.equal(result.cumulativePos, 0);
+    assert.deepEqual(result.segments.map((s) => s.cumulativePod), [0, 0, 0]);
     assert.deepEqual(result.segments.map((s) => s.adjustedPoa), [40, 30, 10]);
     assert.equal(result.row.adjustedPoa, 20);
 });
@@ -61,8 +61,6 @@ test('computeRollup: searching one segment shifts POA to the others', () => {
     assert.equal(b.adjustedPoa, 37.5);    // 30/80
     assert.equal(c.adjustedPoa, 12.5);    // 10/80
     assert.equal(result.row.adjustedPoa, 25);
-    assert.equal(a.pos, 20);              // 40 · 0.5
-    assert.equal(result.cumulativePos, 20);
     // POA still sums to 100
     const total = result.segments.reduce((acc, s) => acc + s.adjustedPoa, 0) + result.row.adjustedPoa;
     assert.ok(Math.abs(total - 100) < 0.05);
@@ -70,7 +68,7 @@ test('computeRollup: searching one segment shifts POA to the others', () => {
 
 test('computeRollup: ignores debriefs for unknown segments', () => {
     const result = computeRollup(SEGMENTS, ROW, [record({ segmentUid: 'ghost', pod: 90 })]);
-    assert.equal(result.cumulativePos, 0);
+    assert.deepEqual(result.segments.map((s) => s.cumulativePod), [0, 0, 0]);
     assert.deepEqual(result.segments.map((s) => s.searches), [0, 0, 0]);
 });
 
@@ -106,7 +104,8 @@ test('splitDebriefRecords + splitSegment: replay is preserved across a split', (
     const combined = after.final.poa.a1 + after.final.poa.a2;
     assert.ok(Math.abs(combined - before.final.poa.a) < 0.05, `${combined} vs ${before.final.poa.a}`);
     assert.ok(Math.abs(after.final.poa.b - before.final.poa.b) < 0.05);
-    assert.ok(Math.abs(after.final.cumulativePos - before.final.cumulativePos) < 0.05);
+    assert.equal(after.final.cpod.a1, before.final.cpod.a);
+    assert.equal(after.final.cpod.a2, before.final.cpod.a);
 });
 
 test('fractionsFromAreas: normalizes and validates', () => {

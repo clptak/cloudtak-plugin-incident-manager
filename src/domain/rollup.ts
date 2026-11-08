@@ -8,7 +8,6 @@
  * - Shifted (posterior) POA, Bayesian update, renormalized over segments + ROW:
  *     wᵢ = POAᵢ · (1 − PODcumᵢ/100);  wROW = POAROW
  *     POAᵢ' = 100 · wᵢ / Σw
- * - POS per segment: POAᵢ · PODcumᵢ / 100; cumulative POS = Σ.
  */
 
 import type {
@@ -83,7 +82,6 @@ export function computeRollup(
             cumulativePod: cumPod,
             initialPoa,
             weight: initialPoa * (1 - cumPod / 100),
-            pos: initialPoa * (cumPod / 100),
         };
     });
 
@@ -99,7 +97,6 @@ export function computeRollup(
         cumulativePod: round2(s.cumulativePod),
         initialPoa: round2(s.initialPoa),
         adjustedPoa: round2(normalize(s.weight)),
-        pos: round2(s.pos),
     }));
 
     return {
@@ -108,7 +105,6 @@ export function computeRollup(
             initialPoa: round2(rowInitial),
             adjustedPoa: round2(normalize(rowInitial)),
         },
-        cumulativePos: round2(partial.reduce((acc, s) => acc + s.pos, 0)),
         computedAt: now().toISOString(),
     };
 }

@@ -126,6 +126,10 @@
                                         v-if='step.podEff[seg.uid] !== undefined'
                                         class='text-warning'
                                     ><br>POD {{ fmt(step.podEff[seg.uid]) }}</span>
+                                    <span
+                                        v-if='step.cpod[seg.uid]'
+                                        class='text-info'
+                                    ><br>CPOD {{ fmt(step.cpod[seg.uid]) }}</span>
                                 </td>
                             </tr>
                             <tr class='text-muted'>
@@ -138,32 +142,13 @@
                                     {{ fmt(step.rowPoa) }}
                                 </td>
                             </tr>
-                            <tr class='border-top'>
-                                <td><strong>OPOS</strong></td>
-                                <td
-                                    v-for='step in history.steps'
-                                    :key='step.opNumber'
-                                    class='text-end'
-                                >
-                                    {{ step.opNumber === 0 ? '—' : fmt(step.opos) }}
-                                </td>
-                            </tr>
-                            <tr>
-                                <td><strong>Cumulative POS</strong></td>
-                                <td
-                                    v-for='step in history.steps'
-                                    :key='step.opNumber'
-                                    class='text-end'
-                                >
-                                    <strong>{{ fmt(step.cumulativePos) }}</strong>
-                                </td>
-                            </tr>
                         </tbody>
                     </table>
                 </div>
                 <p class='form-text mb-0'>
                     POA shown after each OP (renormalized incl. R.O.W.); POD is that OP's
-                    effective detection for the segment. Recomputed from the Initial
+                    effective detection for the segment; CPOD is the segment's cumulative
+                    POD across every search so far (1 − Π(1 − POD)). Recomputed from the Initial
                     Consensus + debrief records — nothing here is hand-entered.
                 </p>
             </TablerBorder>
@@ -761,11 +746,6 @@
                             (forked after {{ draft.throughOp === 0 ? 'Initial Consensus' : `OP${draft.throughOp}` }})
                         </span>
                     </p>
-                    <div class='small'>
-                        Cumulative POS:
-                        <strong>{{ fmt(scenarioHistory.final.cumulativePos) }}</strong>
-                        <span class='text-muted'>(real: {{ fmt(history.final.cumulativePos) }})</span>
-                    </div>
                     <div class='table-responsive mt-1'>
                         <table class='table table-sm small mb-0'>
                             <thead>
