@@ -227,19 +227,11 @@
                             >
                                 {{ busy ? 'Working…' : `Plan OP${nextOp}` }}
                             </button>
-                            <button
-                                class='btn btn-outline-primary'
-                                :disabled='busy || !opChannels.length'
-                                @click='onOpenOp'
-                            >
-                                {{ busy ? 'Working…' : `Start OP${nextOp} now` }}
-                            </button>
                         </div>
                         <div class='form-text'>
                             <strong>Plan</strong> creates OP{{ nextOp }} on the management channels only, so the
                             IAP, resources and assignments can be prepared before the field sees it;
-                            <strong>Start</strong> it when the period begins. <strong>Start now</strong> gives the
-                            field access immediately.
+                            <strong>Start</strong> it when the period begins.
                         </div>
                     </div>
                     <div
@@ -1201,7 +1193,6 @@ import {
     deleteDebrief,
     detachTrackLog,
     findSameResourceDebrief,
-    openOperationalPeriod,
     planOperationalPeriod,
     publishAssignments,
     recordDebrief,
@@ -1608,45 +1599,8 @@ async function onActivateOp(op: OpPeriodRegistryEntry): Promise<void> {
     error.value = ''; notice.value = '';
     try {
         const entry = await activateOperationalPeriod({ registry: createRegistryStore(mission), gateway }, op);
-        let ippNote = '';
-        try {
-            const ippUid = await publishIppToOp(mission, entry);
-            ippNote = ippUid ? ' IPP published.' : '';
-        } catch (ippErr) {
-            ippNote = ` IPP publish failed: ${ippErr instanceof Error ? ippErr.message : String(ippErr)}`;
-        }
-        const eventNote = await opEventNote(mission, entry, { attach: true, start: true });
-        confirmOp.value = null;
-        workingOpGuid.value = entry.guid;
-        notice.value = `Started ${entry.name}: field channels ${entry.channels.join(', ')}.${ippNote}${eventNote}`;
-        await refresh();
-    } catch (err) {
-        error.value = err instanceof Error ? err.message : String(err);
-    } finally {
-        busy.value = false;
-    }
-}
-
-async function onOpenOp(): Promise<void> {
-    const mission = activeMission.value;
-    if (!mission?.mgmt) return;
-    busy.value = true;
-    error.value = ''; notice.value = '';
-    try {
-        if (!missionTemplates.value.length) await loadMissionTemplates();
-        const keywords = opCreateKeywords();
-        const entry = await openOperationalPeriod(
-            { registry: createRegistryStore(mission), gateway },
-            {
-                incidentName: mission.name,
-                channels: opChannels.value,
-                keywords: keywords.length ? keywords : undefined,
-            },
-        );
-        await ensureOpOverlay(entry);
-        // The new OP becomes the working mission: clues/logs land there by default.
+        // The started OP becomes the working mission: new markers, clues and logs land there.
         await makeMapActive(entry.guid, entry.name);
-        // Every OP carries the incident IPP (idempotent per-OP uid).
         let ippNote = '';
         try {
             const ippUid = await publishIppToOp(mission, entry);
@@ -1655,7 +1609,9 @@ async function onOpenOp(): Promise<void> {
             ippNote = ` IPP publish failed: ${ippErr instanceof Error ? ippErr.message : String(ippErr)}`;
         }
         const eventNote = await opEventNote(mission, entry, { attach: true, start: true });
-        notice.value = `Started ${entry.name}.${ippNote}${eventNote}`;
+        confirmOp.value = null;
+        workingOpGuid.value = entry.guid;
+        notice.value = `Started ${entry.name}: field channels ${entry.channels.join(', ')}.${ippNote}${eventNote}`;
         await refresh();
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);

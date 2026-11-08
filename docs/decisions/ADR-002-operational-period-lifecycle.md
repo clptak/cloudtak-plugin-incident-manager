@@ -24,12 +24,16 @@ unchanged.
 - **Plan:** "Plan OP*n*" creates the OP DataSync on the incident's management
   channels only (status `planning`) and stores the field + management
   channels for later (`plannedChannels`). Only one OP can be in planning.
-- **Activate:** applies the planned channels (status `open`) and publishes the
-  IPP. The previous OP is left open.
+- **Activate** (labelled **Start OP*n*** in the UI since 2026-11-08): applies
+  the planned channels (status `open`), publishes the IPP and makes the
+  started OP the active map mission. The previous OP is left open.
 - **Close** is always a separate, manual action with an inline confirmation.
   It removes field channels. It is never a side effect of activating the next
   OP.
-- **Open now** remains available for opening an OP to the field immediately.
+- **Plan → Start is the only path.** The old "Open now" button, which created
+  an OP already open to the field, was removed on 2026-11-08 (issue #7): it
+  was the behaviour rejected below. In a hurry, Plan and then Start right
+  away. `openOperationalPeriod` remains in `usecases.ts` but has no UI caller.
 - Clues, field logs and the IPP go to the field's current OP
   (`currentOpPeriod`), which never returns a planning OP. "Work on" chooses
   which OP the assignments, roster and IPP controls apply to.
