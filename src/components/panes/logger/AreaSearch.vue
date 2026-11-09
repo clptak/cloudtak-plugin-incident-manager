@@ -446,7 +446,7 @@
                     <span>
                         Publishing copies each {{ isSearchIncident ? 'segment polygon' : 'feature' }}
                         into {{ currentOp.name }} so field personnel receive it on their
-                        channel, and adds it to the running assignment list (the basis
+                        channel, and adds it to the Assignment Status List (the basis
                         for this OP's IAP).
                     </span>
                     <button
@@ -602,46 +602,306 @@
                     </div>
                 </template>
 
-                <div
-                    v-if='assignments.length'
-                    class='mt-3'
-                >
-                    <p class='text-uppercase text-white-50 small mb-1'>
-                        Running Assignment List ({{ assignments.length }})
+            </TablerBorder>
+
+            <!-- ── Assignment Status List (#23) ───────────────────────── -->
+            <TablerBorder
+                v-if='statusRows.length'
+                class='cloudtak-accent text-white mb-3'
+                :fill-height='false'
+                :shadow='false'
+                gap='sm'
+            >
+                <template #label>
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Assignment Status List ({{ statusRows.length }})
                     </p>
-                    <div
-                        v-for='(a, i) in assignments'
-                        :key='a.id || i'
-                        class='small border-bottom py-1 d-flex align-items-center gap-2'
-                    >
+                </template>
+
+                <div
+                    v-for='row in statusRows'
+                    :key='row.key'
+                    class='border-bottom py-1'
+                >
+                    <div class='small d-flex flex-wrap align-items-center gap-2'>
                         <span>
-                            OP{{ a.opNumber }} · {{ a.label }}
+                            OP{{ row.opNumber }} · {{ row.label }}
                             <span
-                                v-if='a.team'
+                                v-if='row.team'
                                 class='text-muted'
-                            > · {{ a.team }}</span>
+                            > · {{ row.team }}</span>
                             <span
-                                v-if='a.notes'
+                                v-if='row.assignment?.notes'
                                 class='text-muted'
-                            > · {{ a.notes }}</span>
+                            > · {{ row.assignment.notes }}</span>
+                            <span
+                                v-if='!row.assignment'
+                                class='text-muted fst-italic'
+                            > · not on an assignment</span>
                         </span>
-                        <span
-                            v-if='assignmentDebriefs(a).length'
-                            class='badge bg-success-lt text-success ms-auto'
-                            :title='`${assignmentDebriefs(a).length} debrief${assignmentDebriefs(a).length === 1 ? "" : "s"} recorded for this assignment`'
-                        >{{ debriefSummary(a) }}</span>
+                        <div class='ms-auto d-flex flex-column align-items-end gap-1'>
+                            <div
+                                v-for='d in row.debriefs'
+                                :key='debriefKeyOf(d)'
+                                class='d-flex flex-wrap align-items-center justify-content-end gap-2'
+                            >
+                                <button
+                                    type='button'
+                                    class='badge bg-success-lt text-success border-0'
+                                    :disabled='busy'
+                                    :title='`Recorded ${shortDt(d.recordedAt || "")}. Click to correct this debrief.`'
+                                    @click='startEdit(d)'
+                                >
+                                    {{ debriefBadge(d) }}
+                                </button>
+                                <span
+                                    v-if='d.correctedAt'
+                                    class='text-warning'
+                                    :title='`Corrected ${shortDt(d.correctedAt)}`'
+                                >corrected</span>
+                                <button
+                                    class='btn btn-link btn-sm p-0 text-danger'
+                                    :disabled='busy'
+                                    title='Delete this debrief'
+                                    @click='deletingKey = debriefKeyOf(d)'
+                                >
+                                    delete
+                                </button>
+                                <button
+                                    class='btn btn-link btn-sm p-0 d-flex align-items-center gap-1'
+                                    :disabled='trackBusy'
+                                    title='Attach a GPS track log to this debrief'
+                                    @click='toggleTrackPanel(d)'
+                                >
+                                    <IconRoute
+                                        :size='16'
+                                        :stroke-width='2'
+                                    />
+                                    <span class='d-none d-md-inline'>Attach GPS Track Log</span>
+                                </button>
+                            </div>
+                        </div>
                         <button
-                            v-if='registry.some((op) => op.opNumber === a.opNumber)'
+                            v-if='row.assignment && registry.some((op) => op.opNumber === row.opNumber)'
                             type='button'
                             class='btn btn-link btn-sm p-0 text-danger'
-                            :class='assignmentDebriefs(a).length ? "" : "ms-auto"'
+                            :class='row.debriefs.length ? "" : "ms-auto"'
                             :disabled='busy'
-                            :title='`Fill in the completed-assignment form for ${a.team || "this assignment"} on ${a.label}`'
-                            @click='startAssignmentDebrief(a)'
+                            :title='`Fill in the completed-assignment form for ${row.team || "this assignment"} on ${row.label}`'
+                            @click='startAssignmentDebrief(row.assignment)'
                         >
-                            {{ assignmentDebriefs(a).length ? 'Debrief again' : 'Debrief' }}
+                            {{ row.debriefs.length ? 'Debrief again' : 'Debrief' }}
                         </button>
                     </div>
+
+                    <template
+                        v-for='d in row.debriefs'
+                        :key='debriefKeyOf(d)'
+                    >
+                            <div
+                                v-if='deletingKey === debriefKeyOf(d)'
+                                class='small d-flex flex-wrap align-items-center gap-2 ps-3 py-1'
+                            >
+                                <span class='text-danger'>
+                                    Delete this completed assignment?<span
+                                        v-if='d.tracks?.length'
+                                    > Its track lines stay in the OP sync.</span>
+                                </span>
+                                <button
+                                    class='btn btn-danger btn-sm py-0'
+                                    :disabled='busy'
+                                    @click='onDeleteDebrief(d)'
+                                >
+                                    Delete
+                                </button>
+                                <button
+                                    class='btn btn-link btn-sm p-0'
+                                    :disabled='busy'
+                                    @click='deletingKey = null'
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+
+                            <!-- Attached tracks -->
+                            <div
+                                v-for='t in (d.tracks || [])'
+                                :key='t.uid'
+                                class='small text-muted d-flex align-items-center gap-2 ps-3'
+                            >
+                                <IconRoute
+                                    :size='14'
+                                    :stroke-width='2'
+                                />
+                                <span>
+                                    {{ t.name }} · {{ t.lengthMi }} mi · {{ t.points }} pts<span
+                                        v-if='t.sourcePoints'
+                                    > of {{ t.sourcePoints }}</span>
+                                    <span v-if='t.startedAt'> · {{ shortDt(t.startedAt) }}</span>
+                                </span>
+                                <button
+                                    class='btn btn-link btn-sm p-0 ms-auto'
+                                    title='Center the map on this track'
+                                    @click='flyToCandidate(t.uid)'
+                                >
+                                    locate
+                                </button>
+                                <button
+                                    class='btn btn-link btn-sm p-0 text-danger'
+                                    :disabled='trackBusy'
+                                    title='Remove the reference — the line stays in the OP sync'
+                                    @click='onDetachTrack(d, t.uid)'
+                                >
+                                    detach
+                                </button>
+                            </div>
+
+                            <!-- ── Attach panel — inline, map stays usable ──────── -->
+                            <div
+                                v-if='trackPanel && trackPanel.key === debriefKeyOf(d)'
+                                class='cloudtak-accent border border-info rounded-3 mt-2 mb-2 p-3'
+                            >
+                                <p class='text-uppercase text-info small mb-1'>
+                                    Attach GPS Track Log — {{ trackPanel.label }}
+                                </p>
+                                <p
+                                    v-if='!trackPanel.op'
+                                    class='form-text mt-0 mb-0 text-warning'
+                                >
+                                    OP{{ d.opNumber }} is not in the registry, so there is no
+                                    DataSync to file a track into.
+                                </p>
+                                <template v-else>
+                                    <p class='form-text mt-0 mb-2'>
+                                        Filed under the <strong>Track Logs</strong> folder in
+                                        {{ trackPanel.op.name }}. GPX/KML uploads are converted
+                                        to GeoJSON and stored as a mission file on that DataSync.
+                                    </p>
+
+                                    <div class='row g-3'>
+                                        <div class='col-md-6'>
+                                            <label class='form-label'>Upload a file</label>
+                                            <input
+                                                type='file'
+                                                class='form-control form-control-sm'
+                                                :accept='TRACK_FILE_ACCEPT'
+                                                :disabled='trackBusy'
+                                                @change='onTrackFile'
+                                            >
+                                            <div class='form-text'>
+                                                GPX and KML are converted to GeoJSON and imported
+                                                into this OP DataSync — CloudTAK cannot overlay GPX.
+                                                Multi-track files attach every track. Long tracks
+                                                are thinned on the map; the GeoJSON file keeps every
+                                                fix.
+                                            </div>
+
+                                            <!-- Single-track file: name it before filing.
+                                                 Handheld exports carry generic track names, and
+                                                 one assignment often has several units out. -->
+                                            <div
+                                                v-if='pendingTrack'
+                                                class='mt-2'
+                                            >
+                                                <TablerInput
+                                                    v-model='pendingTrack.callsign'
+                                                    label='Track name'
+                                                    :disabled='trackBusy'
+                                                    @keyup.enter='onConfirmPendingTrack'
+                                                />
+                                                <div class='form-text'>
+                                                    {{ pendingTrack.source }} ·
+                                                    {{ pendingTrack.lengthMi }} mi ·
+                                                    {{ pendingTrack.track.coords.length }} fixes<span
+                                                        v-if='pendingTrack.sourceName'
+                                                    > · named "{{ pendingTrack.sourceName }}" in the file</span>
+                                                </div>
+                                                <div class='d-flex gap-2 mt-2'>
+                                                    <button
+                                                        class='btn btn-primary btn-sm'
+                                                        :disabled='trackBusy || !pendingTrack.callsign.trim()'
+                                                        @click='onConfirmPendingTrack'
+                                                    >
+                                                        {{ trackBusy ? 'Attaching…' : 'Attach track' }}
+                                                    </button>
+                                                    <button
+                                                        class='btn btn-link btn-sm'
+                                                        :disabled='trackBusy'
+                                                        @click='pendingTrack = null'
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class='col-md-6'>
+                                            <label class='form-label d-flex align-items-center'>
+                                                Or pick a line from the map
+                                                <button
+                                                    class='btn btn-link btn-sm p-0 ms-auto'
+                                                    :disabled='loadingTracks'
+                                                    @click='loadTrackCandidates'
+                                                >
+                                                    {{ loadingTracks ? 'Loading…' : 'Refresh' }}
+                                                </button>
+                                            </label>
+                                            <div
+                                                v-if='loadingTracks'
+                                                class='text-muted small'
+                                            >
+                                                Looking for lines…
+                                            </div>
+                                            <div
+                                                v-else-if='!trackCandidates.length'
+                                                class='text-muted small'
+                                            >
+                                                No unfiled lines found. Draw the track on the map,
+                                                then hit Refresh.
+                                            </div>
+                                            <div
+                                                v-for='c in trackCandidates'
+                                                :key='c.uid'
+                                                class='d-flex align-items-center gap-2 mb-1'
+                                            >
+                                                <button
+                                                    class='btn btn-outline-primary btn-sm py-0'
+                                                    :disabled='trackBusy'
+                                                    @click='onAttachCandidate(c)'
+                                                >
+                                                    Attach
+                                                </button>
+                                                <span class='small'>
+                                                    {{ c.callsign }}
+                                                    <span class='text-muted'>· {{ c.lengthMi }} mi · {{ c.source }}</span>
+                                                </span>
+                                                <button
+                                                    class='btn btn-link btn-sm p-0 ms-auto'
+                                                    title='Center map on this line'
+                                                    @click.prevent='flyToCandidate(c.uid)'
+                                                >
+                                                    locate
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+
+                                <div class='d-flex align-items-center gap-2 mt-2'>
+                                    <span
+                                        v-if='trackBusy'
+                                        class='text-muted small'
+                                    >Publishing to the OP sync…</span>
+                                    <button
+                                        class='btn btn-link btn-sm ms-auto'
+                                        :disabled='trackBusy'
+                                        @click='trackPanel = null'
+                                    >
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                    </template>
                 </div>
             </TablerBorder>
 
@@ -987,270 +1247,6 @@
                     </div>
                 </div>
 
-                <div
-                    v-if='debriefs.length'
-                    class='mt-3'
-                >
-                    <p class='text-uppercase text-white-50 small mb-1'>
-                        Recorded ({{ debriefs.length }})
-                    </p>
-                    <div
-                        v-for='(d, i) in debriefs'
-                        :key='i'
-                        class='border-bottom py-1'
-                    >
-                        <div class='small d-flex align-items-center gap-2'>
-                            <span>
-                                OP{{ d.opNumber }} · {{ d.label || segmentLabel(d.segmentUid) }}<span
-                                    v-if='d.pod !== undefined'
-                                > · POD {{ d.pod }}%</span><span
-                                    v-if='d.coverage !== undefined'
-                                > ({{ Math.round(d.coverage * 100) }}% completed)</span>
-                                <span
-                                    v-if='d.resource'
-                                    class='text-muted'
-                                > · {{ d.resource }}</span>
-                                <span
-                                    v-if='d.correctedAt'
-                                    class='text-warning'
-                                    :title='`Corrected ${shortDt(d.correctedAt)}`'
-                                > · corrected</span>
-                            </span>
-                            <button
-                                class='btn btn-link btn-sm p-0 ms-auto'
-                                :disabled='busy'
-                                title='Correct this completed assignment'
-                                @click='startEdit(d)'
-                            >
-                                edit
-                            </button>
-                            <button
-                                class='btn btn-link btn-sm p-0 text-danger'
-                                :disabled='busy'
-                                title='Delete this completed assignment'
-                                @click='deletingKey = debriefKeyOf(d)'
-                            >
-                                delete
-                            </button>
-                            <button
-                                class='btn btn-link btn-sm p-0 d-flex align-items-center gap-1'
-                                :disabled='trackBusy'
-                                title='Attach a GPS track log to this completed assignment'
-                                @click='toggleTrackPanel(d)'
-                            >
-                                <IconRoute
-                                    :size='16'
-                                    :stroke-width='2'
-                                />
-                                <span class='d-none d-md-inline'>Attach GPS Track Log</span>
-                            </button>
-                        </div>
-
-                        <div
-                            v-if='deletingKey === debriefKeyOf(d)'
-                            class='small d-flex flex-wrap align-items-center gap-2 ps-3 py-1'
-                        >
-                            <span class='text-danger'>
-                                Delete this completed assignment?<span
-                                    v-if='d.tracks?.length'
-                                > Its track lines stay in the OP sync.</span>
-                            </span>
-                            <button
-                                class='btn btn-danger btn-sm py-0'
-                                :disabled='busy'
-                                @click='onDeleteDebrief(d)'
-                            >
-                                Delete
-                            </button>
-                            <button
-                                class='btn btn-link btn-sm p-0'
-                                :disabled='busy'
-                                @click='deletingKey = null'
-                            >
-                                Cancel
-                            </button>
-                        </div>
-
-                        <!-- Attached tracks -->
-                        <div
-                            v-for='t in (d.tracks || [])'
-                            :key='t.uid'
-                            class='small text-muted d-flex align-items-center gap-2 ps-3'
-                        >
-                            <IconRoute
-                                :size='14'
-                                :stroke-width='2'
-                            />
-                            <span>
-                                {{ t.name }} · {{ t.lengthMi }} mi · {{ t.points }} pts<span
-                                    v-if='t.sourcePoints'
-                                > of {{ t.sourcePoints }}</span>
-                                <span v-if='t.startedAt'> · {{ shortDt(t.startedAt) }}</span>
-                            </span>
-                            <button
-                                class='btn btn-link btn-sm p-0 ms-auto'
-                                title='Center the map on this track'
-                                @click='flyToCandidate(t.uid)'
-                            >
-                                locate
-                            </button>
-                            <button
-                                class='btn btn-link btn-sm p-0 text-danger'
-                                :disabled='trackBusy'
-                                title='Remove the reference — the line stays in the OP sync'
-                                @click='onDetachTrack(d, t.uid)'
-                            >
-                                detach
-                            </button>
-                        </div>
-
-                        <!-- ── Attach panel — inline, map stays usable ──────── -->
-                        <div
-                            v-if='trackPanel && trackPanel.key === debriefKeyOf(d)'
-                            class='cloudtak-accent border border-info rounded-3 mt-2 mb-2 p-3'
-                        >
-                            <p class='text-uppercase text-info small mb-1'>
-                                Attach GPS Track Log — {{ trackPanel.label }}
-                            </p>
-                            <p
-                                v-if='!trackPanel.op'
-                                class='form-text mt-0 mb-0 text-warning'
-                            >
-                                OP{{ d.opNumber }} is not in the registry, so there is no
-                                DataSync to file a track into.
-                            </p>
-                            <template v-else>
-                                <p class='form-text mt-0 mb-2'>
-                                    Filed under the <strong>Track Logs</strong> folder in
-                                    {{ trackPanel.op.name }}. GPX/KML uploads are converted
-                                    to GeoJSON and stored as a mission file on that DataSync.
-                                </p>
-
-                                <div class='row g-3'>
-                                    <div class='col-md-6'>
-                                        <label class='form-label'>Upload a file</label>
-                                        <input
-                                            type='file'
-                                            class='form-control form-control-sm'
-                                            :accept='TRACK_FILE_ACCEPT'
-                                            :disabled='trackBusy'
-                                            @change='onTrackFile'
-                                        >
-                                        <div class='form-text'>
-                                            GPX and KML are converted to GeoJSON and imported
-                                            into this OP DataSync — CloudTAK cannot overlay GPX.
-                                            Multi-track files attach every track. Long tracks
-                                            are thinned on the map; the GeoJSON file keeps every
-                                            fix.
-                                        </div>
-
-                                        <!-- Single-track file: name it before filing.
-                                             Handheld exports carry generic track names, and
-                                             one assignment often has several units out. -->
-                                        <div
-                                            v-if='pendingTrack'
-                                            class='mt-2'
-                                        >
-                                            <TablerInput
-                                                v-model='pendingTrack.callsign'
-                                                label='Track name'
-                                                :disabled='trackBusy'
-                                                @keyup.enter='onConfirmPendingTrack'
-                                            />
-                                            <div class='form-text'>
-                                                {{ pendingTrack.source }} ·
-                                                {{ pendingTrack.lengthMi }} mi ·
-                                                {{ pendingTrack.track.coords.length }} fixes<span
-                                                    v-if='pendingTrack.sourceName'
-                                                > · named "{{ pendingTrack.sourceName }}" in the file</span>
-                                            </div>
-                                            <div class='d-flex gap-2 mt-2'>
-                                                <button
-                                                    class='btn btn-primary btn-sm'
-                                                    :disabled='trackBusy || !pendingTrack.callsign.trim()'
-                                                    @click='onConfirmPendingTrack'
-                                                >
-                                                    {{ trackBusy ? 'Attaching…' : 'Attach track' }}
-                                                </button>
-                                                <button
-                                                    class='btn btn-link btn-sm'
-                                                    :disabled='trackBusy'
-                                                    @click='pendingTrack = null'
-                                                >
-                                                    Cancel
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class='col-md-6'>
-                                        <label class='form-label d-flex align-items-center'>
-                                            Or pick a line from the map
-                                            <button
-                                                class='btn btn-link btn-sm p-0 ms-auto'
-                                                :disabled='loadingTracks'
-                                                @click='loadTrackCandidates'
-                                            >
-                                                {{ loadingTracks ? 'Loading…' : 'Refresh' }}
-                                            </button>
-                                        </label>
-                                        <div
-                                            v-if='loadingTracks'
-                                            class='text-muted small'
-                                        >
-                                            Looking for lines…
-                                        </div>
-                                        <div
-                                            v-else-if='!trackCandidates.length'
-                                            class='text-muted small'
-                                        >
-                                            No unfiled lines found. Draw the track on the map,
-                                            then hit Refresh.
-                                        </div>
-                                        <div
-                                            v-for='c in trackCandidates'
-                                            :key='c.uid'
-                                            class='d-flex align-items-center gap-2 mb-1'
-                                        >
-                                            <button
-                                                class='btn btn-outline-primary btn-sm py-0'
-                                                :disabled='trackBusy'
-                                                @click='onAttachCandidate(c)'
-                                            >
-                                                Attach
-                                            </button>
-                                            <span class='small'>
-                                                {{ c.callsign }}
-                                                <span class='text-muted'>· {{ c.lengthMi }} mi · {{ c.source }}</span>
-                                            </span>
-                                            <button
-                                                class='btn btn-link btn-sm p-0 ms-auto'
-                                                title='Center map on this line'
-                                                @click.prevent='flyToCandidate(c.uid)'
-                                            >
-                                                locate
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </template>
-
-                            <div class='d-flex align-items-center gap-2 mt-2'>
-                                <span
-                                    v-if='trackBusy'
-                                    class='text-muted small'
-                                >Publishing to the OP sync…</span>
-                                <button
-                                    class='btn btn-link btn-sm ms-auto'
-                                    :disabled='trackBusy'
-                                    @click='trackPanel = null'
-                                >
-                                    Close
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </TablerBorder>
         </template>
     </div>
@@ -1534,7 +1530,7 @@ const debriefForm = reactive({
     opNumber: 1,
     resource: '',
     notes: '',
-    /** Set when the form was filled from the Running Assignment List (#21). */
+    /** Set when the form was filled from the Assignment Status List (#21). */
     assignmentId: '',
 });
 
@@ -1549,16 +1545,58 @@ watch(() => [debriefForm.segmentUid, debriefForm.opNumber] as const, ([uid, op])
     if (a && (a.segmentUid !== uid || a.opNumber !== op)) debriefForm.assignmentId = '';
 });
 
-function assignmentDebriefs(a: OpAssignment): DebriefRecord[] {
-    return debriefsForAssignment(a, debriefs.value);
+interface StatusRow {
+    key: string;
+    opNumber: number;
+    label: string;
+    team: string;
+    /** Absent for a debrief that is not tied to any assignment. */
+    assignment: OpAssignment | null;
+    debriefs: DebriefRecord[];
 }
 
-/** "Debriefed · POD 30%", or the last of several sorties: "2 debriefs · POD 45%". */
-function debriefSummary(a: OpAssignment): string {
-    const list = assignmentDebriefs(a);
-    const last = list[list.length - 1];
-    const head = list.length === 1 ? 'Debriefed' : `${list.length} debriefs`;
-    return last?.pod !== undefined ? `${head} · POD ${last.pod}%` : head;
+/**
+ * Assignment Status List (#23): every assignment with its debriefs, then any
+ * debrief not tied to an assignment, in OP order. Each debrief appears once.
+ */
+const statusRows = computed<StatusRow[]>(() => {
+    const claimed = new Set<string>();
+    const rows: StatusRow[] = assignments.value.map((a, i) => {
+        const mine = debriefsForAssignment(a, debriefs.value).filter((d) => !claimed.has(debriefKey(d)));
+        for (const d of mine) claimed.add(debriefKey(d));
+        return {
+            key: `a-${a.id ?? i}`,
+            opNumber: a.opNumber,
+            label: a.label,
+            team: a.team?.trim() ?? '',
+            assignment: a,
+            debriefs: mine,
+        };
+    });
+    for (const d of debriefs.value) {
+        const key = debriefKey(d);
+        if (claimed.has(key)) continue;
+        rows.push({
+            key: `d-${key}`,
+            opNumber: d.opNumber,
+            label: d.label || segmentLabel(d.segmentUid),
+            team: d.resource ?? '',
+            assignment: null,
+            debriefs: [d],
+        });
+    }
+    return rows
+        .map((row, i) => ({ row, i }))
+        .sort((x, y) => x.row.opNumber - y.row.opNumber || x.i - y.i)
+        .map(({ row }) => row);
+});
+
+/** "Debriefed · POD 30%", plus how much was completed when it was partial. */
+function debriefBadge(d: DebriefRecord): string {
+    const parts = ['Debriefed'];
+    if (d.pod !== undefined) parts.push(`POD ${d.pod}%`);
+    if (d.coverage !== undefined && d.coverage < 1) parts.push(`${Math.round(d.coverage * 100)}% completed`);
+    return parts.join(' · ');
 }
 
 const debriefHighlight = ref(false);
@@ -1577,6 +1615,11 @@ function startAssignmentDebrief(a: OpAssignment): void {
     debriefForm.coverage = '';
     debriefForm.notes = '';
     debriefForm.assignmentId = a.id ?? '';
+    goToDebriefForm();
+}
+
+/** Scroll to the completed-assignment form, focus its first field, flash its border. */
+function goToDebriefForm(): void {
     void nextTick(() => {
         const el = document.getElementById('im-debrief-form');
         if (!el) return;
@@ -2346,6 +2389,7 @@ function startEdit(record: DebriefRecord): void {
     debriefForm.resource = record.resource ?? '';
     debriefForm.notes = record.notes ?? '';
     debriefForm.assignmentId = record.assignmentId ?? '';
+    goToDebriefForm();
 }
 
 function cancelEdit(): void {
