@@ -42,6 +42,20 @@
                         No numbered segment polygons in the active DataSync.
                     </div>
                     <label
+                        v-if='!loadingFeatures && availablePolygons.length > 1'
+                        class='d-flex gap-2 align-items-center py-1 border-bottom mb-1'
+                        style='cursor:pointer'
+                    >
+                        <input
+                            type='checkbox'
+                            class='form-check-input'
+                            :checked='allSegmentsSelected'
+                            :indeterminate='segmentUids.length > 0 && !allSegmentsSelected'
+                            @change='toggleAllSegments'
+                        >
+                        <span class='fw-bold'>Select all ({{ availablePolygons.length }})</span>
+                    </label>
+                    <label
                         v-for='p in availablePolygons'
                         :key='p.uid'
                         class='d-flex gap-2 align-items-center py-1'
@@ -292,6 +306,11 @@ function goToExpand(): void {
 const missionPolygons = ref<MissionFeatureRef[]>([]);
 const loadingFeatures = ref(false);
 const segmentUids = ref<string[]>([]);
+const allSegmentsSelected = computed(() => availablePolygons.value.length > 0
+    && availablePolygons.value.every((p) => segmentUids.value.includes(p.uid)));
+function toggleAllSegments(): void {
+    segmentUids.value = allSegmentsSelected.value ? [] : availablePolygons.value.map((p) => p.uid);
+}
 const segments = ref<SegmentMap>({});
 const rowSegments = ref<SegmentMap>({});
 const contentHash = ref<string | undefined>();
