@@ -233,7 +233,7 @@
                                 <button
                                     type='button'
                                     class='btn btn-outline-success btn-sm w-100'
-                                    title='Send start to DataSync'
+                                    title='Log the start to the FIELD DataSync'
                                     :disabled='saving || sending'
                                     @click='onSendStart(row.id)'
                                 >
@@ -244,7 +244,7 @@
                                 <button
                                     type='button'
                                     class='btn btn-outline-primary btn-sm w-100'
-                                    title='Send completion to DataSync'
+                                    title='Log the completion to the FIELD DataSync'
                                     :disabled='saving || sending'
                                     @click='onSendComplete(row.id)'
                                 >

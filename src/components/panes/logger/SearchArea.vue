@@ -373,7 +373,7 @@
                     :title='theoreticalBlockReason'
                     @click='onPushTheoretical'
                 >
-                    Add to DataSync
+                    Add to MGMT DataSync
                 </button>
             </div>
         </TablerBorder>
@@ -502,7 +502,7 @@
                     :disabled='!canPushLpb || pushing'
                     @click='onPushLpb'
                 >
-                    {{ pushing ? 'Sending…' : 'Add selected rings to DataSync' }}
+                    {{ pushing ? 'Adding…' : 'Add selected rings to MGMT DataSync' }}
                 </button>
 
                 <div class='mt-3 pt-3 border-top'>
@@ -621,7 +621,7 @@
                             :disabled='!canPushCustomLpb || pushing'
                             @click='onPushCustomLpb'
                         >
-                            {{ pushing ? 'Sending…' : 'Add rings to DataSync' }}
+                            {{ pushing ? 'Adding…' : 'Add rings to MGMT DataSync' }}
                         </button>
                     </div>
                 </div>
@@ -744,7 +744,7 @@
                     :disabled='!canAddSubjective || pushing'
                     @click='onAddSubjective'
                 >
-                    Add to DataSync
+                    Add to MGMT DataSync
                 </button>
             </div>
         </TablerBorder>
@@ -865,7 +865,7 @@
                     :disabled='!canAddDeductive || pushing'
                     @click='onAddDeductive'
                 >
-                    Add to DataSync
+                    Add to MGMT DataSync
                 </button>
             </div>
         </TablerBorder>
@@ -2006,7 +2006,7 @@ async function pushTheoretical(): Promise<void> {
             }
         }
         await loadAreas(sub);
-        status.value = `Saved theoretical ring (${theoreticalMiles.value.toFixed(1)} mi) to ${activeMission.value.name}${folderUid ? ` (${SEARCH_AREA_FOLDER})` : ''}.`;
+        status.value = `Saved theoretical ring (${theoreticalMiles.value.toFixed(1)} mi) to the MGMT DataSync${folderUid ? ` (${SEARCH_AREA_FOLDER})` : ''}.`;
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);
@@ -2182,7 +2182,7 @@ async function addSubjective(): Promise<void> {
             console.warn('Failed to file subjective polygon into Search Area folder', attachErr);
         }
         await loadAreas(sub);
-        status.value = `Saved subjective search area to ${activeMission.value.name}.`;
+        status.value = `Saved subjective search area to the MGMT DataSync.`;
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);
@@ -2215,7 +2215,7 @@ async function addDeductive(): Promise<void> {
             console.warn('Failed to file deductive polygon into Search Area folder', attachErr);
         }
         await loadAreas(sub);
-        status.value = `Saved deductive search area to ${activeMission.value.name}.`;
+        status.value = `Saved deductive search area to the MGMT DataSync.`;
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);

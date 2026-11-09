@@ -23,7 +23,7 @@
                     :disabled='!hasCanvas || syncingOrgChart'
                     @click='onSyncOrgChart'
                 >
-                    {{ syncingOrgChart ? 'Syncing…' : 'Sync org chart to DataSync' }}
+                    {{ syncingOrgChart ? 'Syncing…' : 'Sync org chart to FIELD DataSync Log' }}
                 </button>
                 <button
                     type='button'
@@ -48,8 +48,8 @@
         <p class='text-muted small mb-2 flex-shrink-0'>
             Create resource teams in the <strong>Resources</strong> tab, then drag them onto the chart
             with incident command and rescue roles. Add personnel from the palette. The org chart
-            auto-saves in <strong>mission_schema.json</strong>. Use
-            <strong>Sync org chart to DataSync</strong> for ICS 201 log lines; teams with a selected
+            auto-saves to the MGMT DataSync. <strong>Sync org chart to FIELD DataSync Log</strong>
+            posts the positions as log lines field teams see (ICS 201 reads them too); teams with a selected
             assignment CoT are linked via <code>entryUid</code>. Use
             <strong>×</strong> to remove a node, or <strong>Clear canvas</strong> to start over.
         </p>
@@ -802,7 +802,7 @@ async function syncOrgChart(): Promise<void> {
         if (result.assignmentRemarksMissing) {
             parts.push(`${result.assignmentRemarksMissing} assignment CoT${result.assignmentRemarksMissing === 1 ? '' : 's'} not found`);
         }
-        syncStatus.value = `Synced ${result.lines} org position${result.lines === 1 ? '' : 's'} to ${activeMission.value.name}`
+        syncStatus.value = `Synced ${result.lines} org position${result.lines === 1 ? '' : 's'} to the FIELD DataSync Log (${activeMission.value.name})`
             + (parts.length ? ` (${parts.join(', ')})` : '')
             + '. ICS 201 will pick these up on refresh.';
     } catch (err) {
