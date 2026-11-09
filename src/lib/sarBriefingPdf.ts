@@ -212,26 +212,6 @@ function paintField(
     }
 }
 
-/**
- * The template prints "Initial Planning Point (UTM/Map Datum):" on page 1.
- * Until Search Area sets the IPP this is an estimated location (#12), so the
- * printed label is covered and redrawn in the same place and style.
- */
-const IPP_LABEL_TEXT = 'Estimated Location (UTM/Map Datum):';
-const IPP_LABEL = { x: 27, baseline: 617.6, size: 12, underline: 615.6 };
-
-function relabelIpp(page: PDFPage, bold: PDFFont): void {
-    page.drawRectangle({ x: 26, y: 613.5, width: 246.5, height: 17, color: rgb(1, 1, 1), borderWidth: 0 });
-    page.drawText(IPP_LABEL_TEXT, { x: IPP_LABEL.x, y: IPP_LABEL.baseline, size: IPP_LABEL.size, font: bold });
-    const w = bold.widthOfTextAtSize(IPP_LABEL_TEXT, IPP_LABEL.size);
-    page.drawLine({
-        start: { x: IPP_LABEL.x, y: IPP_LABEL.underline },
-        end: { x: IPP_LABEL.x + w, y: IPP_LABEL.underline },
-        thickness: 0.9,
-        color: rgb(0, 0, 0),
-    });
-}
-
 function buildFieldLayoutMap(form: BriefingPdfForm, fieldNames: Iterable<string>): Map<string, FieldLayout> {
     const layouts = new Map<string, FieldLayout>();
     for (const fieldName of fieldNames) {
@@ -312,7 +292,6 @@ export async function buildSarBriefingPdf(form: IrBriefingForm): Promise<Uint8Ar
         if (!layout) continue;
         paintField(pages, font, layout, value, WRAPPED_FIELD_NAMES.has(fieldName));
     }
-    if (pages[0]) relabelIpp(pages[0], await outDoc.embedFont(StandardFonts.HelveticaBold));
 
     return outDoc.save();
 }
