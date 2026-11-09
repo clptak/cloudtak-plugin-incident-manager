@@ -99,17 +99,38 @@
                         />
                     </div>
                     <div class='col-md-4'>
-                        <label class='form-label small mb-1'>Priority</label>
-                        <input
-                            v-model.number='drafts[letter].priority'
-                            type='number'
-                            min='1'
-                            max='5'
-                            class='form-control form-control-sm'
+                        <label class='form-label small mb-1'>Priority rank</label>
+                        <select
+                            v-model='drafts[letter].priority'
+                            class='form-select form-select-sm'
                         >
+                            <option :value='null'>
+                                —
+                            </option>
+                            <option
+                                v-for='c in rankChoices(scenarioRanks, letter)'
+                                :key='c.rank'
+                                :value='c.rank'
+                                :disabled='Boolean(c.takenBy)'
+                            >
+                                {{ c.rank }}{{ c.takenBy ? ` — Scenario ${c.takenBy}` : '' }}
+                            </option>
+                        </select>
                     </div>
                 </div>
             </div>
+
+            <p class='form-text mt-0 mb-2'>
+                Priority is a ranking: 1 is the highest, and each rank is used by one scenario only.
+            </p>
+            <TablerInlineAlert
+                v-for='d in rankTies'
+                :key='d.rank'
+                class='mb-2'
+                severity='warning'
+                title='Shared rank'
+                :description='`Scenarios ${d.keys.join(" and ")} are both rank ${d.rank}. Give each scenario its own rank.`'
+            />
 
             <button
                 v-if='newLetters.length < availableLetters.length'
@@ -245,7 +266,7 @@
                     <p class='text-muted small mb-2'>
                         Prefills from ICS 201 / Initial Information when available.
                         Edit header and Prepared By before downloading.
-                        Rows are ordered by priority ascending (1→5).
+                        Rows are ordered by priority rank (1 first).
                     </p>
                     <div class='row g-2 mb-2'>
                         <div class='col-md-6'>
@@ -336,7 +357,9 @@ import { localDateTimeLabel } from '../../../lib/localTime.ts';
 import { downloadPdfBytes, uploadMissionFile } from '../../../lib/missionUpload.ts';
 import {
     buildSearchScenario,
+    duplicateRanks,
     isScenarioLetter,
+    rankChoices,
     SCENARIO_LETTERS,
     type SearchScenario,
 } from '../../../lib/searchScenarios.ts';
@@ -459,6 +482,13 @@ const editorLetters = computed(() => {
     }
     return out;
 });
+
+/** Every scenario on screen with its rank: sent ones as saved, open ones as drafted. */
+const scenarioRanks = computed(() => [
+    ...visibleSent.value.map((s) => ({ key: s.key, rank: s.fields.priority })),
+    ...editorLetters.value.map((l) => ({ key: l, rank: drafts[l].priority })),
+]);
+const rankTies = computed(() => duplicateRanks(scenarioRanks.value));
 
 function addScenario(): void {
     if (visibleCount.value < availableLetters.value.length) visibleCount.value++;
