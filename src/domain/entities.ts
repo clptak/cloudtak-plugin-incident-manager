@@ -171,13 +171,13 @@ export interface OpAssignment {
 /**
  * Influence of a clue (ISM Table 8.17/8.18, WinCASIE "Add Influence of Clue").
  * Letters A–I per segment AND ROW express what the clue suggests if authentic;
- * authenticity discounts the update: final = α·bayes + (1−α)·prior.
+ * authenticity is the power on the letter weights (Win CASIE III).
  */
 export interface ClueRecord {
     /** OP during which the clue was found; 0 = right after Initial Consensus. */
     opNumber: number;
     description: string;
-    /** Authenticity probability α in [0,1]. */
+    /** Power on the letter weights in [0,1]: 1 almost surely authentic … 0 almost surely not. */
     authenticity: number;
     /** Human label for the authenticity choice (for history display). */
     authenticityLabel?: string;
