@@ -3,7 +3,7 @@
         <p class='text-muted small mb-3'>
             ICS 201 Incident Briefing — auto-filled from Initial Information, mission logs
             (201 / #201 / planned / current / RESOURCES), Risk Assessment strategies/tactics, and IPP weather.
-            Save to mission log to persist; generate PDF when ready.
+            Add it to the MGMT DataSync Log to keep it; generate the PDF when ready. Field teams don't see the MGMT DataSync.
         </p>
 
         <div
@@ -559,7 +559,7 @@
                 :disabled='saving'
                 @click='onSaveToMission'
             >
-                {{ saving ? 'Saving…' : 'Save to mission log' }}
+                {{ saving ? 'Adding…' : 'Add to MGMT DataSync Log' }}
             </button>
         </div>
 
@@ -645,7 +645,7 @@
                     :disabled='uploading'
                     @click='onAddPdfToDataSync'
                 >
-                    {{ uploading ? 'Uploading…' : 'Add ICS-201.pdf to DataSync' }}
+                    {{ uploading ? 'Uploading…' : 'Add ICS-201.pdf to MGMT DataSync' }}
                 </button>
             </div>
         </TablerBorder>
@@ -949,7 +949,7 @@ async function saveToMission(): Promise<void> {
             planningTarget.missionToken,
         );
         form.logId = logId;
-        status.value = 'Saved ICS 201 to mission log.';
+        status.value = `Added ICS 201 to the MGMT DataSync Log (${planningTarget.name}).`;
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);

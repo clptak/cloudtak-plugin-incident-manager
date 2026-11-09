@@ -78,8 +78,8 @@
         </div>
 
         <p class='form-text mb-1 mt-3'>
-            Save stores the matrix in <strong>mission_schema.json</strong>;
-            Send to DataSync posts mission log entries.
+            Save keeps the matrix on the MGMT DataSync; adding to the MGMT DataSync Log
+            also posts log entries. Field teams don't see the MGMT DataSync.
         </p>
         <div class='d-flex flex-wrap align-items-center gap-2'>
             <button
@@ -87,14 +87,14 @@
                 :disabled='saving || savingSchema || !filledRowCount'
                 @click='onSaveSchema'
             >
-                {{ savingSchema ? 'Saving…' : 'Save' }}
+                {{ savingSchema ? 'Saving…' : 'Save to MGMT DataSync' }}
             </button>
             <button
                 class='btn btn-outline-secondary btn-sm'
                 :disabled='saving || savingSchema || (!filledRowCount && !pendingDeletions)'
                 @click='onSave'
             >
-                {{ saving ? 'Sending…' : `Send ${filledRowCount} objective${filledRowCount === 1 ? '' : 's'} to DataSync` }}
+                {{ saving ? 'Adding…' : `Add ${filledRowCount} objective${filledRowCount === 1 ? '' : 's'} to MGMT DataSync Log` }}
             </button>
             <button
                 class='btn btn-outline-secondary btn-sm'
@@ -243,7 +243,7 @@
                     :disabled='uploading || !filledRowCount'
                     @click='onAddPdfToDataSync'
                 >
-                    {{ uploading ? 'Uploading…' : 'Add ICS-234.PDF to DataSync' }}
+                    {{ uploading ? 'Uploading…' : 'Add ICS-234.PDF to MGMT DataSync' }}
                 </button>
             </div>
         </TablerBorder>
@@ -653,7 +653,7 @@ async function upsertCell(
 const savingSchema = ref(false);
 const schemaContentHash = ref<string | undefined>();
 
-/** Save the matrix to mission_schema.json only — no DataSync log entries. */
+/** Save the matrix to the MGMT DataSync (mission_schema.json) only — no log entries. */
 async function onSaveSchema(): Promise<void> {
     if (!requireActiveMission() || !activeMission.value || !filledRowCount.value) return;
     savingSchema.value = true;
@@ -666,7 +666,7 @@ async function onSaveSchema(): Promise<void> {
             filled,
             schemaContentHash.value,
         );
-        status.value = `Saved ${filled.length} objective${filled.length === 1 ? '' : 's'} to mission_schema.json.`;
+        status.value = `Saved ${filled.length} objective${filled.length === 1 ? '' : 's'} to the MGMT DataSync.`;
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);
@@ -749,7 +749,7 @@ async function save(): Promise<void> {
         if (counters.created) parts.push(`${counters.created} new`);
         if (counters.updated) parts.push(`${counters.updated} updated`);
         if (counters.deleted) parts.push(`${counters.deleted} removed`);
-        status.value = `Saved ${parts.join(', ') || '0'} to ${schemaMission(activeMission.value).name}`
+        status.value = `Added ${parts.join(', ') || '0'} to the MGMT DataSync Log (${schemaMission(activeMission.value).name})`
             + (counters.failed ? `, ${counters.failed} failed.` : '.');
         await loadRows();
     } catch (err) {
