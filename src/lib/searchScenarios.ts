@@ -186,3 +186,27 @@ export function duplicateRanks(scenarios: ScenarioRank[]): { rank: number; keys:
         .sort(([a], [b]) => a - b)
         .map(([rank, keys]) => ({ rank, keys: keys.sort() }));
 }
+
+/**
+ * Which copy of each scenario to save or print. A sent scenario shown in the
+ * Already-sent list uses its sent fields, even when the MGMT record also put
+ * a copy in the drafts: that copy can hold an old priority rank (#22). Any
+ * other letter uses its draft when it has a description.
+ */
+export function scenarioFieldsForSave<T extends { description: string }>(
+    letters: readonly string[],
+    drafts: Record<string, T>,
+    shownSent: { key: string; fields: T }[],
+): { letter: string; fields: T }[] {
+    const out: { letter: string; fields: T }[] = [];
+    for (const letter of letters) {
+        const sent = shownSent.find((s) => s.key === letter);
+        if (sent) {
+            if (sent.fields.description.trim()) out.push({ letter, fields: sent.fields });
+            continue;
+        }
+        const draft = drafts[letter];
+        if (draft?.description.trim()) out.push({ letter, fields: draft });
+    }
+    return out;
+}

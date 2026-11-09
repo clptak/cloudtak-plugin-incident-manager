@@ -404,6 +404,7 @@ import {
     moveItem,
     orderByRank,
     ranksFromOrder,
+    scenarioFieldsForSave,
     SCENARIO_LETTERS,
     type SearchScenario,
 } from '../../../lib/searchScenarios.ts';
@@ -593,7 +594,8 @@ async function toggleRankEditing(): Promise<void> {
  * changed get their log entry updated; the MGMT record is saved once.
  */
 async function saveRanking(ranks: Record<string, number>): Promise<void> {
-    for (const l of editorLetters.value) {
+    // Drafts of sent scenarios too, so no copy keeps the old rank.
+    for (const l of LETTERS) {
         if (ranks[l] != null) drafts[l].priority = ranks[l];
     }
     const changedSent = visibleSent.value.filter((s) => ranks[s.key] != null && s.fields.priority !== ranks[s.key]);
@@ -692,22 +694,11 @@ function applyScenarioToDraft(scenario: SearchScenario, logId?: string): void {
     });
 }
 
-/** Collect A–F scenarios for schema Save / PDF (drafts + non-editing sent). */
+/** Collect A–F scenarios for schema Save / PDF, as shown on screen (#22). */
 function scenariosForSave(): SearchScenario[] {
-    const out: SearchScenario[] = [];
     const now = new Date().toISOString();
-    for (const letter of LETTERS) {
-        const d = drafts[letter];
-        if (d.description.trim()) {
-            out.push(buildSearchScenario(letter, d, now));
-            continue;
-        }
-        const sent = sentScenarios.value.find((s) => s.key === letter);
-        if (sent && !editingKeys.value.includes(letter) && sent.fields.description.trim()) {
-            out.push(buildSearchScenario(letter, sent.fields, now));
-        }
-    }
-    return out;
+    return scenarioFieldsForSave(LETTERS, drafts, visibleSent.value)
+        .map(({ letter, fields }) => buildSearchScenario(letter, fields, now));
 }
 
 const saveCount = computed(() => scenariosForSave().length);
