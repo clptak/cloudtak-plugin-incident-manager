@@ -474,81 +474,122 @@
                     </template>
                 </div>
                 <template v-else>
-                    <label
-                        v-for='t in targets'
-                        :key='t.uid'
-                        class='form-check d-flex align-items-center gap-2 mb-1'
-                    >
-                        <input
-                            v-model='selectedSegments'
-                            type='checkbox'
-                            class='form-check-input'
-                            :value='t.uid'
-                        >
-                        <span class='form-check-label'>
-                            {{ t.label }}
-                            <span
-                                v-if='t.detail'
-                                class='text-muted small'
-                            >· {{ t.detail }}</span>
-                        </span>
-                        <span
-                            v-if='assignedThisOp.has(t.uid)'
-                            class='badge bg-success-lt text-success'
-                        >published OP{{ currentOp.opNumber }}</span>
-                        <button
-                            class='btn btn-link btn-sm p-0 ms-auto'
-                            title='Center the map on this'
-                            @click.prevent='flyToCandidate(t.uid)'
-                        >
-                            locate
-                        </button>
-                    </label>
-                    <div class='row g-2 mt-1'>
-                        <div class='col-md-6'>
-                            <template v-if='opResourceOptions.length'>
-                                <label class='form-label'>Team / Resource</label>
-                                <select
-                                    v-model='assignTeam'
-                                    class='form-select form-select-sm'
-                                >
-                                    <option value=''>
-                                        — unassigned —
-                                    </option>
-                                    <option
-                                        v-for='r in opResourceOptions'
-                                        :key='r'
-                                        :value='r'
-                                    >
-                                        {{ r }}
-                                    </option>
-                                </select>
-                                <div class='form-text'>
-                                    Resources assigned to OP{{ currentOp.opNumber }} in the Resources screen.
-                                </div>
-                            </template>
-                            <template v-else>
-                                <TablerInput
-                                    v-model='assignTeam'
-                                    label='Team / Resource'
-                                    placeholder='No resources assigned to this OP — set OP in Resources'
-                                />
-                            </template>
+                    <div class='row g-2 small text-white-50 d-none d-md-flex'>
+                        <div class='col-md-4'>
+                            {{ targetNoun }}
                         </div>
-                        <div class='col-md-6'>
-                            <TablerInput
-                                v-model='assignNotes'
-                                label='Notes (optional)'
-                            />
+                        <div class='col-md-3'>
+                            Team / Resource
+                        </div>
+                        <div class='col-md-4'>
+                            Details
                         </div>
                     </div>
-                    <button
-                        class='btn btn-primary mt-2'
-                        :disabled='busy || !selectedSegments.length'
-                        @click='onPublishAssignments'
+                    <div
+                        v-for='(row, i) in assignRows'
+                        :key='row.key'
+                        class='row g-2 align-items-center mb-1'
                     >
-                        {{ busy ? 'Working…' : `Publish ${selectedSegments.length || ''} to OP${currentOp.opNumber}` }}
-                    </button>
+                        <div class='col-md-4'>
+                            <select
+                                v-model='row.segmentUid'
+                                class='form-select form-select-sm'
+                                :aria-label='`${targetNoun} for assignment ${i + 1}`'
+                            >
+                                <option value=''>
+                                    — {{ targetNoun.toLowerCase() }} —
+                                </option>
+                                <option
+                                    v-for='t in targets'
+                                    :key='t.uid'
+                                    :value='t.uid'
+                                    :disabled='segmentTakenByOtherRow(t.uid, row.key)'
+                                >
+                                    {{ t.label }}{{ t.detail ? ` · ${t.detail}` : '' }}{{ assignedThisOp.has(t.uid) ? ` — published OP${currentOp.opNumber}` : '' }}
+                                </option>
+                            </select>
+                        </div>
+                        <div class='col-md-3'>
+                            <select
+                                v-if='opResourceOptions.length'
+                                v-model='row.team'
+                                class='form-select form-select-sm'
+                                :aria-label='`Team or resource for assignment ${i + 1}`'
+                            >
+                                <option value=''>
+                                    — unassigned —
+                                </option>
+                                <option
+                                    v-for='r in opResourceOptions'
+                                    :key='r'
+                                    :value='r'
+                                >
+                                    {{ r }}
+                                </option>
+                            </select>
+                            <input
+                                v-else
+                                v-model='row.team'
+                                class='form-control form-control-sm'
+                                placeholder='Team / resource'
+                                :aria-label='`Team or resource for assignment ${i + 1}`'
+                            >
+                        </div>
+                        <div class='col-md-4'>
+                            <input
+                                v-model='row.details'
+                                class='form-control form-control-sm'
+                                placeholder='Details (optional)'
+                                :aria-label='`Details for assignment ${i + 1}`'
+                            >
+                        </div>
+                        <div class='col-md-1 d-flex gap-2 justify-content-end'>
+                            <button
+                                class='btn btn-link btn-sm p-0'
+                                title='Center the map on this'
+                                :disabled='!row.segmentUid'
+                                @click='flyToCandidate(row.segmentUid)'
+                            >
+                                locate
+                            </button>
+                            <button
+                                class='btn btn-link btn-sm p-0 text-danger'
+                                title='Remove this row'
+                                :aria-label='`Remove assignment ${i + 1}`'
+                                @click='removeAssignRow(row.key)'
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <div
+                            v-if='row.segmentUid && assignedThisOp.has(row.segmentUid)'
+                            class='col-12 form-text text-warning mt-0'
+                        >
+                            Already published to OP{{ currentOp.opNumber }} — publishing again replaces its team and details.
+                        </div>
+                    </div>
+                    <div
+                        v-if='!opResourceOptions.length'
+                        class='form-text'
+                    >
+                        No resources assigned to OP{{ currentOp.opNumber }} — set OP in Resources to pick from a list.
+                    </div>
+                    <div class='d-flex flex-wrap gap-2 mt-2'>
+                        <button
+                            class='btn btn-outline-primary btn-sm'
+                            :disabled='assignRows.length >= targets.length'
+                            @click='addAssignRow'
+                        >
+                            + Add assignment
+                        </button>
+                        <button
+                            class='btn btn-primary btn-sm'
+                            :disabled='busy || !readyAssignRows.length'
+                            @click='onPublishAssignments'
+                        >
+                            {{ busy ? 'Working…' : `Publish ${readyAssignRows.length || ''} to OP${currentOp.opNumber}` }}
+                        </button>
+                    </div>
                 </template>
 
                 <div
@@ -1293,9 +1334,25 @@ const registry = ref<OpPeriodRegistryEntry[]>([]);
 const segments = ref<SegmentMap>({});
 const debriefs = ref<DebriefRecord[]>([]);
 const assignments = ref<OpAssignment[]>([]);
-const selectedSegments = ref<string[]>([]);
-const assignTeam = ref('');
-const assignNotes = ref('');
+/** One row per assignment: a segment (or map feature), its team, and details. */
+interface AssignRow { key: number; segmentUid: string; team: string; details: string }
+let assignRowSeq = 0;
+function blankAssignRow(): AssignRow {
+    return { key: ++assignRowSeq, segmentUid: '', team: '', details: '' };
+}
+const assignRows = ref<AssignRow[]>([blankAssignRow()]);
+const readyAssignRows = computed(() => assignRows.value.filter((r) => r.segmentUid));
+/** Assignments are one per segment per OP, so a segment can be in one row only. */
+function segmentTakenByOtherRow(uid: string, key: number): boolean {
+    return assignRows.value.some((r) => r.key !== key && r.segmentUid === uid);
+}
+function addAssignRow(): void {
+    assignRows.value.push(blankAssignRow());
+}
+function removeAssignRow(key: number): void {
+    assignRows.value = assignRows.value.filter((r) => r.key !== key);
+    if (!assignRows.value.length) assignRows.value = [blankAssignRow()];
+}
 const subscribers = ref<{ clientUid: string; username: string; role: string }[]>([]);
 const opChannels = ref<string[]>([]);
 
@@ -1771,26 +1828,36 @@ async function onPublishAssignments(): Promise<void> {
     if (!mission?.mgmt || !op) return;
     busy.value = true;
     error.value = ''; notice.value = '';
+    let published = 0;
     try {
-        const published = await publishAssignments({
+        const deps = {
             // Pass the registry so a target drawn on an OP sync (common on
             // non-search incidents) is still resolvable.
             geometry: createSegmentGeometrySource(mission, registry.value),
             publisher: createOpFeaturePublisher(),
             assignments: createAssignmentStore(mission),
-        }, op, {
-            segmentUids: selectedSegments.value,
-            team: assignTeam.value,
-            notes: assignNotes.value,
-        });
-        notice.value = `Published ${published.length} assignment${published.length === 1 ? '' : 's'} to ${op.name}.`;
-        selectedSegments.value = [];
-        assignTeam.value = '';
-        assignNotes.value = '';
-        assignments.value = await createAssignmentStore(mission).load();
+        };
+        // Each row has its own team and details, so publish row by row.
+        for (const row of readyAssignRows.value) {
+            await publishAssignments(deps, op, {
+                segmentUids: [row.segmentUid],
+                team: row.team,
+                notes: row.details,
+            });
+            published++;
+            assignRows.value = assignRows.value.filter((r) => r.key !== row.key);
+        }
+        notice.value = `Published ${published} assignment${published === 1 ? '' : 's'} to ${op.name}.`;
     } catch (err) {
-        error.value = err instanceof Error ? err.message : String(err);
+        error.value = (published ? `Published ${published}, then: ` : '')
+            + (err instanceof Error ? err.message : String(err));
     } finally {
+        if (!assignRows.value.length) assignRows.value = [blankAssignRow()];
+        try {
+            assignments.value = await createAssignmentStore(mission).load();
+        } catch {
+            // The list refreshes on the next load.
+        }
         busy.value = false;
     }
 }
