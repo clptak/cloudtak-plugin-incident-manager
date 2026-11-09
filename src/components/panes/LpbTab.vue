@@ -127,7 +127,7 @@
                             Mean
                         </th>
                         <th class='text-end text-nowrap'>
-                            Add to Map
+                            Add to DataSync
                         </th>
                     </tr>
                 </thead>
@@ -159,13 +159,29 @@
                             {{ formatLpbMiles(row.meanMi) }}
                         </td>
                         <td class='text-end text-nowrap'>
-                            <button
-                                type='button'
-                                class='btn btn-outline-primary btn-sm'
-                                @click='openAddToMap(row)'
+                            <div
+                                class='btn-group btn-group-sm'
+                                role='group'
+                                :aria-label='`Add ${row.category} rings to`'
                             >
-                                Add to Map
-                            </button>
+                                <button
+                                    type='button'
+                                    class='btn btn-azure'
+                                    title='Plot rings on the incident DataSync field teams see'
+                                    @click='openAddToMap(row, "field")'
+                                >
+                                    FIELD
+                                </button>
+                                <button
+                                    type='button'
+                                    class='btn btn-purple'
+                                    :title='activeMission?.mgmt ? "Plot rings on the sworn-only planning DataSync" : "This incident has no MGMT DataSync"'
+                                    :disabled='!activeMission?.mgmt'
+                                    @click='openAddToMap(row, "mgmt")'
+                                >
+                                    MGMT
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 </tbody>
@@ -185,8 +201,12 @@
             >
                 <div class='modal-content'>
                     <div class='modal-header'>
-                        <h5 class='modal-title'>
+                        <h5 class='modal-title d-flex align-items-center gap-2'>
                             {{ modalRow.category }}
+                            <span
+                                class='badge'
+                                :class='modalTarget === "mgmt" ? "bg-purple-lt" : "bg-azure-lt"'
+                            >{{ modalTarget === 'mgmt' ? 'MGMT' : 'FIELD' }}</span>
                         </h5>
                         <button
                             type='button'
@@ -242,21 +262,12 @@
                         </button>
                         <button
                             type='button'
-                            class='btn btn-azure'
-                            title='The incident DataSync field teams see'
+                            class='btn'
+                            :class='modalTarget === "mgmt" ? "btn-purple" : "btn-azure"'
                             :disabled='!canPlot'
-                            @click='onAddToMap("field")'
+                            @click='onAddToMap(modalTarget)'
                         >
-                            {{ pushing === 'field' ? 'Adding…' : 'FIELD' }}
-                        </button>
-                        <button
-                            type='button'
-                            class='btn btn-purple'
-                            :title='activeMission?.mgmt ? "The sworn-only planning DataSync" : "This incident has no MGMT DataSync"'
-                            :disabled='!canPlot || !activeMission?.mgmt'
-                            @click='onAddToMap("mgmt")'
-                        >
-                            {{ pushing === 'mgmt' ? 'Adding…' : 'MGMT' }}
+                            {{ pushing ? 'Adding…' : `Add to ${modalTarget === 'mgmt' ? 'MGMT' : 'FIELD'} DataSync` }}
                         </button>
                     </div>
                 </div>
@@ -311,6 +322,7 @@ const error = ref('');
 
 const modalRow = ref<AzlpbEntry | null>(null);
 const modalOptions = ref<LpbQuartileOption[]>([]);
+const modalTarget = ref<Target>('field');
 const pushing = ref<Target | null>(null);
 const modalError = ref('');
 
@@ -387,8 +399,9 @@ function closeModal(): void {
     modalError.value = '';
 }
 
-function openAddToMap(row: AzlpbEntry): void {
+function openAddToMap(row: AzlpbEntry, target: Target): void {
     if (!requireActiveMission()) return;
+    modalTarget.value = target;
     notice.value = '';
     error.value = '';
     modalError.value = '';
