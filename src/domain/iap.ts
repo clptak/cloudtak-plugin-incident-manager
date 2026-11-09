@@ -50,23 +50,21 @@ export function isUasLabel(...labels: (string | undefined)[]): boolean {
     return UAS_KEYWORDS.some((k) => hay.includes(k));
 }
 
-/** Assignments merged per segment, in first-seen order, with every team and note. */
-export function groupBySegment<T extends { segmentUid: string; team?: string; notes?: string }>(
-    list: T[],
-): Array<{ a: T; teams: string[]; notes: string[] }> {
-    const groups = new Map<string, { a: T; teams: string[]; pairs: Array<[string, string]> }>();
-    for (const a of list) {
-        const g = groups.get(a.segmentUid) ?? { a, teams: [], pairs: [] };
-        const team = a.team?.trim() ?? '';
-        if (team && !g.teams.includes(team)) g.teams.push(team);
-        const note = a.notes?.trim();
-        if (note) g.pairs.push([team, note]);
-        groups.set(a.segmentUid, g);
+/**
+ * The saved 204 to carry edits from when the IAP is re-pulled: the one made
+ * for this assignment, or, for plans saved before assignment ids, the one on
+ * the same segment for the same resource (or the only one on the segment).
+ */
+export function priorPlanFor<P extends { assignmentId?: string; segmentUid: string; supervisor: string }>(
+    previous: P[],
+    a: { id?: string; segmentUid: string; team?: string },
+): P | undefined {
+    if (a.id) {
+        const byId = previous.find((p) => p.assignmentId === a.id);
+        if (byId) return byId;
     }
-    // Label each note with its team once more than one team shares the segment.
-    return [...groups.values()].map(({ a, teams, pairs }) => ({
-        a,
-        teams,
-        notes: pairs.map(([team, note]) => (teams.length > 1 && team ? `${team}: ${note}` : note)),
-    }));
+    const onSegment = previous.filter((p) => !p.assignmentId && p.segmentUid === a.segmentUid);
+    const team = a.team?.trim() ?? '';
+    return onSegment.find((p) => p.supervisor.trim() === team)
+        ?? (onSegment.length === 1 ? onSegment[0] : undefined);
 }

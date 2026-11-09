@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { groupBySegment, iapFormPlan, isUasLabel, usesExtendedIcsSet } from './iap.ts';
+import { iapFormPlan, priorPlanFor, isUasLabel, usesExtendedIcsSet } from './iap.ts';
 
 test('iapFormPlan: base SAR set', () => {
     assert.deepEqual(iapFormPlan({ category: 'search', hasUas: false }),
@@ -48,16 +48,19 @@ test('usesExtendedIcsSet / isUasLabel', () => {
     assert.equal(isUasLabel('Grid Team', 'GT-4'), false);
 });
 
-test('groupBySegment: resources sharing a segment become one 204 with every team', () => {
-    const groups = groupBySegment([
-        { segmentUid: 's1', team: 'GT3', notes: 'grid' },
-        { segmentUid: 's2', team: 'GT4' },
-        { segmentUid: 's1', team: 'Heli 1', notes: 'hasty' },
-    ]);
-    assert.deepEqual(groups.map((g) => g.a.segmentUid), ['s1', 's2']);
-    assert.deepEqual(groups[0].teams, ['GT3', 'Heli 1']);
-    assert.deepEqual(groups[0].notes, ['GT3: grid', 'Heli 1: hasty']);
-    assert.deepEqual(groups[1].notes, []);
-    // One team: its note is not labelled
-    assert.deepEqual(groupBySegment([{ segmentUid: 's1', team: 'GT3', notes: 'grid' }])[0].notes, ['grid']);
+test('priorPlanFor: each resource on a segment keeps its own 204', () => {
+    const saved = [
+        { assignmentId: 'a1', segmentUid: 's1', supervisor: 'GT3', note: 'gt' },
+        { assignmentId: 'a2', segmentUid: 's1', supervisor: 'Heli 1', note: 'heli' },
+    ];
+    assert.equal(priorPlanFor(saved, { id: 'a2', segmentUid: 's1', team: 'Heli 1' })?.note, 'heli');
+    assert.equal(priorPlanFor(saved, { id: 'a1', segmentUid: 's1', team: 'GT3' })?.note, 'gt');
+    assert.equal(priorPlanFor(saved, { id: 'a9', segmentUid: 's1', team: 'Drone' }), undefined);
+});
+
+test('priorPlanFor: plans saved before ids match by segment and resource', () => {
+    const legacy = [{ segmentUid: 's1', supervisor: 'GT3' }, { segmentUid: 's2', supervisor: '' }];
+    assert.equal(priorPlanFor(legacy, { id: 'a1', segmentUid: 's1', team: 'GT3' }), legacy[0]);
+    assert.equal(priorPlanFor(legacy, { segmentUid: 's2', team: 'GT4' }), legacy[1]); // only one on s2
+    assert.equal(priorPlanFor([...legacy, { segmentUid: 's1', supervisor: 'X' }], { segmentUid: 's1', team: 'Heli' }), undefined);
 });
