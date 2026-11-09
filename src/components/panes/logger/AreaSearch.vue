@@ -611,18 +611,36 @@
                     </p>
                     <div
                         v-for='(a, i) in assignments'
-                        :key='i'
-                        class='small border-bottom py-1'
+                        :key='a.id || i'
+                        class='small border-bottom py-1 d-flex align-items-center gap-2'
                     >
-                        OP{{ a.opNumber }} · {{ a.label }}
+                        <span>
+                            OP{{ a.opNumber }} · {{ a.label }}
+                            <span
+                                v-if='a.team'
+                                class='text-muted'
+                            > · {{ a.team }}</span>
+                            <span
+                                v-if='a.notes'
+                                class='text-muted'
+                            > · {{ a.notes }}</span>
+                        </span>
                         <span
-                            v-if='a.team'
-                            class='text-muted'
-                        > · {{ a.team }}</span>
-                        <span
-                            v-if='a.notes'
-                            class='text-muted'
-                        > · {{ a.notes }}</span>
+                            v-if='assignmentDebriefs(a).length'
+                            class='badge bg-success-lt text-success ms-auto'
+                            :title='`${assignmentDebriefs(a).length} debrief${assignmentDebriefs(a).length === 1 ? "" : "s"} recorded for this assignment`'
+                        >{{ debriefSummary(a) }}</span>
+                        <button
+                            v-if='registry.some((op) => op.opNumber === a.opNumber)'
+                            type='button'
+                            class='btn btn-link btn-sm p-0 text-danger'
+                            :class='assignmentDebriefs(a).length ? "" : "ms-auto"'
+                            :disabled='busy'
+                            :title='`Fill in the completed-assignment form for ${a.team || "this assignment"} on ${a.label}`'
+                            @click='startAssignmentDebrief(a)'
+                        >
+                            {{ assignmentDebriefs(a).length ? 'Debrief again' : 'Debrief' }}
+                        </button>
                     </div>
                 </div>
             </TablerBorder>
@@ -676,7 +694,9 @@
             <!-- ── Debrief / POD ───────────────────────────────────────── -->
             <TablerBorder
                 v-if='registry.length'
+                id='im-debrief-form'
                 class='cloudtak-accent text-white mb-3'
+                :class='debriefHighlight ? "border border-primary" : ""'
                 :fill-height='false'
                 :shadow='false'
                 gap='sm'
@@ -782,6 +802,22 @@
                             label='Notes'
                         />
                     </div>
+                </div>
+                <div
+                    v-if='debriefAssignment'
+                    class='form-text mt-2 mb-0'
+                >
+                    Debrief for the OP{{ debriefAssignment.opNumber }} assignment of
+                    {{ debriefAssignment.team || 'an unassigned resource' }} on {{ debriefAssignment.label }}.
+                    <button
+                        v-if='!editingKey'
+                        type='button'
+                        class='btn btn-link btn-sm p-0 align-baseline'
+                        title='Record this as a debrief not tied to the assignment'
+                        @click='debriefForm.assignmentId = ""'
+                    >
+                        Unlink
+                    </button>
                 </div>
                 <div class='d-flex align-items-center gap-2 mt-2'>
                     <button
@@ -1221,7 +1257,7 @@
 </template>
 
 <script setup lang='ts'>
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useIncidentChanges } from '../../../composables/useIncidentChanges.ts';
 import { OP_LIST_PREFIXES, touchesPrefixes } from '../../../lib/screenKeys.ts';
 import { IconRoute } from '@tabler/icons-vue';
@@ -1248,6 +1284,7 @@ import {
     publishAssignments,
     recordDebrief,
 } from '../../../domain/usecases.ts';
+import { debriefsForAssignment } from '../../../domain/debrief.ts';
 import {
     debriefKey,
     trackLengthMiles,
@@ -1497,7 +1534,59 @@ const debriefForm = reactive({
     opNumber: 1,
     resource: '',
     notes: '',
+    /** Set when the form was filled from the Running Assignment List (#21). */
+    assignmentId: '',
 });
+
+/** The assignment the debrief form is filled from, if any. */
+const debriefAssignment = computed(() => (debriefForm.assignmentId
+    ? assignments.value.find((a) => a.id === debriefForm.assignmentId) ?? null
+    : null));
+
+// Changing the segment or OP means it is no longer that assignment's debrief.
+watch(() => [debriefForm.segmentUid, debriefForm.opNumber] as const, ([uid, op]) => {
+    const a = debriefAssignment.value;
+    if (a && (a.segmentUid !== uid || a.opNumber !== op)) debriefForm.assignmentId = '';
+});
+
+function assignmentDebriefs(a: OpAssignment): DebriefRecord[] {
+    return debriefsForAssignment(a, debriefs.value);
+}
+
+/** "Debriefed · POD 30%", or the last of several sorties: "2 debriefs · POD 45%". */
+function debriefSummary(a: OpAssignment): string {
+    const list = assignmentDebriefs(a);
+    const last = list[list.length - 1];
+    const head = list.length === 1 ? 'Debriefed' : `${list.length} debriefs`;
+    return last?.pod !== undefined ? `${head} · POD ${last.pod}%` : head;
+}
+
+const debriefHighlight = ref(false);
+let debriefHighlightTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** Debrief link on an assignment row: fill the completed-assignment form and go to it. */
+function startAssignmentDebrief(a: OpAssignment): void {
+    splitPrompt.value = null;
+    duplicatePrompt.value = null;
+    deletingKey.value = null;
+    editingKey.value = null;
+    debriefForm.opNumber = a.opNumber;
+    debriefForm.segmentUid = a.segmentUid;
+    debriefForm.resource = a.team?.trim() ?? '';
+    debriefForm.pod = '';
+    debriefForm.coverage = '';
+    debriefForm.notes = '';
+    debriefForm.assignmentId = a.id ?? '';
+    void nextTick(() => {
+        const el = document.getElementById('im-debrief-form');
+        if (!el) return;
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        el.querySelector<HTMLInputElement>('input:not([disabled])')?.focus({ preventScroll: true });
+        debriefHighlight.value = true;
+        clearTimeout(debriefHighlightTimer);
+        debriefHighlightTimer = setTimeout(() => { debriefHighlight.value = false; }, 2000);
+    });
+}
 
 function shortDt(iso: string): string {
     return localDateTimeLabel(iso);
@@ -2202,6 +2291,7 @@ function buildDebriefRecord(): DebriefRecord {
     if (coveragePct) record.coverage = Number(coveragePct) / 100;
     if (debriefForm.resource.trim()) record.resource = debriefForm.resource.trim();
     if (debriefForm.notes.trim()) record.notes = debriefForm.notes.trim();
+    if (debriefForm.assignmentId) record.assignmentId = debriefForm.assignmentId;
     return record;
 }
 
@@ -2209,6 +2299,7 @@ function resetDebriefForm(): void {
     debriefForm.pod = '';
     debriefForm.coverage = '';
     debriefForm.notes = '';
+    debriefForm.assignmentId = '';
     editingKey.value = null;
     duplicatePrompt.value = null;
 }
@@ -2254,6 +2345,7 @@ function startEdit(record: DebriefRecord): void {
     debriefForm.coverage = record.coverage !== undefined ? String(Math.round(record.coverage * 100)) : '';
     debriefForm.resource = record.resource ?? '';
     debriefForm.notes = record.notes ?? '';
+    debriefForm.assignmentId = record.assignmentId ?? '';
 }
 
 function cancelEdit(): void {

@@ -132,6 +132,12 @@ export interface DebriefRecord {
     coverage?: number;
     resource?: string;
     notes?: string;
+    /**
+     * Id of the OP assignment (ICS 204) this debrief reports on, when it was
+     * entered from the Running Assignment List. Absent on debriefs entered
+     * by hand and on those recorded before assignments had ids.
+     */
+    assignmentId?: string;
     /** GPS track logs evidencing this search. */
     tracks?: TrackLogRef[];
     /** ISO timestamp. */

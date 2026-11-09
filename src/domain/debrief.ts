@@ -3,7 +3,7 @@
  * adapter and the Mission Properties adapter so both read records identically.
  */
 
-import type { DebriefRecord } from './entities.ts';
+import type { DebriefRecord, OpAssignment } from './entities.ts';
 import { trackLogRefsFromValue } from './trackLog.ts';
 
 export function debriefRecordFromValue(value: unknown): DebriefRecord | null {
@@ -23,6 +23,7 @@ export function debriefRecordFromValue(value: unknown): DebriefRecord | null {
     if (typeof rec.coverage === 'number' && Number.isFinite(rec.coverage)) record.coverage = rec.coverage;
     if (typeof rec.resource === 'string' && rec.resource.trim()) record.resource = rec.resource.trim();
     if (typeof rec.notes === 'string' && rec.notes.trim()) record.notes = rec.notes.trim();
+    if (typeof rec.assignmentId === 'string' && rec.assignmentId.trim()) record.assignmentId = rec.assignmentId.trim();
     if (typeof rec.recordedAt === 'string' && rec.recordedAt.trim()) record.recordedAt = rec.recordedAt;
     if (typeof rec.correctedAt === 'string' && rec.correctedAt.trim()) record.correctedAt = rec.correctedAt;
     const tracks = trackLogRefsFromValue(rec.tracks);
@@ -67,8 +68,28 @@ export function correctedDebrief(existing: DebriefRecord, update: DebriefRecord,
     if (update.coverage !== undefined) next.coverage = update.coverage;
     if (update.resource) next.resource = update.resource;
     if (update.notes) next.notes = update.notes;
+    const assignmentId = update.assignmentId ?? existing.assignmentId;
+    if (assignmentId) next.assignmentId = assignmentId;
     if (existing.tracks?.length) next.tracks = existing.tracks;
     if (existing.recordedAt) next.recordedAt = existing.recordedAt;
     next.correctedAt = correctedAt;
     return next;
+}
+
+/**
+ * Debriefs that report on one OP assignment, oldest first. A debrief entered
+ * from the assignment carries its id. One without an id (entered by hand, or
+ * before ids existed) belongs to the assignment with the same OP, segment and
+ * resource, so older records still tie out.
+ */
+export function debriefsForAssignment(assignment: OpAssignment, records: DebriefRecord[]): DebriefRecord[] {
+    const team = (assignment.team ?? '').trim().toLowerCase();
+    return records
+        .filter((r) => {
+            if (r.assignmentId) return r.assignmentId === assignment.id;
+            return r.opNumber === assignment.opNumber
+                && r.segmentUid === assignment.segmentUid
+                && resourceId(r) === team;
+        })
+        .sort((a, b) => (a.recordedAt ?? '').localeCompare(b.recordedAt ?? ''));
 }
