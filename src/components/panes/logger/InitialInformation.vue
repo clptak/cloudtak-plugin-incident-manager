@@ -176,10 +176,6 @@
                 Active DataSync: <strong>{{ activeMission.name }}</strong>
             </p>
 
-            <p class='text-muted small mt-2 mb-0'>
-                Save stores fields in <strong>mission_schema.json</strong>;
-                Send to DataSync posts a mission log entry.
-            </p>
 
             <TablerInlineAlert
                 v-if='demaInvalid'
@@ -195,16 +191,19 @@
                     :disabled='savingIncident || sendingIncident || demaInvalid'
                     @click='onSaveIncidentInfo'
                 >
-                    {{ savingIncident ? 'Saving…' : 'Save' }}
+                    {{ savingIncident ? 'Saving…' : 'Save to MGMT Only' }}
                 </button>
                 <button
                     class='btn btn-outline-secondary btn-sm'
                     :disabled='sendingIncident || savingIncident || demaInvalid'
                     @click='onSendIncidentInfo'
                 >
-                    {{ sendingIncident ? 'Sending…' : 'Send to DataSync' }}
+                    {{ sendingIncident ? 'Adding…' : 'Add to FIELD DataSync Log' }}
                 </button>
             </div>
+            <p class='form-text mt-1 mb-0'>
+                Team members in the field will see incident information added to the FIELD DataSync Log.
+            </p>
 
             <TablerInlineAlert
                 v-if='incidentStatus'
@@ -562,7 +561,7 @@ async function saveIncidentInfo(): Promise<void> {
         schemaContentHash.value = savedSchema.contentHash;
         legacySchemaLogId.value = undefined;
         missionSchema.value = schema;
-        incidentStatus.value = `Saved incident information to mission_schema.json on ${activeMission.value.name}.`;
+        incidentStatus.value = `Saved incident information to the MGMT DataSync.`;
         // Case Number and DEMA number onto the incident event (ADR-004). The
         // incident is saved either way; an event problem is only reported.
         try {
@@ -599,7 +598,7 @@ async function sendIncidentInfoToDataSync(): Promise<void> {
             const created = await sub.log.create(body);
             incidentForm.logId = String(created.id);
         }
-        incidentStatus.value = `Sent incident information log to ${activeMission.value.name}.`;
+        incidentStatus.value = `Added incident information to the FIELD DataSync Log on ${activeMission.value.name}.`;
     } catch (err) {
         incidentStatusError.value = true;
         incidentStatus.value = err instanceof Error ? err.message : String(err);
