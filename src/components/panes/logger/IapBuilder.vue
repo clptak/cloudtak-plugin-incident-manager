@@ -270,7 +270,7 @@
 
                 <div
                     v-for='(a, ai) in plan.assignments'
-                    :key='a.segmentUid'
+                    :key='a.assignmentId || `${ai}-${a.segmentUid}`'
                     class='cloudtak-accent border rounded-3 mb-2 p-2'
                 >
                     <div class='row g-2'>

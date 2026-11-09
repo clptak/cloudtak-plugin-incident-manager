@@ -13,7 +13,7 @@ import type { OpPeriodRegistryEntry } from '../domain/entities.ts';
 import { loadSchemaSubscription, schemaMissionToken } from './incidentSubscription.ts';
 import { loadMissionSchema, saveMissionSchema, type MissionSchema } from './missionSchema.ts';
 import type { IapInputs } from './iapData.ts';
-import { groupBySegment } from '../domain/iap.ts';
+import { priorPlanFor } from '../domain/iap.ts';
 
 
 
@@ -50,6 +50,11 @@ export function blankContactRow(): IapContactRow {
 }
 
 export interface IapAssignmentPlan {
+    /**
+     * The OP assignment this 204 is for. Each resource on a segment gets its
+     * own 204 (and its own POD at debrief); empty on plans saved before ids.
+     */
+    assignmentId?: string;
     segmentUid: string;
     label: string;
     supervisor: string;
@@ -258,7 +263,7 @@ function sanitizeAssignments(raw: unknown): IapAssignmentPlan[] {
                 ? [{ nameFunction: str(rec.contactName), contact: str(rec.contactPhone) }]
                 : [];
 
-        return {
+        const plan: IapAssignmentPlan = {
             segmentUid: str(rec.segmentUid),
             label: str(rec.label),
             supervisor: str(rec.supervisor),
@@ -268,6 +273,8 @@ function sanitizeAssignments(raw: unknown): IapAssignmentPlan[] {
             divisionId: str(rec.divisionId),
             contacts,
         };
+        if (str(rec.assignmentId)) plan.assignmentId = str(rec.assignmentId);
+        return plan;
     });
 }
 
@@ -395,12 +402,12 @@ export function prefillIapPlan(input: IapInputs, previous?: IapPlan | null): Iap
         preparers: previous?.preparers
             ? { ...previous.preparers }
             : { ics205: '', ics206: '', ics220: '' },
-        // One ICS 204 per segment: resources sharing a segment in this OP (a
-        // ground team and a helicopter) are listed together on it.
-        assignments: groupBySegment(input.assignments).map(({ a, teams, notes }) => {
-            const prior = previous?.assignments.find((p) => p.segmentUid === a.segmentUid);
+        // One ICS 204 per assignment: a ground team and a helicopter on the
+        // same segment each get their own 204 and report their own POD.
+        assignments: input.assignments.map((a) => {
+            const prior = priorPlanFor(previous?.assignments ?? [], a);
             const resources = input.resources
-                .filter((r) => !teams.length || teams.includes(r.resourceIdentifier))
+                .filter((r) => !a.team || r.resourceIdentifier === a.team)
                 .map((r) => ({
                     identifier: r.resourceIdentifier,
                     leader: r.agency,
@@ -413,12 +420,13 @@ export function prefillIapPlan(input: IapInputs, previous?: IapPlan | null): Iap
                 // Seed §8 with the team/supervisor so there is a line to fill.
                 contacts: prior?.contacts?.length
                     ? prior.contacts.map((c) => ({ ...c }))
-                    : teams.map((t) => ({ nameFunction: t, contact: '' })),
+                    : (a.team ? [{ nameFunction: a.team, contact: '' }] : []),
+                ...(a.id ? { assignmentId: a.id } : {}),
                 segmentUid: a.segmentUid,
                 label: a.label,
-                supervisor: teams[0] ?? prior?.supervisor ?? '',
+                supervisor: a.team ?? prior?.supervisor ?? '',
                 workAssignment: prior?.workAssignment
-                    || [`Search segment ${a.label}.`, ...notes].filter(Boolean).join(' '),
+                    || [`Search segment ${a.label}.`, a.notes ?? ''].filter(Boolean).join(' '),
                 specialInstructions: prior?.specialInstructions
                     ?? 'Report POD and coverage at debrief.',
                 resources: resources.length ? resources : (prior?.resources ?? []),
