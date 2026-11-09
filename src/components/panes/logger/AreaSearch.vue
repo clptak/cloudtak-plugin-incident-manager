@@ -639,7 +639,21 @@
                                 class='text-muted fst-italic'
                             > · not on an assignment</span>
                         </span>
-                        <div class='ms-auto d-flex flex-column align-items-end gap-1'>
+                        <button
+                            v-if='row.assignment && registry.some((op) => op.opNumber === row.opNumber)'
+                            type='button'
+                            class='btn btn-link btn-sm p-0 text-danger ms-auto'
+                            :disabled='busy'
+                            :title='`Fill in the completed-assignment form for ${row.team || "this assignment"} on ${row.label}`'
+                            @click='startAssignmentDebrief(row.assignment)'
+                        >
+                            {{ row.debriefs.length ? 'Debrief again' : 'Debrief' }}
+                        </button>
+                        <div
+                            v-if='row.debriefs.length'
+                            class='d-flex flex-column align-items-end gap-1'
+                            :class='row.assignment && registry.some((op) => op.opNumber === row.opNumber) ? "" : "ms-auto"'
+                        >
                             <div
                                 v-for='d in row.debriefs'
                                 :key='debriefKeyOf(d)'
@@ -660,14 +674,6 @@
                                     :title='`Corrected ${shortDt(d.correctedAt)}`'
                                 >corrected</span>
                                 <button
-                                    class='btn btn-link btn-sm p-0 text-danger'
-                                    :disabled='busy'
-                                    title='Delete this debrief'
-                                    @click='deletingKey = debriefKeyOf(d)'
-                                >
-                                    delete
-                                </button>
-                                <button
                                     class='btn btn-link btn-sm p-0 d-flex align-items-center gap-1'
                                     :disabled='trackBusy'
                                     title='Attach a GPS track log to this debrief'
@@ -679,19 +685,21 @@
                                     />
                                     <span class='d-none d-md-inline'>Attach GPS Track Log</span>
                                 </button>
+                                <button
+                                    type='button'
+                                    class='btn btn-ghost-secondary btn-sm p-1'
+                                    :disabled='busy'
+                                    title='Delete this debrief'
+                                    aria-label='Delete this debrief'
+                                    @click='deletingKey = debriefKeyOf(d)'
+                                >
+                                    <IconTrash
+                                        :size='16'
+                                        :stroke-width='1.5'
+                                    />
+                                </button>
                             </div>
                         </div>
-                        <button
-                            v-if='row.assignment && registry.some((op) => op.opNumber === row.opNumber)'
-                            type='button'
-                            class='btn btn-link btn-sm p-0 text-danger'
-                            :class='row.debriefs.length ? "" : "ms-auto"'
-                            :disabled='busy'
-                            :title='`Fill in the completed-assignment form for ${row.team || "this assignment"} on ${row.label}`'
-                            @click='startAssignmentDebrief(row.assignment)'
-                        >
-                            {{ row.debriefs.length ? 'Debrief again' : 'Debrief' }}
-                        </button>
                     </div>
 
                     <template
@@ -700,27 +708,46 @@
                     >
                             <div
                                 v-if='deletingKey === debriefKeyOf(d)'
-                                class='small d-flex flex-wrap align-items-center gap-2 ps-3 py-1'
+                                class='cloudtak-accent border border-warning rounded-3 my-2 p-2 small'
+                                role='alertdialog'
                             >
-                                <span class='text-danger'>
-                                    Delete this completed assignment?<span
-                                        v-if='d.tracks?.length'
-                                    > Its track lines stay in the OP sync.</span>
-                                </span>
-                                <button
-                                    class='btn btn-danger btn-sm py-0'
-                                    :disabled='busy'
-                                    @click='onDeleteDebrief(d)'
-                                >
-                                    Delete
-                                </button>
-                                <button
-                                    class='btn btn-link btn-sm p-0'
-                                    :disabled='busy'
-                                    @click='deletingKey = null'
-                                >
-                                    Cancel
-                                </button>
+                                <div class='d-flex align-items-start gap-2'>
+                                    <IconAlertTriangle
+                                        class='text-warning flex-shrink-0'
+                                        :size='20'
+                                        :stroke-width='1.5'
+                                    />
+                                    <div>
+                                        <div class='fw-bold text-warning'>
+                                            Delete this debrief?
+                                        </div>
+                                        <div>
+                                            OP{{ d.opNumber }} · {{ d.label || segmentLabel(d.segmentUid) }}<span
+                                                v-if='d.resource'
+                                            > · {{ d.resource }}</span> · {{ debriefBadge(d) }}.
+                                            <span v-if='d.pod !== undefined'>Its POD comes out of the CASIE rollup and the POAs change.</span>
+                                            This cannot be undone.<span
+                                                v-if='d.tracks?.length'
+                                            > Its track lines stay in the OP sync.</span>
+                                        </div>
+                                        <div class='d-flex gap-2 mt-2'>
+                                            <button
+                                                class='btn btn-danger btn-sm'
+                                                :disabled='busy'
+                                                @click='onDeleteDebrief(d)'
+                                            >
+                                                {{ busy ? 'Deleting…' : 'Delete debrief' }}
+                                            </button>
+                                            <button
+                                                class='btn btn-outline-secondary btn-sm'
+                                                :disabled='busy'
+                                                @click='deletingKey = null'
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Attached tracks -->
@@ -1256,7 +1283,7 @@
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useIncidentChanges } from '../../../composables/useIncidentChanges.ts';
 import { OP_LIST_PREFIXES, touchesPrefixes } from '../../../lib/screenKeys.ts';
-import { IconRoute } from '@tabler/icons-vue';
+import { IconAlertTriangle, IconRoute, IconTrash } from '@tabler/icons-vue';
 import { TablerBorder, TablerEnum, TablerInlineAlert, TablerInput } from '@tak-ps/vue-tabler';
 import OverlayManager from '../../../../../../src/base/overlay.ts';
 import { useMapStore } from '../../../../../../src/stores/map.ts';
