@@ -273,8 +273,8 @@ function buildParts(f: SubjectForm): string[] {
     if (hasValue(f.subjectExperience)) parts.push(`Experience: ${f.subjectExperience.trim()}`);
     if (hasValue(f.subjectEquipment)) parts.push(`Equipment: ${f.subjectEquipment.trim()}`);
     if (hasValue(f.subjectPhoto)) parts.push(`Photo: ${f.subjectPhoto.trim()}`);
-    if (hasValue(f.subjectIppFromTak)) parts.push(`IPP (DataSync): ${f.subjectIppFromTak.trim()}`);
-    else if (hasValue(f.subjectIpp)) parts.push(`IPP: ${f.subjectIpp.trim()}`);
+    if (hasValue(f.subjectIppFromTak)) parts.push(`Estimated Location (DataSync): ${f.subjectIppFromTak.trim()}`);
+    else if (hasValue(f.subjectIpp)) parts.push(`Estimated Location: ${f.subjectIpp.trim()}`);
     if (hasValue(f.subjectTimeWentMissing)) parts.push(`Missing: ${f.subjectTimeWentMissing}`);
     if (hasValue(f.subjectTimeReportedMissing)) parts.push(`Reported: ${f.subjectTimeReportedMissing}`);
     if (hasValue(f.subjectReportedMissingBy)) parts.push(`Reported by: ${f.subjectReportedMissingBy}`);
@@ -386,9 +386,9 @@ export function subjectDetailRows(s: SubjectForm): SubjectDetailRow[] {
     if (hasValue(s.subjectEquipment)) rows.push({ label: 'Equipment', value: s.subjectEquipment.trim() });
     if (hasValue(s.subjectPhoto)) rows.push({ label: 'Photo', value: s.subjectPhoto.trim() });
     if (hasValue(s.subjectIppFromTak)) {
-        rows.push({ label: 'IPP (DataSync)', value: s.subjectIppFromTak.trim() });
+        rows.push({ label: 'Estimated Location (DataSync)', value: s.subjectIppFromTak.trim() });
     } else if (hasValue(s.subjectIpp)) {
-        rows.push({ label: 'IPP', value: s.subjectIpp.trim() });
+        rows.push({ label: 'Estimated Location', value: s.subjectIpp.trim() });
     }
     if (hasValue(s.subjectTimeWentMissing)) {
         rows.push({ label: 'Time Went Missing', value: s.subjectTimeWentMissing });

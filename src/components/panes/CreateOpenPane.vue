@@ -189,7 +189,7 @@
                     </div>
                     <div class='form-text'>
                         Optional: an active incident event this mission belongs to. Picking one fills
-                        Activity Number, Date, Location Coordinates and Subject Profile.
+                        Activity Number, Date, Estimated Location (Coordinates) and Subject Profile.
                         <span
                             v-if='eventsError'
                             class='text-warning'
@@ -243,7 +243,7 @@
                     <div class='col-md-8'>
                         <TablerInput
                             v-model='form.coords'
-                            label='Location Coordinates'
+                            label='Estimated Location (Coordinates)'
                             description='Supports decimal degrees, DMS, DM, and MPS (blank = none).'
                             placeholder='40.0150, -105.2705 or 40 00 54 -105 16 14'
                         />
@@ -752,8 +752,8 @@ function fillFromCad(): void {
     } else missing.push('Date');
     if (fields.coords) {
         form.coords = fields.coords;
-        filled.push('Location Coordinates');
-    } else missing.push('Location Coordinates');
+        filled.push('Estimated Location (Coordinates)');
+    } else missing.push('Estimated Location (Coordinates)');
     cadResultError.value = !filled.length;
     cadResult.value = [
         filled.length ? `Filled: ${filled.join(', ')}.` : '',
