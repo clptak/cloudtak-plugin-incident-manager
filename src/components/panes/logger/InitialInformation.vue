@@ -238,18 +238,40 @@
                         />
                     </div>
                     <div class='modal-body'>
-                        <div class='d-flex align-items-center justify-content-between mb-2'>
-                            <span class='text-muted small'>
-                                Review parsed call-note entries before posting to DataSync.
+                        <div class='d-flex flex-wrap align-items-center gap-2 mb-2'>
+                            <span class='text-muted small me-auto'>
+                                Choose FIELD or MGMT for each entry to log. Click a choice again to clear it.
                             </span>
-                            <button
-                                v-if='rows.length'
-                                type='button'
-                                class='btn btn-sm btn-link p-0'
-                                @click='toggleAll'
-                            >
-                                {{ allSelected ? 'Deselect all' : 'Select all' }}
-                            </button>
+                            <template v-if='rows.length'>
+                                <button
+                                    type='button'
+                                    class='btn btn-sm btn-outline-azure'
+                                    @click='setAllDests("field")'
+                                >
+                                    All FIELD
+                                </button>
+                                <button
+                                    type='button'
+                                    class='btn btn-sm btn-outline-purple'
+                                    :disabled='!activeMission?.mgmt'
+                                    @click='setAllDests("mgmt")'
+                                >
+                                    All MGMT
+                                </button>
+                                <button
+                                    type='button'
+                                    class='btn btn-sm btn-link p-0'
+                                    @click='setAllDests(null)'
+                                >
+                                    Clear
+                                </button>
+                            </template>
+                        </div>
+                        <div
+                            v-if='checkingDuplicates'
+                            class='small text-muted mb-2'
+                        >
+                            Checking for entries already logged…
                         </div>
 
                         <div
@@ -275,17 +297,36 @@
                             v-else
                             style='max-height: 50vh; overflow: auto;'
                         >
-                            <label
+                            <div
                                 v-for='(r, i) in rows'
                                 :key='i'
                                 class='border-bottom py-2 small d-flex gap-2'
-                                style='cursor: pointer;'
                             >
-                                <input
-                                    v-model='selected[i]'
-                                    type='checkbox'
-                                    class='form-check-input mt-1 flex-shrink-0'
+                                <div
+                                    class='btn-group btn-group-sm flex-shrink-0 align-self-start'
+                                    role='group'
+                                    :aria-label='`Destination for entry ${i + 1}`'
                                 >
+                                    <button
+                                        type='button'
+                                        class='btn'
+                                        :class='dests[i] === "field" ? "btn-azure" : "btn-outline-azure"'
+                                        :aria-pressed='dests[i] === "field"'
+                                        @click='pickDest(i, "field")'
+                                    >
+                                        FIELD
+                                    </button>
+                                    <button
+                                        type='button'
+                                        class='btn'
+                                        :class='dests[i] === "mgmt" ? "btn-purple" : "btn-outline-purple"'
+                                        :aria-pressed='dests[i] === "mgmt"'
+                                        :disabled='!activeMission?.mgmt'
+                                        @click='pickDest(i, "mgmt")'
+                                    >
+                                        MGMT
+                                    </button>
+                                </div>
                                 <span>
                                     <span class='text-muted'>{{ r.dtg }} · {{ r.uid }}</span>
                                     <br>
@@ -296,8 +337,14 @@
                                     >
                                         {{ r.lat }}, {{ r.lon }}
                                     </span>
+                                    <span
+                                        v-if='duplicates[i]?.field || duplicates[i]?.mgmt'
+                                        class='text-warning d-block'
+                                    >
+                                        Already logged in {{ [duplicates[i].field ? 'FIELD' : '', duplicates[i].mgmt ? 'MGMT' : ''].filter(Boolean).join(' and ') }}
+                                    </span>
                                 </span>
-                            </label>
+                            </div>
                         </div>
 
                         <div
@@ -330,7 +377,7 @@
                             :disabled='!selectedCount || posting'
                             @click='onPostLogs'
                         >
-                            {{ posting ? 'Posting…' : `Post ${selectedCount} entr${selectedCount === 1 ? "y" : "ies"} to DataSync` }}
+                            {{ posting ? 'Adding…' : 'Add Logs to DataSync(s)' }}
                         </button>
                     </div>
                 </div>
@@ -353,6 +400,13 @@ import {
     TablerInlineAlert,
 } from '@tak-ps/vue-tabler';
 import { parseCadImport, type CadImport, type MpsRow } from '../../../lib/mpsParser.ts';
+import {
+    callNoteContent,
+    callNoteDuplicates,
+    toggleDest,
+    type CallNoteDest,
+    type CallNoteDuplicate,
+} from '../../../lib/callNoteRouting.ts';
 import { applyCadToSchema, takeCadText } from '../../../lib/cadImport.ts';
 import {
     applyParsedCadToForm,
@@ -397,7 +451,9 @@ const loadingIncident = ref(false);
 const cfsExpanded = ref(false);
 const cadText = ref('');
 const rows = ref<MpsRow[]>([]);
-const selected = ref<boolean[]>([]);
+const dests = ref<CallNoteDest[]>([]);
+const duplicates = ref<CallNoteDuplicate[]>([]);
+const checkingDuplicates = ref(false);
 const parsedActivityNumber = ref<string | null>(null);
 const parsedReportNumber = ref<string | null>(null);
 const posting = ref(false);
@@ -427,14 +483,39 @@ const demaInvalid = computed(
     () => !isValidDemaMission(incidentForm.demaMission),
 );
 
-const selectedCount = computed(() => selected.value.filter(Boolean).length);
-const allSelected = computed(
-    () => rows.value.length > 0 && selectedCount.value === rows.value.length,
-);
+const selectedCount = computed(() => dests.value.filter(Boolean).length);
 
-function toggleAll(): void {
-    const next = !allSelected.value;
-    selected.value = rows.value.map(() => next);
+function pickDest(i: number, picked: 'field' | 'mgmt'): void {
+    dests.value[i] = toggleDest(dests.value[i] ?? null, picked);
+}
+
+function setAllDests(dest: CallNoteDest): void {
+    dests.value = rows.value.map(() => dest);
+}
+
+/** Flag parsed entries whose wording is already logged on FIELD or MGMT. */
+async function checkDuplicates(): Promise<void> {
+    const mission = activeMission.value;
+    duplicates.value = [];
+    if (!mission || !rows.value.length) return;
+    checkingDuplicates.value = true;
+    const contents = async (load: () => ReturnType<typeof loadSub>): Promise<string[]> => {
+        try {
+            const logs = await (await load()).log.list({ refresh: true });
+            return logs.map((l) => String(l.content ?? ''));
+        } catch {
+            return [];
+        }
+    };
+    try {
+        const [field, mgmt] = await Promise.all([
+            contents(loadSub),
+            mission.mgmt ? contents(loadSchemaSub) : Promise.resolve([]),
+        ]);
+        duplicates.value = callNoteDuplicates(rows.value, { field, mgmt });
+    } finally {
+        checkingDuplicates.value = false;
+    }
 }
 
 function closeParsedModal(): void {
@@ -637,7 +718,8 @@ async function parse(): Promise<void> {
     const cad = parseCadImport(cadText.value);
     const { header, activityNumber, reportNumber } = cad;
     rows.value = cad.rows;
-    selected.value = cad.rows.map(() => true);
+    dests.value = cad.rows.map(() => null);
+    void checkDuplicates();
     parsedActivityNumber.value = activityNumber;
     parsedReportNumber.value = reportNumber;
     applyParsedCadToForm(incidentForm, {
@@ -717,31 +799,38 @@ async function postLogs(): Promise<void> {
     status.value = '';
     statusError.value = false;
 
-    let ok = 0;
+    const counts = { field: 0, mgmt: 0 };
     let failed = 0;
     try {
-        const sub = await loadSub();
-
-        const toPost = rows.value.filter((_, i) => selected.value[i]);
-        for (const r of toPost) {
-            const coords = (r.lat !== '' && r.lon !== '') ? ` [${r.lat}, ${r.lon}]` : '';
-            const keywords = ['source:CAD'];
-            if (r.uid) keywords.push(`uid:${r.uid}`);
-            try {
-                await sub.log.create({
-                    dtg: toDtg(r.dtg),
-                    content: `${r.remark}${coords}`,
-                    keywords,
-                });
-                ok++;
-            } catch {
-                failed++;
+        const toPost = rows.value.filter((_, i) => dests.value[i]);
+        for (const target of ['field', 'mgmt'] as const) {
+            const batch = rows.value.filter((_, i) => dests.value[i] === target);
+            if (!batch.length) continue;
+            const sub = target === 'mgmt' ? await loadSchemaSub() : await loadSub();
+            for (const r of batch) {
+                const keywords = ['source:CAD'];
+                if (r.uid) keywords.push(`uid:${r.uid}`);
+                try {
+                    await sub.log.create({
+                        dtg: toDtg(r.dtg),
+                        content: callNoteContent(r),
+                        keywords,
+                    });
+                    counts[target]++;
+                } catch {
+                    failed++;
+                }
             }
         }
+        const ok = counts.field + counts.mgmt;
 
         statusError.value = failed > 0;
-        status.value = `Posted ${ok} log${ok === 1 ? '' : 's'} to ${activeMission.value.name}`
-            + (failed ? `, ${failed} failed.` : '.');
+        const parts: string[] = [];
+        if (counts.field) parts.push(`${counts.field} to FIELD (${activeMission.value.name})`);
+        if (counts.mgmt) parts.push(`${counts.mgmt} to MGMT (${activeMission.value.mgmt?.name ?? 'MGMT'})`);
+        status.value = `Added ${ok} log${ok === 1 ? '' : 's'}${parts.length ? `: ${parts.join(', ')}` : ''}`
+            + (failed ? `; ${failed} failed.` : '.');
+        if (ok) void checkDuplicates();
 
         if (ok > 0 && !rows.value.length) {
             const schemaSub = await loadSchemaSub();
