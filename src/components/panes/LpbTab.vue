@@ -4,6 +4,70 @@
             Arizona Distance Traveled Statistics
         </h3>
 
+        <TablerBorder
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0 d-flex align-items-center w-100'>
+                    <span>Plot rings around</span>
+                    <button
+                        type='button'
+                        class='btn btn-outline-primary btn-sm ms-auto'
+                        :disabled='loadingCenters'
+                        @click='loadCenters'
+                    >
+                        {{ loadingCenters ? 'Loading…' : 'Refresh' }}
+                    </button>
+                </p>
+            </template>
+            <select
+                v-model='centerChoice'
+                class='form-select form-select-sm mb-2'
+            >
+                <option
+                    v-for='c in centerChoices'
+                    :key='c.value'
+                    :value='c.value'
+                >
+                    {{ c.label }}
+                </option>
+                <option value='manual'>
+                    Enter coordinates…
+                </option>
+            </select>
+            <template v-if='centerChoice === "manual"'>
+                <TablerInput
+                    v-model='manualInput'
+                    placeholder='33.4484, -112.0740 or 33 26 54 -112 04 26'
+                />
+                <div class='form-text'>
+                    <span
+                        v-if='parsedManual'
+                        class='text-success'
+                    >→ {{ parsedManual.lat.toFixed(5) }}, {{ parsedManual.lng.toFixed(5) }}</span>
+                    <span
+                        v-else-if='manualInput'
+                        class='text-danger'
+                    >→ unrecognized format</span>
+                    <span v-else>Supports decimal degrees, DMS, DM, and MPS.</span>
+                </div>
+            </template>
+            <div class='form-text'>
+                Try any location for planning. Plotting rings does not set the IPP — that
+                is set in Search Area.
+            </div>
+            <TablerInlineAlert
+                v-if='centerError'
+                class='mt-2'
+                severity='warning'
+                title='Locations'
+                :description='centerError'
+            />
+        </TablerBorder>
+
         <TablerInput
             v-model='filter'
             class='mb-3'
@@ -133,94 +197,26 @@
                     </div>
                     <div class='modal-body'>
                         <TablerInlineAlert
-                            v-if='ippLoadError'
-                            class='mb-3'
-                            severity='warning'
-                            title='IPP'
-                            :description='ippLoadError'
-                        />
-                        <TablerInlineAlert
                             v-if='modalError'
                             class='mb-3'
                             severity='danger'
                             title='Error'
                             :description='modalError'
                         />
-
                         <p
-                            v-if='ippCenter && ippStoredType'
-                            class='text-muted small mb-3'
+                            v-if='plotCenter'
+                            class='text-muted small mb-2'
                         >
-                            {{ formatIppSummary(ippCenter, ippStoredType) }}
+                            {{ lpbCenterSummary(plotCenterLabel, plotCenter) }}
                         </p>
-
-                        <template v-else-if='!ippLoading && !ippLoadError'>
-                            <p class='text-muted small mb-2'>
-                                No IPP is set yet. Choose coordinates or a DataSync
-                                point, then Add to Map will set the IPP and plot the rings.
-                            </p>
-                            <TablerInput
-                                v-model='ippInput'
-                                label='IPP Coordinates'
-                                :disabled='!!selectedObjectUid'
-                                placeholder='40.0150, -105.2705 or 40 00 54 -105 16 14'
-                            />
-                            <div class='form-text mb-3'>
-                                <span
-                                    v-if='selectedObjectUid'
-                                    class='text-muted'
-                                >Using selected DataSync object.</span>
-                                <span
-                                    v-else-if='parsedIpp'
-                                    class='text-success'
-                                >→ {{ parsedIpp.lat.toFixed(5) }}, {{ parsedIpp.lng.toFixed(5) }}</span>
-                                <span
-                                    v-else-if='ippInput'
-                                    class='text-danger'
-                                >→ unrecognized format</span>
-                                <span v-else>Supports decimal degrees, DMS, DM, and MPS.</span>
-                            </div>
-
-                            <p class='text-uppercase text-white-50 small mb-1'>
-                                OR Choose DataSync Object
-                            </p>
-                            <select
-                                v-model='selectedObjectUid'
-                                class='form-select form-select-sm mb-2'
-                            >
-                                <option value=''>
-                                    — none (use coordinates above) —
-                                </option>
-                                <option
-                                    v-for='m in missionMarkers'
-                                    :key='m.uid'
-                                    :value='m.uid'
-                                >
-                                    {{ m.callsign }}
-                                </option>
-                            </select>
-                            <div
-                                v-if='loadingFeatures'
-                                class='form-text mb-3'
-                            >
-                                Loading mission objects…
-                            </div>
-                            <div
-                                v-else-if='!missionMarkers.length'
-                                class='form-text text-muted mb-3'
-                            >
-                                No point markers in the active DataSync.
-                            </div>
-
-                            <TablerEnum
-                                v-model='ippTypeLabel'
-                                label='IPP Type'
-                                :options='IPP_TYPE_OPTIONS'
-                            />
-                        </template>
-
+                        <p
+                            v-else
+                            class='text-warning small mb-2'
+                        >
+                            Choose a location under "Plot rings around" first.
+                        </p>
                         <p class='text-muted small mb-2 mt-3'>
-                            Plot selected percentile rings at the incident IPP.
+                            Plot the selected percentile rings:
                         </p>
                         <label
                             v-for='opt in modalOptions'
@@ -246,11 +242,21 @@
                         </button>
                         <button
                             type='button'
-                            class='btn btn-primary'
+                            class='btn btn-azure'
+                            title='The incident DataSync field teams see'
                             :disabled='!canPlot'
-                            @click='onAddToMap'
+                            @click='onAddToMap("field")'
                         >
-                            {{ pushing ? 'Sending…' : 'Add to Map' }}
+                            {{ pushing === 'field' ? 'Adding…' : 'FIELD' }}
+                        </button>
+                        <button
+                            type='button'
+                            class='btn btn-purple'
+                            :title='activeMission?.mgmt ? "The sworn-only planning DataSync" : "This incident has no MGMT DataSync"'
+                            :disabled='!canPlot || !activeMission?.mgmt'
+                            @click='onAddToMap("mgmt")'
+                        >
+                            {{ pushing === 'mgmt' ? 'Adding…' : 'MGMT' }}
                         </button>
                     </div>
                 </div>
@@ -264,27 +270,21 @@
 </template>
 
 <script setup lang='ts'>
-import { computed, ref } from 'vue';
-import { TablerEnum, TablerInlineAlert, TablerInput } from '@tak-ps/vue-tabler';
+import { computed, ref, watch } from 'vue';
+import { TablerBorder, TablerInlineAlert, TablerInput } from '@tak-ps/vue-tabler';
 import { useIncident } from '../../composables/useIncident.ts';
 import { usePluginSettings } from '../../composables/usePluginSettings.ts';
 import { parseCoordinates } from '../../lib/coords.ts';
-import {
-    ensureIncidentIpp,
-    listIncidentPointFeatures,
-    type IncidentPointFeature,
-} from '../../lib/ensureIncidentIpp.ts';
+import { listIncidentPointFeatures } from '../../lib/ensureIncidentIpp.ts';
 import { attachFeaturesToFolder, ensureMissionFolder } from '../../lib/folder.ts';
+import { readIppFromSchema } from '../../lib/ippPersistence.ts';
 import {
-    formatIppSummary,
-    IPP_TYPE_OPTIONS,
-    ippTypeFromLabel,
-} from '../../lib/ippFormat.ts';
-import { readIppFromSchema, type IppType } from '../../lib/ippPersistence.ts';
-import {
+    loadIncidentSubscription,
     loadSchemaSubscription,
+    missionAuthToken,
     schemaMission,
 } from '../../lib/incidentSubscription.ts';
+import { lpbCenterChoices, lpbCenterSummary, type LpbCenterChoice } from '../../lib/lpbCenter.ts';
 import {
     filterLpbRows,
     formatLpbCases,
@@ -300,6 +300,8 @@ import { loadMissionSchema } from '../../lib/missionSchema.ts';
 import { circleRing } from '../../lib/rings.ts';
 import type { AzlpbEntry } from '../../lib/pluginSettings.ts';
 
+type Target = 'field' | 'mgmt';
+
 const { activeMission, requireActiveMission } = useIncident();
 const { lpbTable } = usePluginSettings();
 
@@ -309,94 +311,80 @@ const error = ref('');
 
 const modalRow = ref<AzlpbEntry | null>(null);
 const modalOptions = ref<LpbQuartileOption[]>([]);
-const ippCenter = ref<[number, number] | null>(null);
-const ippStoredType = ref<IppType | null>(null);
-const ippLoadError = ref('');
-const ippLoading = ref(false);
-const pushing = ref(false);
+const pushing = ref<Target | null>(null);
 const modalError = ref('');
 
-const ippInput = ref('');
-const selectedObjectUid = ref('');
-const ippTypeLabel = ref(IPP_TYPE_OPTIONS[0]);
-const missionMarkers = ref<IncidentPointFeature[]>([]);
-const loadingFeatures = ref(false);
+const centerChoices = ref<LpbCenterChoice[]>([]);
+const centerChoice = ref('manual');
+const manualInput = ref('');
+const loadingCenters = ref(false);
+const centerError = ref('');
 
 const filteredRows = computed(() => filterLpbRows(lpbTable.value, filter.value));
 
 const selectedOptions = computed(() => modalOptions.value.filter((opt) => opt.selected));
 
-const parsedIpp = computed(() => parseCoordinates(ippInput.value));
+const parsedManual = computed(() => parseCoordinates(manualInput.value));
 
-const pendingCenter = computed<[number, number] | null>(() => {
-    if (selectedObjectUid.value) {
-        const marker = missionMarkers.value.find((m) => m.uid === selectedObjectUid.value);
-        return marker?.coords ?? null;
+const plotCenter = computed<[number, number] | null>(() => {
+    if (centerChoice.value === 'manual') {
+        return parsedManual.value ? [parsedManual.value.lng, parsedManual.value.lat] : null;
     }
-    if (parsedIpp.value) return [parsedIpp.value.lng, parsedIpp.value.lat];
-    return null;
+    return centerChoices.value.find((c) => c.value === centerChoice.value)?.coords ?? null;
 });
 
-const plotCenter = computed<[number, number] | null>(() => ippCenter.value ?? pendingCenter.value);
+const plotCenterLabel = computed(() => (centerChoice.value === 'manual'
+    ? 'the entered coordinates'
+    : centerChoices.value.find((c) => c.value === centerChoice.value)?.label ?? ''));
 
 const canPlot = computed(() => (
     !!modalRow.value
     && selectedOptions.value.length > 0
     && !!plotCenter.value
-    && !ippLoading.value
     && !pushing.value
-    && !ippLoadError.value
 ));
 
-function resetIppPicker(): void {
-    ippInput.value = '';
-    selectedObjectUid.value = '';
-    ippTypeLabel.value = IPP_TYPE_OPTIONS[0];
-    missionMarkers.value = [];
-    loadingFeatures.value = false;
+/** IPP, subjects' estimated locations and DataSync markers to centre rings on. */
+async function loadCenters(): Promise<void> {
+    const mission = activeMission.value;
+    if (!mission) {
+        centerChoices.value = [];
+        return;
+    }
+    loadingCenters.value = true;
+    centerError.value = '';
+    try {
+        let schema = null;
+        let ippType: string | undefined;
+        try {
+            const loaded = await loadMissionSchema(await loadSchemaSubscription(mission));
+            schema = loaded.schema;
+            ippType = readIppFromSchema(loaded.schema)?.type;
+        } catch (err) {
+            centerError.value = `Could not read the IPP and subjects: ${err instanceof Error ? err.message : String(err)}`;
+        }
+        const markers = await listIncidentPointFeatures(mission);
+        centerChoices.value = lpbCenterChoices({ schema, ippType, markers });
+        if (!centerChoices.value.some((c) => c.value === centerChoice.value) && centerChoice.value !== 'manual') {
+            centerChoice.value = 'manual';
+        }
+        if (centerChoice.value === 'manual' && !manualInput.value && centerChoices.value.length) {
+            centerChoice.value = centerChoices.value[0].value;
+        }
+    } catch (err) {
+        centerError.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        loadingCenters.value = false;
+    }
 }
+
+watch(() => activeMission.value?.guid, () => void loadCenters(), { immediate: true });
 
 function closeModal(): void {
     if (pushing.value) return;
     modalRow.value = null;
     modalOptions.value = [];
-    ippCenter.value = null;
-    ippStoredType.value = null;
-    ippLoadError.value = '';
     modalError.value = '';
-    resetIppPicker();
-}
-
-async function loadIppAndMarkers(): Promise<void> {
-    ippLoading.value = true;
-    ippLoadError.value = '';
-    ippCenter.value = null;
-    ippStoredType.value = null;
-    try {
-        const mission = activeMission.value;
-        if (!mission) {
-            ippLoadError.value = 'Select or create an incident in Create | Open first.';
-            return;
-        }
-        const sub = await loadSchemaSubscription(mission);
-        const loaded = await loadMissionSchema(sub);
-        const ipp = readIppFromSchema(loaded.schema);
-        if (ipp) {
-            ippCenter.value = [ipp.lng, ipp.lat];
-            ippStoredType.value = ipp.type;
-            return;
-        }
-        loadingFeatures.value = true;
-        try {
-            missionMarkers.value = await listIncidentPointFeatures(mission);
-        } finally {
-            loadingFeatures.value = false;
-        }
-    } catch (err) {
-        ippLoadError.value = err instanceof Error ? err.message : String(err);
-    } finally {
-        ippLoading.value = false;
-    }
 }
 
 function openAddToMap(row: AzlpbEntry): void {
@@ -404,14 +392,12 @@ function openAddToMap(row: AzlpbEntry): void {
     notice.value = '';
     error.value = '';
     modalError.value = '';
-    resetIppPicker();
     modalRow.value = row;
     modalOptions.value = lpbQuartileOptions(row);
-    void loadIppAndMarkers();
 }
 
 async function takenFolderNames(
-    sub: Awaited<ReturnType<typeof loadSchemaSubscription>>,
+    sub: Awaited<ReturnType<typeof loadIncidentSubscription>>,
 ): Promise<Set<string>> {
     const taken = new Set<string>();
     try {
@@ -425,11 +411,13 @@ async function takenFolderNames(
     return taken;
 }
 
-async function onAddToMap(): Promise<void> {
+async function onAddToMap(target: Target): Promise<void> {
     if (!canPlot.value) return;
     const mission = activeMission.value;
     const row = modalRow.value;
-    if (!mission || !row) return;
+    const center = plotCenter.value;
+    if (!mission || !row || !center) return;
+    if (target === 'mgmt' && !mission.mgmt) return;
 
     const rings = selectedOptions.value.filter((opt) => opt.meters > 0);
     if (!rings.length) {
@@ -437,29 +425,15 @@ async function onAddToMap(): Promise<void> {
         return;
     }
 
-    pushing.value = true;
+    pushing.value = target;
     notice.value = '';
     error.value = '';
     modalError.value = '';
     try {
-        let center = ippCenter.value;
-        if (!center) {
-            const pending = pendingCenter.value;
-            if (!pending) {
-                modalError.value = 'Set IPP coordinates or choose a DataSync object.';
-                return;
-            }
-            const result = await ensureIncidentIpp({
-                mission,
-                type: ippTypeFromLabel(ippTypeLabel.value),
-                coords: pending,
-                existingUid: selectedObjectUid.value || undefined,
-            });
-            center = result.coords;
-        }
-
-        const sub = await loadSchemaSubscription(mission);
-        const planning = schemaMission(mission);
+        const sub = target === 'mgmt' ? await loadSchemaSubscription(mission) : await loadIncidentSubscription(mission);
+        const dest = target === 'mgmt'
+            ? schemaMission(mission)
+            : { guid: mission.guid, name: mission.name, missionToken: missionAuthToken(mission) };
         const taken = await takenFolderNames(sub);
         const folderName = uniqueLpbFolderName(lpbFolderName(row.category), taken);
         let folderUid: string | undefined;
@@ -473,8 +447,8 @@ async function onAddToMap(): Promise<void> {
         const postedUids: string[] = [];
         for (const opt of rings) {
             postedUids.push(await pushPolygonToMission({
-                missionGuid: planning.guid,
-                missionToken: planning.missionToken,
+                missionGuid: dest.guid,
+                missionToken: dest.missionToken,
                 callsign: opt.label,
                 ring: circleRing(center[0], center[1], opt.meters),
                 center,
@@ -492,13 +466,13 @@ async function onAddToMap(): Promise<void> {
         }
 
         const n = postedUids.length;
-        notice.value = `Added ${n} LPB ring${n === 1 ? '' : 's'} for ${row.category}${folderUid ? ` (${folderName})` : ''}.`;
-        pushing.value = false;
+        notice.value = `Added ${n} LPB ring${n === 1 ? '' : 's'} for ${row.category} to the ${target === 'mgmt' ? 'MGMT' : 'FIELD'} DataSync (${dest.name})${folderUid ? `, folder ${folderName}` : ''}.`;
+        pushing.value = null;
         closeModal();
     } catch (err) {
         modalError.value = err instanceof Error ? err.message : String(err);
     } finally {
-        pushing.value = false;
+        pushing.value = null;
     }
 }
 </script>
