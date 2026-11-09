@@ -57,7 +57,7 @@
                         :disabled='busy'
                         @click='onSave'
                     >
-                        {{ busy ? 'Saving…' : 'Save' }}
+                        {{ busy ? 'Saving…' : 'Save to MGMT DataSync' }}
                     </button>
                     <button
                         class='btn btn-success btn-sm'
@@ -908,7 +908,7 @@ async function onSave(): Promise<void> {
     error.value = ''; notice.value = '';
     try {
         await saveIapPlan(mission, plan.value);
-        notice.value = `Saved IAP for OP${plan.value.opNumber}.`;
+        notice.value = `Saved the IAP for OP${plan.value.opNumber} to the MGMT DataSync.`;
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
     } finally {

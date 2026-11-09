@@ -142,8 +142,8 @@ export function useWorkAssignments() {
                 schemaHash.value,
             );
             statusMessage.value = phase === 'started'
-                ? `Assignment ${current.assignmentNumber} start sent to DataSync`
-                : `Assignment ${current.assignmentNumber} completion sent to DataSync`;
+                ? `Assignment ${current.assignmentNumber} start logged to the FIELD DataSync`
+                : `Assignment ${current.assignmentNumber} completion logged to the FIELD DataSync`;
         } catch (err) {
             statusError.value = true;
             statusMessage.value = err instanceof Error ? err.message : String(err);
