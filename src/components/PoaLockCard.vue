@@ -19,6 +19,12 @@
             (Dashboard → Move to Mission Properties).
         </div>
         <template v-else>
+            <p class='small text-white-50 mb-2'>
+                The POA keeps moving as debriefs and clues come in. Locking it fixes the
+                numbers an OP is planned on, so assignments and the IAP aren't built on
+                values that shift underneath them. A later correction never changes a lock:
+                the lock is marked stale and you decide whether to re-lock.
+            </p>
             <div class='d-flex flex-wrap align-items-center gap-2 mb-2'>
                 <label class='small text-white-50 mb-0'>POA for</label>
                 <select
@@ -89,21 +95,44 @@
             >
                 <thead>
                     <tr class='text-white-50'>
-                        <th>Segment</th>
+                        <th>
+                            <button
+                                type='button'
+                                class='btn btn-link btn-sm p-0 text-white-50 text-decoration-none'
+                                title='Sort by segment name'
+                                @click='sortBy("name")'
+                            >
+                                Segment{{ arrow('name') }}
+                            </button>
+                        </th>
                         <th
                             v-if='latest'
                             class='text-end'
                         >
-                            Locked POA %
+                            <button
+                                type='button'
+                                class='btn btn-link btn-sm p-0 text-white-50 text-decoration-none'
+                                title='Sort by locked POA'
+                                @click='sortBy("locked")'
+                            >
+                                Locked POA %{{ arrow('locked') }}
+                            </button>
                         </th>
                         <th class='text-end'>
-                            {{ latest ? 'Current' : 'POA %' }}
+                            <button
+                                type='button'
+                                class='btn btn-link btn-sm p-0 text-white-50 text-decoration-none'
+                                :title='latest ? "Sort by current POA" : "Sort by POA"'
+                                @click='sortBy("current")'
+                            >
+                                {{ latest ? 'Current' : 'POA %' }}{{ arrow('current') }}
+                            </button>
                         </th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr
-                        v-for='uid in rowUids'
+                        v-for='uid in sortedUids'
                         :key='uid'
                     >
                         <td>{{ labelFor(uid) }}</td>
@@ -209,6 +238,37 @@ const rowUids = computed(() => {
     const uids = props.inputs.segments.map((s) => s.uid);
     for (const uid of Object.keys(latest.value?.poa ?? {})) if (!uids.includes(uid)) uids.push(uid);
     return uids;
+});
+
+type SortKey = 'name' | 'locked' | 'current';
+const sortKey = ref<SortKey | null>(null);
+const sortAsc = ref(true);
+
+/** Click a header to sort ascending, again for descending. R.O.W. stays last. */
+function sortBy(key: SortKey): void {
+    if (sortKey.value === key) sortAsc.value = !sortAsc.value;
+    else {
+        sortKey.value = key;
+        sortAsc.value = true;
+    }
+}
+
+function arrow(key: SortKey): string {
+    if (sortKey.value !== key) return '';
+    return sortAsc.value ? ' ▲' : ' ▼';
+}
+
+const sortedUids = computed(() => {
+    const key = sortKey.value;
+    if (!key) return rowUids.value;
+    const value = (uid: string): number => {
+        const v = key === 'locked' ? latest.value?.poa[uid] : preview.value?.poa[uid];
+        return v ?? -1;
+    };
+    const sorted = [...rowUids.value].sort((a, b) => (key === 'name'
+        ? labelFor(a).localeCompare(labelFor(b), undefined, { numeric: true, sensitivity: 'base' })
+        : value(a) - value(b)));
+    return sortAsc.value ? sorted : sorted.reverse();
 });
 
 function labelFor(uid: string): string {
