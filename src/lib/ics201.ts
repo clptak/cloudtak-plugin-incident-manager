@@ -321,7 +321,7 @@ export function buildMapSketchText(
     const guid = sources.missionGuid.trim();
     lines.push(guid ? `TAK MISSION: ${missionLabel} (${guid})` : `TAK MISSION: ${missionLabel}`);
     if (form.initialPlanningPoint.trim()) {
-        lines.push(`IPP: ${form.initialPlanningPoint.trim()}`);
+        lines.push(`Estimated Location: ${form.initialPlanningPoint.trim()}`);
     }
     if (form.weatherSummary.trim()) {
         lines.push('');

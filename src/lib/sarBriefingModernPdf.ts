@@ -265,7 +265,7 @@ function drawHeaderFields(
     y -= HEADER_ROW_H + 2;
 
     const halfW = (CONTENT_W - gap) / 2;
-    drawLabelValuePair(page, font, bold, 'IPP', ipp, MARGIN_X, y, halfW);
+    drawLabelValuePair(page, font, bold, 'Estimated Location', ipp, MARGIN_X, y, halfW);
     drawLabelValuePair(page, font, bold, 'Datum', datum || 'WGS84', MARGIN_X + halfW + gap, y, halfW);
     return y - HEADER_ROW_H - 4;
 }
