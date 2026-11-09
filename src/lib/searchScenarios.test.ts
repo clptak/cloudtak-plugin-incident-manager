@@ -1,21 +1,18 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { buildSearchScenario, duplicateRanks, rankChoices } from './searchScenarios.ts';
+import { buildSearchScenario, duplicateRanks, moveItem, orderByRank, ranksFromOrder } from './searchScenarios.ts';
 
-test('rankChoices: ranks run 1..N and mark ones other scenarios hold', () => {
-    const scen = [{ key: 'A', rank: 1 }, { key: 'B', rank: null }, { key: 'C', rank: 3 }];
-    assert.deepEqual(rankChoices(scen, 'B'), [
-        { rank: 1, takenBy: 'A' },
-        { rank: 2 },
-        { rank: 3, takenBy: 'C' },
-    ]);
-    // A scenario's own rank is not "taken" for itself
-    assert.deepEqual(rankChoices(scen, 'A')[0], { rank: 1 });
+test('orderByRank: ranked by rank, unranked last, ties by letter', () => {
+    assert.deepEqual(orderByRank([
+        { key: 'C', rank: null }, { key: 'B', rank: 2 }, { key: 'A', rank: null }, { key: 'D', rank: 1 }, { key: 'E', rank: 2 },
+    ]), ['D', 'B', 'E', 'A', 'C']);
 });
 
-test('rankChoices: a single scenario can only be rank 1; a stored rank above N stays', () => {
-    assert.deepEqual(rankChoices([{ key: 'A', rank: null }], 'A'), [{ rank: 1 }]);
-    assert.equal(rankChoices([{ key: 'A', rank: 4 }], 'A').length, 4);
+test('moveItem and ranksFromOrder: a drag renumbers 1..N', () => {
+    const order = moveItem(['A', 'B', 'C', 'D'], 3, 0);
+    assert.deepEqual(order, ['D', 'A', 'B', 'C']);
+    assert.deepEqual(moveItem(['A', 'B', 'C'], 0, 2), ['B', 'C', 'A']);
+    assert.deepEqual(ranksFromOrder(order), { D: 1, A: 2, B: 3, C: 4 });
 });
 
 test('duplicateRanks: reports ties only', () => {

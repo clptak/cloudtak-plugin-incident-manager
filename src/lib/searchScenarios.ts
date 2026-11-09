@@ -147,26 +147,31 @@ export interface ScenarioRank {
     rank: number | null;
 }
 
-export interface RankChoice {
-    rank: number;
-    /** Letter of another scenario that already holds this rank. */
-    takenBy?: string;
+/**
+ * Scenario letters in ranking order for the drag list (#20): ranked first by
+ * rank, then unranked; ties by letter.
+ */
+export function orderByRank(scenarios: ScenarioRank[]): string[] {
+    return [...scenarios].sort((a, b) => {
+        if (a.rank == null && b.rank == null) return a.key.localeCompare(b.key);
+        if (a.rank == null) return 1;
+        if (b.rank == null) return -1;
+        return a.rank - b.rank || a.key.localeCompare(b.key);
+    }).map((s) => s.key);
 }
 
-/**
- * Priority is a ranking (#11): with N scenarios the ranks are 1..N and each
- * is used once. Returns the ranks `key` may pick, marking those another
- * scenario already holds. A stored rank above N stays listed so it isn't lost.
- */
-export function rankChoices(scenarios: ScenarioRank[], key: string): RankChoice[] {
-    const self = scenarios.find((s) => s.key === key);
-    const max = Math.max(scenarios.length, 1, self?.rank ?? 0);
-    const out: RankChoice[] = [];
-    for (let rank = 1; rank <= max; rank++) {
-        const other = scenarios.find((s) => s.key !== key && s.rank === rank);
-        out.push(other ? { rank, takenBy: other.key } : { rank });
-    }
+/** Move one item, as a drag-and-drop does. */
+export function moveItem<T>(list: T[], from: number, to: number): T[] {
+    const out = [...list];
+    if (from < 0 || from >= out.length) return out;
+    const [item] = out.splice(from, 1);
+    out.splice(Math.max(0, Math.min(to, out.length)), 0, item);
     return out;
+}
+
+/** Ranks from a ranking order: first is 1, with no gaps or ties. */
+export function ranksFromOrder(order: string[]): Record<string, number> {
+    return Object.fromEntries(order.map((key, i) => [key, i + 1]));
 }
 
 /** Ranks held by more than one scenario (older records allowed ties). */

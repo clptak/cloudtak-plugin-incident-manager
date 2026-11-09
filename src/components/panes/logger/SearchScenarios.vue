@@ -41,6 +41,10 @@
                     <div class='small d-flex align-items-center justify-content-between'>
                         <span>
                             <span class='badge bg-secondary me-1'>Scenario {{ s.key }}</span>
+                            <span
+                                v-if='s.fields.priority != null'
+                                class='badge bg-azure-lt me-1'
+                            >Rank {{ s.fields.priority }}</span>
                             <span class='text-muted'>{{ fmtDtg(s.created) }}</span>
                         </span>
                         <button
@@ -64,7 +68,13 @@
                 class='cloudtak-accent border rounded-3 p-2 mb-2'
             >
                 <div class='fw-bold mb-2 d-flex align-items-center justify-content-between'>
-                    <span>Scenario {{ letter }}</span>
+                    <span>
+                        Scenario {{ letter }}
+                        <span
+                            v-if='drafts[letter].priority != null'
+                            class='badge bg-azure-lt ms-1'
+                        >Rank {{ drafts[letter].priority }}</span>
+                    </span>
                     <span v-if='drafts[letter].logId'>
                         <span class='badge bg-warning text-dark me-2'>editing</span>
                         <button
@@ -82,7 +92,7 @@
                     :placeholder='`Description for Scenario ${letter}`'
                 />
                 <div class='row g-2 mt-0'>
-                    <div class='col-md-4'>
+                    <div class='col-md-6'>
                         <TablerEnum
                             :model-value='mobilityLabel(letter)'
                             label='Mobility'
@@ -90,7 +100,7 @@
                             @update:model-value='setMobilityLabel(letter, $event)'
                         />
                     </div>
-                    <div class='col-md-4'>
+                    <div class='col-md-6'>
                         <TablerEnum
                             :model-value='responsivenessLabel(letter)'
                             label='Responsiveness'
@@ -98,39 +108,69 @@
                             @update:model-value='setResponsivenessLabel(letter, $event)'
                         />
                     </div>
-                    <div class='col-md-4'>
-                        <label class='form-label small mb-1'>Priority rank</label>
-                        <select
-                            v-model='drafts[letter].priority'
-                            class='form-select form-select-sm'
-                        >
-                            <option :value='null'>
-                                —
-                            </option>
-                            <option
-                                v-for='c in rankChoices(scenarioRanks, letter)'
-                                :key='c.rank'
-                                :value='c.rank'
-                                :disabled='Boolean(c.takenBy)'
-                            >
-                                {{ c.rank }}{{ c.takenBy ? ` — Scenario ${c.takenBy}` : '' }}
-                            </option>
-                        </select>
-                    </div>
                 </div>
             </div>
 
-            <p class='form-text mt-0 mb-2'>
-                Priority is a ranking: 1 is the highest, and each rank is used by one scenario only.
-            </p>
-            <TablerInlineAlert
-                v-for='d in rankTies'
-                :key='d.rank'
-                class='mb-2'
-                severity='warning'
-                title='Shared rank'
-                :description='`Scenarios ${d.keys.join(" and ")} are both rank ${d.rank}. Give each scenario its own rank.`'
-            />
+            <div
+                v-if='scenarioRanks.length'
+                class='cloudtak-accent border rounded-3 p-2 mb-2'
+            >
+                <div class='d-flex align-items-center mb-1'>
+                    <span class='fw-bold small'>Priority ranking</span>
+                    <span class='form-text ms-2 my-0'>
+                        {{ rankEditing ? 'Drag to reorder, then click ✓ to save.' : '1 is the highest priority.' }}
+                    </span>
+                    <button
+                        type='button'
+                        class='btn btn-sm btn-ghost-secondary ms-auto p-1'
+                        :title='rankEditing ? "Save this ranking" : (scenarioRanks.length > 1 ? "Reorder the ranking" : "Add another scenario to rank")'
+                        :aria-label='rankEditing ? "Save this ranking" : "Reorder the ranking"'
+                        :disabled='savingRanks || (!rankEditing && scenarioRanks.length < 2)'
+                        @click='toggleRankEditing'
+                    >
+                        <IconPencilCheck
+                            v-if='rankEditing'
+                            :size='20'
+                            stroke='1.5'
+                        />
+                        <IconPencil
+                            v-else
+                            :size='20'
+                            stroke='1.5'
+                        />
+                    </button>
+                </div>
+                <div ref='rankListRef'>
+                    <div
+                        v-for='(key, i) in rankOrder'
+                        :key='key'
+                        class='d-flex align-items-center gap-2 py-1 border-bottom small'
+                    >
+                        <IconGripVertical
+                            v-if='rankEditing'
+                            class='rank-drag-handle text-white-50'
+                            style='cursor: move'
+                            :size='18'
+                            stroke='1.5'
+                        />
+                        <span class='badge bg-azure-lt'>{{ rankEditing ? i + 1 : (rankOf(key) ?? '—') }}</span>
+                        <span class='fw-bold'>Scenario {{ key }}</span>
+                        <span class='text-truncate text-white-50'>{{ descriptionOf(key) }}</span>
+                    </div>
+                </div>
+                <div
+                    v-if='rankTies.length && !rankEditing'
+                    class='form-text text-warning'
+                >
+                    Some scenarios share a rank ({{ rankTies.map((d) => `${d.keys.join(" and ")} at ${d.rank}`).join('; ') }}). Click the pencil to rank them in order.
+                </div>
+                <div
+                    v-else-if='scenarioRanks.some((r) => r.rank == null) && !rankEditing'
+                    class='form-text'
+                >
+                    Unranked scenarios are listed last. Click the pencil to rank them.
+                </div>
+            </div>
 
             <button
                 v-if='newLetters.length < availableLetters.length'
@@ -346,8 +386,10 @@
 
 <script setup lang='ts'>
 import DataSyncDestination from '../../DataSyncDestination.vue';
-import { reactive, ref, computed, onMounted, watch } from 'vue';
-import { IconChevronDown } from '@tabler/icons-vue';
+import { reactive, ref, computed, onBeforeUnmount, onMounted, watch } from 'vue';
+import { IconChevronDown, IconGripVertical, IconPencil, IconPencilCheck } from '@tabler/icons-vue';
+import Sortable from 'sortablejs';
+import type { SortableEvent } from 'sortablejs';
 import { TablerBorder, TablerInput, TablerEnum, TablerInlineAlert } from '@tak-ps/vue-tabler';
 import { loadSchemaSubscription, schemaMission } from '../../../lib/incidentSubscription.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
@@ -359,7 +401,9 @@ import {
     buildSearchScenario,
     duplicateRanks,
     isScenarioLetter,
-    rankChoices,
+    moveItem,
+    orderByRank,
+    ranksFromOrder,
     SCENARIO_LETTERS,
     type SearchScenario,
 } from '../../../lib/searchScenarios.ts';
@@ -483,12 +527,109 @@ const editorLetters = computed(() => {
     return out;
 });
 
-/** Every scenario on screen with its rank: sent ones as saved, open ones as drafted. */
+/** Every described scenario with its rank: sent ones as saved, open ones as drafted. */
 const scenarioRanks = computed(() => [
     ...visibleSent.value.map((s) => ({ key: s.key, rank: s.fields.priority })),
-    ...editorLetters.value.map((l) => ({ key: l, rank: drafts[l].priority })),
+    ...editorLetters.value
+        .filter((l) => drafts[l].description.trim())
+        .map((l) => ({ key: l, rank: drafts[l].priority })),
 ]);
 const rankTies = computed(() => duplicateRanks(scenarioRanks.value));
+
+// ---- Drag ranking (#20): pencil to reorder, check to save ------------------
+const rankEditing = ref(false);
+const savingRanks = ref(false);
+const draggedOrder = ref<string[]>([]);
+const rankOrder = computed(() => (rankEditing.value ? draggedOrder.value : orderByRank(scenarioRanks.value)));
+const rankListRef = ref<HTMLElement | null>(null);
+let sortable: Sortable | undefined;
+
+function rankOf(key: string): number | null {
+    return scenarioRanks.value.find((r) => r.key === key)?.rank ?? null;
+}
+
+function descriptionOf(key: string): string {
+    if (editorLetters.value.includes(key)) return drafts[key].description.trim();
+    return sentScenarios.value.find((s) => s.key === key)?.fields.description.trim() ?? '';
+}
+
+function onRankDrop(evt: SortableEvent): void {
+    const { oldIndex, newIndex, item, from } = evt;
+    if (oldIndex == null || newIndex == null || oldIndex === newIndex) return;
+    // Put the DOM back and let Vue re-render from the new order.
+    from.removeChild(item);
+    from.insertBefore(item, from.children[oldIndex] ?? null);
+    draggedOrder.value = moveItem(draggedOrder.value, oldIndex, newIndex);
+}
+
+watch([rankListRef, rankEditing], ([el, editing]) => {
+    if (el && editing) {
+        if (sortable && sortable.el === el) return;
+        sortable?.destroy();
+        sortable = new Sortable(el, { handle: '.rank-drag-handle', animation: 150, onEnd: onRankDrop });
+    } else if (sortable) {
+        sortable.destroy();
+        sortable = undefined;
+    }
+});
+
+onBeforeUnmount(() => {
+    sortable?.destroy();
+    sortable = undefined;
+});
+
+async function toggleRankEditing(): Promise<void> {
+    if (!rankEditing.value) {
+        draggedOrder.value = orderByRank(scenarioRanks.value);
+        rankEditing.value = true;
+        return;
+    }
+    await saveRanking(ranksFromOrder(draggedOrder.value));
+    rankEditing.value = false;
+}
+
+/**
+ * Apply a ranking: open drafts take the new ranks; sent scenarios whose rank
+ * changed get their log entry updated; the MGMT record is saved once.
+ */
+async function saveRanking(ranks: Record<string, number>): Promise<void> {
+    for (const l of editorLetters.value) {
+        if (ranks[l] != null) drafts[l].priority = ranks[l];
+    }
+    const changedSent = visibleSent.value.filter((s) => ranks[s.key] != null && s.fields.priority !== ranks[s.key]);
+    for (const s of changedSent) s.fields.priority = ranks[s.key];
+    if (!activeMission.value) return;
+    savingRanks.value = true;
+    status.value = '';
+    statusError.value = false;
+    let failed = 0;
+    try {
+        if (changedSent.length) {
+            const sub = await loadSchemaSubscription(activeMission.value);
+            for (const s of changedSent) {
+                try {
+                    await sub.log.update(s.id, {
+                        dtg: new Date().toISOString(),
+                        content: summarize(s.key, s.fields),
+                        keywords: buildKeywords(s.key, s.fields),
+                    });
+                } catch {
+                    failed++;
+                }
+            }
+        }
+        contentHash.value = await saveSearchScenariosToMission(activeMission.value, scenariosForSave(), contentHash.value);
+        statusError.value = failed > 0;
+        status.value = `Saved the priority ranking to the MGMT DataSync (${schemaMission(activeMission.value).name})`
+            + (failed ? `; ${failed} sent scenario${failed === 1 ? '' : 's'} could not be updated.` : '.');
+        if (changedSent.length) await loadSent();
+    } catch (err) {
+        statusError.value = true;
+        status.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        savingRanks.value = false;
+    }
+}
 
 function addScenario(): void {
     if (visibleCount.value < availableLetters.value.length) visibleCount.value++;
