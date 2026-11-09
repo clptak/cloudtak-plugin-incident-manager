@@ -49,7 +49,7 @@
                 <div class='col-12'>
                     <TablerInput
                         :model-value='form.initialPlanningPoint'
-                        label='Estimated Location (UTM/Map Datum)'
+                        label='Initial Planning Point (UTM/Map Datum)'
                         @update:model-value='onIppInput'
                     />
                     <div

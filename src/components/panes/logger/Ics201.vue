@@ -57,7 +57,7 @@
                 <div class='col-md-6'>
                     <TablerInput
                         :model-value='form.initialPlanningPoint'
-                        label='Estimated Location'
+                        label='Initial Planning Point'
                         @update:model-value='onIppInput'
                     />
                     <div
