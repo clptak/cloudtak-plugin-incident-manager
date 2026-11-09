@@ -33,9 +33,11 @@ function parseResponsiveness(raw: unknown): ScenarioResponsiveness {
     return '';
 }
 
+/** Priority is a rank: 1 to the number of scenario letters (A–F → 1–6). */
 function parsePriority(raw: unknown): number | null {
+    if (raw == null || raw === '') return null;
     const n = typeof raw === 'number' ? raw : Number(raw);
-    if (![1, 2, 3, 4, 5].includes(n)) return null;
+    if (!Number.isInteger(n) || n < 1 || n > SCENARIO_LETTERS.length) return null;
     return n;
 }
 
@@ -126,7 +128,7 @@ export function buildSearchScenario(
     };
 }
 
-/** Priority ascending (1→5); missing priority last; ties by letter A–F. */
+/** Priority rank ascending (1 first); missing priority last; ties by letter A–F. */
 export function sortScenariosByPriority(scenarios: SearchScenario[]): SearchScenario[] {
     return [...scenarios].sort((a, b) => {
         const ap = a.priority;
@@ -137,4 +139,45 @@ export function sortScenariosByPriority(scenarios: SearchScenario[]): SearchScen
         if (ap !== bp) return ap - bp;
         return a.letter.localeCompare(b.letter);
     });
+}
+
+/** A scenario's letter and its priority rank, for rank pickers. */
+export interface ScenarioRank {
+    key: string;
+    rank: number | null;
+}
+
+export interface RankChoice {
+    rank: number;
+    /** Letter of another scenario that already holds this rank. */
+    takenBy?: string;
+}
+
+/**
+ * Priority is a ranking (#11): with N scenarios the ranks are 1..N and each
+ * is used once. Returns the ranks `key` may pick, marking those another
+ * scenario already holds. A stored rank above N stays listed so it isn't lost.
+ */
+export function rankChoices(scenarios: ScenarioRank[], key: string): RankChoice[] {
+    const self = scenarios.find((s) => s.key === key);
+    const max = Math.max(scenarios.length, 1, self?.rank ?? 0);
+    const out: RankChoice[] = [];
+    for (let rank = 1; rank <= max; rank++) {
+        const other = scenarios.find((s) => s.key !== key && s.rank === rank);
+        out.push(other ? { rank, takenBy: other.key } : { rank });
+    }
+    return out;
+}
+
+/** Ranks held by more than one scenario (older records allowed ties). */
+export function duplicateRanks(scenarios: ScenarioRank[]): { rank: number; keys: string[] }[] {
+    const byRank = new Map<number, string[]>();
+    for (const s of scenarios) {
+        if (s.rank == null) continue;
+        byRank.set(s.rank, [...(byRank.get(s.rank) ?? []), s.key]);
+    }
+    return [...byRank.entries()]
+        .filter(([, keys]) => keys.length > 1)
+        .sort(([a], [b]) => a - b)
+        .map(([rank, keys]) => ({ rank, keys: keys.sort() }));
 }
