@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { DebriefRecord, SegmentState } from './entities.ts';
-import { applyClue, computeOpHistory, computeScenario, opNumbersIn, scenariosFromValue } from './history.ts';
+import { applyClue, clueExponent, computeOpHistory, computeScenario, opNumbersIn, scenariosFromValue } from './history.ts';
 import { computeRollup } from './rollup.ts';
 
 const SEGMENTS: SegmentState[] = [
@@ -104,30 +104,43 @@ test('applyClue: uniform letters are informationless; E default is neutral', () 
 });
 
 test('applyClue: authentic clue shifts mass toward suggested segments', () => {
-    // Wallet in segment a: a=A(9), others G(3), ROW C(7)
+    // Wallet in segment a: a=A(16), others G(2), ROW C(8)
     const result = applyClue({ a: 40, b: 30, c: 10 }, 20, {
         opNumber: 1, description: 'wallet', authenticity: 1,
         letters: { a: 'A', b: 'G', c: 'G', ROW: 'C' },
     });
-    // weights: 360, 90, 30, 140 → total 620
-    assert.equal(result.poa.a, 58.06);
-    assert.equal(result.poa.b, 14.52);
-    assert.equal(result.poa.c, 4.84);
-    assert.equal(result.rowPoa, 22.58);
+    // weights: 640, 60, 20, 160 → total 880
+    assert.equal(result.poa.a, 72.73);
+    assert.equal(result.poa.b, 6.82);
+    assert.equal(result.poa.c, 2.27);
+    assert.equal(result.rowPoa, 18.18);
     const sum = result.poa.a + result.poa.b + result.poa.c + result.rowPoa;
     assert.ok(Math.abs(sum - 100) < 0.05);
 });
 
-test('applyClue: authenticity blends toward the prior', () => {
-    const letters = { a: 'A', b: 'G', c: 'G', ROW: 'C' };
-    const zero = applyClue({ a: 40, b: 30, c: 10 }, 20, {
-        opNumber: 1, description: 'hoax', authenticity: 0, letters,
+// Win CASIE III runs posted on issue #9: R.O.W. 10, S1 50, S2 30, S3 10,
+// each clue added on its own. Expected values are WC3's Incident Status.
+const WC3_START = { s1: 50, s2: 30, s3: 10 };
+const WC3_CASES: { name: string; letters: Record<string, string>; authenticity: number; expect: [number, number, number, number] }[] = [
+    { name: 'E,A,E,I almost surely', letters: { ROW: 'E', s1: 'A', s2: 'E', s3: 'I' }, authenticity: 1, expect: [82.47, 12.37, 1.03, 4.12] },
+    { name: 'E,A,E,I probably', letters: { ROW: 'E', s1: 'A', s2: 'E', s3: 'I' }, authenticity: 0.75, expect: [76.46, 16.22, 1.91, 5.41] },
+    { name: 'E,A,E,I even chance', letters: { ROW: 'E', s1: 'A', s2: 'E', s3: 'I' }, authenticity: 0.5, expect: [68.97, 20.69, 3.45, 6.90] },
+    { name: 'E,A,E,I probably not', letters: { ROW: 'E', s1: 'A', s2: 'E', s3: 'I' }, authenticity: 0.25, expect: [60.04, 25.47, 6.00, 8.49] },
+    { name: 'E,A,E,I almost surely not', letters: { ROW: 'E', s1: 'A', s2: 'E', s3: 'I' }, authenticity: 0, expect: [50, 30, 10, 10] },
+    { name: 'C,A,C,C almost surely', letters: { ROW: 'C', s1: 'A', s2: 'C', s3: 'C' }, authenticity: 1, expect: [66.67, 20, 6.67, 6.67] },
+];
+for (const c of WC3_CASES) {
+    test(`applyClue matches Win CASIE III: ${c.name}`, () => {
+        const r = applyClue(WC3_START, 10, { opNumber: 0, description: c.name, authenticity: c.authenticity, letters: c.letters });
+        assert.deepEqual([r.poa.s1, r.poa.s2, r.poa.s3, r.rowPoa], c.expect);
     });
-    assert.deepEqual(zero.poa, { a: 40, b: 30, c: 10 });
-    const half = applyClue({ a: 40, b: 30, c: 10 }, 20, {
-        opNumber: 1, description: 'maybe', authenticity: 0.5, letters,
-    });
-    assert.ok(Math.abs(half.poa.a - 49.03) < 0.02, String(half.poa.a));
+}
+
+test('clueExponent: clues saved with the old 0.95 / 0.05 read as 1 / 0', () => {
+    assert.equal(clueExponent(0.95), 1);
+    assert.equal(clueExponent(0.05), 0);
+    assert.equal(clueExponent(0.75), 0.75);
+    assert.equal(clueExponent(50), 1);
 });
 
 test('computeOpHistory: clue applies after its OP and shows in the step', () => {

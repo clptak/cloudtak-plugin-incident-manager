@@ -17,23 +17,42 @@
 import type { ClueRecord, DebriefRecord, SegmentState } from './entities.ts';
 import { cumulativePod } from './rollup.ts';
 
-/** Clue-significance letter weights (A=9 … E=5 neutral … I=1); ratios matter. */
-const CLUE_WEIGHTS: Record<string, number> = {
-    A: 9, B: 8, C: 7, D: 6, E: 5, F: 4, G: 3, H: 2, I: 1,
-};
+/**
+ * Clue-significance letter weights, as Win CASIE III uses them: each letter
+ * is worth √2 times the next (A=16, C=8, E=4, G=2, I=1). Only ratios matter.
+ * Fitted exactly to WC3 runs on issue #9.
+ */
+const CLUE_LETTERS = 'ABCDEFGHI';
+function letterWeight(letter: string | undefined): number {
+    const i = CLUE_LETTERS.indexOf((letter ?? 'E').toUpperCase());
+    return 2 ** ((8 - (i < 0 ? 4 : i)) / 2);
+}
 
 /**
- * Apply one clue to a POA state (percentages summing to ~100 incl. ROW):
- * bayes posterior ∝ prior × letterWeight, renormalized; authenticity blends
- * posterior with prior. Missing letters default to E (neutral).
+ * The power authenticity puts on a clue's letter weights (WC3): almost surely
+ * authentic 1, probably 0.75, chances even 0.5, probably not 0.25, almost
+ * surely not 0 (no effect). Clues saved before this used 0.95 and 0.05 for
+ * the two "almost surely" choices; those read as 1 and 0.
+ */
+export function clueExponent(authenticity: number): number {
+    if (Math.abs(authenticity - 0.95) < 1e-9) return 1;
+    if (Math.abs(authenticity - 0.05) < 1e-9) return 0;
+    return Math.min(1, Math.max(0, authenticity));
+}
+
+/**
+ * Apply one clue to a POA state (percentages summing to ~100 incl. ROW),
+ * Win CASIE III eq. D.23: POA ∝ prior × IOC, renormalized with the R.O.W.,
+ * where IOC = letterWeight ^ authenticity. Missing letters default to E.
+ * Matches WC3 to the hundredth of a percent (issue #9).
  */
 export function applyClue(
     poa: Record<string, number>,
     rowPoa: number,
     clue: ClueRecord,
 ): { poa: Record<string, number>; rowPoa: number } {
-    const alpha = Math.min(1, Math.max(0, clue.authenticity));
-    const weightOf = (key: string): number => CLUE_WEIGHTS[(clue.letters[key] ?? 'E').toUpperCase()] ?? 5;
+    const power = clueExponent(clue.authenticity);
+    const weightOf = (key: string): number => letterWeight(clue.letters[key]) ** power;
 
     let total = rowPoa * weightOf('ROW');
     const weighted: Record<string, number> = {};
@@ -45,13 +64,11 @@ export function applyClue(
 
     const out: Record<string, number> = {};
     for (const [uid, value] of Object.entries(poa)) {
-        const bayes = (100 * weighted[uid]) / total;
-        out[uid] = Math.round((alpha * bayes + (1 - alpha) * value) * 100) / 100;
+        out[uid] = Math.round((10000 * weighted[uid]) / total) / 100;
     }
-    const rowBayes = (100 * rowPoa * weightOf('ROW')) / total;
     return {
         poa: out,
-        rowPoa: Math.round((alpha * rowBayes + (1 - alpha) * rowPoa) * 100) / 100,
+        rowPoa: Math.round((10000 * rowPoa * weightOf('ROW')) / total) / 100,
     };
 }
 

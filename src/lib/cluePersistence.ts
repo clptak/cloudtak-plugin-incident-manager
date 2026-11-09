@@ -10,13 +10,16 @@ import { loadSchemaSubscription, schemaMissionToken } from './incidentSubscripti
 import { loadMissionSchema, saveMissionSchema, type MissionSchema } from './missionSchema.ts';
 import { appendCasieHistory } from './segmentSplit.ts';
 
-/** ISM Table 8.18 authenticity choices (α provisional pending WC3 calibration). */
+/**
+ * ISM Table 8.18 authenticity choices. `alpha` is the power on the clue's
+ * letter weights, as Win CASIE III applies it (confirmed on issue #9).
+ */
 export const CLUE_AUTHENTICITY_OPTIONS: { label: string; alpha: number }[] = [
-    { label: 'Almost surely authentic', alpha: 0.95 },
+    { label: 'Almost surely authentic', alpha: 1 },
     { label: 'Probably authentic', alpha: 0.75 },
     { label: 'Chances about even', alpha: 0.5 },
     { label: 'Probably not authentic', alpha: 0.25 },
-    { label: 'Almost surely not authentic', alpha: 0.05 },
+    { label: 'Almost surely not authentic', alpha: 0 },
 ];
 
 export function cluesFromSchema(schema: MissionSchema): ClueRecord[] {
