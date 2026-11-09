@@ -245,14 +245,14 @@
                             <template v-if='rows.length'>
                                 <button
                                     type='button'
-                                    class='btn btn-sm btn-outline-azure'
+                                    class='btn btn-sm btn-outline btn-azure'
                                     @click='setAllDests("field")'
                                 >
                                     All FIELD
                                 </button>
                                 <button
                                     type='button'
-                                    class='btn btn-sm btn-outline-purple'
+                                    class='btn btn-sm btn-outline btn-purple'
                                     :disabled='!activeMission?.mgmt'
                                     @click='setAllDests("mgmt")'
                                 >
@@ -310,7 +310,7 @@
                                     <button
                                         type='button'
                                         class='btn'
-                                        :class='dests[i] === "field" ? "btn-azure" : "btn-outline-azure"'
+                                        :class='dests[i] === "field" ? "btn-azure" : "btn-outline btn-azure"'
                                         :aria-pressed='dests[i] === "field"'
                                         @click='pickDest(i, "field")'
                                     >
@@ -319,7 +319,7 @@
                                     <button
                                         type='button'
                                         class='btn'
-                                        :class='dests[i] === "mgmt" ? "btn-purple" : "btn-outline-purple"'
+                                        :class='dests[i] === "mgmt" ? "btn-purple" : "btn-outline btn-purple"'
                                         :aria-pressed='dests[i] === "mgmt"'
                                         :disabled='!activeMission?.mgmt'
                                         @click='pickDest(i, "mgmt")'
