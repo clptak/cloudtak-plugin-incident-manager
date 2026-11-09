@@ -10,7 +10,7 @@
  *   c.row-segments.<uid>          schema.row_segments[uid]             (map)
  *   c.resources.<id>              incident_response.resource_assignments[]
  *   c.work-assignments.<id>       incident_response.work_assignments[]
- *   c.op-assignments.<op>-<seg>   incident_response.op_assignments[]
+ *   c.op-assignments.<op>-<seg>[-<id>] incident_response.op_assignments[]
  *   c.clues.<op>-<hash>           incident_response.clues[]
  *   c.iap.<op>.<field>            incident_response.iap_plans[op][field] (one key per IAP field)
  *   c.cad-remarks.<hash>          cad_data.call_remarks[]
@@ -84,9 +84,10 @@ const SPECS: Spec[] = [
         kind: 'array',
         name: 'op-assignments',
         path: ['incident_response', 'op_assignments'],
-        // Upserted by (OP, segment), so that pair is the identity.
+        // Identity is the record's id (several resources per segment per OP);
+        // records saved before ids existed keep their (OP, segment) key.
         id: (r) => (isRecord(r) && Number.isInteger(Number(r.opNumber)) && str(r.segmentUid).trim()
-            ? `${Number(r.opNumber)}-${seg(str(r.segmentUid).trim())}`
+            ? `${Number(r.opNumber)}-${seg(str(r.segmentUid).trim())}${str(r.id).trim() ? `-${seg(str(r.id).trim())}` : ''}`
             : null),
         // Upsert moves a record to the end; ordering by creation keeps other keys still.
         order: (r) => (isRecord(r) ? `${str(r.createdAt)}|${String(r.opNumber).padStart(6, '0')}` : ''),

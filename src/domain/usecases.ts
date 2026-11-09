@@ -206,6 +206,10 @@ export async function ensureTrackLogFolder(
  * restrictions don't block this, and volunteers receive it via the OP sync's
  * field channel), and append to the running assignment list Sworn-side.
  */
+function newAssignmentId(now: Date): string {
+    return `a${now.getTime().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+}
+
 export async function publishAssignments(
     deps: {
         geometry: SegmentGeometrySource;
@@ -230,19 +234,28 @@ export async function publishAssignments(
         if (!feature) {
             throw new Error(`publishAssignments: no feature found for ${segmentUid}`);
         }
-        // Republish reuses the prior feature uid — TAK updates in place instead
-        // of duplicating features on subscriber maps.
-        const prior = existing.find(
-            (a) => a.opNumber === op.opNumber && a.segmentUid === segmentUid,
-        );
-        const opFeatureUid = await deps.publisher.publishFeature(op, feature, prior?.opFeatureUid);
+        // Several resources may work one segment in one OP. The same segment
+        // and resource again replaces that assignment; another resource adds one.
+        const team = input.team?.trim() ?? '';
+        const onSegment = existing.filter((a) => a.opNumber === op.opNumber && a.segmentUid === segmentUid);
+        const prior = onSegment.find((a) => (a.team ?? '') === team);
+        // All of a segment's assignments share one OP copy of the polygon, and
+        // republishing reuses its uid, so TAK updates it in place.
+        const sharedFeatureUid = prior?.opFeatureUid ?? onSegment.find((a) => a.opFeatureUid)?.opFeatureUid;
+        const opFeatureUid = await deps.publisher.publishFeature(op, feature, sharedFeatureUid);
+        const now = (deps.now?.() ?? new Date());
         const assignment: OpAssignment = {
             opNumber: op.opNumber,
             segmentUid,
             opFeatureUid,
             label: feature.callsign || segmentUid,
-            createdAt: prior?.createdAt ?? (deps.now?.() ?? new Date()).toISOString(),
+            createdAt: prior?.createdAt ?? now.toISOString(),
         };
+        // A replaced legacy assignment keeps having no id (its stored key);
+        // a new one gets an id so it can sit beside others on the segment.
+        const id = prior ? prior.id : newAssignmentId(now);
+        if (id) assignment.id = id;
+        existing.push(assignment);
         if (input.team?.trim()) assignment.team = input.team.trim();
         if (input.notes?.trim()) assignment.notes = input.notes.trim();
         await deps.assignments.upsert(assignment);

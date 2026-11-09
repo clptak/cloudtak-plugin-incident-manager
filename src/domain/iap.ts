@@ -49,3 +49,24 @@ export function isUasLabel(...labels: (string | undefined)[]): boolean {
     const hay = labels.filter(Boolean).join(' ').toLowerCase();
     return UAS_KEYWORDS.some((k) => hay.includes(k));
 }
+
+/** Assignments merged per segment, in first-seen order, with every team and note. */
+export function groupBySegment<T extends { segmentUid: string; team?: string; notes?: string }>(
+    list: T[],
+): Array<{ a: T; teams: string[]; notes: string[] }> {
+    const groups = new Map<string, { a: T; teams: string[]; pairs: Array<[string, string]> }>();
+    for (const a of list) {
+        const g = groups.get(a.segmentUid) ?? { a, teams: [], pairs: [] };
+        const team = a.team?.trim() ?? '';
+        if (team && !g.teams.includes(team)) g.teams.push(team);
+        const note = a.notes?.trim();
+        if (note) g.pairs.push([team, note]);
+        groups.set(a.segmentUid, g);
+    }
+    // Label each note with its team once more than one team shares the segment.
+    return [...groups.values()].map(({ a, teams, pairs }) => ({
+        a,
+        teams,
+        notes: pairs.map(([team, note]) => (teams.length > 1 && team ? `${team}: ${note}` : note)),
+    }));
+}

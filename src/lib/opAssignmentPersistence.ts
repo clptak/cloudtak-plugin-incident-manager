@@ -36,6 +36,7 @@ export function opAssignmentsFromSchema(schema: MissionSchema): OpAssignment[] {
         const opNumber = Number(rec.opNumber);
         if (!segmentUid || !Number.isInteger(opNumber)) continue;
         const assignment: OpAssignment = { opNumber, segmentUid, label: label || segmentUid };
+        if (typeof rec.id === 'string' && rec.id.trim()) assignment.id = rec.id.trim();
         if (typeof rec.opFeatureUid === 'string' && rec.opFeatureUid.trim()) assignment.opFeatureUid = rec.opFeatureUid;
         if (typeof rec.team === 'string' && rec.team.trim()) assignment.team = rec.team.trim();
         if (typeof rec.notes === 'string' && rec.notes.trim()) assignment.notes = rec.notes.trim();
@@ -43,6 +44,12 @@ export function opAssignmentsFromSchema(schema: MissionSchema): OpAssignment[] {
         assignments.push(assignment);
     }
     return assignments;
+}
+
+/** Same record: equal ids, or (no ids) the same OP and segment. */
+export function sameAssignment(a: OpAssignment, b: OpAssignment): boolean {
+    if (a.id || b.id) return a.id === b.id;
+    return a.opNumber === b.opNumber && a.segmentUid === b.segmentUid;
 }
 
 export function createAssignmentStore(mission: ActiveMission): AssignmentStore {
@@ -57,7 +64,7 @@ export function createAssignmentStore(mission: ActiveMission): AssignmentStore {
             const sub = await loadSchemaSubscription(mission);
             const loaded = await loadMissionSchema(sub);
             const existing = opAssignmentsFromSchema(loaded.schema).filter(
-                (a) => !(a.opNumber === assignment.opNumber && a.segmentUid === assignment.segmentUid),
+                (a) => !sameAssignment(a, assignment),
             );
             (loaded.schema.incident_response as Record<string, unknown>).op_assignments = [
                 ...existing,
