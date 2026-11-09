@@ -13,6 +13,9 @@ import type { OpPeriodRegistryEntry } from '../domain/entities.ts';
 import { loadSchemaSubscription, schemaMissionToken } from './incidentSubscription.ts';
 import { loadMissionSchema, saveMissionSchema, type MissionSchema } from './missionSchema.ts';
 import type { IapInputs } from './iapData.ts';
+import { groupBySegment } from '../domain/iap.ts';
+
+
 
 export interface IapCommsRow {
     zone: string;
@@ -392,10 +395,12 @@ export function prefillIapPlan(input: IapInputs, previous?: IapPlan | null): Iap
         preparers: previous?.preparers
             ? { ...previous.preparers }
             : { ics205: '', ics206: '', ics220: '' },
-        assignments: input.assignments.map((a) => {
+        // One ICS 204 per segment: resources sharing a segment in this OP (a
+        // ground team and a helicopter) are listed together on it.
+        assignments: groupBySegment(input.assignments).map(({ a, teams, notes }) => {
             const prior = previous?.assignments.find((p) => p.segmentUid === a.segmentUid);
             const resources = input.resources
-                .filter((r) => !a.team || r.resourceIdentifier === a.team)
+                .filter((r) => !teams.length || teams.includes(r.resourceIdentifier))
                 .map((r) => ({
                     identifier: r.resourceIdentifier,
                     leader: r.agency,
@@ -408,12 +413,12 @@ export function prefillIapPlan(input: IapInputs, previous?: IapPlan | null): Iap
                 // Seed §8 with the team/supervisor so there is a line to fill.
                 contacts: prior?.contacts?.length
                     ? prior.contacts.map((c) => ({ ...c }))
-                    : (a.team ? [{ nameFunction: a.team, contact: '' }] : []),
+                    : teams.map((t) => ({ nameFunction: t, contact: '' })),
                 segmentUid: a.segmentUid,
                 label: a.label,
-                supervisor: a.team ?? prior?.supervisor ?? '',
+                supervisor: teams[0] ?? prior?.supervisor ?? '',
                 workAssignment: prior?.workAssignment
-                    || [`Search segment ${a.label}.`, a.notes ?? ''].filter(Boolean).join(' '),
+                    || [`Search segment ${a.label}.`, ...notes].filter(Boolean).join(' '),
                 specialInstructions: prior?.specialInstructions
                     ?? 'Report POD and coverage at debrief.',
                 resources: resources.length ? resources : (prior?.resources ?? []),

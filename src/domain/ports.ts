@@ -168,6 +168,6 @@ export interface OpFeaturePublisher {
 /** Running assignment list — stored on the management sync. */
 export interface AssignmentStore {
     load(): Promise<OpAssignment[]>;
-    /** Insert or replace keyed by (opNumber, segmentUid). */
+    /** Insert or replace by `id`; an assignment without one by (opNumber, segmentUid). */
     upsert(assignment: OpAssignment): Promise<void>;
 }

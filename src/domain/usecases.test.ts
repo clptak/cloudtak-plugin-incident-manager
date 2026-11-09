@@ -300,9 +300,10 @@ test('publishAssignments: republishes polygons into the OP sync and records the 
         assignments: {
             async load() { return [...stored]; },
             async upsert(a: OpAssignment) {
-                const i = stored.findIndex(
-                    (s) => s.opNumber === a.opNumber && s.segmentUid === a.segmentUid,
-                );
+                // Same identity rule as the real store: id, else (OP, segment).
+                const i = stored.findIndex((s) => (s.id || a.id
+                    ? s.id === a.id
+                    : s.opNumber === a.opNumber && s.segmentUid === a.segmentUid));
                 if (i >= 0) stored[i] = a;
                 else stored.push(a);
             },
@@ -317,16 +318,53 @@ test('publishAssignments: republishes polygons into the OP sync and records the 
     assert.equal(result[1].team, 'Team 3');
     assert.equal(stored.length, 2);
 
-    // Republish of s1: reuses the prior feature uid (no duplicate polygon)
-    // and replaces the list entry instead of appending.
-    await publishAssignments(deps, op, { segmentUids: ['s1'], team: 'Team 5' });
+    assert.ok(result[0].id && result[1].id && result[0].id !== result[1].id);
+
+    // A second resource on s1 (a helicopter with the ground team) is its own
+    // assignment, sharing the segment's one OP polygon.
+    await publishAssignments(deps, op, { segmentUids: ['s1'], team: 'Heli 1', notes: 'hasty' });
     assert.equal(published.at(-1)?.existingUid, 'op-feat-1');
-    assert.equal(stored.length, 2);
-    assert.equal(stored.find((a) => a.segmentUid === 's1')?.team, 'Team 5');
+    assert.equal(stored.length, 3);
+    assert.deepEqual(stored.filter((a) => a.segmentUid === 's1').map((a) => a.team), ['Team 3', 'Heli 1']);
+
+    // The same segment and resource again replaces that assignment.
+    const heliId = stored.find((a) => a.team === 'Heli 1')?.id;
+    await publishAssignments(deps, op, { segmentUids: ['s1'], team: 'Heli 1', notes: 'second pass' });
+    assert.equal(stored.length, 3);
+    const heli = stored.find((a) => a.team === 'Heli 1');
+    assert.equal(heli?.id, heliId);
+    assert.equal(heli?.notes, 'second pass');
+    assert.equal(heli?.opFeatureUid, 'op-feat-1');
 
     await assert.rejects(() => publishAssignments(deps, op, { segmentUids: [] }));
     await assert.rejects(() => publishAssignments(deps, op, { segmentUids: ['missing'] }));
     await assert.rejects(() => publishAssignments(deps, { ...op, status: 'closed' }, { segmentUids: ['s1'] }));
+});
+
+test('publishAssignments: a legacy assignment (no id) is replaced in place by the same resource', async () => {
+    const op: OpPeriodRegistryEntry = { opNumber: 1, name: 'X - OP1', guid: 'g1', status: 'open', channels: [] };
+    const stored: OpAssignment[] = [{ opNumber: 1, segmentUid: 's1', label: 'Seg s1', team: 'GT1', opFeatureUid: 'old' }];
+    const deps = {
+        geometry: { async getFeature() { return { kind: 'polygon' as const, callsign: 'Seg s1', ring: [[0, 0], [0, 1], [1, 1], [0, 0]] as [number, number][], center: [0, 0] as [number, number] }; } },
+        publisher: { async publishFeature(_op: OpPeriodRegistryEntry, _f: unknown, existingUid?: string) { return existingUid ?? 'new'; } },
+        assignments: {
+            async load() { return [...stored]; },
+            async upsert(a: OpAssignment) {
+                const i = stored.findIndex((s) => (s.id || a.id ? s.id === a.id : s.opNumber === a.opNumber && s.segmentUid === a.segmentUid));
+                if (i >= 0) stored[i] = a; else stored.push(a);
+            },
+        },
+        now: NOW,
+    };
+    await publishAssignments(deps, op, { segmentUids: ['s1'], team: 'GT1', notes: 'redo' });
+    assert.equal(stored.length, 1);
+    assert.equal(stored[0].id, undefined);
+    assert.equal(stored[0].notes, 'redo');
+    // A different resource on the legacy segment is added beside it.
+    await publishAssignments(deps, op, { segmentUids: ['s1'], team: 'Drone 2' });
+    assert.equal(stored.length, 2);
+    assert.equal(stored[1].opFeatureUid, 'old');
+    assert.ok(stored[1].id);
 });
 
 test('recordDebrief: POD is optional (non-search incidents) but validated when given', async () => {

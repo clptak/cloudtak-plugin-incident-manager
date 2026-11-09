@@ -98,6 +98,15 @@ test('collections: an upserted op assignment keeps its key and the others are un
     assert.deepEqual(changed, [`c.op-assignments.1-${S1}`]);
 });
 
+test('collections: op assignments with an id get their own key beside a legacy one', () => {
+    const s = busySchema();
+    (ir(s).op_assignments as Rec[]).push(
+        { id: 'a1', opNumber: 1, segmentUid: S1, label: '01', team: 'Heli 1', createdAt: '2026-10-11T11:02:00Z' },
+    );
+    const keys = keysWith(encodeSchema(s), 'c.op-assignments.');
+    assert.deepEqual(keys, [`c.op-assignments.1-${S1}`, `c.op-assignments.1-${S1}-a1`, `c.op-assignments.1-${S2}`].sort());
+});
+
 test('collections: only the IAP updated stamp is volatile', () => {
     assert.ok(isVolatileKey('c.iap.1.updated'));
     assert.ok(!isVolatileKey('c.iap.1.objectives'));

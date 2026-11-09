@@ -503,7 +503,6 @@
                                     v-for='t in targets'
                                     :key='t.uid'
                                     :value='t.uid'
-                                    :disabled='segmentTakenByOtherRow(t.uid, row.key)'
                                 >
                                     {{ t.label }}{{ t.detail ? ` · ${t.detail}` : '' }}{{ assignedThisOp.has(t.uid) ? ` — published OP${currentOp.opNumber}` : '' }}
                                 </option>
@@ -562,10 +561,22 @@
                             </button>
                         </div>
                         <div
-                            v-if='row.segmentUid && assignedThisOp.has(row.segmentUid)'
+                            v-if='duplicateRow(row)'
+                            class='col-12 form-text text-danger mt-0'
+                        >
+                            Another row already assigns this resource to this {{ targetNoun.toLowerCase() }}.
+                        </div>
+                        <div
+                            v-else-if='publishedSameResource(row)'
                             class='col-12 form-text text-warning mt-0'
                         >
-                            Already published to OP{{ currentOp.opNumber }} — publishing again replaces its team and details.
+                            {{ row.team.trim() || 'Unassigned' }} is already published to OP{{ currentOp.opNumber }} here — publishing again replaces its details.
+                        </div>
+                        <div
+                            v-else-if='otherResourcesOn(row).length'
+                            class='col-12 form-text mt-0'
+                        >
+                            Also assigned here in OP{{ currentOp.opNumber }}: {{ otherResourcesOn(row).join(', ') }}
                         </div>
                     </div>
                     <div
@@ -577,14 +588,13 @@
                     <div class='d-flex flex-wrap gap-2 mt-2'>
                         <button
                             class='btn btn-outline-primary btn-sm'
-                            :disabled='assignRows.length >= targets.length'
                             @click='addAssignRow'
                         >
                             + Add assignment
                         </button>
                         <button
                             class='btn btn-primary btn-sm'
-                            :disabled='busy || !readyAssignRows.length'
+                            :disabled='busy || !readyAssignRows.length || assignRows.some(duplicateRow)'
                             @click='onPublishAssignments'
                         >
                             {{ busy ? 'Working…' : `Publish ${readyAssignRows.length || ''} to OP${currentOp.opNumber}` }}
@@ -1342,9 +1352,28 @@ function blankAssignRow(): AssignRow {
 }
 const assignRows = ref<AssignRow[]>([blankAssignRow()]);
 const readyAssignRows = computed(() => assignRows.value.filter((r) => r.segmentUid));
-/** Assignments are one per segment per OP, so a segment can be in one row only. */
-function segmentTakenByOtherRow(uid: string, key: number): boolean {
-    return assignRows.value.some((r) => r.key !== key && r.segmentUid === uid);
+/**
+ * Several resources may work one segment in an OP (a ground team and a
+ * helicopter), each its own assignment; the same segment and resource twice
+ * is one assignment, so two rows may not repeat that pair.
+ */
+const sameTeam = (a: string | undefined, b: string | undefined) => (a ?? '').trim() === (b ?? '').trim();
+function duplicateRow(row: AssignRow): boolean {
+    return !!row.segmentUid && assignRows.value.some(
+        (r) => r.key !== row.key && r.segmentUid === row.segmentUid && sameTeam(r.team, row.team),
+    );
+}
+function opAssignmentsOn(uid: string) {
+    return assignments.value.filter((a) => a.opNumber === currentOp.value?.opNumber && a.segmentUid === uid);
+}
+function publishedSameResource(row: AssignRow): boolean {
+    return !!row.segmentUid && opAssignmentsOn(row.segmentUid).some((a) => sameTeam(a.team, row.team));
+}
+function otherResourcesOn(row: AssignRow): string[] {
+    if (!row.segmentUid) return [];
+    return opAssignmentsOn(row.segmentUid)
+        .filter((a) => !sameTeam(a.team, row.team))
+        .map((a) => a.team?.trim() || 'unassigned');
 }
 function addAssignRow(): void {
     assignRows.value.push(blankAssignRow());

@@ -149,6 +149,13 @@ export interface DebriefRecord {
  * OP sync (new feature uid) so volunteers receive it via their channel.
  */
 export interface OpAssignment {
+    /**
+     * Identity of this assignment. Several resources may work one segment in
+     * one OP (a ground team and a helicopter), each its own assignment and
+     * its own debrief. Assignments saved before this field existed have no
+     * id and are identified by (opNumber, segmentUid).
+     */
+    id?: string;
     opNumber: number;
     segmentUid: string;
     /** Feature uid of the polygon copy living in the OP sync. */

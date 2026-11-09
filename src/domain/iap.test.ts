@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { iapFormPlan, isUasLabel, usesExtendedIcsSet } from './iap.ts';
+import { groupBySegment, iapFormPlan, isUasLabel, usesExtendedIcsSet } from './iap.ts';
 
 test('iapFormPlan: base SAR set', () => {
     assert.deepEqual(iapFormPlan({ category: 'search', hasUas: false }),
@@ -46,4 +46,18 @@ test('usesExtendedIcsSet / isUasLabel', () => {
     assert.equal(isUasLabel('Fixed Wing'), false);
     assert.equal(isUasLabel(undefined, 'Team UAV-2'), true);
     assert.equal(isUasLabel('Grid Team', 'GT-4'), false);
+});
+
+test('groupBySegment: resources sharing a segment become one 204 with every team', () => {
+    const groups = groupBySegment([
+        { segmentUid: 's1', team: 'GT3', notes: 'grid' },
+        { segmentUid: 's2', team: 'GT4' },
+        { segmentUid: 's1', team: 'Heli 1', notes: 'hasty' },
+    ]);
+    assert.deepEqual(groups.map((g) => g.a.segmentUid), ['s1', 's2']);
+    assert.deepEqual(groups[0].teams, ['GT3', 'Heli 1']);
+    assert.deepEqual(groups[0].notes, ['GT3: grid', 'Heli 1: hasty']);
+    assert.deepEqual(groups[1].notes, []);
+    // One team: its note is not labelled
+    assert.deepEqual(groupBySegment([{ segmentUid: 's1', team: 'GT3', notes: 'grid' }])[0].notes, ['grid']);
 });
