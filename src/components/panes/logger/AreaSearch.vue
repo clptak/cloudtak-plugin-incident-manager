@@ -640,22 +640,21 @@
                             > · not on an assignment</span>
                         </span>
                         <button
-                            v-if='row.assignment && registry.some((op) => op.opNumber === row.opNumber)'
+                            v-if='!row.debriefs.length && canDebrief(row)'
                             type='button'
                             class='btn btn-link btn-sm p-0 text-danger ms-auto'
                             :disabled='busy'
                             :title='`Fill in the completed-assignment form for ${row.team || "this assignment"} on ${row.label}`'
-                            @click='startAssignmentDebrief(row.assignment)'
+                            @click='startAssignmentDebrief(row.assignment!)'
                         >
-                            {{ row.debriefs.length ? 'Debrief again' : 'Debrief' }}
+                            Debrief
                         </button>
                         <div
                             v-if='row.debriefs.length'
-                            class='d-flex flex-column align-items-end gap-1'
-                            :class='row.assignment && registry.some((op) => op.opNumber === row.opNumber) ? "" : "ms-auto"'
+                            class='ms-auto d-flex flex-column align-items-end gap-1'
                         >
                             <div
-                                v-for='d in row.debriefs'
+                                v-for='(d, di) in row.debriefs'
                                 :key='debriefKeyOf(d)'
                                 class='d-flex flex-wrap align-items-center justify-content-end gap-2'
                             >
@@ -673,6 +672,16 @@
                                     class='text-warning'
                                     :title='`Corrected ${shortDt(d.correctedAt)}`'
                                 >corrected</span>
+                                <button
+                                    v-if='di === row.debriefs.length - 1 && canDebrief(row)'
+                                    type='button'
+                                    class='btn btn-link btn-sm p-0 text-danger'
+                                    :disabled='busy'
+                                    :title='`Record another sortie for ${row.team || "this assignment"} on ${row.label}`'
+                                    @click='startAssignmentDebrief(row.assignment!)'
+                                >
+                                    Debrief again
+                                </button>
                                 <button
                                     class='btn btn-link btn-sm p-0 d-flex align-items-center gap-1'
                                     :disabled='trackBusy'
@@ -1617,6 +1626,11 @@ const statusRows = computed<StatusRow[]>(() => {
         .sort((x, y) => x.row.opNumber - y.row.opNumber || x.i - y.i)
         .map(({ row }) => row);
 });
+
+/** A row can be debriefed when it is an assignment in an OP that still exists. */
+function canDebrief(row: StatusRow): boolean {
+    return Boolean(row.assignment) && registry.value.some((op) => op.opNumber === row.opNumber);
+}
 
 /** "Debriefed · POD 30%", plus how much was completed when it was partial. */
 function debriefBadge(d: DebriefRecord): string {
