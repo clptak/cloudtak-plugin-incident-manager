@@ -14,8 +14,8 @@
         <div>
             <p class='text-muted small mb-3'>
                 Score each factor 1 (most urgent) to 3 (least urgent).
-                Save stores the rating in <strong>mission_schema.json</strong>;
-                Send to DataSync posts a mission log entry.
+                Save keeps the rating on the MGMT DataSync; adding it to the MGMT DataSync
+                Log also posts a log entry. Field teams don't see the MGMT DataSync.
             </p>
 
             <div class='table-responsive urgency-table-wrap'>
@@ -137,14 +137,14 @@
                     :disabled='saving || posting || !valid || !activeMission || loading'
                     @click='onSave'
                 >
-                    {{ saving ? 'Saving…' : 'Save' }}
+                    {{ saving ? 'Saving…' : 'Save to MGMT DataSync' }}
                 </button>
                 <button
                     class='btn btn-outline-secondary btn-sm'
                     :disabled='posting || saving || !valid || !activeMission || loading'
                     @click='onSend'
                 >
-                    {{ posting ? 'Sending…' : 'Send to DataSync' }}
+                    {{ posting ? 'Adding…' : 'Add to MGMT DataSync Log' }}
                 </button>
                 <button
                     type='button'
@@ -160,7 +160,7 @@
                     :disabled='uploading || !valid || !activeMission || loading'
                     @click='onAddPdfToDataSync'
                 >
-                    {{ uploading ? 'Uploading…' : 'Add PDF to DataSync' }}
+                    {{ uploading ? 'Uploading…' : 'Add PDF to MGMT DataSync' }}
                 </button>
                 <button
                     class='btn btn-outline-secondary btn-sm'
@@ -317,7 +317,7 @@
                             :disabled='uploading || !valid || !activeMission'
                             @click='onAddPdfToDataSync'
                         >
-                            {{ uploading ? 'Uploading…' : 'Add Urgency-Rating-Chart.pdf to DataSync' }}
+                            {{ uploading ? 'Uploading…' : 'Add Urgency-Rating-Chart.pdf to MGMT DataSync' }}
                         </button>
                     </div>
                 </div>
@@ -576,7 +576,7 @@ async function recall(): Promise<void> {
         contentHash.value = loaded.contentHash;
         if (loaded.rating) {
             applyFactors(loaded.rating.factors);
-            status.value = 'Loaded saved urgency from mission_schema.json.';
+            status.value = 'Loaded the saved urgency rating from the MGMT DataSync.';
         }
         await prefillPdfHeader();
     } catch (err) {
@@ -600,7 +600,7 @@ async function onSave(): Promise<void> {
             rating,
             contentHash.value,
         );
-        status.value = `Saved urgency rating (${rating.level}) to mission_schema.json on ${schemaMission(activeMission.value).name}.`;
+        status.value = `Saved urgency rating (${rating.level}) to the MGMT DataSync (${schemaMission(activeMission.value).name}).`;
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);
@@ -625,7 +625,7 @@ async function send(): Promise<void> {
             content,
             keywords: ['search-urgency', `urgency:${level.value.label}`, `total:${total.value}`],
         });
-        status.value = `Sent urgency rating (${level.value.label}) to ${schemaMission(activeMission.value).name}.`;
+        status.value = `Added urgency rating (${level.value.label}) to the MGMT DataSync Log (${schemaMission(activeMission.value).name}).`;
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);

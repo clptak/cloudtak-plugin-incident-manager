@@ -315,7 +315,7 @@
                     :disabled='uploading'
                     @click='onAddPdfToDataSync'
                 >
-                    {{ uploading ? 'Uploading…' : 'Add SAR-Briefing.pdf to DataSync' }}
+                    {{ uploading ? 'Uploading…' : 'Add SAR-Briefing.pdf to FIELD DataSync' }}
                 </button>
                 <button
                     type='button'
@@ -331,7 +331,7 @@
                     :disabled='uploadingNew'
                     @click='onAddPdfNewToDataSync'
                 >
-                    {{ uploadingNew ? 'Uploading…' : 'Add SAR-Briefing-New.pdf to DataSync' }}
+                    {{ uploadingNew ? 'Uploading…' : 'Add SAR-Briefing-New.pdf to FIELD DataSync' }}
                 </button>
             </div>
         </TablerBorder>

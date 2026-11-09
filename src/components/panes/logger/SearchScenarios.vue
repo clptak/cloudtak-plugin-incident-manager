@@ -14,9 +14,9 @@
         <div>
             <p class='text-muted small mb-3'>
                 Describe likely scenarios (letters A–F).
-                <strong>Save</strong> stores them in <strong>mission_schema.json</strong>;
-                <strong>Send to DataSync</strong> posts mission log entries keyed by letter
-                (re-sending a letter updates that entry in place).
+                <strong>Save</strong> keeps them on the MGMT DataSync;
+                <strong>Add to MGMT DataSync Log</strong> also posts a log entry per letter
+                (adding a letter again updates that entry). Field teams don't see the MGMT DataSync.
             </p>
 
             <!-- Recalled (already sent) scenarios -->
@@ -154,14 +154,14 @@
                     :disabled='saving || posting || !saveCount || !activeMission || loading'
                     @click='onSave'
                 >
-                    {{ saving ? 'Saving…' : 'Save' }}
+                    {{ saving ? 'Saving…' : 'Save to MGMT DataSync' }}
                 </button>
                 <button
                     class='btn btn-outline-secondary btn-sm'
                     :disabled='posting || saving || !filledCount || !activeMission || loading'
                     @click='onSend'
                 >
-                    {{ posting ? 'Sending…' : 'Send to DataSync' }}
+                    {{ posting ? 'Adding…' : 'Add to MGMT DataSync Log' }}
                 </button>
                 <button
                     type='button'
@@ -177,7 +177,7 @@
                     :disabled='uploading || !saveCount || !activeMission || loading'
                     @click='onAddPdfToDataSync'
                 >
-                    {{ uploading ? 'Uploading…' : 'Add PDF to DataSync' }}
+                    {{ uploading ? 'Uploading…' : 'Add PDF to MGMT DataSync' }}
                 </button>
                 <button
                     class='btn btn-outline-secondary btn-sm'
@@ -335,7 +335,7 @@
                             :disabled='uploading || !saveCount || !activeMission'
                             @click='onAddPdfToDataSync'
                         >
-                            {{ uploading ? 'Uploading…' : 'Add Scenarios-Record-Sheet.pdf to DataSync' }}
+                            {{ uploading ? 'Uploading…' : 'Add Scenarios-Record-Sheet.pdf to MGMT DataSync' }}
                         </button>
                     </div>
                 </div>
@@ -631,7 +631,7 @@ async function recallSchema(): Promise<void> {
         applyScenarioToDraft(scenario, drafts[scenario.letter].logId);
     }
     if (loaded.scenarios.length) {
-        status.value = `Loaded ${loaded.scenarios.length} scenario${loaded.scenarios.length === 1 ? '' : 's'} from mission_schema.json.`;
+        status.value = `Loaded ${loaded.scenarios.length} scenario${loaded.scenarios.length === 1 ? '' : 's'} from the MGMT DataSync.`;
         statusError.value = false;
     }
 }
@@ -758,7 +758,7 @@ async function onSave(): Promise<void> {
             scenarios,
             contentHash.value,
         );
-        status.value = `Saved ${scenarios.length} scenario${scenarios.length === 1 ? '' : 's'} to mission_schema.json on ${schemaMission(activeMission.value).name}.`;
+        status.value = `Saved ${scenarios.length} scenario${scenarios.length === 1 ? '' : 's'} to the MGMT DataSync (${schemaMission(activeMission.value).name}).`;
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);
@@ -805,7 +805,7 @@ async function send(): Promise<void> {
         const parts: string[] = [];
         if (created) parts.push(`${created} new`);
         if (updated) parts.push(`${updated} updated`);
-        status.value = `Sent ${parts.join(', ') || '0'} to ${schemaMission(activeMission.value).name}`
+        status.value = `Added ${parts.join(', ') || '0'} to the MGMT DataSync Log (${schemaMission(activeMission.value).name})`
             + (failed ? `, ${failed} failed.` : '.');
         // Recall from the mission so saved letters move into "Already sent".
         if (didWrite) await loadSent();
