@@ -302,7 +302,7 @@
                         <div class='col-12'>
                             <TablerEnum
                                 :model-value='ippLabelForValue(draft.form.subjectIppFromTak)'
-                                label='Subject IPP'
+                                label='Estimated Location (Coordinates)'
                                 :options='ippOptions'
                                 :disabled='!!draft.form.subjectIpp.trim()'
                                 @update:model-value='onIppLabelChange(draft, $event)'
@@ -313,7 +313,7 @@
                             <TablerInput
                                 v-model='draft.form.subjectIpp'
                                 :disabled='!!draft.form.subjectIppFromTak'
-                                placeholder='Enter Subject IPP Coordinates (lat, lon)'
+                                placeholder='Enter estimated location coordinates (lat, lon)'
                             />
                         </div>
 
@@ -462,7 +462,7 @@ const GENDER_OPTIONS = ['Select Gender', 'Male', 'Female', 'Other'];
 const YES_NO_OPTIONS = ['—', 'Yes', 'No'];
 const REPORTED_BY_OPTIONS = ['Select Who Reported Subject Missing', ...REPORTED_BY];
 const PHOTO_PLACEHOLDER = 'Select Photo From DataSync';
-const IPP_PLACEHOLDER = 'Subject IPP from DataSync';
+const IPP_PLACEHOLDER = 'Estimated location from DataSync';
 
 interface SubjectDraft {
     id: string;

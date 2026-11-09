@@ -1,8 +1,11 @@
 <template>
     <div class='wisar-ipp-picker'>
         <div class='d-flex align-items-center mb-1'>
-            <p class='text-uppercase text-white-50 small mb-0'>
-                Initial Planning Point (IPP)
+            <p
+                class='text-uppercase text-white-50 small mb-0'
+                :title='stored ? "Set in Search Area" : "Becomes the IPP when it is set in Search Area at Search Transition"'
+            >
+                {{ stored ? 'Initial Planning Point (IPP)' : 'Estimated Previously Known Location' }}
             </p>
             <button
                 type='button'
@@ -26,7 +29,7 @@
                 :value='selectedUid'
                 class='form-select form-select-sm'
                 :disabled='loading || !options.length'
-                aria-label='IPP marker'
+                :aria-label='stored ? "IPP marker" : "Estimated location marker"'
                 @change='onSelect(($event.target as HTMLSelectElement).value)'
             >
                 <option value=''>
