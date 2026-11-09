@@ -21,8 +21,6 @@
 
         <p class='text-muted small mb-3'>
             Enter details for one or more missing subjects.
-            Send posts each filled subject as a DataSync log entry and upserts it into
-            <strong>mission_schema.json</strong> (<code>incident_response.subjects</code>).
         </p>
 
         <div
@@ -354,18 +352,14 @@
             All {{ MAX_SUBJECTS }} subject slots are in use for this mission.
         </div>
 
-        <p class='form-text mb-1 mt-3'>
-            Save stores subjects in <strong>mission_schema.json</strong>;
-            Send to DataSync also posts mission log entries.
-        </p>
-        <div>
+        <div class='mt-3'>
             <button
                 type='button'
                 class='btn btn-primary btn-sm'
                 :disabled='savingSchema || posting || !filledCount'
                 @click='onSave'
             >
-                {{ savingSchema ? 'Saving…' : 'Save' }}
+                {{ savingSchema ? 'Saving…' : 'Save to MGMT DataSync' }}
             </button>
             <button
                 type='button'
@@ -373,7 +367,7 @@
                 :disabled='posting || savingSchema || !filledCount'
                 @click='onSend'
             >
-                {{ posting ? 'Sending…' : `Send ${filledCount} subject${filledCount === 1 ? '' : 's'} to DataSync` }}
+                {{ posting ? 'Adding…' : `Add ${filledCount} subject${filledCount === 1 ? '' : 's'} to FIELD DataSync Log` }}
             </button>
             <button
                 type='button'
@@ -383,6 +377,10 @@
                 Clear Fields
             </button>
         </div>
+        <p class='form-text mt-1 mb-0'>
+            Team members in the field will see subjects added to the FIELD DataSync Log.
+            Adding also saves them to the MGMT DataSync.
+        </p>
 
         <TablerInlineAlert
             v-if='!activeMission'
@@ -827,7 +825,7 @@ async function onSend(): Promise<void> {
     await send();
 }
 
-/** Save filled subjects to mission_schema.json only — no DataSync log entries. */
+/** Save filled subjects to the MGMT DataSync (mission_schema.json) only — no field log entries. */
 async function onSave(): Promise<void> {
     if (!requireActiveMission() || !activeMission.value || !filledCount.value) return;
     savingSchema.value = true;
@@ -836,7 +834,7 @@ async function onSave(): Promise<void> {
     try {
         const forms = filledDrafts.value.map((d) => ({ ...d.form }));
         await saveSubjectsToMission(activeMission.value, forms);
-        status.value = `Saved ${forms.length} subject${forms.length === 1 ? '' : 's'} to mission_schema.json.`;
+        status.value = `Saved ${forms.length} subject${forms.length === 1 ? '' : 's'} to the MGMT DataSync.`;
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);
@@ -894,9 +892,9 @@ async function send(): Promise<void> {
         const parts: string[] = [];
         if (created) parts.push(`${created} new`);
         if (updated) parts.push(`${updated} updated`);
-        let msg = `Saved ${parts.join(', ') || '0'} to DataSync on ${activeMission.value.name}`;
+        let msg = `Added ${parts.join(', ') || '0'} to the FIELD DataSync Log on ${activeMission.value.name}`;
         if (succeeded.length && schemaOk) {
-            msg += ' and updated mission_schema.json';
+            msg += ' and saved to the MGMT DataSync';
         }
         msg += failed ? `, ${failed} failed.` : '.';
         if (!schemaOk) {
