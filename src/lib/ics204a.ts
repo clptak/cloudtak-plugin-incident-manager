@@ -9,9 +9,10 @@ import type { Ics204aPdfData } from './ics204aPdf.ts';
 import type { IapAssignmentPlan } from './iapPlanPersistence.ts';
 
 /**
- * Task name from the assignment's ICS 204 work assignment, team leader from
- * the 204 resource row for this team, debriefed-by from the signed-in
- * callsign, and completed now.
+ * Task name from the assignment's ICS 204 work assignment, debriefed-by from
+ * the signed-in callsign, and completed now. Team leader is left blank: the
+ * 204 leader column starts out as the agency name, and the team leader signs
+ * the 204A as "/S/ <name>", so the name has to be typed in.
  */
 export function prefillIcs204a(
     assignment: OpAssignment,
@@ -23,11 +24,6 @@ export function prefillIcs204a(
     const plan = priorPlanFor(plans, assignment);
     const taskName = plan?.workAssignment.trim() || assignment.notes?.trim();
     if (taskName) out.taskName = taskName;
-    const team = assignment.team?.trim().toLowerCase() ?? '';
-    const rows = plan?.resources.filter((r) => r.identifier.trim() || r.leader.trim()) ?? [];
-    const row = rows.find((r) => team && r.identifier.trim().toLowerCase() === team)
-        ?? (rows.length === 1 ? rows[0] : undefined);
-    if (row?.leader.trim()) out.teamLeader = row.leader.trim();
     if (callsign.trim()) out.debriefedBy = callsign.trim();
     return out;
 }
