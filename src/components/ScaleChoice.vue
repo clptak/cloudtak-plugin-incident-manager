@@ -47,7 +47,7 @@ const props = withDefaults(defineProps<{
     modelValue: number;
     options: { value: number; label?: string }[];
     layout?: 'row' | 'list';
-    /** First option red, last green (Search Urgency, Complacency). Default is green first. */
+    /** First option red, last green (Search Urgency). Default is green first. */
     lowIsRed?: boolean;
     label?: string;
     disabled?: boolean;
