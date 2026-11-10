@@ -565,26 +565,29 @@
 
                 <div class='row g-2 mb-3'>
                     <div class='col-md-4'>
-                        <TablerEnum
-                            v-model='compRepetitionLabel'
+                        <ScaleChoice
+                            v-model='comp.repetition'
+                            layout='list'
                             label='Repetition'
-                            :options='repetitionOptionLabels'
+                            :options='REPETITION_OPTIONS'
                             :disabled='busy'
                         />
                     </div>
                     <div class='col-md-4'>
-                        <TablerEnum
-                            v-model='compConfidenceLabel'
+                        <ScaleChoice
+                            v-model='comp.confidence'
+                            layout='list'
                             label='Confidence'
-                            :options='confidenceOptionLabels'
+                            :options='CONFIDENCE_OPTIONS'
                             :disabled='busy'
                         />
                     </div>
                     <div class='col-md-4'>
-                        <TablerEnum
-                            v-model='compExperienceLabel'
+                        <ScaleChoice
+                            v-model='comp.experience'
+                            layout='list'
                             label='Experience'
-                            :options='experienceOptionLabels'
+                            :options='EXPERIENCE_OPTIONS'
                             :disabled='busy'
                         />
                     </div>
@@ -767,26 +770,29 @@
 
                 <div class='row g-2 mb-3'>
                     <div class='col-md-4'>
-                        <TablerEnum
-                            v-model='speSeverityLabel'
+                        <ScaleChoice
+                            v-model='spe.severity'
+                            layout='list'
                             label='Severity'
-                            :options='severityOptionLabels'
+                            :options='SEVERITY_OPTIONS'
                             :disabled='busy'
                         />
                     </div>
                     <div class='col-md-4'>
-                        <TablerEnum
-                            v-model='speProbabilityLabel'
+                        <ScaleChoice
+                            v-model='spe.probability'
+                            layout='list'
                             label='Probability'
-                            :options='probabilityOptionLabels'
+                            :options='PROBABILITY_OPTIONS'
                             :disabled='busy'
                         />
                     </div>
                     <div class='col-md-4'>
-                        <TablerEnum
-                            v-model='speExposureLabel'
+                        <ScaleChoice
+                            v-model='spe.exposure'
+                            layout='list'
                             label='Exposure'
-                            :options='exposureOptionLabels'
+                            :options='EXPOSURE_OPTIONS'
                             :disabled='busy'
                         />
                     </div>
@@ -948,6 +954,7 @@ import {
     TablerInlineAlert,
     TablerInput,
 } from '@tak-ps/vue-tabler';
+import ScaleChoice from '../../ScaleChoice.vue';
 import { useIncident } from '../../../composables/useIncident.ts';
 import { useWorkAssignments } from '../../../composables/useWorkAssignments.ts';
 import {
@@ -971,7 +978,6 @@ import {
     worstGarRespondent,
     worstSpeRespondent,
     type ComplacencyRiskRespondent,
-    type FactorOption,
     type GarFactorKey,
     type GarMitigations,
     type GarRiskRespondent,
@@ -1125,51 +1131,6 @@ const garScoreOptionStrings = GAR_SCORE_OPTIONS.map(String);
 function onGarFactorChange(key: GarFactorKey, label: string): void {
     gar.factors[key] = Number(label) || 0;
 }
-
-function factorOptionLabels(options: FactorOption[]): string[] {
-    return ['Select…', ...options.map((o) => `${o.value} — ${o.label}`)];
-}
-
-function factorValueToLabel(value: number, options: FactorOption[]): string {
-    const opt = options.find((o) => o.value === value);
-    return opt ? `${opt.value} — ${opt.label}` : 'Select…';
-}
-
-function factorLabelToValue(label: string, options: FactorOption[]): number {
-    return options.find((o) => `${o.value} — ${o.label}` === label)?.value ?? 0;
-}
-
-const repetitionOptionLabels = factorOptionLabels(REPETITION_OPTIONS);
-const confidenceOptionLabels = factorOptionLabels(CONFIDENCE_OPTIONS);
-const experienceOptionLabels = factorOptionLabels(EXPERIENCE_OPTIONS);
-const severityOptionLabels = factorOptionLabels(SEVERITY_OPTIONS);
-const probabilityOptionLabels = factorOptionLabels(PROBABILITY_OPTIONS);
-const exposureOptionLabels = factorOptionLabels(EXPOSURE_OPTIONS);
-
-const compRepetitionLabel = computed({
-    get: () => factorValueToLabel(comp.repetition, REPETITION_OPTIONS),
-    set: (label: string) => { comp.repetition = factorLabelToValue(label, REPETITION_OPTIONS); },
-});
-const compConfidenceLabel = computed({
-    get: () => factorValueToLabel(comp.confidence, CONFIDENCE_OPTIONS),
-    set: (label: string) => { comp.confidence = factorLabelToValue(label, CONFIDENCE_OPTIONS); },
-});
-const compExperienceLabel = computed({
-    get: () => factorValueToLabel(comp.experience, EXPERIENCE_OPTIONS),
-    set: (label: string) => { comp.experience = factorLabelToValue(label, EXPERIENCE_OPTIONS); },
-});
-const speSeverityLabel = computed({
-    get: () => factorValueToLabel(spe.severity, SEVERITY_OPTIONS),
-    set: (label: string) => { spe.severity = factorLabelToValue(label, SEVERITY_OPTIONS); },
-});
-const speProbabilityLabel = computed({
-    get: () => factorValueToLabel(spe.probability, PROBABILITY_OPTIONS),
-    set: (label: string) => { spe.probability = factorLabelToValue(label, PROBABILITY_OPTIONS); },
-});
-const speExposureLabel = computed({
-    get: () => factorValueToLabel(spe.exposure, EXPOSURE_OPTIONS),
-    set: (label: string) => { spe.exposure = factorLabelToValue(label, EXPOSURE_OPTIONS); },
-});
 
 const garResult = computed(() => {
     const score = garScoreFromFactors(gar.factors);
