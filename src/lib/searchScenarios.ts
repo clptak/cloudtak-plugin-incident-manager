@@ -193,12 +193,12 @@ export function duplicateRanks(scenarios: ScenarioRank[]): { rank: number; keys:
  * a copy in the drafts: that copy can hold an old priority rank (#22). Any
  * other letter uses its draft when it has a description.
  */
-export function scenarioFieldsForSave<T extends { description: string }>(
-    letters: readonly string[],
+export function scenarioFieldsForSave<L extends string, T extends { description: string }>(
+    letters: readonly L[],
     drafts: Record<string, T>,
     shownSent: { key: string; fields: T }[],
-): { letter: string; fields: T }[] {
-    const out: { letter: string; fields: T }[] = [];
+): { letter: L; fields: T }[] {
+    const out: { letter: L; fields: T }[] = [];
     for (const letter of letters) {
         const sent = shownSent.find((s) => s.key === letter);
         if (sent) {

@@ -63,7 +63,7 @@ export function applyClue(
     if (total <= 0) return { poa: { ...poa }, rowPoa };
 
     const out: Record<string, number> = {};
-    for (const [uid, value] of Object.entries(poa)) {
+    for (const uid of Object.keys(poa)) {
         out[uid] = Math.round((10000 * weighted[uid]) / total) / 100;
     }
     return {

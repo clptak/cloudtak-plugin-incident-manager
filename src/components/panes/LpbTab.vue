@@ -255,7 +255,7 @@
                         <button
                             type='button'
                             class='btn btn-secondary'
-                            :disabled='pushing'
+                            :disabled='pushing !== null'
                             @click='closeModal'
                         >
                             Cancel
