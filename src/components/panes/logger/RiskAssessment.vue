@@ -361,7 +361,7 @@
                     class='mb-2'
                 >
                     <div class='row g-2 align-items-start'>
-                        <div class='col-md-8'>
+                        <div class='col-lg-6'>
                             <label class='form-label small mb-0'>{{ factor.label }}</label>
                             <div
                                 class='text-muted'
@@ -370,12 +370,12 @@
                                 {{ factor.help }}
                             </div>
                         </div>
-                        <div class='col-md-4'>
-                            <TablerEnum
-                                :model-value='String(gar.factors[factor.key])'
-                                :options='garScoreOptionStrings'
+                        <div class='col-lg-6'>
+                            <ScaleChoice
+                                v-model='gar.factors[factor.key]'
+                                :options='GAR_SCALE_OPTIONS'
+                                :label='`${factor.label}, 0 no risk to 10 maximum risk`'
                                 :disabled='busy'
-                                @update:model-value='(v: string) => onGarFactorChange(factor.key, v)'
                             />
                         </div>
                     </div>
@@ -1129,11 +1129,8 @@ const speTacticLabel = computed({
     set: (label: string) => { spe.tacticChoice = tacticLabelToChoice(label); },
 });
 
-const garScoreOptionStrings = GAR_SCORE_OPTIONS.map(String);
-
-function onGarFactorChange(key: GarFactorKey, label: string): void {
-    gar.factors[key] = Number(label) || 0;
-}
+/** GAR scale 0 (no risk, green) … 5 (amber) … 10 (maximum risk, red). */
+const GAR_SCALE_OPTIONS = GAR_SCORE_OPTIONS.map((value) => ({ value }));
 
 const garResult = computed(() => {
     const score = garScoreFromFactors(gar.factors);
