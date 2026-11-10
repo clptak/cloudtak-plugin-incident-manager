@@ -1099,8 +1099,11 @@
                     </div>
                 </div>
 
-                <!-- ── ICS 204A details (#17) — collapsed so a quick debrief stays quick ── -->
-                <div class='border rounded-3 mt-2'>
+                <!-- ── ICS 204A details (#17) — search incidents only; collapsed so a quick debrief stays quick ── -->
+                <div
+                    v-if='isSearchIncident'
+                    class='border rounded-3 mt-2'
+                >
                     <button
                         type='button'
                         class='btn btn-link w-100 d-flex align-items-center gap-2 text-white text-decoration-none px-2 py-1'
@@ -1159,30 +1162,21 @@
                                     label='Debriefed by (Planning)'
                                 />
                             </div>
-                            <div
-                                v-if='isSearchIncident'
-                                class='col-md-6'
-                            >
+                            <div class='col-md-6'>
                                 <TablerInput
                                     v-model='ics204aForm.podResponsive'
                                     label='POD % if responsive'
                                     placeholder='0–100'
                                 />
                             </div>
-                            <div
-                                v-if='isSearchIncident'
-                                class='col-md-6'
-                            >
+                            <div class='col-md-6'>
                                 <TablerInput
                                     v-model='ics204aForm.podUnresponsive'
                                     label='POD % if non-responsive'
                                     placeholder='0–100'
                                 />
                             </div>
-                            <div
-                                v-if='isSearchIncident'
-                                class='col-12 form-text mt-0'
-                            >
+                            <div class='col-12 form-text mt-0'>
                                 The POD % above is the Estimated POD and the only one used by CASIE.
                                 These two are recorded and printed on the 204A.
                             </div>
@@ -1838,7 +1832,7 @@ function startAssignmentDebrief(a: OpAssignment): void {
     debriefForm.notes = '';
     debriefForm.assignmentId = a.id ?? '';
     setIcs204aForm(undefined);
-    void prefillIcs204aFor(a);
+    if (isSearchIncident.value) void prefillIcs204aFor(a);
     goToDebriefForm();
 }
 
@@ -2559,7 +2553,8 @@ function buildDebriefRecord(): DebriefRecord {
     if (debriefForm.resource.trim()) record.resource = debriefForm.resource.trim();
     if (debriefForm.notes.trim()) record.notes = debriefForm.notes.trim();
     if (debriefForm.assignmentId) record.assignmentId = debriefForm.assignmentId;
-    const ics204a = ics204aFromForm();
+    // The ICS 204A is a search debriefing form; other incident types have none.
+    const ics204a = isSearchIncident.value ? ics204aFromForm() : null;
     if (ics204a) record.ics204a = ics204a;
     return record;
 }
