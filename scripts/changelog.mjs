@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Release notes from git history, grouped by the GitHub issue each commit
- * names in brackets: "(#25)", "(#17 phase 3)" or "(Closes #20)". A bare "#201"
+ * names in brackets: "(#25)", "(#26, #27)", "(#17 phase 3)" or "(Closes #20)". A bare "#201"
  * (the ICS form) is not an issue.
  *
  * Two tag families: `v1.2.3` (multi-op) and `v1.2.3-ccso` (ccso). Each
@@ -87,7 +87,9 @@ function issue(n) {
 const byIssue = new Map();
 const loose = [];
 for (const c of commits) {
-    const nums = [...new Set([...c.subject.matchAll(/\((?:(?:closes|fixes|resolves)\s+)?#(\d+)\b/gi)].map((m) => Number(m[1])))];
+    // Every #N inside a bracket that starts with an issue: "(#26, #27)".
+    const brackets = [...c.subject.matchAll(/\((?:(?:closes|fixes|resolves)\s+)?#\d+[^)]*\)/gi)].map((m) => m[0]);
+    const nums = [...new Set(brackets.flatMap((g) => [...g.matchAll(/#(\d+)\b/g)].map((m) => Number(m[1]))))];
     if (!nums.length) {
         loose.push(c);
         continue;
