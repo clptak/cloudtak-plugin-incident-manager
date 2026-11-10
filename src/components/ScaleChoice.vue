@@ -19,7 +19,8 @@
             type='button'
             role='radio'
             class='btn btn-sm scale-choice-btn'
-            :class='[`scale-tone-${scaleTone(i, options.length, lowIsRed)}`, { "is-selected": o.value === modelValue }]'
+            :class='[toneClass(i), { "is-selected": o.value === modelValue }]'
+            :style='toneStyle(i)'
             :aria-checked='o.value === modelValue'
             :tabindex='o.value === modelValue || (!hasValue && i === 0) ? 0 : -1'
             :title='o.label ? `${o.value} — ${o.label}` : String(o.value)'
@@ -41,7 +42,7 @@
  * with each option's wording. Arrow keys move the choice.
  */
 import { computed, ref } from 'vue';
-import { scaleTone } from '../lib/scaleTone.ts';
+import { scaleRgb, scaleTextOn, scaleTone } from '../lib/scaleTone.ts';
 
 const props = withDefaults(defineProps<{
     modelValue: number;
@@ -63,6 +64,19 @@ const emit = defineEmits<{ (e: 'update:modelValue', value: number): void }>();
 const buttons = ref<HTMLButtonElement[]>([]);
 const hasValue = computed(() => props.options.some((o) => o.value === props.modelValue));
 
+/** Up to five steps use fixed Tabler tones; longer scales (GAR 0–10) blend. */
+const blended = computed(() => props.options.length > 5);
+
+function toneClass(i: number): string {
+    return blended.value ? '' : `scale-tone-${scaleTone(i, props.options.length, props.lowIsRed)}`;
+}
+
+function toneStyle(i: number): Record<string, string> | undefined {
+    if (!blended.value) return undefined;
+    const rgb = scaleRgb(i, props.options.length, props.lowIsRed);
+    return { '--scale-rgb': rgb, '--scale-text': scaleTextOn(rgb) };
+}
+
 function onKey(e: KeyboardEvent): void {
     const step = ['ArrowRight', 'ArrowDown'].includes(e.key) ? 1
         : ['ArrowLeft', 'ArrowUp'].includes(e.key) ? -1 : 0;
@@ -78,6 +92,7 @@ function onKey(e: KeyboardEvent): void {
 <style scoped>
 .scale-choice-row {
     display: inline-flex;
+    flex-wrap: wrap;
     gap: 0.25rem;
 }
 
