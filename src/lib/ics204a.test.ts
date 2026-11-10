@@ -15,23 +15,18 @@ const row = (identifier: string, leader: string) => ({ identifier, leader, perso
 const ground: OpAssignment = { id: 'a1', opNumber: 1, segmentUid: 'seg1', label: '01', team: 'CCSO SAR 01', notes: 'Some notes' };
 const NOW = '2026-11-09T18:00:00.000Z';
 
-test('prefillIcs204a: task name and team leader from this assignment\'s 204', () => {
+test('prefillIcs204a: task name from this assignment\'s 204; team leader left blank', () => {
     const plans = [
         plan({ assignmentId: 'a1', workAssignment: 'Hasty search of trail', resources: [row('Ranger 3', 'Pilot'), row('CCSO SAR 01', 'J. Smith')] }),
         plan({ assignmentId: 'a2', workAssignment: 'Look from the air' }),
     ];
     assert.deepEqual(prefillIcs204a(ground, plans, ' 064-ccso-cno ', NOW), {
-        completedAt: NOW, taskName: 'Hasty search of trail', teamLeader: 'J. Smith', debriefedBy: '064-ccso-cno',
+        completedAt: NOW, taskName: 'Hasty search of trail', debriefedBy: '064-ccso-cno',
     });
 });
 
 test('prefillIcs204a: no 204 yet falls back to the assignment notes', () => {
     assert.deepEqual(prefillIcs204a(ground, [], '', NOW), { completedAt: NOW, taskName: 'Some notes' });
-});
-
-test('prefillIcs204a: a single resource row is the team leader even if named differently', () => {
-    const plans = [plan({ assignmentId: 'a1', resources: [row('', 'K. Lee')] })];
-    assert.equal(prefillIcs204a(ground, plans, '', NOW).teamLeader, 'K. Lee');
 });
 
 test('toLocalInput / fromLocalInput round-trip to the minute', () => {
