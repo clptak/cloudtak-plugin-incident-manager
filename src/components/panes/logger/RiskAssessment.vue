@@ -432,9 +432,17 @@
                         type='button'
                         class='btn btn-primary btn-sm'
                         :disabled='!garCanSave || busy'
-                        @click='onGarSaveClick'
+                        @click='onGarSaveClick(false)'
                     >
-                        {{ saving ? 'Saving…' : (gar.editingRespondentId ? 'Update assessment' : 'Save assessment') }}
+                        {{ saving && !sendingField ? 'Saving…' : (gar.editingRespondentId ? 'Update MGMT Only' : 'Save to MGMT Only') }}
+                    </button>
+                    <button
+                        type='button'
+                        class='btn btn-outline-secondary btn-sm'
+                        :disabled='!garCanSave || busy'
+                        @click='onGarSaveClick(true)'
+                    >
+                        {{ sendingField ? 'Adding…' : 'Add to FIELD DataSync Log' }}
                     </button>
                     <button
                         type='button'
@@ -445,6 +453,9 @@
                         Clear
                     </button>
                 </div>
+                <p class='form-text mt-1 mb-0'>
+                    Team members in the field will see assessments added to the FIELD DataSync Log.
+                </p>
 
                 <TablerInlineAlert
                     v-if='garStatusMessage'
@@ -624,9 +635,17 @@
                         type='button'
                         class='btn btn-primary btn-sm'
                         :disabled='!compCanSave || busy'
-                        @click='onCompSave'
+                        @click='onCompSave(false)'
                     >
-                        {{ saving ? 'Saving…' : (comp.editingRespondentId ? 'Update assessment' : 'Save assessment') }}
+                        {{ saving && !sendingField ? 'Saving…' : (comp.editingRespondentId ? 'Update MGMT Only' : 'Save to MGMT Only') }}
+                    </button>
+                    <button
+                        type='button'
+                        class='btn btn-outline-secondary btn-sm'
+                        :disabled='!compCanSave || busy'
+                        @click='onCompSave(true)'
+                    >
+                        {{ sendingField ? 'Adding…' : 'Add to FIELD DataSync Log' }}
                     </button>
                     <button
                         type='button'
@@ -637,6 +656,9 @@
                         Clear
                     </button>
                 </div>
+                <p class='form-text mt-1 mb-0'>
+                    Team members in the field will see assessments added to the FIELD DataSync Log.
+                </p>
 
                 <TablerInlineAlert
                     v-if='compStatusMessage'
@@ -815,9 +837,17 @@
                         type='button'
                         class='btn btn-primary btn-sm'
                         :disabled='!speCanSave || busy'
-                        @click='onSpeSave'
+                        @click='onSpeSave(false)'
                     >
-                        {{ saving ? 'Saving…' : (spe.editingRespondentId ? 'Update assessment' : 'Save assessment') }}
+                        {{ saving && !sendingField ? 'Saving…' : (spe.editingRespondentId ? 'Update MGMT Only' : 'Save to MGMT Only') }}
+                    </button>
+                    <button
+                        type='button'
+                        class='btn btn-outline-secondary btn-sm'
+                        :disabled='!speCanSave || busy'
+                        @click='onSpeSave(true)'
+                    >
+                        {{ sendingField ? 'Adding…' : 'Add to FIELD DataSync Log' }}
                     </button>
                     <button
                         type='button'
@@ -828,6 +858,9 @@
                         Clear
                     </button>
                 </div>
+                <p class='form-text mt-1 mb-0'>
+                    Team members in the field will see assessments added to the FIELD DataSync Log.
+                </p>
 
                 <TablerInlineAlert
                     v-if='speStatusMessage'
@@ -951,6 +984,8 @@ import {
     loadTacticAssessmentsFromMission,
     saveTacticAssessmentsToMission,
 } from '../../../lib/tacticRiskPersistence.ts';
+import { loadIncidentSubscription } from '../../../lib/incidentSubscription.ts';
+import { riskFieldLogEntry, type RiskModel, type RiskLogRespondent } from '../../../lib/riskFieldLog.ts';
 
 const { activeMission, requireActiveMission } = useIncident();
 const { assignments, loadForMission } = useWorkAssignments();
@@ -959,6 +994,10 @@ const assessments = ref<TacticRiskMap>({});
 const contentHash = ref<string | undefined>();
 const loading = ref(false);
 const saving = ref(false);
+/** True while an "Add to FIELD DataSync Log" save is running. */
+const sendingField = ref(false);
+/** Which button opened the GAR mitigation prompt. */
+let garToField = false;
 
 const garExpanded = ref(false);
 const compExpanded = ref(false);
@@ -1407,9 +1446,11 @@ async function persist(
     next: TacticRiskMap,
     successMessage: string,
     which: 'gar' | 'comp' | 'spe',
+    fieldLog?: { tacticLabel: string; respondent: RiskLogRespondent },
 ): Promise<void> {
     if (!activeMission.value) return;
     saving.value = true;
+    sendingField.value = Boolean(fieldLog);
     if (which === 'gar') {
         garStatusError.value = false;
         garStatusMessage.value = 'Saving…';
@@ -1427,9 +1468,23 @@ async function persist(
             contentHash.value,
         );
         assessments.value = next;
-        if (which === 'gar') garStatusMessage.value = successMessage;
-        else if (which === 'comp') compStatusMessage.value = successMessage;
-        else speStatusMessage.value = successMessage;
+        let message = successMessage;
+        if (fieldLog) {
+            try {
+                const sub = await loadIncidentSubscription(activeMission.value);
+                await sub.log.create({
+                    dtg: new Date().toISOString(),
+                    ...riskFieldLogEntry(which as RiskModel, fieldLog.tacticLabel, fieldLog.respondent),
+                });
+                message += ` Added to the FIELD DataSync Log on ${activeMission.value.name}.`;
+            } catch (logErr) {
+                const why = logErr instanceof Error ? logErr.message : String(logErr);
+                throw new Error(`${successMessage} It was not added to the FIELD DataSync Log: ${why}`, { cause: logErr });
+            }
+        }
+        if (which === 'gar') garStatusMessage.value = message;
+        else if (which === 'comp') compStatusMessage.value = message;
+        else speStatusMessage.value = message;
     } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (which === 'gar') {
@@ -1444,6 +1499,7 @@ async function persist(
         }
     } finally {
         saving.value = false;
+        sendingField.value = false;
     }
 }
 
@@ -1487,8 +1543,9 @@ function buildGarRespondent(): GarRiskRespondent {
     };
 }
 
-function onGarSaveClick(): void {
+function onGarSaveClick(toField: boolean): void {
     if (!requireActiveMission() || !garCanSave.value) return;
+    garToField = toField;
     const draft = buildGarRespondent();
     const needed = factorsNeedingMitigation(draft);
     if (needed.length) {
@@ -1496,7 +1553,7 @@ function onGarSaveClick(): void {
         showMitigationModal.value = true;
         return;
     }
-    void saveGarAssessment();
+    void saveGarAssessment(toField);
 }
 
 function closeMitigationModal(): void {
@@ -1506,10 +1563,10 @@ function closeMitigationModal(): void {
 
 function confirmSaveWithoutMitigations(): void {
     closeMitigationModal();
-    void saveGarAssessment();
+    void saveGarAssessment(garToField);
 }
 
-async function saveGarAssessment(): Promise<void> {
+async function saveGarAssessment(toField = false): Promise<void> {
     if (!requireActiveMission() || !garCanSave.value) return;
 
     const key = keyForForm(gar.tacticChoice, gar.editingKey) ?? newTacticKey();
@@ -1541,6 +1598,7 @@ async function saveGarAssessment(): Promise<void> {
         { ...assessments.value, [key]: entry },
         `Saved ${name}'s GAR assessment of "${entry.tacticLabel}" (${respondent.level}).`,
         'gar',
+        toField ? { tacticLabel: entry.tacticLabel, respondent } : undefined,
     );
     if (!garStatusError.value) {
         gar.editingKey = key.startsWith('tactic:') ? key : '';
@@ -1548,7 +1606,7 @@ async function saveGarAssessment(): Promise<void> {
     }
 }
 
-async function onCompSave(): Promise<void> {
+async function onCompSave(toField = false): Promise<void> {
     if (!requireActiveMission() || !compResult.value || !compCanSave.value) return;
 
     const key = keyForForm(comp.tacticChoice, comp.editingKey) ?? newTacticKey();
@@ -1592,6 +1650,7 @@ async function onCompSave(): Promise<void> {
         { ...assessments.value, [key]: entry },
         `Saved ${name}'s complacency assessment of "${entry.tacticLabel}" (${respondent.level}).`,
         'comp',
+        toField ? { tacticLabel: entry.tacticLabel, respondent } : undefined,
     );
     if (!compStatusError.value) {
         comp.editingKey = key.startsWith('tactic:') ? key : '';
@@ -1599,7 +1658,7 @@ async function onCompSave(): Promise<void> {
     }
 }
 
-async function onSpeSave(): Promise<void> {
+async function onSpeSave(toField = false): Promise<void> {
     if (!requireActiveMission() || !speResult.value || !speCanSave.value) return;
 
     const key = keyForForm(spe.tacticChoice, spe.editingKey) ?? newTacticKey();
@@ -1643,6 +1702,7 @@ async function onSpeSave(): Promise<void> {
         { ...assessments.value, [key]: entry },
         `Saved ${name}'s SPE assessment of "${entry.tacticLabel}" (${respondent.level}).`,
         'spe',
+        toField ? { tacticLabel: entry.tacticLabel, respondent } : undefined,
     );
     if (!speStatusError.value) {
         spe.editingKey = key.startsWith('tactic:') ? key : '';
