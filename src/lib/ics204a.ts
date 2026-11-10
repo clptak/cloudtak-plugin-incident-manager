@@ -4,7 +4,8 @@
  */
 
 import { priorPlanFor } from '../domain/iap.ts';
-import type { Ics204aDetails, OpAssignment } from '../domain/entities.ts';
+import type { DebriefRecord, Ics204aDetails, OpAssignment } from '../domain/entities.ts';
+import type { Ics204aPdfData } from './ics204aPdf.ts';
 import type { IapAssignmentPlan } from './iapPlanPersistence.ts';
 
 /**
@@ -125,4 +126,56 @@ export function ics204aLine(item: Ics204aMapItem, timeLabel: string, note: strin
 /** Add a line to the end of a 204A text box. */
 export function appendIcs204aLine(text: string, line: string): string {
     return text.trim() ? `${text.trimEnd()}\n${line}` : line;
+}
+
+// ---- PDF (#17 phase 3) ----------------------------------------------------
+
+function pct(n: number | undefined): string {
+    return n === undefined ? '' : `${n}%`;
+}
+
+/**
+ * What the drawn ICS 204A prints for one debrief. OP, assignment # (the
+ * segment label), team name (the resource) and Estimated POD come from the
+ * debrief; Map attached is Y when a GPS track is attached; a partial search
+ * shows how much was completed next to the POD.
+ */
+export function ics204aPdfData(record: DebriefRecord, incidentName: string, segmentLabel: string): Ics204aPdfData {
+    const d = record.ics204a ?? {};
+    const local = d.completedAt ? toLocalInput(d.completedAt) : '';
+    const [dateCompleted = '', timeCompleted = ''] = local ? local.split('T') : [];
+    const partial = record.coverage !== undefined && record.coverage < 1
+        ? ` (${Math.round(record.coverage * 100)}% of segment completed)`
+        : '';
+    return {
+        incidentName,
+        opNumber: String(record.opNumber),
+        taskNumber: d.taskNumber ?? '',
+        assignmentNumber: record.label || segmentLabel,
+        taskName: d.taskName ?? '',
+        dateCompleted,
+        timeCompleted,
+        teamName: record.resource ?? '',
+        teamLeader: d.teamLeader ?? '',
+        debriefedBy: d.debriefedBy ?? '',
+        actions: d.actions ?? '',
+        mapAttached: Boolean(record.tracks?.length),
+        estimatedPod: record.pod !== undefined ? `${pct(record.pod)}${partial}` : '',
+        podResponsive: pct(d.podResponsive),
+        podUnresponsive: pct(d.podUnresponsive),
+        clues: d.clues ?? '',
+        clueStatus: d.clueStatus ?? '',
+        gaps: d.gaps ?? '',
+        hazards: d.hazards ?? '',
+        suggestions: d.suggestions ?? '',
+    };
+}
+
+/** e.g. ICS-204A_OP1_01_CCSO-SAR-01.pdf (one file per debrief). */
+export function ics204aFilename(record: DebriefRecord, segmentLabel: string): string {
+    const safe = (s: string): string => s.trim().replace(/[^\w.-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    const parts = ['ICS-204A', `OP${record.opNumber}`, safe(record.label || segmentLabel), safe(record.resource ?? '')];
+    const stamp = (record.recordedAt ?? '').replace(/[^0-9]/g, '').slice(0, 12);
+    if (stamp) parts.push(stamp);
+    return `${parts.filter(Boolean).join('_')}.pdf`;
 }
