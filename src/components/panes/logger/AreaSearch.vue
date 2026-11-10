@@ -1098,6 +1098,113 @@
                         />
                     </div>
                 </div>
+
+                <!-- ── ICS 204A details (#17) — collapsed so a quick debrief stays quick ── -->
+                <div class='border rounded-3 mt-2'>
+                    <button
+                        type='button'
+                        class='btn btn-link w-100 d-flex align-items-center gap-2 text-white text-decoration-none px-2 py-1'
+                        :aria-expanded='ics204aOpen'
+                        @click='toggleIcs204a'
+                    >
+                        <IconChevronDown
+                            v-if='ics204aOpen'
+                            :size='16'
+                            :stroke-width='1.5'
+                        />
+                        <IconChevronRight
+                            v-else
+                            :size='16'
+                            :stroke-width='1.5'
+                        />
+                        <span class='small text-uppercase'>ICS 204A details</span>
+                        <span class='small text-white-50 ms-auto'>
+                            {{ ics204aFilledCount ? `${ics204aFilledCount} filled in` : 'optional' }}
+                        </span>
+                    </button>
+                    <div
+                        v-if='ics204aOpen'
+                        class='px-2 pb-2'
+                    >
+                        <div class='row g-2'>
+                            <div class='col-md-3'>
+                                <TablerInput
+                                    v-model='ics204aForm.taskNumber'
+                                    label='Task #'
+                                />
+                            </div>
+                            <div class='col-md-5'>
+                                <TablerInput
+                                    v-model='ics204aForm.taskName'
+                                    label='Task name'
+                                />
+                            </div>
+                            <div class='col-md-4'>
+                                <label class='form-label'>Date / time completed</label>
+                                <input
+                                    v-model='ics204aForm.completedAt'
+                                    type='datetime-local'
+                                    class='form-control form-control-sm'
+                                >
+                            </div>
+                            <div class='col-md-6'>
+                                <TablerInput
+                                    v-model='ics204aForm.teamLeader'
+                                    label='Team leader'
+                                />
+                            </div>
+                            <div class='col-md-6'>
+                                <TablerInput
+                                    v-model='ics204aForm.debriefedBy'
+                                    label='Debriefed by (Planning)'
+                                />
+                            </div>
+                            <div
+                                v-if='isSearchIncident'
+                                class='col-md-6'
+                            >
+                                <TablerInput
+                                    v-model='ics204aForm.podResponsive'
+                                    label='POD % if responsive'
+                                    placeholder='0–100'
+                                />
+                            </div>
+                            <div
+                                v-if='isSearchIncident'
+                                class='col-md-6'
+                            >
+                                <TablerInput
+                                    v-model='ics204aForm.podUnresponsive'
+                                    label='POD % if non-responsive'
+                                    placeholder='0–100'
+                                />
+                            </div>
+                            <div
+                                v-if='isSearchIncident'
+                                class='col-12 form-text mt-0'
+                            >
+                                The POD % above is the Estimated POD and the only one used by CASIE.
+                                These two are recorded and printed on the 204A.
+                            </div>
+                            <div
+                                v-for='box in ICS204A_TEXT_BOXES'
+                                :key='box.key'
+                                class='col-12'
+                            >
+                                <label class='form-label'>{{ box.label }}</label>
+                                <textarea
+                                    v-model='ics204aForm[box.key]'
+                                    class='form-control form-control-sm'
+                                    rows='2'
+                                />
+                            </div>
+                            <div class='col-12 form-text mt-0'>
+                                Map attached: {{ ics204aMapAttached ? 'Y (a GPS track is attached)' : 'attach a GPS track from the Assignment Status List and the 204A shows Y' }}.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div
                     v-if='debriefAssignment'
                     class='form-text mt-2 mb-0'
@@ -1290,7 +1397,7 @@
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useIncidentChanges } from '../../../composables/useIncidentChanges.ts';
 import { OP_LIST_PREFIXES, touchesPrefixes } from '../../../lib/screenKeys.ts';
-import { IconAlertTriangle, IconRoute, IconTrash } from '@tabler/icons-vue';
+import { IconAlertTriangle, IconChevronDown, IconChevronRight, IconRoute, IconTrash } from '@tabler/icons-vue';
 import { TablerBorder, TablerEnum, TablerInlineAlert, TablerInput } from '@tak-ps/vue-tabler';
 import OverlayManager from '../../../../../../src/base/overlay.ts';
 import { useMapStore } from '../../../../../../src/stores/map.ts';
@@ -1298,7 +1405,10 @@ import { server } from '../../../../../../src/std.ts';
 import GroupSelect from '../../../../../../src/components/CloudTAK/util/GroupSelect.vue';
 import { useIncident, type ActiveMission } from '../../../composables/useIncident.ts';
 import { usePluginSettings } from '../../../composables/usePluginSettings.ts';
-import type { DebriefRecord, OpAssignment, OpPeriodRegistryEntry } from '../../../domain/entities.ts';
+import type { DebriefRecord, Ics204aDetails, OpAssignment, OpPeriodRegistryEntry } from '../../../domain/entities.ts';
+import ProfileConfig from '../../../../../../src/base/profile.ts';
+import { fromLocalInput, prefillIcs204a, toLocalInput } from '../../../lib/ics204a.ts';
+import { loadIapPlan, type IapAssignmentPlan } from '../../../lib/iapPlanPersistence.ts';
 import { currentOpPeriod, isFieldActive, nextOpNumber, planningOpPeriod } from '../../../domain/registry.ts';
 import {
     attachTrackFile,
@@ -1314,7 +1424,7 @@ import {
     publishAssignments,
     recordDebrief,
 } from '../../../domain/usecases.ts';
-import { debriefsForAssignment } from '../../../domain/debrief.ts';
+import { debriefsForAssignment, ics204aFromValue } from '../../../domain/debrief.ts';
 import {
     debriefKey,
     trackLengthMiles,
@@ -1568,6 +1678,79 @@ const debriefForm = reactive({
     assignmentId: '',
 });
 
+// ---- ICS 204A details (#17) ------------------------------------------------
+const ICS204A_TEXT_BOXES = [
+    { key: 'actions', label: 'What the team actually did (include times and GPS coordinates if available)' },
+    { key: 'clues', label: 'Clues / items discovered (time and location)' },
+    { key: 'clueStatus', label: 'Current status of clues / items' },
+    { key: 'gaps', label: 'Difficulties or gaps in coverage' },
+    { key: 'hazards', label: 'Hazards or dangers in the search area' },
+    { key: 'suggestions', label: 'Suggestions, ideas, recommendations' },
+] as const;
+
+function blankIcs204aForm(): Record<keyof Ics204aDetails, string> {
+    return {
+        taskNumber: '', taskName: '', teamLeader: '', debriefedBy: '', completedAt: '',
+        podResponsive: '', podUnresponsive: '',
+        actions: '', clues: '', clueStatus: '', gaps: '', hazards: '', suggestions: '',
+    };
+}
+
+const ics204aForm = reactive(blankIcs204aForm());
+const ics204aOpen = ref(false);
+const myCallsign = ref('');
+
+const ics204aFilledCount = computed(() => Object.values(ics204aForm).filter((v) => v.trim()).length);
+const ics204aMapAttached = computed(() => Boolean(
+    editingKey.value && debriefs.value.find((d) => debriefKey(d) === editingKey.value)?.tracks?.length,
+));
+
+function setIcs204aForm(details: Ics204aDetails | undefined): void {
+    const blank = blankIcs204aForm();
+    for (const key of Object.keys(blank) as (keyof Ics204aDetails)[]) {
+        const v = details?.[key];
+        blank[key] = v === undefined ? '' : String(v);
+    }
+    blank.completedAt = details?.completedAt ? toLocalInput(details.completedAt) : '';
+    Object.assign(ics204aForm, blank);
+}
+
+/** The 204A details as entered, or null when every box is empty. */
+function ics204aFromForm(): Ics204aDetails | null {
+    const local = ics204aForm.completedAt.trim();
+    return ics204aFromValue({ ...ics204aForm, completedAt: local ? fromLocalInput(local) : '' });
+}
+
+async function loadMyCallsign(): Promise<string> {
+    if (myCallsign.value) return myCallsign.value;
+    try {
+        const profile = await ProfileConfig.fetch();
+        myCallsign.value = (profile as { tak_callsign?: string }).tak_callsign?.trim() ?? '';
+    } catch { /* leave it for the user to type */ }
+    return myCallsign.value;
+}
+
+/** Opening the section on a hand-entered debrief fills who and when, if blank. */
+async function toggleIcs204a(): Promise<void> {
+    ics204aOpen.value = !ics204aOpen.value;
+    if (!ics204aOpen.value || editingKey.value) return;
+    if (!ics204aForm.completedAt) ics204aForm.completedAt = toLocalInput(new Date().toISOString());
+    if (!ics204aForm.debriefedBy) ics204aForm.debriefedBy = await loadMyCallsign();
+}
+
+/** Debrief from an assignment: task name and team leader from its ICS 204, who and when. */
+async function prefillIcs204aFor(a: OpAssignment): Promise<void> {
+    const mission = activeMission.value;
+    let plans: IapAssignmentPlan[] = [];
+    try {
+        if (mission?.mgmt) plans = (await loadIapPlan(mission, a.opNumber))?.assignments ?? [];
+    } catch { /* no saved IAP: the rest still fills */ }
+    const callsign = await loadMyCallsign();
+    // The user may have moved on to another assignment while this loaded.
+    if (debriefForm.assignmentId !== (a.id ?? '') || debriefForm.segmentUid !== a.segmentUid) return;
+    setIcs204aForm(prefillIcs204a(a, plans, callsign, new Date().toISOString()));
+}
+
 /** The assignment the debrief form is filled from, if any. */
 const debriefAssignment = computed(() => (debriefForm.assignmentId
     ? assignments.value.find((a) => a.id === debriefForm.assignmentId) ?? null
@@ -1654,6 +1837,8 @@ function startAssignmentDebrief(a: OpAssignment): void {
     debriefForm.coverage = '';
     debriefForm.notes = '';
     debriefForm.assignmentId = a.id ?? '';
+    setIcs204aForm(undefined);
+    void prefillIcs204aFor(a);
     goToDebriefForm();
 }
 
@@ -2374,6 +2559,8 @@ function buildDebriefRecord(): DebriefRecord {
     if (debriefForm.resource.trim()) record.resource = debriefForm.resource.trim();
     if (debriefForm.notes.trim()) record.notes = debriefForm.notes.trim();
     if (debriefForm.assignmentId) record.assignmentId = debriefForm.assignmentId;
+    const ics204a = ics204aFromForm();
+    if (ics204a) record.ics204a = ics204a;
     return record;
 }
 
@@ -2382,6 +2569,8 @@ function resetDebriefForm(): void {
     debriefForm.coverage = '';
     debriefForm.notes = '';
     debriefForm.assignmentId = '';
+    setIcs204aForm(undefined);
+    ics204aOpen.value = false;
     editingKey.value = null;
     duplicatePrompt.value = null;
 }
@@ -2428,6 +2617,8 @@ function startEdit(record: DebriefRecord): void {
     debriefForm.resource = record.resource ?? '';
     debriefForm.notes = record.notes ?? '';
     debriefForm.assignmentId = record.assignmentId ?? '';
+    setIcs204aForm(record.ics204a);
+    ics204aOpen.value = Boolean(record.ics204a);
     goToDebriefForm();
 }
 
