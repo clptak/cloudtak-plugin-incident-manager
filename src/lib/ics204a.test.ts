@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import type { OpAssignment } from '../domain/entities.ts';
 import type { IapAssignmentPlan } from './iapPlanPersistence.ts';
-import { fromLocalInput, prefillIcs204a, toLocalInput } from './ics204a.ts';
+import { appendIcs204aLine, fromLocalInput, ics204aLine, ics204aMapItems, prefillIcs204a, toLocalInput } from './ics204a.ts';
 
 function plan(over: Partial<IapAssignmentPlan>): IapAssignmentPlan {
     return {
@@ -40,4 +40,26 @@ test('toLocalInput / fromLocalInput round-trip to the minute', () => {
     assert.equal(fromLocalInput(local), '2026-11-09T18:42:00.000Z');
     assert.equal(toLocalInput('not a date'), '');
     assert.equal(fromLocalInput(''), '');
+});
+
+test('ics204aMapItems: named markers and areas, newest first; segments, tracks and lines left out', () => {
+    const items = ics204aMapItems([
+        { id: 'm1', properties: { callsign: 'Boot print', time: '2026-11-09T15:00:00Z' }, geometry: { type: 'Point', coordinates: [-111.65, 35.2] } },
+        { id: 'a1', properties: { callsign: 'Cliff band', time: '2026-11-09T16:00:00Z' }, geometry: { type: 'Polygon', coordinates: [[[0, 0], [2, 0], [2, 2], [0, 2], [0, 0]]] } },
+        { id: 'seg', properties: { callsign: '01' }, geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] } },
+        { id: 'trk', properties: { callsign: 'Track' }, geometry: { type: 'LineString', coordinates: [[0, 0], [1, 1]] } },
+        { id: 'noname', properties: {}, geometry: { type: 'Point', coordinates: [0, 0] } },
+        { id: 'bad', properties: { callsign: 'Bad' }, geometry: { type: 'Point', coordinates: [] } },
+    ], new Set(['seg']));
+    assert.deepEqual(items.map((i) => [i.uid, i.kind]), [['a1', 'area'], ['m1', 'marker']]);
+    assert.deepEqual([items[0].lat, items[0].lon], [1, 1]);
+    assert.deepEqual([items[1].lat, items[1].lon], [35.2, -111.65]);
+});
+
+test('ics204aLine and appendIcs204aLine', () => {
+    const marker = { uid: 'm1', callsign: 'Boot print', kind: 'marker' as const, lat: 35.2, lon: -111.65 };
+    assert.equal(ics204aLine(marker, '11/09 15:00', ' size 10, heading N '), 'Boot print · 11/09 15:00 · 35.20000, -111.65000 — size 10, heading N');
+    assert.equal(ics204aLine({ ...marker, kind: 'area' }, '', ''), 'Boot print · area centred 35.20000, -111.65000');
+    assert.equal(appendIcs204aLine('', 'one'), 'one');
+    assert.equal(appendIcs204aLine('one\n', 'two'), 'one\ntwo');
 });

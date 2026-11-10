@@ -281,6 +281,7 @@
             <!-- ── Influence of Clue (ISM 8.17/8.18) — inline, map stays usable ── -->
             <TablerBorder
                 v-if='clueFormOpen && currentOp'
+                id='im-clue-form'
                 class='cloudtak-accent text-white mb-3'
                 :fill-height='false'
                 :shadow='false'
@@ -1180,6 +1181,96 @@
                                 The POD % above is the Estimated POD and the only one used by CASIE.
                                 These two are recorded and printed on the 204A.
                             </div>
+                            <!-- Marker / area picker (#17 phase 2) -->
+                            <div class='col-12'>
+                                <div class='border rounded-3 p-2'>
+                                    <div class='d-flex align-items-center gap-2 mb-1'>
+                                        <span class='small fw-bold'>Add from the OP{{ debriefForm.opNumber }} map</span>
+                                        <span class='form-text my-0'>Markers and areas on the FIELD DataSync, each with a note.</span>
+                                        <button
+                                            type='button'
+                                            class='btn btn-link btn-sm p-0 ms-auto'
+                                            :disabled='loadingPickItems'
+                                            @click='loadPickItems'
+                                        >
+                                            {{ loadingPickItems ? 'Loading…' : (pickItemsLoaded ? 'Refresh' : 'Show markers and areas') }}
+                                        </button>
+                                    </div>
+                                    <div
+                                        v-if='pickError'
+                                        class='small text-warning'
+                                    >
+                                        {{ pickError }}
+                                    </div>
+                                    <div
+                                        v-else-if='pickItemsLoaded && !pickItems.length'
+                                        class='small text-white-50'
+                                    >
+                                        No named markers or areas on the OP{{ debriefForm.opNumber }} DataSync yet.
+                                    </div>
+                                    <div
+                                        v-for='item in pickItems'
+                                        :key='item.uid'
+                                        class='d-flex flex-wrap align-items-center gap-2 py-1 border-top small'
+                                    >
+                                        <span
+                                            class='badge'
+                                            :class='item.kind === "area" ? "bg-purple-lt" : "bg-azure-lt"'
+                                        >{{ item.kind }}</span>
+                                        <span class='fw-bold'>{{ item.callsign }}</span>
+                                        <span
+                                            v-if='item.time'
+                                            class='text-white-50'
+                                        >{{ shortDt(item.time) }}</span>
+                                        <button
+                                            type='button'
+                                            class='btn btn-link btn-sm p-0'
+                                            title='Center the map on this item'
+                                            @click='flyToCandidate(item.uid)'
+                                        >
+                                            locate
+                                        </button>
+                                        <input
+                                            v-model='pickNotes[item.uid]'
+                                            type='text'
+                                            class='form-control form-control-sm flex-grow-1'
+                                            style='min-width: 10rem; width: auto'
+                                            placeholder='Note'
+                                            :aria-label='`Note for ${item.callsign}`'
+                                        >
+                                        <div
+                                            class='btn-group btn-group-sm'
+                                            role='group'
+                                            :aria-label='`Add ${item.callsign} to`'
+                                        >
+                                            <button
+                                                v-for='t in PICK_TARGETS'
+                                                :key='t.key'
+                                                type='button'
+                                                class='btn btn-outline-secondary'
+                                                :title='`Add a line to ${t.box}`'
+                                                @click='addPick(item, t.key)'
+                                            >
+                                                + {{ t.label }}
+                                            </button>
+                                        </div>
+                                        <button
+                                            v-if='pickAdded[item.uid]?.includes("clues")'
+                                            type='button'
+                                            class='btn btn-link btn-sm p-0'
+                                            :disabled='!currentOp'
+                                            :title='currentOp ? "Open Add Influence of Clue so this clue can change the POAs" : "Add Influence of Clue needs an active OP"'
+                                            @click='logPickAsClue(item)'
+                                        >
+                                            Log as Clue
+                                        </button>
+                                        <span
+                                            v-if='pickAdded[item.uid]?.length'
+                                            class='text-success'
+                                        >added to {{ pickAdded[item.uid].map((k) => PICK_TARGETS.find((t) => t.key === k)?.label).join(', ') }}</span>
+                                    </div>
+                                </div>
+                            </div>
                             <div
                                 v-for='box in ICS204A_TEXT_BOXES'
                                 :key='box.key'
@@ -1401,7 +1492,16 @@ import { useIncident, type ActiveMission } from '../../../composables/useInciden
 import { usePluginSettings } from '../../../composables/usePluginSettings.ts';
 import type { DebriefRecord, Ics204aDetails, OpAssignment, OpPeriodRegistryEntry } from '../../../domain/entities.ts';
 import ProfileConfig from '../../../../../../src/base/profile.ts';
-import { fromLocalInput, prefillIcs204a, toLocalInput } from '../../../lib/ics204a.ts';
+import {
+    appendIcs204aLine,
+    fromLocalInput,
+    ics204aLine,
+    ics204aMapItems,
+    prefillIcs204a,
+    toLocalInput,
+    type Ics204aMapItem,
+    type Ics204aPickTarget,
+} from '../../../lib/ics204a.ts';
 import { loadIapPlan, type IapAssignmentPlan } from '../../../lib/iapPlanPersistence.ts';
 import { currentOpPeriod, isFieldActive, nextOpNumber, planningOpPeriod } from '../../../domain/registry.ts';
 import {
@@ -1421,6 +1521,7 @@ import {
 import { debriefsForAssignment, ics204aFromValue } from '../../../domain/debrief.ts';
 import {
     debriefKey,
+    referencedTrackUids,
     trackLengthMiles,
     trackLogCallsign,
     type ParsedTrack,
@@ -1722,6 +1823,71 @@ async function loadMyCallsign(): Promise<string> {
         myCallsign.value = (profile as { tak_callsign?: string }).tak_callsign?.trim() ?? '';
     } catch { /* leave it for the user to type */ }
     return myCallsign.value;
+}
+
+// Marker / area picker: lines for clues, hazards and gaps (#17 phase 2).
+const PICK_TARGETS: { key: Ics204aPickTarget; label: string; box: string }[] = [
+    { key: 'clues', label: 'Clue', box: 'Clues / items discovered' },
+    { key: 'hazards', label: 'Hazard', box: 'Hazards or dangers' },
+    { key: 'gaps', label: 'Gap', box: 'Difficulties or gaps in coverage' },
+];
+const pickItems = ref<Ics204aMapItem[]>([]);
+const pickItemsLoaded = ref(false);
+const loadingPickItems = ref(false);
+const pickError = ref('');
+const pickNotes = reactive<Record<string, string>>({});
+const pickAdded = reactive<Record<string, Ics204aPickTarget[]>>({});
+
+function resetPicker(): void {
+    pickItems.value = [];
+    pickItemsLoaded.value = false;
+    pickError.value = '';
+    for (const k of Object.keys(pickNotes)) delete pickNotes[k];
+    for (const k of Object.keys(pickAdded)) delete pickAdded[k];
+}
+
+// Another OP means another DataSync: the list no longer applies.
+watch(() => debriefForm.opNumber, resetPicker);
+
+/** Named markers and areas on the debrief OP's FIELD DataSync. */
+async function loadPickItems(): Promise<void> {
+    const op = registry.value.find((o) => o.opNumber === debriefForm.opNumber);
+    pickError.value = '';
+    if (!op) {
+        pickError.value = `OP${debriefForm.opNumber} is not in the registry, so there is no DataSync to list.`;
+        return;
+    }
+    loadingPickItems.value = true;
+    try {
+        const sub = await Subscription.load(op.guid, { missiontoken: op.ownerToken || undefined, reload: false });
+        const feats = await sub.feature.list({ refresh: true }) as unknown as Parameters<typeof ics204aMapItems>[0];
+        // Leave out the assignment polygons and the GPS tracks already filed.
+        const exclude = referencedTrackUids(debriefs.value);
+        for (const a of assignments.value) if (a.opFeatureUid) exclude.add(a.opFeatureUid);
+        pickItems.value = ics204aMapItems(feats, exclude);
+        pickItemsLoaded.value = true;
+    } catch (err) {
+        pickError.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        loadingPickItems.value = false;
+    }
+}
+
+function addPick(item: Ics204aMapItem, target: Ics204aPickTarget): void {
+    const line = ics204aLine(item, item.time ? shortDt(item.time) : '', pickNotes[item.uid] ?? '');
+    ics204aForm[target] = appendIcs204aLine(ics204aForm[target], line);
+    const added = pickAdded[item.uid] ?? [];
+    if (!added.includes(target)) pickAdded[item.uid] = [...added, target];
+}
+
+/** Open Add Influence of Clue for a picked clue, so it can change the POAs. */
+function logPickAsClue(item: Ics204aMapItem): void {
+    openClueForm();
+    if (!clueFormOpen.value) return;
+    const note = pickNotes[item.uid]?.trim();
+    clueForm.description = note ? `${item.callsign} — ${note}` : item.callsign;
+    if (registry.value.some((o) => o.opNumber === debriefForm.opNumber)) clueForm.opNumber = debriefForm.opNumber;
+    void nextTick(() => document.getElementById('im-clue-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
 }
 
 /** Opening the section on a hand-entered debrief fills who and when, if blank. */
@@ -2566,6 +2732,7 @@ function resetDebriefForm(): void {
     debriefForm.assignmentId = '';
     setIcs204aForm(undefined);
     ics204aOpen.value = false;
+    resetPicker();
     editingKey.value = null;
     duplicatePrompt.value = null;
 }
