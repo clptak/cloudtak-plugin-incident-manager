@@ -1247,7 +1247,8 @@
                                                 v-for='t in PICK_TARGETS'
                                                 :key='t.key'
                                                 type='button'
-                                                class='btn btn-outline-secondary'
+                                                class='btn btn-outline'
+                                                :class='t.color'
                                                 :title='`Add a line to ${t.box}`'
                                                 @click='addPick(item, t.key)'
                                             >
@@ -1826,10 +1827,11 @@ async function loadMyCallsign(): Promise<string> {
 }
 
 // Marker / area picker: lines for clues, hazards and gaps (#17 phase 2).
-const PICK_TARGETS: { key: Ics204aPickTarget; label: string; box: string }[] = [
-    { key: 'clues', label: 'Clue', box: 'Clues / items discovered' },
-    { key: 'hazards', label: 'Hazard', box: 'Hazards or dangers' },
-    { key: 'gaps', label: 'Gap', box: 'Difficulties or gaps in coverage' },
+const PICK_TARGETS: { key: Ics204aPickTarget; label: string; box: string; color: string }[] = [
+    { key: 'clues', label: 'Clue', box: 'Clues / items discovered', color: 'btn-blue' },
+    { key: 'hazards', label: 'Hazard', box: 'Hazards or dangers', color: 'btn-red' },
+    // Tabler's yellow is amber (#f59f00).
+    { key: 'gaps', label: 'Gap', box: 'Difficulties or gaps in coverage', color: 'btn-yellow' },
 ];
 const pickItems = ref<Ics204aMapItem[]>([]);
 const pickItemsLoaded = ref(false);
