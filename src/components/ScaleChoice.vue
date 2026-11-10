@@ -85,6 +85,11 @@ function onKey(e: KeyboardEvent): void {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+    height: 100%;
+    padding: 0.5rem;
+    border: 1px solid rgba(var(--tblr-body-color-rgb, 255, 255, 255), 0.14);
+    border-radius: var(--tblr-border-radius, 4px);
+    background-color: rgba(var(--tblr-body-color-rgb, 255, 255, 255), 0.02);
 }
 
 .scale-choice-list .scale-choice-btn {
