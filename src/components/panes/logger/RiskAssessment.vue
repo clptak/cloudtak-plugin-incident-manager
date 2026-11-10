@@ -568,6 +568,7 @@
                         <ScaleChoice
                             v-model='comp.repetition'
                             layout='list'
+                            low-is-red
                             label='Repetition'
                             :options='REPETITION_OPTIONS'
                             :disabled='busy'
@@ -577,6 +578,7 @@
                         <ScaleChoice
                             v-model='comp.confidence'
                             layout='list'
+                            low-is-red
                             label='Confidence'
                             :options='CONFIDENCE_OPTIONS'
                             :disabled='busy'
@@ -586,6 +588,7 @@
                         <ScaleChoice
                             v-model='comp.experience'
                             layout='list'
+                            low-is-red
                             label='Experience'
                             :options='EXPERIENCE_OPTIONS'
                             :disabled='busy'

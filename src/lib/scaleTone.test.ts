@@ -10,6 +10,11 @@ test('scaleTone: 1–5 and 1–4 run green → amber → red (#27)', () => {
     assert.deepEqual(tones(4), ['green', 'yellow', 'orange', 'red']);
 });
 
+test('scaleTone: reversed for Complacency 1–5 / 1–4 (#27)', () => {
+    assert.deepEqual(tones(5, true), ['red', 'orange', 'yellow', 'lime', 'green']);
+    assert.deepEqual(tones(4, true), ['red', 'orange', 'yellow', 'green']);
+});
+
 test('scaleTone: Search Urgency 1–3 is red, amber, green (#26)', () => {
     assert.deepEqual(tones(3, true), ['red', 'yellow', 'green']);
 });
