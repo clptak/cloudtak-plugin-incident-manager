@@ -105,6 +105,34 @@ export interface TrackLogRef {
  * rather than stored as 0, so a standalone reader of the schema can tell "not
  * applicable" from "searched and found nothing".
  */
+/**
+ * The ICS 204A boxes a debrief does not already hold. OP, assignment # (the
+ * segment), team name (the resource), Estimated POD and Map attached (a GPS
+ * track is attached) come from the debrief itself. Every field is optional.
+ */
+export interface Ics204aDetails {
+    taskNumber?: string;
+    taskName?: string;
+    teamLeader?: string;
+    /** Planning person who took the debrief. */
+    debriefedBy?: string;
+    /** ISO date and time the assignment was completed. */
+    completedAt?: string;
+    /** POD percent if the subject is responsive. Printed only; not used by CASIE. */
+    podResponsive?: number;
+    /** POD percent if the subject is non-responsive. Printed only; not used by CASIE. */
+    podUnresponsive?: number;
+    /** What the team actually did (times and GPS coordinates if available). */
+    actions?: string;
+    /** Clues/items discovered, with time and location. */
+    clues?: string;
+    clueStatus?: string;
+    /** Difficulties or gaps in coverage. */
+    gaps?: string;
+    hazards?: string;
+    suggestions?: string;
+}
+
 export interface DebriefRecord {
     opNumber: number;
     /**
@@ -138,6 +166,8 @@ export interface DebriefRecord {
      * by hand and on those recorded before assignments had ids.
      */
     assignmentId?: string;
+    /** ICS 204A Team Assignment Debriefing details (#17). */
+    ics204a?: Ics204aDetails;
     /** GPS track logs evidencing this search. */
     tracks?: TrackLogRef[];
     /** ISO timestamp. */

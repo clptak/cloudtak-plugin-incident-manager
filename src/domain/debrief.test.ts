@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { DebriefRecord, OpAssignment } from './entities.ts';
-import { correctedDebrief, debriefRecordFromValue, debriefsForAssignment } from './debrief.ts';
+import { correctedDebrief, debriefRecordFromValue, debriefsForAssignment, ics204aFromValue } from './debrief.ts';
 
 const ground: OpAssignment = { id: 'a1', opNumber: 1, segmentUid: 'seg1', label: '01', team: 'CCSO SAR 01' };
 const air: OpAssignment = { id: 'a2', opNumber: 1, segmentUid: 'seg1', label: '01', team: 'Ranger 3' };
@@ -39,4 +39,20 @@ test('correctedDebrief keeps the assignment id unless the correction names one',
     const existing: DebriefRecord = { opNumber: 1, segmentUid: 'seg1', pod: 30, assignmentId: 'a1', recordedAt: 't0' };
     assert.equal(correctedDebrief(existing, { opNumber: 1, segmentUid: 'seg1', pod: 35 }, 't1').assignmentId, 'a1');
     assert.equal(correctedDebrief(existing, { opNumber: 1, segmentUid: 'seg1', pod: 35, assignmentId: 'a2' }, 't1').assignmentId, 'a2');
+});
+
+test('ics204aFromValue: trims text, keeps 0–100 PODs, drops empty fields', () => {
+    assert.deepEqual(ics204aFromValue({
+        taskName: ' Hasty ', hazards: '', podResponsive: '80', podUnresponsive: 140, actions: 'Walked the trail', extra: 'x',
+    }), { taskName: 'Hasty', actions: 'Walked the trail', podResponsive: 80 });
+    assert.equal(ics204aFromValue({ hazards: '  ' }), null);
+    assert.equal(ics204aFromValue(null), null);
+});
+
+test('debriefRecordFromValue keeps ICS 204A details; a correction replaces them', () => {
+    const r = debriefRecordFromValue({ opNumber: 1, segmentUid: 'seg1', pod: 30, ics204a: { hazards: 'Cliff edge' } });
+    assert.deepEqual(r?.ics204a, { hazards: 'Cliff edge' });
+    const fixed = correctedDebrief(r!, { opNumber: 1, segmentUid: 'seg1', pod: 30, ics204a: { hazards: 'Cliff edge, loose rock' } }, 't1');
+    assert.deepEqual(fixed.ics204a, { hazards: 'Cliff edge, loose rock' });
+    assert.equal(correctedDebrief(r!, { opNumber: 1, segmentUid: 'seg1', pod: 30 }, 't1').ics204a, undefined);
 });

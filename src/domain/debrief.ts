@@ -3,7 +3,7 @@
  * adapter and the Mission Properties adapter so both read records identically.
  */
 
-import type { DebriefRecord, OpAssignment } from './entities.ts';
+import type { DebriefRecord, Ics204aDetails, OpAssignment } from './entities.ts';
 import { trackLogRefsFromValue } from './trackLog.ts';
 
 export function debriefRecordFromValue(value: unknown): DebriefRecord | null {
@@ -24,11 +24,39 @@ export function debriefRecordFromValue(value: unknown): DebriefRecord | null {
     if (typeof rec.resource === 'string' && rec.resource.trim()) record.resource = rec.resource.trim();
     if (typeof rec.notes === 'string' && rec.notes.trim()) record.notes = rec.notes.trim();
     if (typeof rec.assignmentId === 'string' && rec.assignmentId.trim()) record.assignmentId = rec.assignmentId.trim();
+    const ics204a = ics204aFromValue(rec.ics204a);
+    if (ics204a) record.ics204a = ics204a;
     if (typeof rec.recordedAt === 'string' && rec.recordedAt.trim()) record.recordedAt = rec.recordedAt;
     if (typeof rec.correctedAt === 'string' && rec.correctedAt.trim()) record.correctedAt = rec.correctedAt;
     const tracks = trackLogRefsFromValue(rec.tracks);
     if (tracks.length) record.tracks = tracks;
     return record;
+}
+
+const ICS204A_TEXT_KEYS = [
+    'taskNumber', 'taskName', 'teamLeader', 'debriefedBy', 'completedAt',
+    'actions', 'clues', 'clueStatus', 'gaps', 'hazards', 'suggestions',
+] as const;
+
+/**
+ * Normalize stored ICS 204A details: trimmed text, PODs as 0–100 numbers.
+ * Empty fields are dropped; null when nothing is left.
+ */
+export function ics204aFromValue(value: unknown): Ics204aDetails | null {
+    if (!value || typeof value !== 'object') return null;
+    const rec = value as Record<string, unknown>;
+    const out: Ics204aDetails = {};
+    for (const key of ICS204A_TEXT_KEYS) {
+        const v = rec[key];
+        if (typeof v === 'string' && v.trim()) out[key] = v.trim();
+    }
+    for (const key of ['podResponsive', 'podUnresponsive'] as const) {
+        const v = rec[key];
+        if (v === undefined || v === null || v === '') continue;
+        const n = Number(v);
+        if (Number.isFinite(n) && n >= 0 && n <= 100) out[key] = n;
+    }
+    return Object.keys(out).length ? out : null;
 }
 
 function resourceId(record: DebriefRecord): string {
@@ -70,6 +98,7 @@ export function correctedDebrief(existing: DebriefRecord, update: DebriefRecord,
     if (update.notes) next.notes = update.notes;
     const assignmentId = update.assignmentId ?? existing.assignmentId;
     if (assignmentId) next.assignmentId = assignmentId;
+    if (update.ics204a) next.ics204a = update.ics204a;
     if (existing.tracks?.length) next.tracks = existing.tracks;
     if (existing.recordedAt) next.recordedAt = existing.recordedAt;
     next.correctedAt = correctedAt;
