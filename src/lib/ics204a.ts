@@ -47,3 +47,82 @@ export function fromLocalInput(local: string): string {
     const d = new Date(local);
     return Number.isNaN(d.getTime()) ? '' : d.toISOString();
 }
+
+// ---- Marker / area picker (#17 phase 2) -----------------------------------
+
+/** A marker or area on the OP's FIELD DataSync that a 204A line can name. */
+export interface Ics204aMapItem {
+    uid: string;
+    callsign: string;
+    kind: 'marker' | 'area';
+    /** The marker's position, or the middle of the area. */
+    lat: number;
+    lon: number;
+    /** When the feature was made (CoT time), if known. */
+    time?: string;
+}
+
+/** The three 204A boxes the picker can add a line to. */
+export type Ics204aPickTarget = 'clues' | 'hazards' | 'gaps';
+
+interface FeatureLike {
+    id?: string | number;
+    properties?: { callsign?: string; time?: string; start?: string };
+    geometry?: { type?: string; coordinates?: unknown };
+}
+
+function outerRing(geometry: FeatureLike['geometry']): number[][] | null {
+    const c = geometry?.coordinates;
+    if (geometry?.type === 'Polygon' && Array.isArray(c)) return (c[0] as number[][]) ?? null;
+    if (geometry?.type === 'MultiPolygon' && Array.isArray(c)) return ((c[0] as number[][][])?.[0]) ?? null;
+    return null;
+}
+
+/**
+ * Named markers and areas from an OP sync, newest first. Leaves out the
+ * features listed in `exclude` (the assignment polygon copies and attached
+ * GPS tracks), unnamed features, lines and anything without usable
+ * coordinates.
+ */
+export function ics204aMapItems(features: FeatureLike[], exclude: Set<string>): Ics204aMapItem[] {
+    const out: Ics204aMapItem[] = [];
+    for (const f of features) {
+        const uid = String(f.id ?? '');
+        const callsign = f.properties?.callsign?.trim() ?? '';
+        if (!uid || !callsign || exclude.has(uid)) continue;
+        const time = f.properties?.time || f.properties?.start || undefined;
+        if (f.geometry?.type === 'Point') {
+            const [lon, lat] = (f.geometry.coordinates as number[]) ?? [];
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+            out.push({ uid, callsign, kind: 'marker', lat, lon, ...(time ? { time } : {}) });
+            continue;
+        }
+        const ring = outerRing(f.geometry)?.filter((p) => Number.isFinite(p?.[0]) && Number.isFinite(p?.[1]));
+        if (!ring?.length) continue;
+        // A closed ring repeats its first point; leave it out of the average.
+        const pts = ring.length > 1 && ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1]
+            ? ring.slice(0, -1)
+            : ring;
+        const lon = pts.reduce((s, p) => s + p[0], 0) / pts.length;
+        const lat = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+        out.push({ uid, callsign, kind: 'area', lat, lon, ...(time ? { time } : {}) });
+    }
+    return out.sort((a, b) => (b.time ?? '').localeCompare(a.time ?? '') || a.callsign.localeCompare(b.callsign));
+}
+
+/**
+ * One 204A line for a picked item: name, time, location (lat, lon to 5
+ * places, about 1 m), then the note. `timeLabel` is the item's time already
+ * formatted for the reader, or '' to leave it out.
+ */
+export function ics204aLine(item: Ics204aMapItem, timeLabel: string, note: string): string {
+    const where = `${item.kind === 'area' ? 'area centred ' : ''}${item.lat.toFixed(5)}, ${item.lon.toFixed(5)}`;
+    const parts = [item.callsign, timeLabel.trim() ? `${timeLabel.trim()}` : '', where].filter(Boolean);
+    const head = parts.join(' · ');
+    return note.trim() ? `${head} — ${note.trim()}` : head;
+}
+
+/** Add a line to the end of a 204A text box. */
+export function appendIcs204aLine(text: string, line: string): string {
+    return text.trim() ? `${text.trimEnd()}\n${line}` : line;
+}
