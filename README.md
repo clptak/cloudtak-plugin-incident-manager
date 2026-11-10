@@ -209,3 +209,26 @@ cd ~/CloudTAK/api/web && npm run serve
 
 Then open the **Incident Manager** entry from the CloudTAK main menu.
 To validate like the CloudTAK Docker build gate, run `bash scripts/check-like-docker.sh ~/CloudTAK/api/web`.
+
+## Releases and changelog
+
+Release notes are built from commit messages, grouped by the GitHub issue
+each commit names in brackets: `(#25)`, `(#17 phase 3)` or `(Closes #20)`.
+
+Preview what the next release will list:
+
+```sh
+npm run changelog
+```
+
+To release, tag and push. The **Release notes** workflow publishes a GitHub
+Release and adds the notes to `CHANGELOG.md` on that branch:
+
+```sh
+git tag v0.1.5 && git push origin v0.1.5             # multi-op
+git tag v0.1.5-ccso ccso && git push origin v0.1.5-ccso   # ccso
+```
+
+`v*-ccso` tags are compared with the previous `-ccso` tag, and other tags
+with the previous plain `v*` tag. Pull after a release to get the
+`CHANGELOG.md` commit.

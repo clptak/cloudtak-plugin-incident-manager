@@ -1,0 +1,145 @@
+#!/usr/bin/env node
+/**
+ * Release notes from git history, grouped by the GitHub issue each commit
+ * names in brackets: "(#25)", "(#17 phase 3)" or "(Closes #20)". A bare "#201"
+ * (the ICS form) is not an issue.
+ *
+ * Two tag families: `v1.2.3` (multi-op) and `v1.2.3-ccso` (ccso). Each
+ * release is compared with the previous tag of its own family.
+ *
+ *   node scripts/changelog.mjs                 preview: last tag → HEAD
+ *   node scripts/changelog.mjs --tag v0.1.5    notes for an existing tag
+ *   node scripts/changelog.mjs --tag v0.1.5 --write   also prepend CHANGELOG.md
+ *   --family ccso|main                         override the family
+ *   --from <ref>                               override the start point
+ *
+ * Issue titles and labels come from `gh api` (GH_TOKEN in Actions). When
+ * gh can't be reached, issues are listed by number only.
+ */
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import process from 'node:process';
+
+const args = process.argv.slice(2);
+function opt(name) {
+    const i = args.indexOf(`--${name}`);
+    return i >= 0 ? args[i + 1] : undefined;
+}
+const write = args.includes('--write');
+const tag = opt('tag');
+
+function git(...a) {
+    return execFileSync('git', a, { encoding: 'utf8' }).trim();
+}
+function tryGit(...a) {
+    try {
+        return git(...a);
+    } catch {
+        return '';
+    }
+}
+
+const branch = tryGit('rev-parse', '--abbrev-ref', 'HEAD');
+const family = opt('family')
+    ?? (tag ? (tag.endsWith('-ccso') ? 'ccso' : 'main') : (branch === 'ccso' ? 'ccso' : 'main'));
+const familyMatch = family === 'ccso'
+    ? ['--match', 'v*-ccso']
+    : ['--match', 'v*', '--exclude', '*-ccso'];
+
+const to = tag ?? 'HEAD';
+// For a tag, look for the previous tag behind it, not the tag itself.
+const from = opt('from')
+    ?? tryGit('describe', '--tags', '--abbrev=0', ...familyMatch, tag ? `${tag}^` : 'HEAD');
+
+const range = from ? `${from}..${to}` : to;
+const log = tryGit('log', '--no-merges', '--format=%h%x09%s', range);
+const commits = log ? log.split('\n').map((line) => {
+    const [sha, ...rest] = line.split('\t');
+    return { sha, subject: rest.join('\t') };
+}) : [];
+
+let gh = true;
+const issueCache = new Map();
+function issue(n) {
+    if (issueCache.has(n)) return issueCache.get(n);
+    let info = { number: n, title: '', labels: [], state: '' };
+    if (gh) {
+        try {
+            const raw = execFileSync('gh', ['api', `repos/{owner}/{repo}/issues/${n}`], {
+                encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+            });
+            const j = JSON.parse(raw);
+            info = {
+                number: n,
+                title: j.title ?? '',
+                labels: (j.labels ?? []).map((l) => (typeof l === 'string' ? l : l.name)),
+                state: j.state ?? '',
+            };
+        } catch (err) {
+            // 404 for a number that isn't an issue; anything else means gh is unusable.
+            if (!String(err.stderr ?? '').includes('404')) gh = false;
+        }
+    }
+    issueCache.set(n, info);
+    return info;
+}
+
+const byIssue = new Map();
+const loose = [];
+for (const c of commits) {
+    const nums = [...new Set([...c.subject.matchAll(/\((?:(?:closes|fixes|resolves)\s+)?#(\d+)\b/gi)].map((m) => Number(m[1])))];
+    if (!nums.length) {
+        loose.push(c);
+        continue;
+    }
+    for (const n of nums) {
+        if (!byIssue.has(n)) byIssue.set(n, []);
+        byIssue.get(n).push(c);
+    }
+}
+
+const groups = { Enhancements: [], Fixes: [], 'Other issues': [] };
+for (const n of [...byIssue.keys()].sort((a, b) => a - b)) {
+    const info = issue(n);
+    const g = info.labels.includes('bug') ? 'Fixes'
+        : info.labels.includes('enhancement') ? 'Enhancements'
+            : 'Other issues';
+    groups[g].push({ info, commits: byIssue.get(n) });
+}
+
+const date = tag ? tryGit('log', '-1', '--format=%cs', tag) : new Date().toISOString().slice(0, 10);
+const lines = [`## ${tag ?? `Unreleased (${branch})`} — ${date}`, ''];
+lines.push(from ? `Changes since ${from}.` : 'All changes.', '');
+if (!commits.length) lines.push('No changes.', '');
+
+for (const [title, items] of Object.entries(groups)) {
+    if (!items.length) continue;
+    lines.push(`### ${title}`, '');
+    for (const { info, commits: cs } of items) {
+        const open = info.state === 'open' ? ' _(still open)_' : '';
+        lines.push(`- **#${info.number}** ${info.title || '(issue title unavailable)'}${open}`);
+        for (const c of cs) lines.push(`  - ${c.subject} (${c.sha})`);
+    }
+    lines.push('');
+}
+if (loose.length) {
+    lines.push('### Other changes', '');
+    for (const c of loose) lines.push(`- ${c.subject} (${c.sha})`);
+    lines.push('');
+}
+if (!gh) lines.push('_Issue titles were unavailable (GitHub CLI not signed in)._', '');
+
+const notes = lines.join('\n');
+process.stdout.write(notes);
+
+if (write) {
+    const file = 'CHANGELOG.md';
+    const header = '# Changelog\n\nGenerated by `npm run changelog` from commits and the issues they name.\n\n';
+    const old = existsSync(file) ? readFileSync(file, 'utf8').replace(/^# Changelog\n[\s\S]*?(?=^## )/m, '') : '';
+    const rest = old.startsWith('## ') ? old : '';
+    if (tag && rest.includes(`## ${tag} `)) {
+        process.stderr.write(`${file} already has ${tag}; left unchanged.\n`);
+    } else {
+        writeFileSync(file, `${header}${notes}\n${rest}`);
+    }
+}
