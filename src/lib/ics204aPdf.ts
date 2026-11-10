@@ -20,6 +20,8 @@ export interface Ics204aPdfData {
     timeCompleted: string;
     teamName: string;
     teamLeader: string;
+    /** "/S/ <team leader>" once the team leader has signed, else ''. */
+    teamLeaderSignature: string;
     debriefedBy: string;
     actions: string;
     mapAttached: boolean;
@@ -267,7 +269,7 @@ export async function buildIcs204aPdf(data: Ics204aPdfData): Promise<Uint8Array>
     const sigH = 30;
     if (l.room() < sigH) l.newPage();
     top = l.y;
-    cell(l.page, f, x0, top, W * 0.8, sigH, 'TEAM LEADER SIGNATURE:', '');
+    cell(l.page, f, x0, top, W * 0.8, sigH, 'TEAM LEADER SIGNATURE:', data.teamLeaderSignature);
     stroke(l.page, x0 + W * 0.8, top - sigH, W * 0.2, sigH);
     const tag = 'ICS 204A';
     const tw = f.bold.widthOfTextAtSize(tag, 13);

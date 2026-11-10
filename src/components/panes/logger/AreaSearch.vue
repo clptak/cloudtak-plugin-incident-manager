@@ -1216,6 +1216,20 @@
                                     v-model='ics204aForm.teamLeader'
                                     label='Team leader'
                                 />
+                                <label class='form-check mt-1 mb-0'>
+                                    <input
+                                        type='checkbox'
+                                        class='form-check-input'
+                                        :checked='Boolean(ics204aForm.teamLeaderSignedAt)'
+                                        :disabled='!ics204aForm.teamLeader.trim()'
+                                        @change='onTeamLeaderSign(($event.target as HTMLInputElement).checked)'
+                                    >
+                                    <span class='form-check-label small'>
+                                        {{ ics204aForm.teamLeaderSignedAt
+                                            ? `Signed: /S/ ${ics204aForm.teamLeader.trim()} (${shortDt(ics204aForm.teamLeaderSignedAt)})`
+                                            : 'Team leader signs (prints /S/ and their name on the 204A)' }}
+                                    </span>
+                                </label>
                             </div>
                             <div class='col-md-6'>
                                 <TablerInput
@@ -1850,7 +1864,7 @@ const ICS204A_TEXT_BOXES = [
 
 function blankIcs204aForm(): Record<keyof Ics204aDetails, string> {
     return {
-        taskNumber: '', taskName: '', teamLeader: '', debriefedBy: '', completedAt: '',
+        taskNumber: '', taskName: '', teamLeader: '', teamLeaderSignedAt: '', debriefedBy: '', completedAt: '',
         podResponsive: '', podUnresponsive: '',
         actions: '', clues: '', clueStatus: '', gaps: '', hazards: '', suggestions: '',
     };
@@ -1865,7 +1879,20 @@ const ics204aMapAttached = computed(() => Boolean(
     editingKey.value && debriefs.value.find((d) => debriefKey(d) === editingKey.value)?.tracks?.length,
 ));
 
+/** The name the team leader signed as; changing the name clears the signature. */
+let signedAs = '';
+
+function onTeamLeaderSign(checked: boolean): void {
+    signedAs = checked ? ics204aForm.teamLeader.trim() : '';
+    ics204aForm.teamLeaderSignedAt = checked ? new Date().toISOString() : '';
+}
+
+watch(() => ics204aForm.teamLeader, (name) => {
+    if (ics204aForm.teamLeaderSignedAt && name.trim() !== signedAs) ics204aForm.teamLeaderSignedAt = '';
+});
+
 function setIcs204aForm(details: Ics204aDetails | undefined): void {
+    signedAs = details?.teamLeaderSignedAt ? details.teamLeader?.trim() ?? '' : '';
     const blank = blankIcs204aForm();
     for (const key of Object.keys(blank) as (keyof Ics204aDetails)[]) {
         const v = details?.[key];

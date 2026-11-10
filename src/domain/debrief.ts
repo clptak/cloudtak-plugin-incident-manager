@@ -34,7 +34,7 @@ export function debriefRecordFromValue(value: unknown): DebriefRecord | null {
 }
 
 const ICS204A_TEXT_KEYS = [
-    'taskNumber', 'taskName', 'teamLeader', 'debriefedBy', 'completedAt',
+    'taskNumber', 'taskName', 'teamLeader', 'teamLeaderSignedAt', 'debriefedBy', 'completedAt',
     'actions', 'clues', 'clueStatus', 'gaps', 'hazards', 'suggestions',
 ] as const;
 

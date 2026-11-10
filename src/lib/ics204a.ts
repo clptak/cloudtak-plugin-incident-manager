@@ -157,6 +157,7 @@ export function ics204aPdfData(record: DebriefRecord, incidentName: string, segm
         timeCompleted,
         teamName: record.resource ?? '',
         teamLeader: d.teamLeader ?? '',
+        teamLeaderSignature: d.teamLeaderSignedAt && d.teamLeader ? `/S/ ${d.teamLeader}` : '',
         debriefedBy: d.debriefedBy ?? '',
         actions: d.actions ?? '',
         mapAttached: Boolean(record.tracks?.length),
