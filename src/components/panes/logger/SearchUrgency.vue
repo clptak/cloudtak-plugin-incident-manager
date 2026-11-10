@@ -22,7 +22,10 @@
                 <table class='table table-sm table-vcenter mb-0'>
                     <thead>
                         <tr>
-                            <th>Factor</th><th style='width:90px;'>
+                            <th>Factor</th><th
+                                class='text-nowrap'
+                                style='width:1%;'
+                            >
                                 Rating (1–3)
                             </th>
                         </tr>
@@ -68,14 +71,13 @@
                                     </div>
                                 </div>
                             </td>
-                            <td>
-                                <input
-                                    v-model.number='f.value'
-                                    type='number'
-                                    min='1'
-                                    max='3'
-                                    class='form-control form-control-sm'
-                                >
+                            <td class='text-nowrap'>
+                                <ScaleChoice
+                                    v-model='f.value'
+                                    :options='URGENCY_OPTIONS'
+                                    low-is-red
+                                    :label='`${f.label} rating, 1 most urgent to 3 least urgent`'
+                                />
                             </td>
                         </tr>
                     </tbody>
@@ -328,6 +330,7 @@
 
 <script setup lang='ts'>
 import DataSyncDestination from '../../DataSyncDestination.vue';
+import ScaleChoice from '../../ScaleChoice.vue';
 import { reactive, ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { IconInfoCircle, IconChevronDown } from '@tabler/icons-vue';
 import { TablerBorder, TablerInput, TablerInlineAlert } from '@tak-ps/vue-tabler';
@@ -366,6 +369,9 @@ interface Factor {
 }
 
 const { activeMission, requireActiveMission } = useIncident();
+
+/** 1 = most urgent (red) … 3 = least urgent (green). */
+const URGENCY_OPTIONS = [{ value: 1 }, { value: 2 }, { value: 3 }];
 
 function blankPdfHeader(): UrgencyRatingChartHeader {
     return {
