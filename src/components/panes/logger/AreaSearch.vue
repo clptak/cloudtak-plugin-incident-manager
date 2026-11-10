@@ -695,6 +695,20 @@
                                     <span class='d-none d-md-inline'>Attach GPS Track Log</span>
                                 </button>
                                 <button
+                                    v-if='isSearchIncident'
+                                    type='button'
+                                    class='btn btn-ghost-secondary btn-sm p-1'
+                                    :disabled='pdfBusy'
+                                    title='ICS 204A PDF for this debrief'
+                                    aria-label='ICS 204A PDF for this debrief'
+                                    @click='togglePdfPanel(d)'
+                                >
+                                    <IconFileTypePdf
+                                        :size='16'
+                                        :stroke-width='1.5'
+                                    />
+                                </button>
+                                <button
                                     type='button'
                                     class='btn btn-ghost-secondary btn-sm p-1'
                                     :disabled='busy'
@@ -715,6 +729,52 @@
                         v-for='d in row.debriefs'
                         :key='debriefKeyOf(d)'
                     >
+                        <div
+                            v-if='pdfPanelKey === debriefKeyOf(d)'
+                            class='cloudtak-accent border rounded-3 my-2 p-2 small'
+                        >
+                            <div class='d-flex flex-wrap align-items-center gap-2'>
+                                <IconFileTypePdf
+                                    :size='18'
+                                    :stroke-width='1.5'
+                                />
+                                <span class='fw-bold'>ICS 204A</span>
+                                <span class='text-white-50'>{{ ics204aFilenameFor(d) }}</span>
+                                <button
+                                    type='button'
+                                    class='btn btn-sm btn-outline-primary ms-auto'
+                                    :disabled='pdfBusy'
+                                    @click='downloadIcs204a(d)'
+                                >
+                                    Download PDF
+                                </button>
+                                <button
+                                    type='button'
+                                    class='btn btn-sm btn-outline btn-purple'
+                                    :disabled='pdfBusy || !activeMission?.mgmt'
+                                    :title='activeMission?.mgmt ? "" : "Needs a MGMT DataSync"'
+                                    @click='uploadIcs204a(d)'
+                                >
+                                    {{ pdfBusy ? 'Working…' : 'Add PDF to MGMT DataSync' }}
+                                </button>
+                                <button
+                                    type='button'
+                                    class='btn btn-link btn-sm p-0'
+                                    :disabled='pdfBusy'
+                                    @click='pdfPanelKey = null'
+                                >
+                                    Close
+                                </button>
+                            </div>
+                            <div
+                                v-if='!d.ics204a'
+                                class='form-text mt-1 mb-0'
+                            >
+                                This debrief has no ICS 204A details yet, so only the header and POD are filled
+                                in. Click its badge to add them.
+                            </div>
+                        </div>
+
                         <div
                             v-if='deletingKey === debriefKeyOf(d)'
                             class='cloudtak-accent border border-warning rounded-3 my-2 p-2 small'
@@ -1483,7 +1543,7 @@
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useIncidentChanges } from '../../../composables/useIncidentChanges.ts';
 import { OP_LIST_PREFIXES, touchesPrefixes } from '../../../lib/screenKeys.ts';
-import { IconAlertTriangle, IconChevronDown, IconChevronRight, IconRoute, IconTrash } from '@tabler/icons-vue';
+import { IconAlertTriangle, IconChevronDown, IconChevronRight, IconFileTypePdf, IconRoute, IconTrash } from '@tabler/icons-vue';
 import { TablerBorder, TablerEnum, TablerInlineAlert, TablerInput } from '@tak-ps/vue-tabler';
 import OverlayManager from '../../../../../../src/base/overlay.ts';
 import { useMapStore } from '../../../../../../src/stores/map.ts';
@@ -1496,7 +1556,9 @@ import ProfileConfig from '../../../../../../src/base/profile.ts';
 import {
     appendIcs204aLine,
     fromLocalInput,
+    ics204aFilename,
     ics204aLine,
+    ics204aPdfData,
     ics204aMapItems,
     prefillIcs204a,
     toLocalInput,
@@ -1543,6 +1605,8 @@ import Subscription from '../../../../../../src/base/subscription.ts';
 import { flyToFeature } from '../../../lib/flyToFeature.ts';
 import { areaSqMi, formatSqMi } from '../../../lib/geometryArea.ts';
 import { loadSchemaSubscription, schemaMission } from '../../../lib/incidentSubscription.ts';
+import { buildIcs204aPdf } from '../../../lib/ics204aPdf.ts';
+import { downloadPdfBytes, uploadMissionFile } from '../../../lib/missionUpload.ts';
 import { incidentTypeKeyword, parseIncidentTypeFromRecord } from '../../../lib/incidentType.ts';
 import { deletePolygonFromMission, pushPolygonToMission } from '../../../lib/missionFeatures.ts';
 import { carveSegmentRemainder } from '../../../lib/segmentSplit.ts';
@@ -1890,6 +1954,53 @@ function logPickAsClue(item: Ics204aMapItem): void {
     clueForm.description = note ? `${item.callsign} — ${note}` : item.callsign;
     if (registry.value.some((o) => o.opNumber === debriefForm.opNumber)) clueForm.opNumber = debriefForm.opNumber;
     void nextTick(() => document.getElementById('im-clue-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+}
+
+// ICS 204A PDF for a recorded debrief (#17 phase 3).
+const pdfPanelKey = ref<string | null>(null);
+const pdfBusy = ref(false);
+
+function togglePdfPanel(d: DebriefRecord): void {
+    const key = debriefKey(d);
+    pdfPanelKey.value = pdfPanelKey.value === key ? null : key;
+}
+
+function ics204aFilenameFor(d: DebriefRecord): string {
+    return ics204aFilename(d, segmentLabel(d.segmentUid));
+}
+
+async function ics204aBytes(d: DebriefRecord): Promise<Uint8Array> {
+    const incident = activeMission.value?.name ?? '';
+    return buildIcs204aPdf(ics204aPdfData(d, incident, segmentLabel(d.segmentUid)));
+}
+
+async function downloadIcs204a(d: DebriefRecord): Promise<void> {
+    pdfBusy.value = true;
+    error.value = ''; notice.value = '';
+    try {
+        downloadPdfBytes(await ics204aBytes(d), ics204aFilenameFor(d));
+        notice.value = `Downloaded ${ics204aFilenameFor(d)}.`;
+    } catch (err) {
+        error.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        pdfBusy.value = false;
+    }
+}
+
+async function uploadIcs204a(d: DebriefRecord): Promise<void> {
+    const mission = activeMission.value;
+    if (!mission?.mgmt) return;
+    pdfBusy.value = true;
+    error.value = ''; notice.value = '';
+    try {
+        const planning = schemaMission(mission);
+        await uploadMissionFile(planning.guid, ics204aFilenameFor(d), await ics204aBytes(d), { missionToken: planning.missionToken });
+        notice.value = `Added ${ics204aFilenameFor(d)} to the MGMT DataSync (${planning.name}).`;
+    } catch (err) {
+        error.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        pdfBusy.value = false;
+    }
 }
 
 /** Opening the section on a hand-entered debrief fills who and when, if blank. */
