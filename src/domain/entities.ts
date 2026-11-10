@@ -114,6 +114,11 @@ export interface Ics204aDetails {
     taskNumber?: string;
     taskName?: string;
     teamLeader?: string;
+    /**
+     * ISO time the team leader signed. The 204A prints "/S/ <team leader>"
+     * in the signature box when set.
+     */
+    teamLeaderSignedAt?: string;
     /** Planning person who took the debrief. */
     debriefedBy?: string;
     /** ISO date and time the assignment was completed. */

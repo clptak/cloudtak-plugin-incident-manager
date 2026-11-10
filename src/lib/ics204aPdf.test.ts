@@ -10,7 +10,7 @@ const record: DebriefRecord = {
     opNumber: 1, segmentUid: 'seg1', label: '01', pod: 30, coverage: 0.5, resource: 'CCSO SAR 01',
     recordedAt: '2026-11-09T18:42:31.000Z', tracks: [{ uid: 't1', name: 'Track', lengthMi: 2, points: 10 } as never],
     ics204a: {
-        taskNumber: 'T-7', taskName: 'Hasty search of trail', teamLeader: 'J. Smith', debriefedBy: '064-ccso-cno',
+        taskNumber: 'T-7', taskName: 'Hasty search of trail', teamLeader: 'J. Smith', teamLeaderSignedAt: '2026-11-09T18:45:00.000Z', debriefedBy: '064-ccso-cno',
         completedAt: '2026-11-09T18:00:00.000Z', podResponsive: 80, podUnresponsive: 40,
         actions: 'Walked the trail', clues: 'Boot print · 35.20000, -111.65000 — size 10', hazards: 'Cliff band',
     },
@@ -24,6 +24,9 @@ test('ics204aPdfData: debrief fields fill the form', () => {
     assert.equal(d.estimatedPod, '30% (50% of segment completed)');
     assert.equal(d.podResponsive, '80%');
     assert.equal(d.mapAttached, true);
+    assert.equal(d.teamLeaderSignature, '/S/ J. Smith');
+    const unsigned = ics204aPdfData({ ...record, ics204a: { ...record.ics204a, teamLeaderSignedAt: undefined } }, '', '01');
+    assert.equal(unsigned.teamLeaderSignature, '');
     assert.match(d.dateCompleted, /^\d{4}-\d{2}-\d{2}$/);
     assert.match(d.timeCompleted, /^\d{2}:\d{2}$/);
     const bare = ics204aPdfData({ opNumber: 2, segmentUid: 's', pod: 70 }, '', 'Seg 9');
