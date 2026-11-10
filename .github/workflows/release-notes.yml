@@ -1,0 +1,51 @@
+# Push a version tag to publish release notes and update CHANGELOG.md.
+#   v0.1.5       compared with the previous v* tag; CHANGELOG.md on multi-op
+#   v0.1.5-ccso  compared with the previous *-ccso tag; CHANGELOG.md on ccso
+name: Release notes
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  issues: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Write the notes
+        run: node scripts/changelog.mjs --tag "$TAG" > "$RUNNER_TEMP/notes.md"
+
+      - name: Create or update the GitHub release
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release edit "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
+          else
+            gh release create "$TAG" --verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
+          fi
+
+      - name: Add the notes to CHANGELOG.md
+        run: |
+          BRANCH=multi-op
+          case "$TAG" in *-ccso) BRANCH=ccso ;; esac
+          git checkout "$BRANCH"
+          node scripts/changelog.mjs --tag "$TAG" --write > /dev/null
+          git add CHANGELOG.md
+          if git diff --cached --quiet; then exit 0; fi
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898281+github-actions[bot]@users.noreply.github.com' \
+              commit -m "Changelog for $TAG"
+          git push origin "$BRANCH"

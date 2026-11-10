@@ -6,7 +6,8 @@
   "license": "MIT",
   "scripts": {
     "typecheck": "vue-tsc --noEmit -p tsconfig.json",
-    "test": "node --experimental-strip-types --test 'src/domain/*.test.ts' 'src/lib/*.test.ts'"
+    "test": "node --experimental-strip-types --test 'src/domain/*.test.ts' 'src/lib/*.test.ts'",
+    "changelog": "node scripts/changelog.mjs"
   },
   "peerDependencies": {
     "@tabler/icons-vue": "^3.0.0",
