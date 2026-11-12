@@ -147,3 +147,32 @@ export function shortLocalTime(local: string): string {
     if (!local.trim() || Number.isNaN(d.getTime())) return '';
     return d.toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
 }
+
+// ── Free resources and the board filter ───────────────────────────────────
+
+/**
+ * A Have resource with no open work: under Initial Response no assignment
+ * still to complete; under an OP no segment assignment still to debrief.
+ */
+export function isFreeResource(
+    resource: ResourceAssignment,
+    op: BoardOp,
+    work: WorkAssignment[],
+    opAssignments: OpAssignment[],
+    debriefs: DebriefRecord[],
+): boolean {
+    if (resource.status !== 'have') return false;
+    if (op === null) return !workFor(resource, work).some((w) => !w.completed.trim());
+    return !opWorkFor(resource, op, opAssignments, debriefs).some((x) => !x.debriefs.length);
+}
+
+/**
+ * Board search: every word must appear in the resource's identifier, type or
+ * agency, or in the text of its work (map object, segment, instructions).
+ */
+export function matchesBoardSearch(resource: ResourceAssignment, query: string, workText: string[] = []): boolean {
+    const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+    if (!words.length) return true;
+    const hay = [resource.resourceIdentifier, resource.resource, resource.agency, ...workText].join(' ').toLowerCase();
+    return words.every((w) => hay.includes(w));
+}

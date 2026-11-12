@@ -42,6 +42,38 @@
             </button>
         </div>
 
+        <!-- Filters -->
+        <div class='d-flex flex-wrap align-items-center gap-2 mb-2'>
+            <input
+                v-model='search'
+                type='search'
+                class='form-control form-control-sm board-search'
+                placeholder='Search resources and assignments'
+                aria-label='Search resources and assignments'
+            >
+            <button
+                type='button'
+                class='btn btn-sm'
+                :class='freeOnly ? "btn-green" : "btn-outline-green"'
+                :aria-pressed='freeOnly'
+                title='Show only Have resources with no open work'
+                @click='freeOnly = !freeOnly'
+            >
+                Free only ({{ freeCount }})
+            </button>
+            <span
+                v-if='filtering'
+                class='small text-white-50'
+            >
+                Showing {{ shownActive.length }} of {{ board.active.length }}
+                <button
+                    type='button'
+                    class='btn btn-link btn-sm p-0 align-baseline'
+                    @click='clearFilters'
+                >Clear</button>
+            </span>
+        </div>
+
         <div
             v-if='pickedOp === null && !mapReminderDismissed'
             class='alert alert-info d-flex align-items-start gap-2 py-2 mb-2'
@@ -87,13 +119,22 @@
         >
             No resources on {{ pickedLabel }} yet. Create one above.
         </div>
+        <div
+            v-else-if='filtering && !shownActive.length'
+            class='text-muted small mb-2'
+        >
+            No {{ freeOnly ? 'free ' : '' }}resources{{ search.trim() ? ` match "${search.trim()}"` : '' }} on {{ pickedLabel }}.
+        </div>
 
         <!-- Resource cards -->
         <template
-            v-for='r in board.active'
+            v-for='r in shownActive'
             :key='r.id'
         >
-            <div class='board-card border rounded mb-2'>
+            <div
+                class='board-card border rounded mb-2'
+                :class='{ "board-card-free": freeIds.has(r.id) }'
+            >
                 <button
                     type='button'
                     class='board-card-head btn w-100 text-start d-flex flex-wrap align-items-center gap-2 p-2'
@@ -103,6 +144,11 @@
                     <strong class='text-break'>{{ r.resourceIdentifier || '(no identifier)' }}</strong>
                     <span class='text-white-50 small'>{{ [r.resource, r.agency].filter(Boolean).join(' · ') }}</span>
                     <span class='ms-auto small text-white-50'>{{ timing(r) }}</span>
+                    <span
+                        v-if='freeIds.has(r.id)'
+                        class='badge bg-green text-white'
+                        title='Have, with no open work'
+                    >Free</span>
                     <span
                         class='badge'
                         :class='statusBadge(r.status)'
@@ -420,7 +466,7 @@
 
         <!-- Assignments with no resource -->
         <div
-            v-if='orphanCount'
+            v-if='orphanCount && !freeOnly'
             class='board-card border border-dashed rounded mb-2'
         >
             <div class='p-2 d-flex align-items-center gap-2'>
@@ -521,21 +567,21 @@
         </div>
 
         <!-- Demobilized and cancelled -->
-        <div v-if='board.inactive.length'>
+        <div v-if='shownInactive.length && !freeOnly'>
             <button
                 type='button'
                 class='btn btn-link btn-sm p-0 text-white-50'
                 :aria-expanded='showInactive'
                 @click='showInactive = !showInactive'
             >
-                {{ showInactive ? 'Hide' : 'Show' }} demobilized and cancelled ({{ board.inactive.length }})
+                {{ showInactive ? 'Hide' : 'Show' }} demobilized and cancelled ({{ shownInactive.length }})
             </button>
             <div
                 v-if='showInactive'
                 class='mt-2'
             >
                 <div
-                    v-for='r in board.inactive'
+                    v-for='r in shownInactive'
                     :key='r.id'
                     class='border rounded mb-2 p-2 d-flex flex-wrap align-items-center gap-2 opacity-75'
                 >
@@ -581,6 +627,8 @@ import { pendingOpAssign, pendingOpDebrief } from '../../lib/pendingOpAssign.ts'
 import {
     boardResources,
     boardSummary,
+    isFreeResource,
+    matchesBoardSearch,
     nextAssignmentNumber,
     opOfResource,
     opWorkFor,
@@ -605,6 +653,11 @@ import type { WorkAssignment } from '../../lib/workAssignments.ts';
 const props = defineProps<{
     opRegistry: OpPeriodRegistryEntry[];
     agencyOptions: string[];
+}>();
+
+const emit = defineEmits<{
+    /** The OP picked at the top (null = Initial Response). */
+    (e: 'op-change', op: BoardOp): void;
 }>();
 
 const ASSIGNMENT_FOLDER = 'Assignments';
@@ -678,6 +731,9 @@ watch(() => props.opRegistry, (registry) => {
     pickedOp.value = currentOpPeriod(registry)?.opNumber ?? null;
 }, { immediate: true });
 
+// The new-resource form above follows the OP picked here.
+watch(pickedOp, (op) => emit('op-change', op), { immediate: true });
+
 function pickOp(op: BoardOp): void {
     userPickedOp = true;
     pickedOp.value = op;
@@ -714,6 +770,31 @@ watch(pickedOp, (op) => {
 
 // ── Board contents ─────────────────────────────────────────────────────────
 const board = computed(() => boardResources(resources.value, pickedOp.value));
+
+// ── Filters and free resources ─────────────────────────────────────────────
+const search = ref('');
+const freeOnly = ref(false);
+const filtering = computed(() => freeOnly.value || Boolean(search.value.trim()));
+
+const freeIds = computed(() => new Set(board.value.active
+    .filter((r) => isFreeResource(r, pickedOp.value, work.value, opAssignments.value, debriefs.value))
+    .map((r) => r.id)));
+const freeCount = computed(() => freeIds.value.size);
+
+function workTextFor(r: ResourceAssignment): string[] {
+    return pickedOp.value === null
+        ? workFor(r, work.value).map((w) => `${w.assignmentCallsign} ${w.instructions}`)
+        : opItemsFor(r).map((x) => `Seg ${x.assignment.label} ${x.assignment.notes ?? ''}`);
+}
+
+const shownActive = computed(() => board.value.active.filter((r) =>
+    (!freeOnly.value || freeIds.value.has(r.id)) && matchesBoardSearch(r, search.value, workTextFor(r))));
+const shownInactive = computed(() => board.value.inactive.filter((r) => matchesBoardSearch(r, search.value)));
+
+function clearFilters(): void {
+    search.value = '';
+    freeOnly.value = false;
+}
 const orphanWorkList = computed(() => (pickedOp.value === null ? orphanWork(resources.value, work.value) : []));
 const orphanOpList = computed(() => (pickedOp.value === null
     ? []
@@ -990,6 +1071,14 @@ watch(() => activeMission.value?.guid, (guid) => {
 
 .board-card-head:hover {
     background-color: rgba(var(--tblr-body-color-rgb, 255, 255, 255), 0.04);
+}
+
+.board-card-free {
+    border-left: 3px solid rgb(var(--tblr-green-rgb, 47, 179, 68)) !important;
+}
+
+.board-search {
+    max-width: 22rem;
 }
 
 .border-dashed {
