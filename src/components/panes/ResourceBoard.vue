@@ -42,6 +42,30 @@
             </button>
         </div>
 
+        <div
+            v-if='pickedOp === null && !mapReminderDismissed'
+            class='alert alert-info d-flex align-items-start gap-2 py-2 mb-2'
+            role='note'
+        >
+            <IconInfoCircle
+                :size='18'
+                stroke='1.5'
+                class='flex-shrink-0 mt-1'
+            />
+            <div class='small flex-grow-1'>
+                You need a map object before making an assignment. Draw or attach the
+                assignment's line or polygon to this DataSync first. If it was drawn in
+                another GIS, import its GeoJSON, or use the CalTopo Sync plugin.
+            </div>
+            <button
+                type='button'
+                class='btn-close'
+                aria-label='Dismiss this reminder'
+                title='Dismiss'
+                @click='dismissMapReminder'
+            />
+        </div>
+
         <TablerInlineAlert
             v-if='workStatusError && workStatusMessage'
             class='mb-2'
@@ -366,7 +390,7 @@
                             </div>
                         </div>
                         <button
-                            v-else-if='r.status === "have"'
+                            v-else
                             type='button'
                             class='btn btn-outline-primary btn-sm mt-1'
                             @click='startAssign(r)'
@@ -381,7 +405,7 @@
                             :item='item'
                         />
                         <button
-                            v-if='r.status === "have" && pickedOpOpen'
+                            v-if='pickedOpOpen'
                             type='button'
                             class='btn btn-outline-primary btn-sm mt-1'
                             @click='assignInOperationalPeriods(r)'
@@ -535,7 +559,7 @@
 
 <script setup lang='ts'>
 import { computed, ref, watch } from 'vue';
-import { IconChevronDown, IconTrash } from '@tabler/icons-vue';
+import { IconChevronDown, IconInfoCircle, IconTrash } from '@tabler/icons-vue';
 import { TablerInlineAlert } from '@tak-ps/vue-tabler';
 import ResourceOpLine from './ResourceOpLine.vue';
 import ResourceWorkFields from './ResourceWorkFields.vue';
@@ -582,6 +606,27 @@ const props = defineProps<{
 }>();
 
 const ASSIGNMENT_FOLDER = 'Assignments';
+const MAP_REMINDER_KEY = 'incident-manager:board-map-object-reminder-dismissed';
+
+function loadMapReminderDismissed(): boolean {
+    try {
+        return localStorage.getItem(MAP_REMINDER_KEY) === '1';
+    } catch {
+        return false;
+    }
+}
+
+/** "You need a map object" reminder at the top of Initial Response, until dismissed. */
+const mapReminderDismissed = ref(loadMapReminderDismissed());
+
+function dismissMapReminder(): void {
+    mapReminderDismissed.value = true;
+    try {
+        localStorage.setItem(MAP_REMINDER_KEY, '1');
+    } catch {
+        // private mode or quota: hidden for this session only
+    }
+}
 
 const { activeMission, requireActiveMission, selectKeyGuarded } = useIncident();
 const {
