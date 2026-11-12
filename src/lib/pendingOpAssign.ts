@@ -1,8 +1,9 @@
 /**
- * Hand-off from the Resources & Assignments board to Operational Periods:
- * "Assign in Operational Periods" leaves the team and OP here, and Operational
- * Periods picks it up once it has loaded, fills the team into a new row and
- * clears it.
+ * Hand-offs from the Resources & Assignments board to Operational Periods.
+ * The board leaves a request here and opens Operational Periods, which picks
+ * it up once it has loaded and clears it:
+ * - "Assign in Operational Periods": fill the team into a new assignment row.
+ * - "Complete / Debrief": fill the completed-assignment (debrief) form.
  */
 import { ref } from 'vue';
 
@@ -12,3 +13,12 @@ export interface PendingOpAssign {
 }
 
 export const pendingOpAssign = ref<PendingOpAssign | null>(null);
+
+export interface PendingOpDebrief {
+    assignmentId?: string;
+    opNumber: number;
+    segmentUid: string;
+    team: string;
+}
+
+export const pendingOpDebrief = ref<PendingOpDebrief | null>(null);
