@@ -37,8 +37,11 @@ export const SCREEN_EDIT_KEYS: Record<string, string[]> = {
     'search-scenarios': [`${IR}scenarios`],
     'risk-assessment': ['s.risk', `${IR}work-assignments`, 'c.work-assignments.'],
     'incident-post': [`${IR}incident-post`],
-    'resources': [`${IR}resource-assignments`, 'c.resources.', 's.default-agency'],
-    'work-assignments': [`${IR}work-assignments`, 'c.work-assignments.'],
+    // Resources & Assignments (#6): resources and the Initial Response work under them.
+    'resources': [
+        `${IR}resource-assignments`, 'c.resources.', 's.default-agency',
+        `${IR}work-assignments`, 'c.work-assignments.',
+    ],
     // The IAP builder lives on this screen; its lists refresh by themselves.
     'operational-periods': [`${IR}iap-plans`, 'c.iap.'],
     'htab:casie': [`${IR}casie`, `${IR}casie-scenarios`],

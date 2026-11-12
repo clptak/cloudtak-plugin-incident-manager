@@ -92,7 +92,6 @@
                         <CreateOpenPane v-if='activeKey === "create-open"' />
                         <SettingsPane v-else-if='activeKey === "settings"' />
                         <ResourcesTab v-else-if='activeKey === "resources"' />
-                        <AssignmentsTab v-else-if='activeKey === "work-assignments"' />
                         <WrapUpPane v-else-if='activeKey === "generate-closing-package"' />
                         <LoggerPane
                             v-else
@@ -144,7 +143,6 @@ const WrapUpPane = defineAsyncComponent(() => import('./panes/WrapUpPane.vue'));
 const DashboardTab = defineAsyncComponent(() => import('./panes/DashboardTab.vue'));
 const TaskTab = defineAsyncComponent(() => import('./panes/TaskTab.vue'));
 const ClueLog = defineAsyncComponent(() => import('./panes/logger/ClueLog.vue'));
-const AssignmentsTab = defineAsyncComponent(() => import('./panes/AssignmentsTab.vue'));
 const OrganizationTab = defineAsyncComponent(() => import('./panes/OrganizationTab.vue'));
 const ResourcesTab = defineAsyncComponent(() => import('./panes/ResourcesTab.vue'));
 

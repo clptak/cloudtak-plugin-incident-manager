@@ -2,7 +2,7 @@
     <TaskbarChipButton
         :icon='IconUsersGroup'
         label='Resources'
-        title='Open Resources'
+        title='Open Resources & Assignments'
         @click='openResources'
     />
 </template>

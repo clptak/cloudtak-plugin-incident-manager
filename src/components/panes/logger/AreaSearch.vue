@@ -432,6 +432,7 @@
             <!-- ── Assignments ─────────────────────────────────────────── -->
             <TablerBorder
                 v-if='currentOp'
+                id='im-op-assign'
                 class='cloudtak-accent text-white mb-3'
                 :fill-height='false'
                 :shadow='false'
@@ -1645,6 +1646,7 @@ import {
     type MissionTemplateItem,
 } from '../../../lib/missionTemplates.ts';
 import { createOpPeriodGateway } from '../../../lib/opPeriodGateway.ts';
+import { pendingOpAssign, type PendingOpAssign } from '../../../lib/pendingOpAssign.ts';
 import { createRegistryStore } from '../../../lib/registryPersistence.ts';
 import { attachOpToIncidentEvent, endFieldEvent, startFieldEvent } from '../../../lib/coreEvents.ts';
 import { segmentsFromSchema, type SegmentMap } from '../../../lib/segmentsPersistence.ts';
@@ -2211,6 +2213,7 @@ async function refresh(): Promise<void> {
         debriefs.value = await createDebriefStore(mission).load();
         assignments.value = await createAssignmentStore(mission).load();
         resources.value = (await loadResourceAssignmentsFromMission(mission)).assignments;
+        const pending = takePendingOpAssign();
 
         if (!opChannels.value.length) {
             opChannels.value = await missionChannels(mission.guid);
@@ -2227,11 +2230,35 @@ async function refresh(): Promise<void> {
             debriefForm.opNumber = registry.value[registry.value.length - 1].opNumber;
         }
         await reopenRememberedIap();
+        if (pending) fillPendingTeam(pending.team);
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
     } finally {
         loadingRegistry.value = false;
     }
+}
+
+/**
+ * "Assign in Operational Periods" on the Resources & Assignments board (#6):
+ * work on that OP, and put the team into a new assignment row.
+ */
+function takePendingOpAssign(): PendingOpAssign | null {
+    const p = pendingOpAssign.value;
+    if (!p) return null;
+    pendingOpAssign.value = null;
+    const op = registry.value.find((e) => e.opNumber === p.opNumber && e.status !== 'closed');
+    if (!op) return null;
+    workingOpGuid.value = op.guid;
+    return p;
+}
+
+function fillPendingTeam(team: string): void {
+    const empty = assignRows.value.find((r) => !r.segmentUid && !r.team.trim());
+    if (empty) empty.team = team;
+    else assignRows.value.push({ ...blankAssignRow(), team });
+    void nextTick(() => {
+        document.getElementById('im-op-assign')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
 }
 
 /**

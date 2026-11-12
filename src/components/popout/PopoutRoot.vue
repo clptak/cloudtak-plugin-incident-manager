@@ -51,14 +51,8 @@
             <TaskbarChipButton
                 :icon='IconUsersGroup'
                 label='Resources'
-                title='Open Resources'
+                title='Open Resources & Assignments'
                 @click='openSection("resources")'
-            />
-            <TaskbarChipButton
-                :icon='IconClipboardList'
-                label='Assignments'
-                title='Open Assignments'
-                @click='openSection("work-assignments")'
             />
             <TaskbarChipButton
                 v-if='isSearchIncident'
@@ -74,7 +68,6 @@
 <script setup lang='ts'>
 import { ref } from 'vue';
 import {
-    IconClipboardList,
     IconMinus,
     IconPolygon,
     IconRuler2,

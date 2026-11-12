@@ -2,7 +2,7 @@
     <div>
         <div class='d-flex flex-wrap align-items-center gap-2 mb-2'>
             <h3 class='mb-0'>
-                Resources
+                Resources &amp; Assignments
             </h3>
             <span
                 v-if='meta?.fetchedAt'
@@ -36,9 +36,9 @@
         </div>
 
         <p class='text-muted small mb-2'>
-            Create and manage resource team assignments. Each record is saved to
-            <strong>mission_schema.json</strong> (<code>incident_response.resource_assignments</code>)
-            and appears in the <strong>Organization</strong> palette by Resource Identifier.
+            Order resources, track their status, and assign their work. Tap a resource to edit it.
+            Pick an operational period to see its resources and segment assignments; those are
+            assigned and published in <strong>Operational Periods</strong>.
         </p>
 
         <TablerInlineAlert
@@ -255,130 +255,17 @@
         >
             <template #label>
                 <p class='text-uppercase text-white-50 small mb-0'>
-                    Mission Resource Assignments ({{ assignments.length }})
+                    Resources and assignments ({{ assignments.length }})
                     <span
                         v-if='loading'
                         class='text-muted fw-normal text-lowercase'
                     > — Loading…</span>
                 </p>
             </template>
-
-            <div
-                v-if='!assignments.length && !loading'
-                class='text-muted small'
-            >
-                No assignments yet — create one above. They will be stored in mission_schema.json.
-            </div>
-            <div
-                v-else-if='assignments.length'
-                class='resources-table-scroll'
-            >
-                <table class='table table-sm table-hover mb-0 small align-middle'>
-                    <thead class='sticky-top bg-body'>
-                        <tr>
-                            <th>Resource Identifier</th>
-                            <th>Resource</th>
-                            <th>Agency</th>
-                            <th>Time Ordered</th>
-                            <th style='width: 72px;'>
-                                ETA
-                            </th>
-                            <th style='width: 110px;'>
-                                Status
-                            </th>
-                            <th>Time Arrived</th>
-                            <th
-                                v-if='opLabelOptions.length > 1'
-                                style='width: 100px;'
-                            >
-                                OP
-                            </th>
-                            <th style='width: 72px;' />
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr
-                            v-for='assignment in assignments'
-                            :key='assignment.id'
-                        >
-                            <td>
-                                <TablerInput
-                                    :model-value='assignment.resourceIdentifier'
-                                    :disabled='saving'
-                                    @update:model-value='onFieldChange(assignment.id, "resourceIdentifier", String($event))'
-                                />
-                            </td>
-                            <td>
-                                <TablerEnum
-                                    :model-value='assignment.resource || "—"'
-                                    :options='rowResourceOptions'
-                                    :disabled='saving'
-                                    @update:model-value='onFieldChange(assignment.id, "resource", $event === "—" ? "" : $event)'
-                                />
-                            </td>
-                            <td>
-                                <TablerEnum
-                                    :model-value='assignment.agency'
-                                    :options='rowAgencyOptions(assignment.agency)'
-                                    :disabled='saving'
-                                    @update:model-value='onFieldChange(assignment.id, "agency", $event)'
-                                />
-                            </td>
-                            <td>
-                                <TablerInput
-                                    :model-value='assignment.timeOrdered'
-                                    type='datetime-local'
-                                    :disabled='saving'
-                                    @update:model-value='onFieldChange(assignment.id, "timeOrdered", String($event))'
-                                />
-                            </td>
-                            <td>
-                                <TablerInput
-                                    :model-value='assignment.eta ?? ""'
-                                    type='number'
-                                    :disabled='saving'
-                                    @update:model-value='onEtaChange(assignment.id, String($event))'
-                                />
-                            </td>
-                            <td>
-                                <TablerEnum
-                                    :model-value='statusLabelFor(assignment.status)'
-                                    :options='statusLabelOptions'
-                                    :disabled='saving'
-                                    @update:model-value='onStatusLabelChange(assignment.id, $event)'
-                                />
-                            </td>
-                            <td>
-                                <TablerInput
-                                    :model-value='assignment.timeArrived'
-                                    type='datetime-local'
-                                    :disabled='saving'
-                                    @update:model-value='onFieldChange(assignment.id, "timeArrived", String($event))'
-                                />
-                            </td>
-                            <td v-if='opLabelOptions.length > 1'>
-                                <TablerEnum
-                                    :model-value='opLabelFor(assignment.opNumber)'
-                                    :options='opLabelOptions'
-                                    :disabled='saving'
-                                    @update:model-value='onOpLabelChange(assignment.id, $event)'
-                                />
-                            </td>
-                            <td>
-                                <button
-                                    type='button'
-                                    class='btn btn-outline-danger btn-sm'
-                                    title='Remove assignment'
-                                    :disabled='saving'
-                                    @click='removeAssignmentRecord(assignment.id)'
-                                >
-                                    ×
-                                </button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+            <ResourceBoard
+                :op-registry='opRegistry'
+                :agency-options='agencyOptions'
+            />
         </TablerBorder>
     </div>
 </template>
@@ -399,6 +286,7 @@ import { formatD4hSyncTime, loadD4hMeta, loadD4hRoster } from '../../lib/d4hRost
 import type { D4HRosterMeta } from '../../lib/d4hTypes.ts';
 import { nowDatetimeLocal } from '../../lib/incidentInfo.ts';
 import NavHelpButton from '../NavHelpButton.vue';
+import ResourceBoard from './ResourceBoard.vue';
 import {
     buildAgencyOptions,
     resolveEffectiveDefaultAgency,
@@ -422,8 +310,6 @@ const {
     blankResourceAssignmentForm,
     loadForMission,
     addAssignment,
-    removeAssignment,
-    updateAssignment,
     updateDefaultAgency,
 } = useResourceAssignments();
 
@@ -482,7 +368,6 @@ const form = ref<Omit<ResourceAssignment, 'id'>>({
 const resourceTypeOptions = RESOURCE_TYPE_OPTIONS;
 const statusOptions = RESOURCE_ASSIGNMENT_STATUSES;
 const statusLabelOptions = statusOptions.map((opt) => opt.label);
-const rowResourceOptions = ['—', ...resourceTypeOptions];
 
 // ── Operational periods (Area Search phase) ────────────────────────────────
 const OP_NONE_LABEL = 'Initial Response';
@@ -528,10 +413,6 @@ async function loadOpRegistry(): Promise<void> {
     }
 }
 
-async function onOpLabelChange(id: string, label: string): Promise<void> {
-    if (!activeMission.value) return;
-    await updateAssignment(activeMission.value, id, { opNumber: opNumberFromLabel(label) });
-}
 
 const resourceFormOptions = computed(() => [RESOURCE_PLACEHOLDER, ...resourceTypeOptions]);
 const agencyFormOptions = computed(() => [AGENCY_PLACEHOLDER, ...agencyOptions.value]);
@@ -695,45 +576,11 @@ async function createAssignment(): Promise<void> {
     resetForm();
 }
 
-async function removeAssignmentRecord(id: string): Promise<void> {
-    if (!activeMission.value) return;
-    if (!window.confirm('Remove this resource assignment?')) return;
-    await removeAssignment(activeMission.value, id);
-}
 
-function rowAgencyOptions(currentAgency: string): string[] {
-    if (currentAgency && !agencyOptions.value.includes(currentAgency)) {
-        return [currentAgency, ...agencyOptions.value];
-    }
-    return agencyOptions.value;
-}
 
-async function onFieldChange(
-    id: string,
-    field: keyof Omit<ResourceAssignment, 'id' | 'eta' | 'status'>,
-    value: string,
-): Promise<void> {
-    if (!activeMission.value) return;
-    await updateAssignment(activeMission.value, id, { [field]: value });
-}
 
-async function onEtaChange(id: string, raw: string | number): Promise<void> {
-    if (!activeMission.value) return;
-    const s = String(raw);
-    const eta = s.trim() === '' || Number.isNaN(Number(s)) ? null : Number(s);
-    await updateAssignment(activeMission.value, id, { eta });
-}
 
-async function onStatusChange(id: string, status: ResourceAssignmentStatus): Promise<void> {
-    if (!activeMission.value) return;
-    await updateAssignment(activeMission.value, id, { status });
-}
 
-async function onStatusLabelChange(id: string, label: string): Promise<void> {
-    const opt = statusOptions.find((entry) => entry.label === label);
-    if (!opt) return;
-    await onStatusChange(id, opt.value);
-}
 
 watch(() => activeMission.value?.guid, async (guid) => {
     await loadForMission(guid ? activeMission.value : null);
@@ -764,11 +611,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.resources-table-scroll {
-    max-height: 50vh;
-    overflow: auto;
-}
-
 .rotate-180 {
     transform: rotate(-180deg);
 }

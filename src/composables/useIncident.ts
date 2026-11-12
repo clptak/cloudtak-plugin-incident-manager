@@ -57,7 +57,6 @@ const VALID_NAV_KEYS = new Set([
     'search-urgency',
     'ir-briefing',
     'resources',
-    'work-assignments',
     'ics-201',
     'search-scenarios',
     'physical-wisar',
@@ -92,8 +91,10 @@ function loadNavFromSession(): PaneNavState {
         // Assignments moved from horizontal tab into Main vertical nav.
         if (htab === 'work-assignments') {
             htab = 'main';
-            key = 'work-assignments';
+            key = 'resources';
         }
+        // Assignments merged into Resources & Assignments (#6).
+        if (key === 'work-assignments') key = 'resources';
         // Wrap Up split into section header + Generate Closing Package sub-pane.
         if (key === 'wrapup') key = 'generate-closing-package';
         // Risk Assessment moved from Main vertical nav into a horizontal tab.
@@ -216,7 +217,8 @@ export function isMissionRequiredView(key: string, htab: string): boolean {
 }
 
 function selectKey(key: string): void {
-    activeKey.value = key;
+    // Assignments merged into Resources & Assignments (#6).
+    activeKey.value = key === 'work-assignments' ? 'resources' : key;
     activeHTab.value = 'main';
 }
 
