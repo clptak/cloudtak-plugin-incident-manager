@@ -26,11 +26,10 @@ test('search incidents: Initial Response has Investigation / Containment / Searc
         ['Search', 'ir-briefing'],
         ['Search', 'incident-post'],
         ['Search', 'resources'],
-        ['Search', 'work-assignments'],
         ['Search', 'ics-201'],
     ]);
     assert.deepEqual(headings(initial.items), [
-        'Investigation', null, null, null, 'Containment', null, 'Search', null, null, null, null,
+        'Investigation', null, null, null, 'Containment', null, 'Search', null, null, null,
     ]);
     assert.equal(initial.items.find((i) => i.key === 'physical-wisar')?.label, 'Motion Model Tools');
     assert.equal(initial.items.find((i) => i.key === 'lpb-distances')?.label, 'LPB Distances');
@@ -40,7 +39,7 @@ test('non-search incidents: same flat Initial Response list as before, no sub-he
     const initial = visibleNavSections(false).find((s) => s.key === 'h-initial');
     assert.ok(initial);
     assert.deepEqual(initial.items.map((i) => i.key), [
-        'initial-information', 'subject-info', 'ir-briefing', 'incident-post', 'resources', 'work-assignments', 'ics-201',
+        'initial-information', 'subject-info', 'ir-briefing', 'incident-post', 'resources', 'ics-201',
     ]);
     assert.ok(initial.items.every((i) => i.group === undefined));
     assert.ok(headings(initial.items).every((h) => h === null));

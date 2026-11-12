@@ -39,7 +39,6 @@
                 <IncidentManagerTaskbarChip />
                 <LpbTaskbarChip />
                 <ResourcesTaskbarChip />
-                <AssignmentsTaskbarChip />
                 <SegmentsTaskbarChip />
                 <ClueTaskbarChip />
             </div>
@@ -113,7 +112,6 @@ import { useMapStore } from '../../../../src/stores/map.ts';
 import IncidentManagerTaskbarChip from './IncidentManagerTaskbarChip.vue';
 import LpbTaskbarChip from './LpbTaskbarChip.vue';
 import ResourcesTaskbarChip from './ResourcesTaskbarChip.vue';
-import AssignmentsTaskbarChip from './AssignmentsTaskbarChip.vue';
 import SegmentsTaskbarChip from './SegmentsTaskbarChip.vue';
 import ClueTaskbarChip from './ClueTaskbarChip.vue';
 import TaskbarChipButton from './TaskbarChipButton.vue';
