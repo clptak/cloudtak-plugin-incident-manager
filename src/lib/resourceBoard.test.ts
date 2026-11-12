@@ -5,7 +5,8 @@ import type { DebriefRecord, OpAssignment } from '../domain/entities.ts';
 import type { ResourceAssignment } from './resourceAssignments.ts';
 import type { WorkAssignment } from './workAssignments.ts';
 import {
-    boardResources, boardSummary, nextAssignmentNumber, opWorkFor, orphanOpWork, orphanWork, workFor, workRunning,
+    boardResources, boardSummary, isFreeResource, matchesBoardSearch, nextAssignmentNumber, opWorkFor, orphanOpWork,
+    orphanWork, workFor, workRunning,
 } from './resourceBoard.ts';
 
 function res(id: string, ident: string, over: Partial<ResourceAssignment> = {}): ResourceAssignment {
@@ -69,4 +70,23 @@ test('boardSummary: counts for the picked OP; running is started work or undebri
     assert.deepEqual(boardSummary(resources, 2, w, opAssignments, debriefs), {
         need: 0, requested: 0, have: 1, demobilized: 0, running: 2,
     });
+});
+
+test('isFreeResource: Have with no open work; Requested and Need are never free', () => {
+    const w = [work('w1', 'r1', 1, { started: 'x' }), work('w2', 'r4', 2, { started: 'x', completed: 'y' })];
+    assert.equal(isFreeResource(resources[0], null, w, [], []), false); // r1: work not completed
+    assert.equal(isFreeResource(resources[3], null, w, [], []), true); // r4: its only work is completed
+    assert.equal(isFreeResource(resources[1], null, [], [], []), false); // requested
+    // OP2 TEAM has one undebriefed segment (a1) on OP2, so it is busy; with every segment debriefed it is free.
+    assert.equal(isFreeResource(resources[5], 2, [], opAssignments, debriefs), false);
+    const all = [...debriefs, { opNumber: 2, segmentUid: 's4', resource: 'op2 team', assignmentId: 'a1' }];
+    assert.equal(isFreeResource(resources[5], 2, [], opAssignments, all), true);
+});
+
+test('matchesBoardSearch: every word, across identifier, type, agency and work text', () => {
+    const r = res('x', 'CCSO GROUND 1', { resource: 'Ground Search Team', agency: 'Coconino SO' });
+    assert.equal(matchesBoardSearch(r, ''), true);
+    assert.equal(matchesBoardSearch(r, 'ground coconino'), true);
+    assert.equal(matchesBoardSearch(r, 'ground dps'), false);
+    assert.equal(matchesBoardSearch(r, 'pls', ['PLS Hasty search of trail']), true);
 });

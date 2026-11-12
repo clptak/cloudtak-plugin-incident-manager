@@ -265,6 +265,7 @@
             <ResourceBoard
                 :op-registry='opRegistry'
                 :agency-options='agencyOptions'
+                @op-change='onBoardOpChange'
             />
         </TablerBorder>
     </div>
@@ -403,7 +404,9 @@ async function loadOpRegistry(): Promise<void> {
     try {
         opRegistry.value = await createRegistryStore(mission).load();
         // Default new resources to the current (open) OP when one exists.
-        if (form.value.opNumber == null) {
+        // New resources follow the OP picked on the board, which opens on the
+        // current OP; until it reports, default to that OP too.
+        if (form.value.opNumber == null && boardOp.value == null) {
             const current = currentOpPeriod(opRegistry.value);
             if (current) form.value.opNumber = current.opNumber;
         }
@@ -514,11 +517,20 @@ function applyEffectiveDefaultToForm(force = false): void {
     lastEffectiveDefaultAgency.value = effective;
 }
 
+/** OP picked on the board below; new resources go there (#6). */
+const boardOp = ref<number | null>(null);
+
+function onBoardOpChange(op: number | null): void {
+    boardOp.value = op;
+    form.value.opNumber = op;
+}
+
 function resetForm(): void {
     form.value = {
         ...blankResourceAssignmentForm(),
         timeOrdered: nowDatetimeLocal(),
         agency: effectiveDefaultAgency.value,
+        opNumber: boardOp.value,
     };
 }
 
