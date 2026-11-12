@@ -44,6 +44,17 @@
                     >
                     <span class='form-check-label small'>209</span>
                 </label>
+                <label
+                    class='form-check mb-0'
+                    title='A map page after each ICS 204: the segment centred, with the segments touching it'
+                >
+                    <input
+                        v-model='includeMaps'
+                        type='checkbox'
+                        class='form-check-input'
+                    >
+                    <span class='form-check-label small'>204 maps</span>
+                </label>
                 <div class='ms-auto d-flex gap-2'>
                     <button
                         class='btn btn-outline-secondary btn-sm'
@@ -64,7 +75,7 @@
                         :disabled='busy'
                         @click='onGenerate'
                     >
-                        Generate PDF
+                        {{ progress || 'Generate PDF' }}
                     </button>
                     <button
                         class='btn btn-link btn-sm'
@@ -758,7 +769,7 @@
 </template>
 
 <script setup lang='ts'>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { TablerBorder, TablerInlineAlert, TablerInput } from '@tak-ps/vue-tabler';
 import { useIncident } from '../../../composables/useIncident.ts';
 import type { OpPeriodRegistryEntry } from '../../../domain/entities.ts';
@@ -769,6 +780,7 @@ import {
     type IapContext,
 } from '../../../lib/iapData.ts';
 import { buildIapPdf, saveIapPdf } from '../../../lib/iapPdf.ts';
+import { buildIapMaps } from '../../../lib/iapMaps.ts';
 import {
     blankAircraftRow,
     blankCommsListRow,
@@ -797,6 +809,22 @@ const ctx = ref<IapContext>({ incidentName: '', incidentNumber: '', category: pr
 const hasUas = ref(false);
 const loading = ref(false);
 const busy = ref(false);
+/** Generate-button text while maps are drawn. */
+const progress = ref('');
+const MAPS_KEY = 'incident-manager:iap-204-maps';
+const includeMaps = ref(readIncludeMaps());
+
+function readIncludeMaps(): boolean {
+    try {
+        return localStorage.getItem(MAPS_KEY) !== '0';
+    } catch {
+        return true;
+    }
+}
+
+watch(includeMaps, (on) => {
+    try { localStorage.setItem(MAPS_KEY, on ? '1' : '0'); } catch { /* not remembered */ }
+});
 const error = ref('');
 const notice = ref('');
 
@@ -929,14 +957,31 @@ async function onGenerate(): Promise<void> {
     error.value = ''; notice.value = '';
     try {
         await saveIapPlan(mission, plan.value);
-        const bytes = await buildIapPdf(buildIapSections(plan.value, ctx.value, hasUas.value));
+        const sections = buildIapSections(plan.value, ctx.value, hasUas.value);
+        let mapNote = '';
+        if (includeMaps.value && plan.value.assignments.length) {
+            try {
+                const maps = await buildIapMaps(mission, plan.value, ctx.value.incidentName, (done, total) => {
+                    progress.value = `Drawing map ${Math.min(done + 1, total)} of ${total}…`;
+                });
+                const forms204 = sections.filter((s) => s.id === 'ics204');
+                forms204.forEach((s, i) => { s.map = maps[i] ?? undefined; });
+                const missing = maps.filter((m) => !m).length;
+                if (missing) mapNote = ` ${missing} assignment${missing === 1 ? ' has' : 's have'} no segment on the map, so no map page.`;
+            } catch (err) {
+                mapNote = ` No 204 maps: ${err instanceof Error ? err.message : String(err)}`;
+            }
+        }
+        progress.value = 'Building PDF…';
+        const bytes = await buildIapPdf(sections);
         const safe = `${ctx.value.incidentName}-OP${plan.value.opNumber}-IAP`.replace(/[^\w.-]+/g, '_');
         const where = await saveIapPdf(bytes, `${safe}.pdf`, ctx.value.incidentName);
-        notice.value = `${where} (${formsLabel.value})`;
+        notice.value = `${where} (${formsLabel.value})${mapNote}`;
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
     } finally {
         busy.value = false;
+        progress.value = '';
     }
 }
 

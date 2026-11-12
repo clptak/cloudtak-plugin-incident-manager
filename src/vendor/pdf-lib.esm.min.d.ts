@@ -29,7 +29,14 @@ export interface PDFPage {
         color?: RGB;
         borderColor?: RGB;
         borderWidth?: number;
+        opacity?: number;
     }): void;
+    drawImage(
+        image: PDFImage,
+        options: { x: number; y: number; width: number; height: number },
+    ): void;
+    /** SVG path with y pointing down from (x, y). */
+    drawSvgPath(path: string, options: { x: number; y: number; color?: RGB; scale?: number }): void;
     drawPage(
         embeddedPage: PDFEmbeddedPage,
         options: { x: number; y: number; width: number; height: number },
@@ -43,6 +50,7 @@ export interface PDFPage {
 }
 
 export type PDFEmbeddedPage = object;
+export type PDFImage = object;
 
 /** AcroForm field types used by the IAP generator (official ICS templates). */
 export interface PDFWidgetAnnotation {
@@ -91,6 +99,7 @@ export class PDFDocument {
     copyPages(src: PDFDocument, indices: number[]): Promise<PDFPage[]>;
     embedPage(page: PDFPage): Promise<PDFEmbeddedPage>;
     embedFont(name: StandardFonts): Promise<PDFFont>;
+    embedJpg(bytes: ArrayBuffer | Uint8Array): Promise<PDFImage>;
     addPage(size: [number, number]): PDFPage;
     getPageCount(): number;
     getForm(): PDFForm;

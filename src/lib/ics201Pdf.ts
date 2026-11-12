@@ -17,6 +17,8 @@ import {
     type Ics201Sources,
 } from './ics201.ts';
 import { toPdfWinAnsiText } from './pdfWinAnsiText.ts';
+import type { PrintMapImage } from './printMap.ts';
+import { drawPrintMap } from './printMapPdf.ts';
 import { localDateString } from './localTime.ts';
 
 export const ICS201_MISSION_FILENAME = 'ICS-201.pdf';
@@ -46,6 +48,21 @@ const OPS_CHIEF_FIELD = 'Planning Section Chief_2';
 const PLAN_CHIEF_FIELD = 'Operations Section Chief_2';
 const LOG_CHIEF_FIELD = 'FinanceAdministration Section Chief';
 const FIN_CHIEF_FIELD = 'Logistics Section Chief';
+
+/**
+ * §4 Map/Sketch with a map (#28): the image fills the box above a caption
+ * strip carrying the mission/IPP/weather/comms text. Box measured from the
+ * template widget (535.8 × 411.5 pt).
+ */
+const MAP_INSET = 3;
+const MAP_CAPTION_SIZE = 7;
+const MAP_CAPTION_LINE = 8;
+const MAP_CAPTION_LINES = 4;
+const MAP_CAPTION_H = MAP_CAPTION_LINE * MAP_CAPTION_LINES + 2;
+export const ICS201_MAP_IMAGE_PT = {
+    width: 535.8 - MAP_INSET * 2,
+    height: 411.48 - MAP_INSET * 2 - MAP_CAPTION_H,
+};
 
 /** Single-widget fields and their template page index (0-based). */
 const SINGLE_FIELD_PAGES: Record<string, number> = {
@@ -667,10 +684,49 @@ function paintOrganizationSection(
     }
 }
 
+/** The Map/Sketch text as one run for the caption: "Weather: …" joins its label. */
+export function mapSketchCaption(text: string): string {
+    return text.replace(/:\n/g, ': ').split('\n').map((l) => l.trim()).filter(Boolean).join(' · ');
+}
+
+async function paintMapSketch(
+    doc: PDFDocument,
+    pages: PDFPage[],
+    font: PDFFont,
+    pdfForm: BriefingPdfForm,
+    map: PrintMapImage,
+    text: string,
+): Promise<void> {
+    const box = layoutsForField(pdfForm, MAP_SKETCH_FIELD)[0];
+    const page = box && pages[box.pageIndex];
+    if (!box || !page) return;
+    const imgH = box.h - MAP_INSET * 2 - MAP_CAPTION_H;
+    await drawPrintMap(doc, page, font, map, {
+        x: box.x + MAP_INSET,
+        y: box.y + box.h - MAP_INSET - imgH,
+        width: box.w - MAP_INSET * 2,
+        height: imgH,
+    });
+    const width = box.w - MAP_INSET * 2;
+    let lines = wrapLines(toPdfWinAnsiText(mapSketchCaption(text)), font, width, MAP_CAPTION_SIZE);
+    if (lines.length > MAP_CAPTION_LINES) {
+        lines = lines.slice(0, MAP_CAPTION_LINES);
+        let last = `${lines[MAP_CAPTION_LINES - 1]}…`;
+        while (last.length > 1 && font.widthOfTextAtSize(last, MAP_CAPTION_SIZE) > width) last = `${last.slice(0, -2)}…`;
+        lines[MAP_CAPTION_LINES - 1] = last;
+    }
+    let y = box.y + MAP_INSET + MAP_CAPTION_H - MAP_CAPTION_LINE;
+    for (const line of lines) {
+        page.drawText(line, { x: box.x + MAP_INSET, y, size: MAP_CAPTION_SIZE, font });
+        y -= MAP_CAPTION_LINE;
+    }
+}
+
 /** Paint ICS 201 values onto the template using measured AcroForm widget boxes. */
 export async function buildIcs201Pdf(
     form: Ics201Form,
     sources: Pick<Ics201Sources, 'missionName' | 'missionGuid'>,
+    opts: { map?: PrintMapImage } = {},
 ): Promise<Uint8Array> {
     const templateBytes = await loadTemplateBytes();
     const templateDoc = await PDFDocument.load(templateBytes);
@@ -694,7 +750,11 @@ export async function buildIcs201Pdf(
     }
 
     for (const job of collectPaintJobs(form, sources)) {
+        if (opts.map && job.name === MAP_SKETCH_FIELD) continue;
         paintNamedField(pages, font, pdfForm, job.name, job.value, job.page, job.fit);
+    }
+    if (opts.map) {
+        await paintMapSketch(outDoc, pages, font, pdfForm, opts.map, buildMapSketchText(form, sources));
     }
     paintOrganizationSection(pages, font, pdfForm, form);
     paintContinuationHeaders(pages, font, pdfForm, form, continuationPages);
