@@ -19,6 +19,24 @@
             v-else
             class='badge bg-yellow-lt ms-auto'
         >Not debriefed</span>
+        <button
+            v-if='!last'
+            type='button'
+            class='btn btn-outline-blue btn-sm py-0'
+            :title='`Fill in the completed-assignment form for Seg ${item.assignment.label} in Operational Periods`'
+            @click='emit("debrief")'
+        >
+            Complete / Debrief
+        </button>
+        <button
+            v-else
+            type='button'
+            class='btn btn-link btn-sm p-0'
+            :title='`Record another sortie on Seg ${item.assignment.label} in Operational Periods`'
+            @click='emit("debrief")'
+        >
+            Debrief again
+        </button>
     </div>
 </template>
 
@@ -31,6 +49,8 @@ const props = defineProps<{
     item: OpWork;
     showTeam?: boolean;
 }>();
+
+const emit = defineEmits<{ (e: 'debrief'): void }>();
 
 const last = computed(() => props.item.debriefs[props.item.debriefs.length - 1]);
 </script>

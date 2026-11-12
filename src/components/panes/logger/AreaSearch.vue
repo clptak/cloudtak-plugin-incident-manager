@@ -1646,7 +1646,7 @@ import {
     type MissionTemplateItem,
 } from '../../../lib/missionTemplates.ts';
 import { createOpPeriodGateway } from '../../../lib/opPeriodGateway.ts';
-import { pendingOpAssign, type PendingOpAssign } from '../../../lib/pendingOpAssign.ts';
+import { pendingOpAssign, pendingOpDebrief, type PendingOpAssign } from '../../../lib/pendingOpAssign.ts';
 import { createRegistryStore } from '../../../lib/registryPersistence.ts';
 import { attachOpToIncidentEvent, endFieldEvent, startFieldEvent } from '../../../lib/coreEvents.ts';
 import { segmentsFromSchema, type SegmentMap } from '../../../lib/segmentsPersistence.ts';
@@ -2214,6 +2214,7 @@ async function refresh(): Promise<void> {
         assignments.value = await createAssignmentStore(mission).load();
         resources.value = (await loadResourceAssignmentsFromMission(mission)).assignments;
         const pending = takePendingOpAssign();
+        const pendingDebrief = takePendingOpDebrief();
 
         if (!opChannels.value.length) {
             opChannels.value = await missionChannels(mission.guid);
@@ -2231,6 +2232,7 @@ async function refresh(): Promise<void> {
         }
         await reopenRememberedIap();
         if (pending) fillPendingTeam(pending.team);
+        if (pendingDebrief) startAssignmentDebrief(pendingDebrief);
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
     } finally {
@@ -2250,6 +2252,18 @@ function takePendingOpAssign(): PendingOpAssign | null {
     if (!op) return null;
     workingOpGuid.value = op.guid;
     return p;
+}
+
+/** "Complete / Debrief" on the board (#6): the assignment to debrief, if it still exists. */
+function takePendingOpDebrief(): OpAssignment | null {
+    const p = pendingOpDebrief.value;
+    if (!p) return null;
+    pendingOpDebrief.value = null;
+    const team = p.team.toLowerCase();
+    return assignments.value.find((a) => (p.assignmentId
+        ? a.id === p.assignmentId
+        : a.opNumber === p.opNumber && a.segmentUid === p.segmentUid && (a.team ?? '').trim().toLowerCase() === team))
+        ?? null;
 }
 
 function fillPendingTeam(team: string): void {

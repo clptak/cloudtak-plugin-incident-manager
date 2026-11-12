@@ -403,6 +403,7 @@
                             v-for='item in opItemsFor(r)'
                             :key='item.assignment.id ?? `${item.assignment.opNumber}-${item.assignment.segmentUid}`'
                             :item='item'
+                            @debrief='debriefInOperationalPeriods(item.assignment)'
                         />
                         <button
                             v-if='pickedOpOpen'
@@ -513,6 +514,7 @@
                         :key='item.assignment.id ?? `${item.assignment.opNumber}-${item.assignment.segmentUid}`'
                         :item='item'
                         show-team
+                        @debrief='debriefInOperationalPeriods(item.assignment)'
                     />
                 </template>
             </div>
@@ -575,7 +577,7 @@ import { loadIncidentSubscription } from '../../lib/incidentSubscription.ts';
 import { nowDatetimeLocal } from '../../lib/incidentInfo.ts';
 import { listMissionCots, type MissionCotRef } from '../../lib/missionCots.ts';
 import { createAssignmentStore } from '../../lib/opAssignmentPersistence.ts';
-import { pendingOpAssign } from '../../lib/pendingOpAssign.ts';
+import { pendingOpAssign, pendingOpDebrief } from '../../lib/pendingOpAssign.ts';
 import {
     boardResources,
     boardSummary,
@@ -946,6 +948,17 @@ async function sendPhase(w: WorkAssignment, phase: 'started' | 'completed'): Pro
 function assignInOperationalPeriods(r: ResourceAssignment): void {
     if (pickedOp.value === null) return;
     pendingOpAssign.value = { team: r.resourceIdentifier.trim(), opNumber: pickedOp.value };
+    selectKeyGuarded('operational-periods');
+}
+
+/** "Complete / Debrief": open the completed-assignment form in Operational Periods. */
+function debriefInOperationalPeriods(a: OpAssignment): void {
+    pendingOpDebrief.value = {
+        ...(a.id ? { assignmentId: a.id } : {}),
+        opNumber: a.opNumber,
+        segmentUid: a.segmentUid,
+        team: a.team?.trim() ?? '',
+    };
     selectKeyGuarded('operational-periods');
 }
 
