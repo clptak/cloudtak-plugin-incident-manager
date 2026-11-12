@@ -630,6 +630,16 @@
                 </div>
             </template>
 
+            <label class='form-check mb-2'>
+                <input
+                    v-model='includeMap'
+                    type='checkbox'
+                    class='form-check-input'
+                >
+                <span class='form-check-label small'>
+                    Map in item 4 (the map as it is on screen now, north up)
+                </span>
+            </label>
             <div class='d-flex flex-wrap gap-2'>
                 <button
                     type='button'
@@ -679,8 +689,10 @@ import { fetchWeatherSummary } from '../../../lib/irBriefingWeather.ts';
 import {
     buildIcs201Pdf,
     defaultIcs201Filename,
+    ICS201_MAP_IMAGE_PT,
     ICS201_MISSION_FILENAME,
 } from '../../../lib/ics201Pdf.ts';
+import { currentPrintView, renderPrintMap, type PrintMapImage } from '../../../lib/printMap.ts';
 import { downloadPdfBytes, uploadMissionFile } from '../../../lib/missionUpload.ts';
 
 const { activeMission, requireActiveMission } = useIncident();
@@ -958,9 +970,40 @@ async function saveToMission(): Promise<void> {
     }
 }
 
+const MAP_KEY = 'incident-manager:ics201-map';
+const includeMap = ref(readIncludeMap());
+/** Appended to the status line when the map couldn't be drawn. */
+let mapNote = '';
+
+function readIncludeMap(): boolean {
+    try {
+        return localStorage.getItem(MAP_KEY) !== '0';
+    } catch {
+        return true;
+    }
+}
+
+watch(includeMap, (on) => {
+    try { localStorage.setItem(MAP_KEY, on ? '1' : '0'); } catch { /* not remembered */ }
+});
+
+/** Item 4's map from the current view, or undefined (the text stays in the box). */
+async function mapSketchImage(): Promise<PrintMapImage | undefined> {
+    mapNote = '';
+    if (!includeMap.value) return undefined;
+    try {
+        const { width, height } = ICS201_MAP_IMAGE_PT;
+        return await renderPrintMap({ widthPt: width, heightPt: height, view: currentPrintView(width, height) });
+    } catch (err) {
+        mapNote = ` No map in item 4: ${err instanceof Error ? err.message : String(err)}`;
+        return undefined;
+    }
+}
+
 async function generatePdfBytes(): Promise<Uint8Array> {
     syncObjectivesSnapshot(form);
     ensureActionRowCapacity(form);
+    const map = await mapSketchImage();
     return buildIcs201Pdf(
         {
             ...form,
@@ -973,6 +1016,7 @@ async function generatePdfBytes(): Promise<Uint8Array> {
             missionName: sources.missionName || activeMission.value?.name || '',
             missionGuid: sources.missionGuid || activeMission.value?.guid || '',
         },
+        { map },
     );
 }
 
@@ -986,7 +1030,7 @@ async function downloadPdf(): Promise<void> {
             form.incidentName || activeMission.value?.name || 'incident',
         );
         downloadPdfBytes(bytes, filename);
-        status.value = 'PDF downloaded.';
+        status.value = `PDF downloaded.${mapNote}`;
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);
@@ -1016,7 +1060,7 @@ async function addPdfToDataSync(): Promise<void> {
         );
         const sub = await loadSchemaSubscription(activeMission.value);
         await sub.fetch();
-        status.value = `Added ${ICS201_MISSION_FILENAME} to ${schemaMission(activeMission.value).name}.`;
+        status.value = `Added ${ICS201_MISSION_FILENAME} to ${schemaMission(activeMission.value).name}.${mapNote}`;
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);

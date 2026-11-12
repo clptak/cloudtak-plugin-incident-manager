@@ -9,7 +9,7 @@
  * blank box, never a failed export.
  */
 
-import { PDFDocument, StandardFonts } from '../vendor/pdf-lib.esm.min.js';
+import { PDFDocument, StandardFonts, rgb } from '../vendor/pdf-lib.esm.min.js';
 import type { PDFFont, PDFForm } from '../vendor/pdf-lib.esm.min.js';
 import ics202Url from '../assets/iap/ics202.pdf?url';
 import ics203Url from '../assets/iap/ics203.pdf?url';
@@ -22,6 +22,55 @@ import ics208Url from '../assets/iap/ics208.pdf?url';
 import ics209Url from '../assets/iap/ics209.pdf?url';
 import ics220Url from '../assets/iap/ics220-uas.pdf?url';
 import { describeSave, saveGeneratedFile } from './fileTarget.ts';
+import { toPdfWinAnsiText } from './pdfWinAnsiText.ts';
+import type { PrintMapImage } from './printMap.ts';
+import { drawPrintMap } from './printMapPdf.ts';
+
+/**
+ * ICS-204 map page (#28): a letter page after the 204, the assigned segment
+ * centred with the segments touching it. Portrait or landscape to suit the
+ * shape of the area.
+ */
+export interface IapMapPage {
+    image: PrintMapImage;
+    landscape: boolean;
+    title: string;
+    subtitle: string;
+}
+
+const MAP_MARGIN = 36;
+const MAP_HEADER_H = 34;
+const MAP_FOOTER_H = 16;
+
+function letterSize(landscape: boolean): [number, number] {
+    return landscape ? [792, 612] : [612, 792];
+}
+
+/** Size of the map image on a 204 map page. */
+export function iapMapImagePt(landscape: boolean): { width: number; height: number } {
+    const [w, h] = letterSize(landscape);
+    return { width: w - MAP_MARGIN * 2, height: h - MAP_MARGIN * 2 - MAP_HEADER_H - MAP_FOOTER_H };
+}
+
+async function addMapPage(out: PDFDocument, map: IapMapPage, pageLabel: string): Promise<void> {
+    const [w, h] = letterSize(map.landscape);
+    const page = out.addPage([w, h]);
+    const font = await out.embedFont(StandardFonts.Helvetica);
+    const bold = await out.embedFont(StandardFonts.HelveticaBold);
+    const ink = rgb(0.1, 0.1, 0.1);
+    page.drawText(toPdfWinAnsiText(map.title), { x: MAP_MARGIN, y: h - MAP_MARGIN - 14, size: 14, font: bold, color: ink });
+    page.drawText(toPdfWinAnsiText(map.subtitle), { x: MAP_MARGIN, y: h - MAP_MARGIN - 28, size: 9, font, color: ink });
+    const size = iapMapImagePt(map.landscape);
+    await drawPrintMap(out, page, font, map.image, {
+        x: MAP_MARGIN,
+        y: MAP_MARGIN + MAP_FOOTER_H,
+        ...size,
+    });
+    const footer = `IAP Page ${pageLabel}`;
+    page.drawText(footer, {
+        x: w - MAP_MARGIN - font.widthOfTextAtSize(footer, 8), y: MAP_MARGIN + 2, size: 8, font, color: ink,
+    });
+}
 
 export type IapFormId =
     | 'ics202' | 'ics203' | 'ics204' | 'ics205' | 'ics205a'
@@ -163,6 +212,8 @@ export interface IapSection {
      * fills it during assembly, when the final page count is known.
      */
     pageField?: string;
+    /** A map page to follow this form (ICS-204). */
+    map?: IapMapPage;
 }
 
 /**
@@ -175,7 +226,7 @@ export async function buildIapPdf(sections: IapSection[]): Promise<Uint8Array> {
 
     // Pages are numbered sequentially across the assembled IAP (1 of N),
     // not per operational period.
-    const total = sections.reduce((n, s) => n + (s.filled.pages?.length || 1), 0);
+    const total = sections.reduce((n, s) => n + (s.filled.pages?.length || 1) + (s.map ? 1 : 0), 0);
     let pageNo = 0;
 
     for (const section of sections) {
@@ -196,6 +247,10 @@ export async function buildIapPdf(sections: IapSection[]): Promise<Uint8Array> {
         const indices = wanted.length ? wanted : [0];
         const copied = await out.copyPages(filledDoc, indices);
         for (const page of copied) out.addPage(page as unknown as [number, number]);
+        if (section.map) {
+            pageNo += 1;
+            await addMapPage(out, section.map, `${pageNo} of ${total}`);
+        }
     }
 
     return out.save();
