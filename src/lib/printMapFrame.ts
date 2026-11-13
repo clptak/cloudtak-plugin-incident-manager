@@ -219,3 +219,45 @@ export function scaleBar(metersPerUnit: number, maxLength: number): ScaleBar | n
 
 /** CSS pixels per PDF point: maps are laid out at screen size (96 dpi) on a 72 pt inch. */
 export const PX_PER_PT = 96 / 72;
+
+// ── Framing on screen (#28 follow-up) ──────────────────────────────────────
+
+export interface ScreenRect {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+}
+
+/**
+ * The largest `aspect` (width ÷ height) rectangle that fits a container,
+ * leaving `margin` all round and `top` extra above for a title bar; centred.
+ */
+export function fitFrame(containerW: number, containerH: number, aspect: number, margin = 48, top = 40): ScreenRect {
+    const availW = Math.max(40, containerW - margin * 2);
+    const availH = Math.max(40, containerH - margin * 2 - top);
+    const w = Math.min(availW, availH * aspect);
+    const h = w / aspect;
+    return { x: (containerW - w) / 2, y: top + margin + (availH - h) / 2, w, h };
+}
+
+/**
+ * Zoom for a print `printWidthPx` wide that shows exactly what a frame
+ * `frameWidthPx` wide shows on a map at `liveZoom`.
+ */
+export function zoomForFrame(liveZoom: number, frameWidthPx: number, printWidthPx: number): number {
+    return liveZoom + Math.log2(printWidthPx / Math.max(1, frameWidthPx));
+}
+
+/** Paper scale denominator (the N of 1:N) of a print at a latitude and zoom. */
+export function paperScale(lat: number, zoom: number): number {
+    const metersPerPt = metersPerPixel(lat, zoom) * PX_PER_PT;
+    return metersPerPt * 72 / 0.0254;
+}
+
+/** "1:24,000", rounded to two significant figures. */
+export function paperScaleLabel(denominator: number): string {
+    if (!(denominator > 0)) return '';
+    const p = 10 ** Math.max(0, Math.floor(Math.log10(denominator)) - 1);
+    return `1:${(Math.round(denominator / p) * p).toLocaleString('en-US')}`;
+}

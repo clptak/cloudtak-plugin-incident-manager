@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-    centredView, mercX, mercY, metersPerPixel, naturalAspect, neighbours, ringsOf, scaleBar, shapesTouch, trimmedView,
+    centredView, fitFrame, mercX, mercY, metersPerPixel, naturalAspect, neighbours, paperScale, paperScaleLabel, ringsOf, scaleBar, shapesTouch, trimmedView, zoomForFrame,
     type LngLat,
 } from './printMapFrame.ts';
 
@@ -92,4 +92,28 @@ test('scaleBar picks the longest round distance that fits', () => {
     assert.equal(scaleBar(1, 100)!.label, '250 ft');
     assert.equal(scaleBar(1, 10), null);
     assert.equal(scaleBar(0, 10), null);
+});
+
+test('fitFrame keeps the aspect, fits inside the margins, leaves room for the bar', () => {
+    const r = fitFrame(1200, 800, 2, 48, 40);
+    assert.ok(Math.abs(r.w / r.h - 2) < 1e-9);
+    assert.ok(r.x >= 48 && r.x + r.w <= 1200 - 48 + 1e-9);
+    assert.ok(r.y >= 88 && r.y + r.h <= 800 - 48 + 1e-9);
+    // Tall container: width limits.
+    const t = fitFrame(400, 1000, 1.3, 48, 40);
+    assert.ok(Math.abs(t.w - (400 - 96)) < 1e-9);
+});
+
+test('zoomForFrame: a print twice the frame width is one zoom level in', () => {
+    assert.equal(zoomForFrame(12, 500, 1000), 13);
+    assert.equal(zoomForFrame(12, 500, 500), 12);
+});
+
+test('paperScale and its label', () => {
+    // Zoom 15 at the equator (512 px tiles): ~2.39 m/px → ×(96/72) m/pt × 72/0.0254 ≈ 1:9,000.
+    const s = paperScale(0, 15);
+    assert.ok(s > 8500 && s < 9500, String(s));
+    assert.equal(paperScaleLabel(24123), '1:24,000');
+    assert.equal(paperScaleLabel(987), '1:990');
+    assert.equal(paperScaleLabel(0), '');
 });
