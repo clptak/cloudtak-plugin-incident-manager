@@ -1,7 +1,7 @@
 <template>
     <div
         class='scale-choice'
-        :class='layout === "list" ? "scale-choice-list" : "scale-choice-row"'
+        :class='layout === "list" ? "scale-choice-list" : ["scale-choice-row", { "scale-choice-nowrap": !blended }]'
         role='radiogroup'
         :aria-label='label'
         @keydown='onKey'
@@ -94,6 +94,11 @@ function onKey(e: KeyboardEvent): void {
     display: inline-flex;
     flex-wrap: wrap;
     gap: 0.25rem;
+}
+
+/* Up to five boxes always fit one line; keeps a table column from squeezing them onto two (#30). */
+.scale-choice-nowrap {
+    flex-wrap: nowrap;
 }
 
 .scale-choice-list {
