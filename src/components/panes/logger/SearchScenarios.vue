@@ -93,19 +93,17 @@
                 />
                 <div class='row g-2 mt-0'>
                     <div class='col-md-6'>
-                        <TablerEnum
-                            :model-value='mobilityLabel(letter)'
+                        <ChoiceToggle
+                            v-model='drafts[letter].mobility'
                             label='Mobility'
                             :options='MOBILITY_OPTIONS'
-                            @update:model-value='setMobilityLabel(letter, $event)'
                         />
                     </div>
                     <div class='col-md-6'>
-                        <TablerEnum
-                            :model-value='responsivenessLabel(letter)'
+                        <ChoiceToggle
+                            v-model='drafts[letter].responsiveness'
                             label='Responsiveness'
                             :options='RESPONSIVENESS_OPTIONS'
-                            @update:model-value='setResponsivenessLabel(letter, $event)'
                         />
                     </div>
                 </div>
@@ -386,11 +384,21 @@
 
 <script setup lang='ts'>
 import DataSyncDestination from '../../DataSyncDestination.vue';
+import ChoiceToggle, { type ChoiceToggleOption } from '../../ChoiceToggle.vue';
 import { reactive, ref, computed, onBeforeUnmount, onMounted, watch } from 'vue';
-import { IconChevronDown, IconGripVertical, IconPencil, IconPencilCheck } from '@tabler/icons-vue';
+import {
+    IconChevronDown,
+    IconGripVertical,
+    IconMapPinPause,
+    IconMessageCircle,
+    IconMessageCircleOff,
+    IconPencil,
+    IconPencilCheck,
+    IconWalk,
+} from '@tabler/icons-vue';
 import Sortable from 'sortablejs';
 import type { SortableEvent } from 'sortablejs';
-import { TablerBorder, TablerInput, TablerEnum, TablerInlineAlert } from '@tak-ps/vue-tabler';
+import { TablerBorder, TablerInput, TablerInlineAlert } from '@tak-ps/vue-tabler';
 import { loadSchemaSubscription, schemaMission } from '../../../lib/incidentSubscription.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import { loadIcs201FromMission } from '../../../lib/ics201.ts';
@@ -445,27 +453,15 @@ function blankDraft(): Draft {
     return { description: '', mobility: '', responsiveness: '', priority: null, logId: undefined };
 }
 
-const MOBILITY_OPTIONS = ['—', 'Mobile', 'Immobile'];
-const MOBILITY_LABEL_BY_VALUE: Record<string, string> = { '': '—', mobile: 'Mobile', immobile: 'Immobile' };
-const MOBILITY_VALUE_BY_LABEL: Record<string, string> = { '—': '', Mobile: 'mobile', Immobile: 'immobile' };
+const MOBILITY_OPTIONS: ChoiceToggleOption[] = [
+    { value: 'mobile', label: 'Mobile', tone: 'green', icon: IconWalk },
+    { value: 'immobile', label: 'Immobile', tone: 'orange', icon: IconMapPinPause },
+];
 
-function mobilityLabel(letter: string): string {
-    return MOBILITY_LABEL_BY_VALUE[drafts[letter].mobility] ?? '—';
-}
-function setMobilityLabel(letter: string, label: string): void {
-    drafts[letter].mobility = MOBILITY_VALUE_BY_LABEL[label] ?? '';
-}
-
-const RESPONSIVENESS_OPTIONS = ['—', 'Responsive', 'Unresponsive'];
-const RESPONSIVENESS_LABEL_BY_VALUE: Record<string, string> = { '': '—', responsive: 'Responsive', unresponsive: 'Unresponsive' };
-const RESPONSIVENESS_VALUE_BY_LABEL: Record<string, string> = { '—': '', Responsive: 'responsive', Unresponsive: 'unresponsive' };
-
-function responsivenessLabel(letter: string): string {
-    return RESPONSIVENESS_LABEL_BY_VALUE[drafts[letter].responsiveness] ?? '—';
-}
-function setResponsivenessLabel(letter: string, label: string): void {
-    drafts[letter].responsiveness = RESPONSIVENESS_VALUE_BY_LABEL[label] ?? '';
-}
+const RESPONSIVENESS_OPTIONS: ChoiceToggleOption[] = [
+    { value: 'responsive', label: 'Responsive', tone: 'green', icon: IconMessageCircle },
+    { value: 'unresponsive', label: 'Unresponsive', tone: 'orange', icon: IconMessageCircleOff },
+];
 
 function blankPdfHeader(): ScenariosRecordSheetHeader {
     const date = nowBriefingDate();
