@@ -637,9 +637,38 @@
                     class='form-check-input'
                 >
                 <span class='form-check-label small'>
-                    Map in item 4 (the map as it is on screen now, north up)
+                    Map in item 4, north up
                 </span>
             </label>
+            <div
+                v-if='includeMap'
+                class='d-flex flex-wrap align-items-center gap-2 mb-2 ms-4 small'
+            >
+                <button
+                    type='button'
+                    class='btn btn-outline-secondary btn-sm'
+                    title='Put a frame the shape of item 4 over the map. Pan and zoom until what you want is inside it.'
+                    @click='frameMap'
+                >
+                    {{ mapFrame ? 'Reframe the map' : 'Frame the map' }}
+                </button>
+                <template v-if='mapFrame'>
+                    <span class='badge bg-azure-lt'>
+                        Framed {{ paperScaleLabel(mapFrame.scale) }}, {{ localDateTimeLabel(new Date(mapFrame.at).toISOString()) }}
+                    </span>
+                    <button
+                        type='button'
+                        class='btn btn-link btn-sm p-0'
+                        @click='clearFrame(frameKey)'
+                    >
+                        Use the screen view instead
+                    </button>
+                </template>
+                <span
+                    v-else
+                    class='text-secondary'
+                >Otherwise the map as it is on screen when you generate.</span>
+            </div>
             <label
                 class='form-check mb-2'
                 title='Untick for a locked PDF that prints the same everywhere.'
@@ -678,6 +707,10 @@
 <script setup lang='ts'>
 import DataSyncDestination from '../../DataSyncDestination.vue';
 import { useStoredFlag } from '../../../composables/useStoredFlag.ts';
+import { clearFrame, savedFrame, startMapFraming } from '../../../lib/mapFrame.ts';
+import { paperScaleLabel } from '../../../lib/printMapFrame.ts';
+import { localDateTimeLabel } from '../../../lib/localTime.ts';
+import { isMinimized, minimizeDesktopPane, restoreDesktopPane } from '../../../lib/floatMinimize.ts';
 import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { IconChevronDown, IconPlus, IconX } from '@tabler/icons-vue';
 import { TablerBorder, TablerInput, TablerInlineAlert } from '@tak-ps/vue-tabler';
@@ -985,6 +1018,31 @@ async function saveToMission(): Promise<void> {
 }
 
 const includeMap = useStoredFlag('incident-manager:ics201-map');
+/** Item 4's framed view for this incident, if one was chosen. */
+const frameKey = computed(() => `ics201:${activeMission.value?.guid ?? 'none'}`);
+const mapFrame = computed(() => savedFrame(frameKey.value));
+
+function frameMap(): void {
+    mapNote = '';
+    const hide = !isMinimized();
+    try {
+        // The frame goes on the map; get the pane out of the way meanwhile.
+        if (hide) minimizeDesktopPane();
+        const { width, height } = ICS201_MAP_IMAGE_PT;
+        startMapFraming({
+            key: frameKey.value,
+            widthPt: width,
+            heightPt: height,
+            title: 'ICS 201 item 4',
+            onClose: () => { if (hide) restoreDesktopPane(); },
+        });
+    } catch (err) {
+        if (hide) restoreDesktopPane();
+        statusError.value = true;
+        status.value = err instanceof Error ? err.message : String(err);
+    }
+}
+
 /** Keep the boxes live for edits in a PDF reader (#33). */
 const editableFields = useStoredFlag('incident-manager:ics201-editable');
 /** Appended to the status line when the map couldn't be drawn. */
@@ -996,7 +1054,8 @@ async function mapSketchImage(): Promise<PrintMapImage | undefined> {
     if (!includeMap.value) return undefined;
     try {
         const { width, height } = ICS201_MAP_IMAGE_PT;
-        return await renderPrintMap({ widthPt: width, heightPt: height, view: currentPrintView(width, height) });
+        const view = mapFrame.value?.view ?? currentPrintView(width, height);
+        return await renderPrintMap({ widthPt: width, heightPt: height, view });
     } catch (err) {
         mapNote = ` No map in item 4: ${err instanceof Error ? err.message : String(err)}`;
         return undefined;
