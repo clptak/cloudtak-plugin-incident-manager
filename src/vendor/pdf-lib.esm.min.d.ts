@@ -47,6 +47,8 @@ export interface PDFPage {
         thickness?: number;
         color?: RGB;
     }): void;
+    /** Low-level page dictionary (form-field merging, #33). */
+    node: { Annots(): PDFArray | undefined };
 }
 
 export type PDFEmbeddedPage = object;
@@ -64,6 +66,18 @@ export interface PDFAcroField {
 export interface PDFTextField {
     acroField: PDFAcroField;
     setText(text: string): void;
+    getText(): string | undefined;
+    addToPage(page: PDFPage, options: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        font?: PDFFont;
+        textColor?: RGB;
+        backgroundColor?: RGB;
+        borderColor?: RGB;
+        borderWidth?: number;
+    }): void;
     setFontSize(size: number): void;
     enableMultiline(): void;
     isMultiline(): boolean;
@@ -89,8 +103,42 @@ export interface PDFForm {
             }>;
         };
     };
+    createTextField(name: string): PDFTextField;
     updateFieldAppearances(font?: PDFFont): void;
     flatten(): void;
+    acroForm: { dict: PDFDict; addField(ref: PDFRef): void };
+}
+
+// ── Low-level objects (form-field merging, #33) ───────────────────────────
+export class PDFObject {}
+export class PDFName extends PDFObject {
+    static of(name: string): PDFName;
+}
+export class PDFHexString extends PDFObject {
+    static fromText(text: string): PDFHexString;
+    decodeText(): string;
+}
+export class PDFString extends PDFObject {
+    decodeText(): string;
+}
+export class PDFRef extends PDFObject {}
+export class PDFArray extends PDFObject {
+    size(): number;
+    get(index: number): PDFObject;
+}
+export class PDFDict extends PDFObject {
+    get(key: PDFName): PDFObject | undefined;
+    set(key: PDFName, value: PDFObject): void;
+    lookup(key: PDFName): PDFObject | undefined;
+    entries(): [PDFName, PDFObject][];
+}
+export interface PDFContext {
+    lookup(obj: PDFObject | undefined): PDFObject | undefined;
+    obj(value: Record<string, never>): PDFDict;
+}
+export class PDFObjectCopier {
+    static for(src: PDFContext, dest: PDFContext): PDFObjectCopier;
+    copy<T extends PDFObject>(obj: T): T;
 }
 
 export class PDFDocument {
@@ -103,5 +151,6 @@ export class PDFDocument {
     addPage(size: [number, number]): PDFPage;
     getPageCount(): number;
     getForm(): PDFForm;
+    context: PDFContext;
     save(): Promise<Uint8Array>;
 }

@@ -16,6 +16,7 @@ import {
     type Ics201Form,
     type Ics201Sources,
 } from './ics201.ts';
+import { EditableFields } from './pdfFormFields.ts';
 import { toPdfWinAnsiText } from './pdfWinAnsiText.ts';
 import type { PrintMapImage } from './printMap.ts';
 import { drawPrintMap } from './printMapPdf.ts';
@@ -245,9 +246,9 @@ const FIT_FONT_SIZES = [9, 8, 7, 6, 5] as const;
  * fits the cell width and all lines fit the cell height. Falls back to the
  * smallest size (truncated) when even that overflows.
  */
-function drawFitted(page: PDFPage, font: PDFFont, text: string, layout: FieldLayout): void {
+function fitText(font: PDFFont, text: string, layout: FieldLayout): { size: number; lines: string[] } | null {
     const collapsed = toPdfWinAnsiText(text).replace(/\s+/g, ' ').trim();
-    if (!collapsed) return;
+    if (!collapsed) return null;
     const contentW = Math.max(4, layout.w - CELL_PAD * 2);
     const contentH = Math.max(4, layout.h - CELL_PAD * 2);
 
@@ -271,7 +272,13 @@ function drawFitted(page: PDFPage, font: PDFFont, text: string, layout: FieldLay
         const maxLines = Math.max(1, Math.floor(contentH / lineHeight));
         lines = wrapLines(collapsed, font, contentW, size).slice(0, maxLines);
     }
+    return { size, lines };
+}
 
+function drawFitted(page: PDFPage, font: PDFFont, text: string, layout: FieldLayout): void {
+    const fitted = fitText(font, text, layout);
+    if (!fitted) return;
+    const { size, lines } = fitted;
     const lineHeight = size + 2;
     const blockH = lines.length * lineHeight;
     // Center the block vertically inside the cell.
@@ -292,18 +299,54 @@ function drawFitted(page: PDFPage, font: PDFFont, text: string, layout: FieldLay
 
 type PaintMode = 'single' | 'wrapped' | 'fit';
 
+/** Smallest size for an empty shrink-to-fit cell left for typing in. */
+const BLANK_FIT_SIZE = 7;
+
+/**
+ * Pages that take editable fields (#33) instead of painted text, and the
+ * field set each belongs to.
+ */
+const editors = new WeakMap<PDFPage, EditableFields>();
+
+function addField(
+    editor: EditableFields,
+    page: PDFPage,
+    font: PDFFont,
+    layout: FieldLayout,
+    value: string,
+    mode: PaintMode,
+    field: { name: string; link: boolean },
+): void {
+    if (mode === 'fit') {
+        // A row cell: one centred line unless the text needs to wrap.
+        const fitted = fitText(font, value, layout);
+        const multiline = (fitted?.lines.length ?? 1) > 1;
+        editor.add(field.name, page, layout, value, { size: fitted?.size ?? BLANK_FIT_SIZE, multiline, link: field.link });
+        return;
+    }
+    editor.add(field.name, page, layout, value, { size: FONT_SIZE, multiline: mode === 'wrapped', link: field.link });
+}
+
 function paintLayouts(
     pages: PDFPage[],
     font: PDFFont,
     layouts: FieldLayout[],
     value: string,
     mode: PaintMode,
+    /** The field to create on editable pages. `link`: one field across all its boxes. */
+    field?: { name: string; link: boolean },
 ): void {
     const trimmed = value.trim();
-    if (!trimmed) return;
     for (const layout of layouts) {
         const page = pages[layout.pageIndex];
         if (!page) continue;
+        const editor = editors.get(page);
+        if (editor && field) {
+            if (trimmed) whiteOutField(page, layout);
+            addField(editor, page, font, layout, value, mode, field);
+            continue;
+        }
+        if (!trimmed) continue;
         whiteOutField(page, layout);
         if (mode === 'wrapped') drawWrapped(page, font, value, layout);
         else if (mode === 'fit') drawFitted(page, font, value, layout);
@@ -322,7 +365,8 @@ function paintNamedField(
 ): void {
     const layouts = layoutsForField(form, fieldName, pageOverride);
     const mode: PaintMode = fit ? 'fit' : (WRAPPED_FIELDS.has(fieldName) ? 'wrapped' : 'single');
-    paintLayouts(pages, font, layouts, value, mode);
+    // A header repeated on every page is one field, so an edit carries across.
+    paintLayouts(pages, font, layouts, value, mode, { name: fieldName, link: true });
 }
 
 function notesFieldName(rowIndex: number): string {
@@ -343,6 +387,8 @@ interface PaintJob {
 function collectPaintJobs(
     form: Ics201Form,
     sources: Pick<Ics201Sources, 'missionName' | 'missionGuid'>,
+    /** Every resource row, empty ones too (boxes to type into). */
+    blankRows = false,
 ): PaintJob[] {
     const jobs: PaintJob[] = [
         { name: 'Incident Name', value: form.incidentName },
@@ -375,7 +421,8 @@ function collectPaintJobs(
     }
 
     for (let i = 0; i < MAX_RESOURCE_ROWS; i++) {
-        const row = form.resources[i];
+        const row = form.resources[i]
+            ?? (blankRows ? { resource: '', identifier: '', dateTimeOrdered: '', eta: '', arrived: false, notes: '' } : undefined);
         if (!row) continue;
         const n = i + 1;
         jobs.push(
@@ -492,9 +539,10 @@ function paintLayoutValue(
     layout: FieldLayout | null,
     value: string,
     mode: PaintMode,
+    field?: { name: string; link: boolean },
 ): void {
     if (!layout) return;
-    paintLayouts(pages, font, [layout], value, mode);
+    paintLayouts(pages, font, [layout], value, mode, field);
 }
 
 function paintContinuationHeaders(
@@ -521,62 +569,19 @@ function paintContinuationHeaders(
             });
         }
 
-        paintLayoutValue(
-            pages,
-            font,
-            layoutForActionsSheet(form, 'Incident Name', outPageIndex),
-            ics201.incidentName,
-            'single',
-        );
-        paintLayoutValue(
-            pages,
-            font,
-            layoutForActionsSheet(form, 'Incident Number', outPageIndex),
-            ics201.incidentNumber,
-            'single',
-        );
-        paintLayoutValue(
-            pages,
-            font,
-            layoutForActionsSheet(form, 'Date', outPageIndex),
-            ics201.date,
-            'single',
-        );
-        paintLayoutValue(
-            pages,
-            font,
-            layoutForActionsSheet(form, 'Time', outPageIndex),
-            ics201.time,
-            'single',
-        );
-        paintLayoutValue(
-            pages,
-            font,
-            layoutForActionsSheet(form, '6 Prepared by Name_2', outPageIndex),
-            ics201.preparedByName,
-            'single',
-        );
-        paintLayoutValue(
-            pages,
-            font,
-            layoutForActionsSheet(form, 'PositionTitle_2', outPageIndex),
-            ics201.positionTitle,
-            'single',
-        );
-        paintLayoutValue(
-            pages,
-            font,
-            layoutForActionsSheet(form, 'Signature_2', outPageIndex),
-            ics201.signature,
-            'single',
-        );
-        paintLayoutValue(
-            pages,
-            font,
-            layoutForActionsSheet(form, 'DateTime_2', outPageIndex),
-            ics201.preparedDateTime,
-            'single',
-        );
+        const headers: [string, string][] = [
+            ['Incident Name', ics201.incidentName],
+            ['Incident Number', ics201.incidentNumber],
+            ['Date', ics201.date],
+            ['Time', ics201.time],
+            ['6 Prepared by Name_2', ics201.preparedByName],
+            ['PositionTitle_2', ics201.positionTitle],
+            ['Signature_2', ics201.signature],
+            ['DateTime_2', ics201.preparedDateTime],
+        ];
+        for (const [name, value] of headers) {
+            paintLayoutValue(pages, font, layoutForActionsSheet(form, name, outPageIndex), value, 'single', { name, link: true });
+        }
     }
 }
 
@@ -586,11 +591,14 @@ function paintActionRows(
     form: BriefingPdfForm,
     actions: Ics201ActionRow[],
     continuationPages: number,
+    /** Every row, empty ones too (boxes to type into). */
+    blankRows = false,
 ): void {
     const sheets = 1 + normalizeActionContinuationPages(continuationPages);
     const maxRows = MAX_ACTION_ROWS * sheets;
     const maxWidth = actionsFieldContentWidth(form);
     const expanded = expandActionRowsForPdf(actions, font, maxWidth, maxRows);
+    while (blankRows && expanded.length < maxRows) expanded.push({ time: '', actions: '' });
 
     for (let i = 0; i < expanded.length; i++) {
         const sheetIndex = Math.floor(i / MAX_ACTION_ROWS);
@@ -602,6 +610,7 @@ function paintActionRows(
             layoutForActionsSheet(form, `TimeRow${rowOnPage}`, outPageIndex),
             expanded[i].time,
             'single',
+            { name: `TimeRow${rowOnPage}`, link: false },
         );
         paintLayoutValue(
             pages,
@@ -609,6 +618,7 @@ function paintActionRows(
             layoutForActionsSheet(form, `ActionsRow${rowOnPage}`, outPageIndex),
             expanded[i].actions,
             'single',
+            { name: `ActionsRow${rowOnPage}`, link: false },
         );
     }
 }
@@ -639,6 +649,12 @@ function paintOrganizationSection(
     const page = areaLayout ? pages[areaLayout.pageIndex] : undefined;
     if (!areaLayout || !page) {
         paintNamedField(pages, font, form, ORG_NOTES_FIELD, ics201.organizationNotes);
+        return;
+    }
+
+    const editor = editors.get(page);
+    if (editor) {
+        paintOrganizationFields(editor, page, font, form, ics201, areaLayout);
         return;
     }
 
@@ -684,6 +700,36 @@ function paintOrganizationSection(
     }
 }
 
+/**
+ * §9 as fields: a box per section column under its chief, and the
+ * organization notes full width below them.
+ */
+function paintOrganizationFields(
+    editor: EditableFields,
+    page: PDFPage,
+    font: PDFFont,
+    form: BriefingPdfForm,
+    ics201: Ics201Form,
+    area: FieldLayout,
+): void {
+    const columns = ORG_SECTION_COLUMNS
+        .map((col) => ({ text: col.units(ics201).trim(), chief: layoutsForField(form, col.chiefField)[0], name: `${col.chiefField} units` }))
+        .filter((col) => col.chief);
+    const notes = ics201.organizationNotes.trim();
+    if (notes || columns.some((c) => c.text)) whiteOutField(page, area);
+
+    // Columns get the lines their text needs, and at least half the box.
+    const needed = Math.max(0, ...columns.map((c) => wrapLines(c.text, font, c.chief.w - CELL_PAD * 2).length)) * LINE_HEIGHT;
+    const colH = columns.length ? Math.min(area.h, Math.max(area.h / 2, needed + CELL_PAD * 2)) : 0;
+    const top = area.y + area.h;
+    for (const col of columns) {
+        editor.add(col.name, page, { x: col.chief.x, y: top - colH, w: col.chief.w, h: colH }, col.text, { size: FONT_SIZE, multiline: true });
+    }
+    if (area.h - colH >= LINE_HEIGHT) {
+        editor.add(ORG_NOTES_FIELD, page, { x: area.x, y: area.y, w: area.w, h: area.h - colH }, notes, { size: FONT_SIZE, multiline: true });
+    }
+}
+
 /** The Map/Sketch text as one run for the caption: "Weather: …" joins its label. */
 export function mapSketchCaption(text: string): string {
     return text.replace(/:\n/g, ': ').split('\n').map((l) => l.trim()).filter(Boolean).join(' · ');
@@ -726,7 +772,8 @@ async function paintMapSketch(
 export async function buildIcs201Pdf(
     form: Ics201Form,
     sources: Pick<Ics201Sources, 'missionName' | 'missionGuid'>,
-    opts: { map?: PrintMapImage } = {},
+    /** `editable`: live form fields instead of painted text (#33). */
+    opts: { map?: PrintMapImage; editable?: boolean } = {},
 ): Promise<Uint8Array> {
     const templateBytes = await loadTemplateBytes();
     const templateDoc = await PDFDocument.load(templateBytes);
@@ -749,7 +796,10 @@ export async function buildIcs201Pdf(
         pages.push(await embedTemplatePage(templateDoc, outDoc, ACTIONS_TEMPLATE_PAGE));
     }
 
-    for (const job of collectPaintJobs(form, sources)) {
+    const editor = opts.editable ? new EditableFields(outDoc, font) : undefined;
+    if (editor) for (const page of pages) editors.set(page, editor);
+
+    for (const job of collectPaintJobs(form, sources, !!editor)) {
         if (opts.map && job.name === MAP_SKETCH_FIELD) continue;
         paintNamedField(pages, font, pdfForm, job.name, job.value, job.page, job.fit);
     }
@@ -758,7 +808,8 @@ export async function buildIcs201Pdf(
     }
     paintOrganizationSection(pages, font, pdfForm, form);
     paintContinuationHeaders(pages, font, pdfForm, form, continuationPages);
-    paintActionRows(pages, font, pdfForm, form.actions, continuationPages);
+    paintActionRows(pages, font, pdfForm, form.actions, continuationPages, !!editor);
+    editor?.finish();
 
     return outDoc.save();
 }
