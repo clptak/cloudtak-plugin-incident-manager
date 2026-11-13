@@ -64,6 +64,12 @@ function formatUploadError(status: number, detail: string): string {
     return `Upload failed (${status})${trimmed ? `: ${trimmed.slice(0, 200)}` : ''}`;
 }
 
+function mimeFor(filename: string): string {
+    const ext = filename.toLowerCase().split('.').pop() ?? '';
+    return ({ pdf: 'application/pdf', json: 'application/json', txt: 'text/plain', csv: 'text/csv', kml: 'application/vnd.google-earth.kml+xml', gpx: 'application/gpx+xml' } as Record<string, string>)[ext]
+        ?? 'application/octet-stream';
+}
+
 /** Upload raw bytes as a mission file (DataSync contents). Returns content hash when present. */
 export async function uploadMissionFile(
     missionGuid: string,
@@ -83,7 +89,10 @@ export async function uploadMissionFile(
     if (token) headers.Authorization = `Bearer ${token}`;
     if (opts?.missionToken) headers.MissionAuthorization = opts.missionToken;
 
-    const body = bytesToArrayBuffer(data);
+    // CloudTAK takes mission uploads as multipart/form-data only (a raw body
+    // is rejected with 400). The browser sets the boundary header itself.
+    const body = new FormData();
+    body.append('file', new Blob([bytesToArrayBuffer(data)], { type: mimeFor(filename) }), filename);
     const res = await fetch(url.toString(), {
         method: 'POST',
         headers,
