@@ -640,6 +640,19 @@
                     Map in item 4 (the map as it is on screen now, north up)
                 </span>
             </label>
+            <label
+                class='form-check mb-2'
+                title='Untick for a locked PDF that prints the same everywhere.'
+            >
+                <input
+                    v-model='editableFields'
+                    type='checkbox'
+                    class='form-check-input'
+                >
+                <span class='form-check-label small'>
+                    Editable fields (correct the PDF in any PDF reader, blank rows included)
+                </span>
+            </label>
             <div class='d-flex flex-wrap gap-2'>
                 <button
                     type='button'
@@ -664,6 +677,7 @@
 
 <script setup lang='ts'>
 import DataSyncDestination from '../../DataSyncDestination.vue';
+import { useStoredFlag } from '../../../composables/useStoredFlag.ts';
 import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { IconChevronDown, IconPlus, IconX } from '@tabler/icons-vue';
 import { TablerBorder, TablerInput, TablerInlineAlert } from '@tak-ps/vue-tabler';
@@ -970,22 +984,11 @@ async function saveToMission(): Promise<void> {
     }
 }
 
-const MAP_KEY = 'incident-manager:ics201-map';
-const includeMap = ref(readIncludeMap());
+const includeMap = useStoredFlag('incident-manager:ics201-map');
+/** Keep the boxes live for edits in a PDF reader (#33). */
+const editableFields = useStoredFlag('incident-manager:ics201-editable');
 /** Appended to the status line when the map couldn't be drawn. */
 let mapNote = '';
-
-function readIncludeMap(): boolean {
-    try {
-        return localStorage.getItem(MAP_KEY) !== '0';
-    } catch {
-        return true;
-    }
-}
-
-watch(includeMap, (on) => {
-    try { localStorage.setItem(MAP_KEY, on ? '1' : '0'); } catch { /* not remembered */ }
-});
 
 /** Item 4's map from the current view, or undefined (the text stays in the box). */
 async function mapSketchImage(): Promise<PrintMapImage | undefined> {
@@ -1016,7 +1019,7 @@ async function generatePdfBytes(): Promise<Uint8Array> {
             missionName: sources.missionName || activeMission.value?.name || '',
             missionGuid: sources.missionGuid || activeMission.value?.guid || '',
         },
-        { map },
+        { map, editable: editableFields.value },
     );
 }
 

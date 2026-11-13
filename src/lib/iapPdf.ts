@@ -2,9 +2,9 @@
  * IAP generator: fills the official ICS AcroForm templates (docs-archive/ → assets)
  * and merges them into one per-operational-period Incident Action Plan PDF.
  *
- * Each form is filled, flattened (values baked into page content so the
- * briefing PDF prints identically everywhere), then copied into the output
- * document in IAP order. Missing field names are ignored rather than throwing:
+ * Each form is filled, then either flattened (values baked into page content
+ * so the PDF prints identically everywhere) or left as live form fields for
+ * on-the-fly edits (#33), and copied into the output document in IAP order. Missing field names are ignored rather than throwing:
  * the official templates get revised, and a renamed field should degrade to a
  * blank box, never a failed export.
  */
@@ -22,6 +22,7 @@ import ics208Url from '../assets/iap/ics208.pdf?url';
 import ics209Url from '../assets/iap/ics209.pdf?url';
 import ics220Url from '../assets/iap/ics220-uas.pdf?url';
 import { describeSave, saveGeneratedFile } from './fileTarget.ts';
+import { adoptFormFields, prefixFieldNames } from './pdfFormFields.ts';
 import { toPdfWinAnsiText } from './pdfWinAnsiText.ts';
 import type { PrintMapImage } from './printMap.ts';
 import { drawPrintMap } from './printMapPdf.ts';
@@ -186,8 +187,15 @@ function setCheck(form: PDFForm, name: string): void {
     }
 }
 
-/** Fill one template and return a flattened single-form document. */
-export async function fillIcsForm(id: IapFormId, filled: FilledForm): Promise<PDFDocument> {
+/**
+ * Fill one template. Flattened by default; `editable` keeps the fields,
+ * renamed with `fieldPrefix` so they stay distinct once merged.
+ */
+export async function fillIcsForm(
+    id: IapFormId,
+    filled: FilledForm,
+    opts: { editable?: boolean; fieldPrefix?: string } = {},
+): Promise<PDFDocument> {
     const doc = await loadTemplate(id);
     const form = doc.getForm();
     const helvetica = await doc.embedFont(StandardFonts.Helvetica);
@@ -200,7 +208,11 @@ export async function fillIcsForm(id: IapFormId, filled: FilledForm): Promise<PD
     } catch {
         // Some templates carry their own appearance streams.
     }
-    form.flatten();
+    if (opts.editable) {
+        if (opts.fieldPrefix) prefixFieldNames(doc, opts.fieldPrefix);
+    } else {
+        form.flatten();
+    }
     return doc;
 }
 
@@ -221,7 +233,10 @@ export interface IapSection {
  * `pages` limits which pages of a template are carried over (ICS templates
  * ship instruction pages after the form itself).
  */
-export async function buildIapPdf(sections: IapSection[]): Promise<Uint8Array> {
+export async function buildIapPdf(
+    sections: IapSection[],
+    opts: { editable?: boolean } = {},
+): Promise<Uint8Array> {
     const out = await PDFDocument.create();
 
     // Pages are numbered sequentially across the assembled IAP (1 of N),
@@ -229,7 +244,7 @@ export async function buildIapPdf(sections: IapSection[]): Promise<Uint8Array> {
     const total = sections.reduce((n, s) => n + (s.filled.pages?.length || 1) + (s.map ? 1 : 0), 0);
     let pageNo = 0;
 
-    for (const section of sections) {
+    for (const [index, section] of sections.entries()) {
         const count = section.filled.pages?.length || 1;
         const pageField = section.filled.pageField ?? section.pageField;
         if (pageField) {
@@ -240,13 +255,18 @@ export async function buildIapPdf(sections: IapSection[]): Promise<Uint8Array> {
         }
         pageNo += count;
 
-        const filledDoc = await fillIcsForm(section.id, section.filled);
+        const filledDoc = await fillIcsForm(section.id, section.filled, {
+            editable: opts.editable,
+            // Section number, not form id: an IAP carries several 204s.
+            fieldPrefix: `s${index + 1}_`,
+        });
         const templatePages = filledDoc.getPageCount();
         const wanted = (section.filled.pages ?? [0])
             .filter((i) => Number.isInteger(i) && i >= 0 && i < templatePages);
         const indices = wanted.length ? wanted : [0];
         const copied = await out.copyPages(filledDoc, indices);
         for (const page of copied) out.addPage(page as unknown as [number, number]);
+        if (opts.editable) adoptFormFields(out, filledDoc, copied);
         if (section.map) {
             pageNo += 1;
             await addMapPage(out, section.map, `${pageNo} of ${total}`);

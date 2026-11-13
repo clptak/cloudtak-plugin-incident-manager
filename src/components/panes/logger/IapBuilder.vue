@@ -55,6 +55,17 @@
                     >
                     <span class='form-check-label small'>204 maps</span>
                 </label>
+                <label
+                    class='form-check mb-0'
+                    title='Leave the boxes as fillable form fields, so the PDF can be corrected in any PDF reader. Untick for a locked PDF that prints the same everywhere.'
+                >
+                    <input
+                        v-model='editableFields'
+                        type='checkbox'
+                        class='form-check-input'
+                    >
+                    <span class='form-check-label small'>Editable fields</span>
+                </label>
                 <div class='ms-auto d-flex gap-2'>
                     <button
                         class='btn btn-outline-secondary btn-sm'
@@ -769,7 +780,7 @@
 </template>
 
 <script setup lang='ts'>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { TablerBorder, TablerInlineAlert, TablerInput } from '@tak-ps/vue-tabler';
 import { useIncident } from '../../../composables/useIncident.ts';
 import type { OpPeriodRegistryEntry } from '../../../domain/entities.ts';
@@ -780,6 +791,7 @@ import {
     type IapContext,
 } from '../../../lib/iapData.ts';
 import { buildIapPdf, saveIapPdf } from '../../../lib/iapPdf.ts';
+import { useStoredFlag } from '../../../composables/useStoredFlag.ts';
 import { buildIapMaps } from '../../../lib/iapMaps.ts';
 import {
     blankAircraftRow,
@@ -811,20 +823,9 @@ const loading = ref(false);
 const busy = ref(false);
 /** Generate-button text while maps are drawn. */
 const progress = ref('');
-const MAPS_KEY = 'incident-manager:iap-204-maps';
-const includeMaps = ref(readIncludeMaps());
-
-function readIncludeMaps(): boolean {
-    try {
-        return localStorage.getItem(MAPS_KEY) !== '0';
-    } catch {
-        return true;
-    }
-}
-
-watch(includeMaps, (on) => {
-    try { localStorage.setItem(MAPS_KEY, on ? '1' : '0'); } catch { /* not remembered */ }
-});
+const includeMaps = useStoredFlag('incident-manager:iap-204-maps');
+/** Keep the forms' fields live for edits in a PDF reader (#33). */
+const editableFields = useStoredFlag('incident-manager:iap-editable');
 const error = ref('');
 const notice = ref('');
 
@@ -973,7 +974,7 @@ async function onGenerate(): Promise<void> {
             }
         }
         progress.value = 'Building PDF…';
-        const bytes = await buildIapPdf(sections);
+        const bytes = await buildIapPdf(sections, { editable: editableFields.value });
         const safe = `${ctx.value.incidentName}-OP${plan.value.opNumber}-IAP`.replace(/[^\w.-]+/g, '_');
         const where = await saveIapPdf(bytes, `${safe}.pdf`, ctx.value.incidentName);
         notice.value = `${where} (${formsLabel.value})${mapNote}`;
