@@ -212,22 +212,32 @@
                             type='date'
                         />
                     </div>
-                    <div class='col-md-3'>
-                        <TablerEnum
-                            v-model='incidentTypeLabel'
-                            label='Incident Type'
-                            :options='incidentTypeOptions'
-                        />
-                    </div>
                     <div
                         v-if='showSubjectProfile'
-                        class='col-md-3'
+                        class='col-md-6'
                     >
                         <TablerEnum
                             v-model='subjectProfileLabel'
                             label='Subject Profile'
                             :options='subjectProfileOptions'
                         />
+                    </div>
+                </div>
+
+                <div class='row g-2 mt-1'>
+                    <div class='col-12'>
+                        <ChoiceToggle
+                            v-model='form.incidentType'
+                            label='Incident Type (required)'
+                            :options='INCIDENT_TYPE_OPTIONS'
+                            wrap
+                        />
+                        <div
+                            v-if='!form.incidentType'
+                            class='form-text text-warning'
+                        >
+                            Pick an incident type to create the mission.
+                        </div>
                     </div>
                 </div>
 
@@ -490,7 +500,8 @@
 
                 <button
                     class='btn btn-success w-100'
-                    :disabled='loading'
+                    :disabled='loading || !form.incidentType'
+                    :title='form.incidentType ? undefined : "Pick an incident type first"'
                     @click='createMission'
                 >
                     {{ loading ? 'Creating…' : 'Create Active Mission' }}
@@ -613,7 +624,19 @@
 
 <script setup lang='ts'>
 import { ref, reactive, computed, watch, onMounted, nextTick } from 'vue';
-import { IconSearch, IconX, IconLayout, IconChevronDown, IconRefresh } from '@tabler/icons-vue';
+import {
+    IconSearch,
+    IconX,
+    IconLayout,
+    IconChevronDown,
+    IconRefresh,
+    IconLifebuoy,
+    IconFlag,
+    IconFingerprint,
+    IconFlame,
+    IconAlertTriangle,
+    IconDots,
+} from '@tabler/icons-vue';
 import {
     TablerBorder,
     TablerInput,
@@ -627,6 +650,7 @@ import { useMapStore } from '../../../../../src/stores/map.ts';
 import OverlayManager from '../../../../../src/base/overlay.ts';
 import GroupSelect from '../../../../../src/components/CloudTAK/util/GroupSelect.vue';
 import OpenExistingMission from './OpenExistingMission.vue';
+import ChoiceToggle, { type ChoiceToggleOption } from '../ChoiceToggle.vue';
 import { buildMissionName, parseCoordinates } from '../../lib/coords.ts';
 import { localDateString } from '../../lib/localTime.ts';
 import { createCaltopoMap, caltopoAvailable } from '../../lib/caltopo.ts';
@@ -659,37 +683,16 @@ function toggleCard(card: CreateOpenCard): void {
     expandedCard.value = expandedCard.value === card ? null : card;
 }
 
-const incidentTypeOptions = [
-    '— Select —',
-    'Search',
-    'Rescue',
-    'Recovery',
-    'Evidence',
-    'Wildland Fire',
-    'Disaster',
-    'Other',
+// #34: buttons, and required - without a type the mission was named "mission".
+const INCIDENT_TYPE_OPTIONS: ChoiceToggleOption[] = [
+    { value: 'search', label: 'Search', tone: 'azure', icon: IconSearch },
+    { value: 'rescue', label: 'Rescue', tone: 'azure', icon: IconLifebuoy },
+    { value: 'recovery', label: 'Recovery', tone: 'azure', icon: IconFlag },
+    { value: 'evidence', label: 'Evidence', tone: 'azure', icon: IconFingerprint },
+    { value: 'wildland-fire', label: 'Wildland Fire', tone: 'azure', icon: IconFlame },
+    { value: 'disaster', label: 'Disaster', tone: 'azure', icon: IconAlertTriangle },
+    { value: 'other', label: 'Other', tone: 'azure', icon: IconDots },
 ];
-
-const incidentTypeByLabel: Record<string, string> = {
-    '— Select —': '',
-    Search: 'search',
-    Rescue: 'rescue',
-    Recovery: 'recovery',
-    Evidence: 'evidence',
-    'Wildland Fire': 'wildland-fire',
-    Disaster: 'disaster',
-    Other: 'other',
-};
-
-const incidentTypeLabel = computed({
-    get(): string {
-        const entry = Object.entries(incidentTypeByLabel).find(([, value]) => value === form.incidentType);
-        return entry?.[0] ?? '— Select —';
-    },
-    set(label: string): void {
-        form.incidentType = incidentTypeByLabel[label] ?? '';
-    },
-});
 
 const subjectProfileOptions = computed(() => subjectProfileEnumOptions(form.subjectProfile));
 
@@ -1098,6 +1101,7 @@ async function createMission(): Promise<void> {
     loading.value = true;
 
     try {
+        if (!form.incidentType) throw new Error('Pick an incident type first.');
         if (eventFromCad.value && !form.mgmtGroups.length) {
             throw new Error('Create Event needs Management Channels - pick them, or turn Create Event off.');
         }

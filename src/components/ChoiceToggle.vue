@@ -8,6 +8,7 @@
         </div>
         <div
             class='choice-toggle'
+            :class='{ "choice-toggle-wrap": wrap }'
             role='radiogroup'
             :aria-label='label'
             @keydown='onKey'
@@ -58,9 +59,12 @@ const props = withDefaults(defineProps<{
     options: ChoiceToggleOption[];
     label?: string;
     disabled?: boolean;
+    /** Let many options flow onto more lines instead of squeezing one row. */
+    wrap?: boolean;
 }>(), {
     label: '',
     disabled: false,
+    wrap: false,
 });
 
 const emit = defineEmits<{ (e: 'update:modelValue', value: string): void }>();
@@ -95,6 +99,12 @@ function onKey(e: KeyboardEvent): void {
     min-width: 0;
     justify-content: center;
     white-space: nowrap;
+}
+
+/* Even columns, so a last odd button keeps the same width as the rest. */
+.choice-toggle-wrap {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
 }
 
 .choice-tone-green { --choice-rgb: var(--tblr-green-rgb, 47, 179, 68); }
