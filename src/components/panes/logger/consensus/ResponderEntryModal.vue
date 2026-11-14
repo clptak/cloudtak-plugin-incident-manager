@@ -197,6 +197,7 @@ import { computed, reactive, ref } from 'vue';
 import { TablerInlineAlert } from '@tak-ps/vue-tabler';
 import {
     OCONNOR_LETTERS,
+    OCONNOR_SCALE,
     methodLabel,
     oconnorValues,
     proportionalValues,
@@ -211,6 +212,8 @@ import '../../../letterScale.css';
 export interface SegmentRef {
     uid: string;
     callsign: string;
+    /** Declared by number, no polygon yet (#29). */
+    undrawn?: boolean;
 }
 
 const props = defineProps<{
@@ -231,13 +234,6 @@ const emit = defineEmits<{
 const letterOptions = OCONNOR_LETTERS;
 
 /** O'Connor anchor letters; B/D/F/H are in-between gradations. */
-const OCONNOR_SCALE: Record<string, string> = {
-    A: 'very likely',
-    C: 'likely',
-    E: 'even chance',
-    G: 'unlikely',
-    I: 'very unlikely',
-};
 
 const isOconnor = computed(() => props.respondent.method === 'oconnor');
 const isMattson = computed(() => props.respondent.method === 'mattson');

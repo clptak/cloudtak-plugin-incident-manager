@@ -467,7 +467,10 @@
                     v-if='!targets.length'
                     class='text-muted small mb-2'
                 >
-                    <template v-if='isSearchIncident'>
+                    <template v-if='isSearchIncident && undrawnSegmentCount'>
+                        No drawn segments yet. {{ UNDRAWN_EXPLAINER }}
+                    </template>
+                    <template v-else-if='isSearchIncident'>
                         No segments registered. Draw and register segments in
                         Search Transition → Segmentation to task search assignments.
                     </template>
@@ -476,6 +479,13 @@
                         working — a structure marker, a division polygon, a road line —
                         then hit Refresh features.
                     </template>
+                </div>
+                <div
+                    v-if='isSearchIncident && targets.length && undrawnSegmentCount'
+                    class='form-text mt-0 mb-2'
+                >
+                    {{ undrawnSegmentCount }} declared segment{{ undrawnSegmentCount === 1 ? ' is' : 's are' }}
+                    not drawn yet and can't be assigned. {{ UNDRAWN_EXPLAINER }}
                 </div>
                 <div>
                     <div class='row g-2 small text-white-50 d-none d-md-flex'>
@@ -1706,6 +1716,7 @@ import { pendingOpAssign, pendingOpDebrief, type PendingOpAssign } from '../../.
 import { createRegistryStore } from '../../../lib/registryPersistence.ts';
 import { attachOpToIncidentEvent, endFieldEvent, startFieldEvent } from '../../../lib/coreEvents.ts';
 import { segmentsFromSchema, type SegmentMap } from '../../../lib/segmentsPersistence.ts';
+import { drawnSegmentUids, UNDRAWN_EXPLAINER } from '../../../lib/declaredSegments.ts';
 import { letterScaleClass, letterScaleLegendClass } from '../../../lib/letterScale.ts';
 import { localDateTimeLabel } from '../../../lib/localTime.ts';
 import '../../letterScale.css';
@@ -1725,7 +1736,8 @@ const loadingTargets = ref(false);
 
 const targets = computed<{ uid: string; label: string; detail?: string }[]>(() => {
     if (isSearchIncident.value) {
-        return segmentUids.value.map((uid) => ({ uid, label: segmentLabel(uid) }));
+        // Declared segments wait for their polygon before they can be tasked (#29).
+        return drawnSegmentUids(segments.value).map((uid) => ({ uid, label: segmentLabel(uid) }));
     }
     return featureTargets.value.map((f) => ({
         uid: f.uid,
@@ -1904,6 +1916,7 @@ function statusBadgeClass(status: string): string {
 }
 const nextOp = computed(() => nextOpNumber(registry.value));
 const segmentUids = computed(() => Object.keys(segments.value));
+const undrawnSegmentCount = computed(() => segmentUids.value.length - drawnSegmentUids(segments.value).length);
 const resources = ref<ResourceAssignment[]>([]);
 /**
  * Resource identifiers assigned (in the Resources screen) to the current OP,

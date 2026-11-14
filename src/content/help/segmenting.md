@@ -103,3 +103,9 @@ When segmenting using a paper map it is best to draw the segments using pencil f
 If GIS software is available, then the initial segments can be drawn by creating polygons on the map. As the search progresses, attributes can then be applied to that polygon to show how well the segment has been searched or the type of resource used to search. Diﬀerent layers can be turned on or oﬀ in the software to show just the segments, just clues, or any other attribute that is of interest. This method is likely to be the way of the future and allows for better data management. Many agencies have a GIS department which may be able to assist in the field. This method requires computer hardware, GIS software, a large format printer (plotter), and an experienced GIS operator.
 
 Having segmented the search area, the next step is to do a consensus.
+
+### Paper first, polygons later
+
+If the group sketches segments on paper, there is no need to wait for the digital drawing before the consensus. In **Segmentation**, use **Declare without drawing** to add the segments by number, or enter the **Number of Segments** when creating the consensus and they are declared for you. **Respondent forms (PDF)** in the consensus prints one form per respondent, laid out for their method.
+
+A declared segment shows **Not drawn**. It can be used in the Initial Consensus (and the WC3 export) only: it can't be assigned, debriefed or split by area until it has a polygon. Once the polygon is drawn with the same number, it is offered as the match on that segment in Segmentation; one click links it. The consensus values stay with the segment.

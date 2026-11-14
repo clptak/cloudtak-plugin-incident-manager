@@ -23,6 +23,15 @@ export const OCONNOR_WEIGHTS: Record<OconnorLetter, number> = {
     A: 9, B: 8, C: 7, D: 6, E: 5, F: 4, G: 3, H: 2, I: 1,
 };
 
+/** Wording for the marked letters; B, D, F and H fall between their neighbours. */
+export const OCONNOR_SCALE: Partial<Record<OconnorLetter, string>> = {
+    A: 'very likely',
+    C: 'likely',
+    E: 'even chance',
+    G: 'unlikely',
+    I: 'very unlikely',
+};
+
 export const MAX_RESPONDENTS = 10;
 
 export interface ConsensusRespondent {
