@@ -23,6 +23,7 @@ import {
     pushPolygonToMission,
 } from './missionFeatures.ts';
 import { loadMissionSchema, saveMissionSchema, type MissionSchema } from './missionSchema.ts';
+import { isAssignmentKind } from '../domain/assignmentKind.ts';
 
 export function opAssignmentsFromSchema(schema: MissionSchema): OpAssignment[] {
     const raw = (schema.incident_response as Record<string, unknown>).op_assignments;
@@ -34,9 +35,12 @@ export function opAssignmentsFromSchema(schema: MissionSchema): OpAssignment[] {
         const segmentUid = typeof rec.segmentUid === 'string' ? rec.segmentUid.trim() : '';
         const label = typeof rec.label === 'string' ? rec.label : '';
         const opNumber = Number(rec.opNumber);
-        if (!segmentUid || !Number.isInteger(opNumber)) continue;
-        const assignment: OpAssignment = { opNumber, segmentUid, label: label || segmentUid };
-        if (typeof rec.id === 'string' && rec.id.trim()) assignment.id = rec.id.trim();
+        const id = typeof rec.id === 'string' ? rec.id.trim() : '';
+        // Work with no map object (#35) has no segment; its id identifies it.
+        if ((!segmentUid && !id) || !Number.isInteger(opNumber)) continue;
+        const assignment: OpAssignment = { opNumber, segmentUid, label: label || segmentUid || 'Assignment' };
+        if (id) assignment.id = id;
+        if (isAssignmentKind(rec.kind)) assignment.kind = rec.kind;
         if (typeof rec.opFeatureUid === 'string' && rec.opFeatureUid.trim()) assignment.opFeatureUid = rec.opFeatureUid;
         if (typeof rec.team === 'string' && rec.team.trim()) assignment.team = rec.team.trim();
         if (typeof rec.notes === 'string' && rec.notes.trim()) assignment.notes = rec.notes.trim();

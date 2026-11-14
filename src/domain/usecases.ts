@@ -5,6 +5,7 @@
  */
 
 import type {
+    AssignmentKind,
     DebriefRecord,
     OpAssignment,
     OpPeriodRegistryEntry,
@@ -222,6 +223,8 @@ export async function publishAssignments(
         segmentUids: string[];
         team?: string;
         notes?: string;
+        /** Left off for search assignments, as before #35. */
+        kind?: AssignmentKind;
     },
 ): Promise<OpAssignment[]> {
     if (op.status === 'closed') throw new Error('publishAssignments: OP is closed');
@@ -255,6 +258,7 @@ export async function publishAssignments(
         // a new one gets an id so it can sit beside others on the segment.
         const id = prior ? prior.id : newAssignmentId(now);
         if (id) assignment.id = id;
+        if (input.kind && input.kind !== 'search') assignment.kind = input.kind;
         existing.push(assignment);
         if (input.team?.trim()) assignment.team = input.team.trim();
         if (input.notes?.trim()) assignment.notes = input.notes.trim();
@@ -262,6 +266,35 @@ export async function publishAssignments(
         published.push(assignment);
     }
     return published;
+}
+
+/**
+ * Add an assignment with no map object (#35), such as an investigator's
+ * interviews. Nothing is published to the OP map; it joins the Assignment
+ * Status List and the IAP (a 204 without a map) and never the search math.
+ */
+export async function addTaskAssignment(
+    deps: { assignments: AssignmentStore; now?: () => Date },
+    op: OpPeriodRegistryEntry,
+    input: { kind: AssignmentKind; label: string; team?: string; notes?: string },
+): Promise<OpAssignment> {
+    if (op.status === 'closed') throw new Error('addTaskAssignment: OP is closed');
+    if (input.kind === 'search') throw new Error('addTaskAssignment: a search assignment needs a segment');
+    const label = input.label.trim();
+    if (!label) throw new Error('addTaskAssignment: describe the work');
+    const now = deps.now?.() ?? new Date();
+    const assignment: OpAssignment = {
+        id: newAssignmentId(now),
+        opNumber: op.opNumber,
+        segmentUid: '',
+        kind: input.kind,
+        label,
+        createdAt: now.toISOString(),
+    };
+    if (input.team?.trim()) assignment.team = input.team.trim();
+    if (input.notes?.trim()) assignment.notes = input.notes.trim();
+    await deps.assignments.upsert(assignment);
+    return assignment;
 }
 
 /** Sign-in-roster check-in: grant a volunteer write access for this OP. */

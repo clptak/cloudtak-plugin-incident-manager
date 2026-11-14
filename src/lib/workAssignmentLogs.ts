@@ -37,7 +37,7 @@ export function buildWorkAssignmentLogKeywords(
         `assignment:${assignment.assignmentNumber}`,
         `phase:${phase}`,
         `team:${assignment.teamResourceAssignmentId}`,
-        `uid:${assignment.assignmentUid}`,
+        ...(assignment.assignmentUid ? [`uid:${assignment.assignmentUid}`] : []),
     ];
 }
 
@@ -55,8 +55,9 @@ export async function sendWorkAssignmentLog(
         dtg,
         content: buildWorkAssignmentLogContent(assignment, phase),
         keywords: buildWorkAssignmentLogKeywords(assignment, phase),
-        entryUid: assignment.assignmentUid,
     };
+    // Ties the log to the map object; work with none (#35) has no entry uid.
+    if (assignment.assignmentUid) body.entryUid = assignment.assignmentUid;
 
     const log = sub.log as unknown as {
         create(body: WorkAssignmentLogBody): Promise<{ id: string }>;

@@ -6,6 +6,7 @@ export interface WorkAssignment {
     /** Resource assignment id from Resources tab (`resource_assignments`). */
     teamResourceAssignmentId: string;
     teamLabel: string;
+    /** Map object (mission CoT uid); empty for work with no map object (#35). */
     assignmentUid: string;
     assignmentCallsign: string;
     instructions: string;
@@ -46,7 +47,7 @@ export function normalizeWorkAssignment(raw: unknown): WorkAssignment | null {
     const assignmentNumber = normalizeAssignmentNumber(r.assignmentNumber);
     const teamResourceAssignmentId = String(r.teamResourceAssignmentId ?? '').trim();
     const assignmentUid = String(r.assignmentUid ?? '').trim();
-    if (!id || assignmentNumber == null || !teamResourceAssignmentId || !assignmentUid) return null;
+    if (!id || assignmentNumber == null || !teamResourceAssignmentId) return null;
 
     return {
         id,
@@ -85,6 +86,19 @@ export function workAssignmentToSchemaRecord(a: WorkAssignment): WorkAssignment 
         startedLogId: a.startedLogId?.trim() || undefined,
         completedLogId: a.completedLogId?.trim() || undefined,
     };
+}
+
+/**
+ * What the work is called: its map object, else its instructions (work with
+ * no map object, such as an interview, #35).
+ */
+export function workAssignmentTitle(a: Pick<WorkAssignment, 'assignmentCallsign' | 'instructions'>): string {
+    return a.assignmentCallsign.trim() || a.instructions.trim();
+}
+
+/** A work assignment needs a map object or, failing that, instructions. */
+export function workAssignmentReady(a: Pick<WorkAssignment, 'assignmentUid' | 'instructions'>): boolean {
+    return Boolean(a.assignmentUid.trim() || a.instructions.trim());
 }
 
 export function mergeWorkAssignmentPatch(

@@ -7,13 +7,13 @@
                 :aria-expanded='open'
                 @click='emit("toggle")'
             >
-                <strong>#{{ work.assignmentNumber }} {{ work.assignmentCallsign || 'map object' }}</strong>
+                <strong>#{{ work.assignmentNumber }} {{ workAssignmentTitle(work) || 'Assignment' }}</strong>
                 <span
                     v-if='showTeam && work.teamLabel'
                     class='text-white-50'
                 >{{ ` · was ${work.teamLabel}` }}</span>
                 <span
-                    v-if='work.instructions'
+                    v-if='work.instructions && work.assignmentCallsign'
                     class='text-white-50'
                 >{{ ` · ${work.instructions}` }}</span>
             </button>
@@ -45,7 +45,7 @@
 /** One Initial Response work assignment on the board: tap to edit (slot), Start / Complete. */
 import { computed } from 'vue';
 import { shortLocalTime } from '../../lib/resourceBoard.ts';
-import type { WorkAssignment } from '../../lib/workAssignments.ts';
+import { workAssignmentTitle, type WorkAssignment } from '../../lib/workAssignments.ts';
 
 const props = defineProps<{
     work: WorkAssignment;

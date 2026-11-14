@@ -86,9 +86,14 @@ const SPECS: Spec[] = [
         path: ['incident_response', 'op_assignments'],
         // Identity is the record's id (several resources per segment per OP);
         // records saved before ids existed keep their (OP, segment) key.
-        id: (r) => (isRecord(r) && Number.isInteger(Number(r.opNumber)) && str(r.segmentUid).trim()
-            ? `${Number(r.opNumber)}-${seg(str(r.segmentUid).trim())}${str(r.id).trim() ? `-${seg(str(r.id).trim())}` : ''}`
-            : null),
+        id: (r) => {
+            if (!isRecord(r) || !Number.isInteger(Number(r.opNumber))) return null;
+            const segment = str(r.segmentUid).trim();
+            const id = str(r.id).trim();
+            if (segment) return `${Number(r.opNumber)}-${seg(segment)}${id ? `-${seg(id)}` : ''}`;
+            // Work with no map object (#35): keyed by its id alone.
+            return id ? `${Number(r.opNumber)}-task-${seg(id)}` : null;
+        },
         // Upsert moves a record to the end; ordering by creation keeps other keys still.
         order: (r) => (isRecord(r) ? `${str(r.createdAt)}|${String(r.opNumber).padStart(6, '0')}` : ''),
     },

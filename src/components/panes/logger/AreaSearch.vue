@@ -450,12 +450,14 @@
                         into {{ currentOp.name }} so field personnel receive it on their
                         channel, and adds it to the Assignment Status List (the basis
                         for this OP's IAP).
+                        Work with no map object, such as interviews, needs only its details:
+                        it gets a 204 with no map{{ isSearchIncident ? ' and stays out of the POA/POD math' : '' }}.
                     </span>
                     <button
-                        v-if='!isSearchIncident'
+                        v-if='!isSearchIncident || assignRows.some((r) => r.kind !== "search")'
                         class='btn btn-link btn-sm p-0 ms-auto text-nowrap'
                         :disabled='loadingTargets'
-                        @click='loadFeatureTargets'
+                        @click='loadFeatureTargets(true)'
                     >
                         {{ loadingTargets ? 'Loading…' : 'Refresh features' }}
                     </button>
@@ -463,11 +465,11 @@
 
                 <div
                     v-if='!targets.length'
-                    class='text-muted small'
+                    class='text-muted small mb-2'
                 >
                     <template v-if='isSearchIncident'>
                         No segments registered. Draw and register segments in
-                        Search Transition → Segmentation first.
+                        Search Transition → Segmentation to task search assignments.
                     </template>
                     <template v-else>
                         Nothing on the map to task yet. Draw or drop what this period is
@@ -475,15 +477,21 @@
                         then hit Refresh features.
                     </template>
                 </div>
-                <template v-else>
+                <div>
                     <div class='row g-2 small text-white-50 d-none d-md-flex'>
-                        <div class='col-md-4'>
+                        <div
+                            v-if='isSearchIncident'
+                            class='col-md-2'
+                        >
+                            Type
+                        </div>
+                        <div :class='isSearchIncident ? "col-md-3" : "col-md-4"'>
                             {{ targetNoun }}
                         </div>
                         <div class='col-md-3'>
                             Team / Resource
                         </div>
-                        <div class='col-md-4'>
+                        <div :class='isSearchIncident ? "col-md-3" : "col-md-4"'>
                             Details
                         </div>
                     </div>
@@ -492,17 +500,43 @@
                         :key='row.key'
                         class='row g-2 align-items-center mb-1'
                     >
-                        <div class='col-md-4'>
+                        <div
+                            v-if='isSearchIncident'
+                            class='col-md-2'
+                        >
+                            <select
+                                :value='row.kind'
+                                class='form-select form-select-sm'
+                                :aria-label='`Type of assignment ${i + 1}`'
+                                title='Only search assignments work a segment and count in the POA/POD math'
+                                @change='setRowKind(row, ($event.target as HTMLSelectElement).value)'
+                            >
+                                <option
+                                    v-for='k in ASSIGNMENT_KINDS'
+                                    :key='k.value'
+                                    :value='k.value'
+                                >
+                                    {{ k.label }}
+                                </option>
+                            </select>
+                        </div>
+                        <div :class='isSearchIncident ? "col-md-3" : "col-md-4"'>
                             <select
                                 v-model='row.segmentUid'
                                 class='form-select form-select-sm'
-                                :aria-label='`${targetNoun} for assignment ${i + 1}`'
+                                :aria-label='`${rowTargetNoun(row)} for assignment ${i + 1}`'
                             >
                                 <option value=''>
-                                    — {{ targetNoun.toLowerCase() }} —
+                                    — {{ rowTargetNoun(row).toLowerCase() }} —
                                 </option>
                                 <option
-                                    v-for='t in targets'
+                                    v-if='row.kind !== "search"'
+                                    :value='NO_MAP'
+                                >
+                                    No map object
+                                </option>
+                                <option
+                                    v-for='t in rowTargets(row)'
                                     :key='t.uid'
                                     :value='t.uid'
                                 >
@@ -536,11 +570,11 @@
                                 :aria-label='`Team or resource for assignment ${i + 1}`'
                             >
                         </div>
-                        <div class='col-md-4'>
+                        <div :class='isSearchIncident ? "col-md-3" : "col-md-4"'>
                             <input
                                 v-model='row.details'
                                 class='form-control form-control-sm'
-                                placeholder='Details (optional)'
+                                :placeholder='row.segmentUid === NO_MAP ? "Describe the work (required)" : "Details (optional)"'
                                 :aria-label='`Details for assignment ${i + 1}`'
                             >
                         </div>
@@ -548,7 +582,7 @@
                             <button
                                 class='btn btn-link btn-sm p-0'
                                 title='Center the map on this'
-                                :disabled='!row.segmentUid'
+                                :disabled='!row.segmentUid || row.segmentUid === NO_MAP'
                                 @click='flyToCandidate(row.segmentUid)'
                             >
                                 locate
@@ -602,7 +636,7 @@
                             {{ busy ? 'Working…' : `Publish ${readyAssignRows.length || ''} to OP${currentOp.opNumber}` }}
                         </button>
                     </div>
-                </template>
+                </div>
             </TablerBorder>
 
             <!-- ── Assignment Status List (#23) ───────────────────────── -->
@@ -627,6 +661,14 @@
                     <div class='small d-flex flex-wrap align-items-center gap-2'>
                         <span>
                             OP{{ row.opNumber }} · {{ row.label }}
+                            <span
+                                v-if='row.assignment && row.assignment.kind && row.assignment.kind !== "search"'
+                                class='badge bg-secondary-lt ms-1'
+                            >{{ assignmentKindLabel(row.assignment.kind) }}</span>
+                            <span
+                                v-if='row.assignment && !hasMapObject(row.assignment)'
+                                class='text-muted fst-italic'
+                            > · no map object</span>
                             <span
                                 v-if='row.team'
                                 class='text-muted'
@@ -1072,7 +1114,7 @@
                                 v-if='!isSearchIncident'
                                 class='btn btn-link btn-sm p-0 ms-auto'
                                 :disabled='loadingTargets'
-                                @click='loadFeatureTargets'
+                                @click='loadFeatureTargets()'
                             >
                                 {{ loadingTargets ? 'Loading…' : 'Refresh' }}
                             </button>
@@ -1566,7 +1608,13 @@ import { server } from '../../../../../../src/std.ts';
 import GroupSelect from '../../../../../../src/components/CloudTAK/util/GroupSelect.vue';
 import { useIncident, type ActiveMission } from '../../../composables/useIncident.ts';
 import { usePluginSettings } from '../../../composables/usePluginSettings.ts';
-import type { DebriefRecord, Ics204aDetails, OpAssignment, OpPeriodRegistryEntry } from '../../../domain/entities.ts';
+import type {
+    AssignmentKind,
+    DebriefRecord,
+    Ics204aDetails,
+    OpAssignment,
+    OpPeriodRegistryEntry,
+} from '../../../domain/entities.ts';
 import ProfileConfig from '../../../../../../src/base/profile.ts';
 import {
     appendIcs204aLine,
@@ -1593,9 +1641,17 @@ import {
     detachTrackLog,
     findSameResourceDebrief,
     planOperationalPeriod,
+    addTaskAssignment,
     publishAssignments,
     recordDebrief,
 } from '../../../domain/usecases.ts';
+import {
+    ASSIGNMENT_KINDS,
+    assignmentKindLabel,
+    hasMapObject,
+    isAssignmentKind,
+    isDebriefable,
+} from '../../../domain/assignmentKind.ts';
 import { debriefsForAssignment, ics204aFromValue } from '../../../domain/debrief.ts';
 import {
     debriefKey,
@@ -1680,9 +1736,10 @@ const targets = computed<{ uid: string; label: string; detail?: string }[]>(() =
 
 const targetNoun = computed(() => (isSearchIncident.value ? 'Segment' : 'Map feature'));
 
-async function loadFeatureTargets(): Promise<void> {
+async function loadFeatureTargets(force = false): Promise<void> {
     const mission = activeMission.value;
-    if (!mission || isSearchIncident.value) return;
+    // A search incident lists map features only for non-search assignments (#35).
+    if (!mission || (isSearchIncident.value && !force)) return;
     loadingTargets.value = true;
     try {
         featureTargets.value = await listAssignableFeatures(mission, currentOp.value ?? undefined);
@@ -1697,14 +1754,47 @@ const registry = ref<OpPeriodRegistryEntry[]>([]);
 const segments = ref<SegmentMap>({});
 const debriefs = ref<DebriefRecord[]>([]);
 const assignments = ref<OpAssignment[]>([]);
-/** One row per assignment: a segment (or map feature), its team, and details. */
-interface AssignRow { key: number; segmentUid: string; team: string; details: string }
+/**
+ * One row per assignment: its type, a segment (or map feature, or NO_MAP for
+ * work with none, #35), its team, and details.
+ */
+interface AssignRow { key: number; kind: AssignmentKind; segmentUid: string; team: string; details: string }
+/** Target value for an assignment with no map object. */
+const NO_MAP = '__no-map__';
 let assignRowSeq = 0;
 function blankAssignRow(): AssignRow {
-    return { key: ++assignRowSeq, segmentUid: '', team: '', details: '' };
+    // Non-search incidents keep untyped rows: none of their work is search math.
+    return { key: ++assignRowSeq, kind: isSearchIncident.value ? 'search' : 'other', segmentUid: '', team: '', details: '' };
 }
 const assignRows = ref<AssignRow[]>([blankAssignRow()]);
-const readyAssignRows = computed(() => assignRows.value.filter((r) => r.segmentUid));
+const readyAssignRows = computed(() => assignRows.value.filter((r) =>
+    r.segmentUid && (r.segmentUid !== NO_MAP || r.details.trim())));
+
+/** Search rows pick a segment; the others a map feature that is not a segment, or none. */
+function rowTargets(row: AssignRow): { uid: string; label: string; detail?: string }[] {
+    if (!isSearchIncident.value || row.kind === 'search') return targets.value;
+    const registered = new Set(segmentUids.value);
+    return featureTargets.value
+        .filter((f) => !registered.has(f.uid))
+        .map((f) => ({ uid: f.uid, label: f.callsign, detail: `${f.kind} · ${f.source}` }));
+}
+function rowTargetNoun(row: AssignRow): string {
+    return isSearchIncident.value && row.kind !== 'search' ? 'Map feature' : targetNoun.value;
+}
+// The incident type can arrive after the first row was made; untouched rows follow it.
+watch(isSearchIncident, (search) => {
+    for (const row of assignRows.value) {
+        if (!row.segmentUid && !row.details.trim()) row.kind = search ? 'search' : 'other';
+    }
+});
+function setRowKind(row: AssignRow, value: string): void {
+    if (!isAssignmentKind(value) || value === row.kind) return;
+    const wasSearch = row.kind === 'search';
+    row.kind = value;
+    // A segment belongs to search work only; a feature or none to the rest.
+    if (wasSearch || value === 'search') row.segmentUid = '';
+    if (value !== 'search' && !featureTargets.value.length && !loadingTargets.value) void loadFeatureTargets(true);
+}
 /**
  * Several resources may work one segment in an OP (a ground team and a
  * helicopter), each its own assignment; the same segment and resource twice
@@ -1712,7 +1802,7 @@ const readyAssignRows = computed(() => assignRows.value.filter((r) => r.segmentU
  */
 const sameTeam = (a: string | undefined, b: string | undefined) => (a ?? '').trim() === (b ?? '').trim();
 function duplicateRow(row: AssignRow): boolean {
-    return !!row.segmentUid && assignRows.value.some(
+    return !!row.segmentUid && row.segmentUid !== NO_MAP && assignRows.value.some(
         (r) => r.key !== row.key && r.segmentUid === row.segmentUid && sameTeam(r.team, row.team),
     );
 }
@@ -1720,10 +1810,10 @@ function opAssignmentsOn(uid: string) {
     return assignments.value.filter((a) => a.opNumber === currentOp.value?.opNumber && a.segmentUid === uid);
 }
 function publishedSameResource(row: AssignRow): boolean {
-    return !!row.segmentUid && opAssignmentsOn(row.segmentUid).some((a) => sameTeam(a.team, row.team));
+    return !!row.segmentUid && row.segmentUid !== NO_MAP && opAssignmentsOn(row.segmentUid).some((a) => sameTeam(a.team, row.team));
 }
 function otherResourcesOn(row: AssignRow): string[] {
-    if (!row.segmentUid) return [];
+    if (!row.segmentUid || row.segmentUid === NO_MAP) return [];
     return opAssignmentsOn(row.segmentUid)
         .filter((a) => !sameTeam(a.team, row.team))
         .map((a) => a.team?.trim() || 'unassigned');
@@ -2112,7 +2202,9 @@ const statusRows = computed<StatusRow[]>(() => {
 
 /** A row can be debriefed when it is an assignment in an OP that still exists. */
 function canDebrief(row: StatusRow): boolean {
-    return Boolean(row.assignment) && registry.value.some((op) => op.opNumber === row.opNumber);
+    // Work with no map object has no segment or feature to record against (#35).
+    return Boolean(row.assignment) && isDebriefable(row.assignment!)
+        && registry.value.some((op) => op.opNumber === row.opNumber);
 }
 
 /** "Debriefed · POD 30%", plus how much was completed when it was partial. */
@@ -2565,11 +2657,22 @@ async function onPublishAssignments(): Promise<void> {
         };
         // Each row has its own team and details, so publish row by row.
         for (const row of readyAssignRows.value) {
-            await publishAssignments(deps, op, {
-                segmentUids: [row.segmentUid],
-                team: row.team,
-                notes: row.details,
-            });
+            if (row.segmentUid === NO_MAP) {
+                // Nothing to put on the map: the details name the work (#35).
+                await addTaskAssignment(deps, op, {
+                    kind: row.kind === 'search' ? 'other' : row.kind,
+                    label: row.details,
+                    team: row.team,
+                });
+            } else {
+                await publishAssignments(deps, op, {
+                    segmentUids: [row.segmentUid],
+                    team: row.team,
+                    notes: row.details,
+                    // Non-search incidents stay untyped, as before #35.
+                    ...(isSearchIncident.value ? { kind: row.kind } : {}),
+                });
+            }
             published++;
             assignRows.value = assignRows.value.filter((r) => r.key !== row.key);
         }
