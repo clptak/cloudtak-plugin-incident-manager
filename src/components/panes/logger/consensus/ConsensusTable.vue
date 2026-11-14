@@ -83,6 +83,11 @@
                         >
                             <th class='text-success'>
                                 Seg. {{ seg.callsign }}
+                                <span
+                                    v-if='seg.undrawn'
+                                    class='badge bg-yellow-lt ms-1'
+                                    :title='UNDRAWN_EXPLAINER'
+                                >Not drawn</span>
                             </th>
                             <td
                                 v-for='(resp, idx) in respondents'
@@ -137,12 +142,32 @@
                 </button>
                 <button
                     type='button'
+                    class='btn btn-outline-primary ms-auto'
+                    :disabled='printing || !respondents.length'
+                    title='One form per respondent, laid out for their method, to fill in on paper or on screen'
+                    @click='onPrintForms'
+                >
+                    {{ printing ? 'Building…' : 'Respondent forms (PDF)' }}
+                </button>
+                <button
+                    type='button'
                     class='btn btn-outline-secondary'
                     title='Help is not available yet'
                 >
                     Help
                 </button>
             </div>
+            <p class='form-text mb-0 mt-2'>
+                Working on paper? Set each respondent's name and method (click the column header),
+                print the forms, and key the answers in here afterwards.
+            </p>
+            <TablerInlineAlert
+                v-if='printError'
+                class='mt-2'
+                severity='danger'
+                title='Error'
+                :description='printError'
+            />
         </div>
     </TablerBorder>
 
@@ -178,10 +203,14 @@ import {
     type ConsensusRespondent,
     type OconnorLetter,
 } from '../../../../lib/consensus.ts';
+import { buildConsensusFormsPdf, consensusFormsFilename } from '../../../../lib/consensusFormPdf.ts';
+import { UNDRAWN_EXPLAINER } from '../../../../lib/declaredSegments.ts';
+import { downloadPdfBytes } from '../../../../lib/missionUpload.ts';
 
 const props = defineProps<{
     respondents: ConsensusRespondent[];
     segments: SegmentRef[];
+    incidentName: string;
     saving: boolean;
     status: string;
     statusError: boolean;
@@ -193,6 +222,26 @@ const emit = defineEmits<{
     back: [];
     cancel: [];
 }>();
+
+const printing = ref(false);
+const printError = ref('');
+
+async function onPrintForms(): Promise<void> {
+    printing.value = true;
+    printError.value = '';
+    try {
+        const bytes = await buildConsensusFormsPdf({
+            incidentName: props.incidentName,
+            respondents: props.respondents.map((r) => ({ name: r.name, method: r.method })),
+            segments: props.segments,
+        });
+        downloadPdfBytes(bytes, consensusFormsFilename(props.incidentName));
+    } catch (err) {
+        printError.value = `Could not build the forms: ${err instanceof Error ? err.message : String(err)}`;
+    } finally {
+        printing.value = false;
+    }
+}
 
 const methodIndex = ref<number | null>(null);
 const entryIndex = ref<number | null>(null);

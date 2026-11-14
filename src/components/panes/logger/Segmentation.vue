@@ -80,6 +80,47 @@
             </TablerBorder>
         </div>
 
+        <div class='col-lg-4'>
+            <TablerBorder
+                class='cloudtak-accent text-white mb-3'
+                :fill-height='false'
+                :shadow='false'
+                gap='sm'
+            >
+                <template #label>
+                    <p class='text-uppercase text-white-50 small mb-0'>
+                        Declare without drawing
+                    </p>
+                </template>
+                <p class='form-text mt-0'>
+                    Sketched the segments on paper? Declare them by number now and run the
+                    Initial Consensus; draw and link the polygons afterwards.
+                </p>
+                <label class='form-label'>Number of segments</label>
+                <div class='d-flex gap-2 align-items-center'>
+                    <input
+                        v-model.number='declareCount'
+                        type='number'
+                        min='1'
+                        max='99'
+                        class='form-control form-control-sm'
+                        style='max-width: 6rem'
+                    >
+                    <button
+                        type='button'
+                        class='btn btn-outline-primary btn-sm'
+                        :disabled='saving || !declareNames.length'
+                        @click='onDeclareSegments'
+                    >
+                        Declare {{ declareNames.length ? declareNames.join(', ') : '' }}
+                    </button>
+                </div>
+                <p class='form-text mb-0'>
+                    {{ UNDRAWN_EXPLAINER }}
+                </p>
+            </TablerBorder>
+        </div>
+
         <div class='col-12'>
             <TablerBorder
                 class='cloudtak-accent text-white'
@@ -110,16 +151,37 @@
                     v-else-if='!segmentRows.length'
                     class='text-muted small'
                 >
-                    No segments registered yet. Select polygons above to add them.
+                    No segments registered yet. Select polygons above, or declare them by number.
+                </div>
+                <TablerInlineAlert
+                    v-if='!loadingSegments && declaredRows.length'
+                    class='mb-2'
+                    severity='warning'
+                    :title='`${declaredRows.length} segment${declaredRows.length === 1 ? " is" : "s are"} not drawn yet`'
+                    :description='UNDRAWN_EXPLAINER'
+                />
+                <div
+                    v-if='!loadingSegments && suggestedCount > 1'
+                    class='d-flex align-items-center gap-2 mb-2'
+                >
+                    <span class='small'>{{ suggestedCount }} drawn polygons match declared segments by number.</span>
+                    <button
+                        type='button'
+                        class='btn btn-primary btn-sm'
+                        :disabled='saving'
+                        @click='onLinkAllSuggested'
+                    >
+                        Link all {{ suggestedCount }}
+                    </button>
                 </div>
                 <table
-                    v-else
+                    v-if='!loadingSegments && segmentRows.length'
                     class='table table-sm table-vcenter mb-0'
                 >
                     <thead>
                         <tr>
                             <th>Segment</th>
-                            <th>Area (mi²)</th>
+                            <th>{{ declaredRows.length ? 'Area (mi²) / polygon' : 'Area (mi²)' }}</th>
                             <th class='text-end' />
                         </tr>
                     </thead>
@@ -129,15 +191,61 @@
                             :key='row.uid'
                         >
                             <td>
+                                <span
+                                    v-if='row.undrawn'
+                                    class='d-inline-flex align-items-center gap-2'
+                                >
+                                    <strong>{{ row.callsign }}</strong>
+                                    <span
+                                        class='badge bg-yellow-lt'
+                                        :title='UNDRAWN_EXPLAINER'
+                                    >Not drawn</span>
+                                </span>
                                 <FeatureCallsignCell
+                                    v-else
                                     :uid='row.uid'
                                     :callsign='row.callsign'
                                     @fly='onFlyTo(row.uid)'
                                 />
                             </td>
-                            <td>{{ formatSqMi(areaForUid(row.uid)) }}</td>
+                            <td>
+                                <div
+                                    v-if='row.undrawn'
+                                    class='d-flex flex-wrap align-items-center gap-2'
+                                >
+                                    <select
+                                        v-model='linkChoice[row.uid]'
+                                        class='form-select form-select-sm'
+                                        style='max-width: 14rem'
+                                        :aria-label='`Polygon for segment ${row.callsign}`'
+                                    >
+                                        <option value=''>
+                                            {{ linkCandidates.length ? 'Pick the drawn polygon…' : 'No unregistered polygons yet' }}
+                                        </option>
+                                        <option
+                                            v-for='p in linkCandidates'
+                                            :key='p.uid'
+                                            :value='p.uid'
+                                        >
+                                            {{ p.callsign }}{{ suggestions[row.uid] === p.uid ? ' (matches)' : '' }}
+                                        </option>
+                                    </select>
+                                    <button
+                                        type='button'
+                                        class='btn btn-primary btn-sm'
+                                        :disabled='saving || !linkChoice[row.uid]'
+                                        @click='onLinkPolygon(row.uid, linkChoice[row.uid])'
+                                    >
+                                        Link
+                                    </button>
+                                </div>
+                                <template v-else>
+                                    {{ formatSqMi(areaForUid(row.uid)) }}
+                                </template>
+                            </td>
                             <td class='text-end'>
                                 <button
+                                    v-if='!row.undrawn'
                                     type='button'
                                     class='btn btn-sm btn-link p-0 me-2'
                                     :disabled='saving'
@@ -267,6 +375,15 @@ import { fractionsFromAreas } from '../../../domain/rollup.ts';
 import { splitRegisteredSegment } from '../../../lib/segmentSplit.ts';
 import { ringCentroid, ringFromGeometry } from '../../../lib/polygonRing.ts';
 import { loadRowSegmentsFromMission } from '../../../lib/rowSegmentsPersistence.ts';
+import {
+    declareSegments,
+    isUndrawn,
+    markDrawn,
+    matchPolygonsToDeclared,
+    nextSegmentNames,
+    sameSegmentName,
+    UNDRAWN_EXPLAINER,
+} from '../../../lib/declaredSegments.ts';
 
 const SEGMENTS_FOLDER = 'Segments';
 
@@ -282,6 +399,8 @@ interface SegmentRow {
     uid: string;
     callsign: string;
     created: string;
+    /** Declared by number, no polygon yet (#29). */
+    undrawn: boolean;
 }
 
 /** ICS segment labels are numeric only (e.g. "1", "12"); letters are for Divisions. */
@@ -325,13 +444,52 @@ const segmentRows = computed<SegmentRow[]>(() =>
             uid,
             callsign: rec.callsign || uid,
             created: rec.created || '',
+            undrawn: isUndrawn(rec),
         }))
         .sort((a, b) => a.callsign.localeCompare(b.callsign) || a.uid.localeCompare(b.uid)),
 );
 
-const availablePolygons = computed(() =>
+/** Polygons not registered as a segment or R.O.W. segment. */
+const unregisteredPolygons = computed(() =>
     missionPolygons.value.filter((p) => !segments.value[p.uid] && !rowSegments.value[p.uid]),
 );
+
+// ── Declared segments (#29) ─────────────────────────────────────────────
+const declaredRows = computed(() => segmentRows.value.filter((r) => r.undrawn));
+
+/**
+ * Registering a polygon numbered like a declared segment would make two
+ * segments with one number; those polygons are linked instead.
+ */
+const availablePolygons = computed(() => unregisteredPolygons.value.filter(
+    (p) => !declaredRows.value.some((d) => sameSegmentName(d.callsign, p.callsign)),
+));
+
+const linkCandidates = unregisteredPolygons;
+
+const suggestions = computed(() => matchPolygonsToDeclared(declaredRows.value, linkCandidates.value));
+const suggestedCount = computed(() => Object.keys(suggestions.value).length);
+
+/** Polygon chosen per declared segment; starts at the name match. */
+const linkChoice = ref<Record<string, string>>({});
+watch(suggestions, (next) => {
+    const choice: Record<string, string> = {};
+    for (const row of declaredRows.value) {
+        const kept = linkChoice.value[row.uid];
+        choice[row.uid] = kept && linkCandidates.value.some((p) => p.uid === kept) ? kept : (next[row.uid] ?? '');
+    }
+    linkChoice.value = choice;
+}, { immediate: true });
+
+const declareCount = ref(3);
+const declareNames = computed(() => {
+    const n = Number(declareCount.value);
+    if (!Number.isInteger(n) || n < 1 || n > 99) return [];
+    return nextSegmentNames([
+        ...Object.values(segments.value).map((s) => s.callsign),
+        ...Object.values(rowSegments.value).map((s) => s.callsign),
+    ], n);
+});
 
 async function loadSub(): Promise<Awaited<ReturnType<typeof Subscription.load>>> {
     return Subscription.load(activeMission.value!.guid, {
@@ -501,6 +659,105 @@ async function onAddSegments(): Promise<void> {
     } finally {
         saving.value = false;
     }
+}
+
+async function onDeclareSegments(): Promise<void> {
+    if (!requireActiveMission() || !activeMission.value || !declareNames.value.length) return;
+    saving.value = true;
+    status.value = '';
+    statusError.value = false;
+    try {
+        const names = declareNames.value;
+        const { segments: next } = declareSegments(segments.value, names);
+        contentHash.value = await saveSegmentsToMission(activeMission.value, next, contentHash.value);
+        segments.value = next;
+        status.value = `Declared segment${names.length === 1 ? '' : 's'} ${names.join(', ')}. `
+            + 'Run the Initial Consensus now; link the polygons here once they are drawn.';
+    } catch (err) {
+        statusError.value = true;
+        status.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        saving.value = false;
+    }
+}
+
+/**
+ * Give a declared segment its polygon: the polygon is pushed to MGMT under
+ * the declared segment's own uid and the original removed, so everything
+ * that already refers to the segment (consensus, POA locks) stays put.
+ */
+async function linkOne(declUid: string, polyUid: string, next: SegmentMap): Promise<void> {
+    const mission = activeMission.value!;
+    const rec = next[declUid];
+    const poly = missionPolygons.value.find((p) => p.uid === polyUid);
+    if (!rec || !poly?.geometry) throw new Error('That polygon is no longer on the map. Refresh map objects.');
+    const ring = ringFromGeometry(poly.geometry);
+    if (!ring) throw new Error(`Polygon ${poly.callsign} has no usable outline.`);
+    const planning = schemaMission(mission);
+    await pushPolygonToMission({
+        id: declUid,
+        missionGuid: planning.guid,
+        missionToken: planning.missionToken,
+        callsign: rec.callsign,
+        ring,
+        center: ringCentroid(ring),
+    });
+    try {
+        await deletePolygonFromMission(poly.onCommonMap
+            ? { missionGuid: mission.guid, uid: poly.uid, missiontoken: missionAuthToken(mission) || undefined }
+            : { missionGuid: planning.guid, uid: poly.uid, missiontoken: planning.missionToken || undefined });
+    } catch { /* the linked copy exists; a stale original is cosmetic */ }
+    next[declUid] = markDrawn(rec);
+}
+
+async function linkPolygons(pairs: [string, string][]): Promise<void> {
+    if (!requireActiveMission() || !activeMission.value || !pairs.length) return;
+    saving.value = true;
+    status.value = '';
+    statusError.value = false;
+    const mission = activeMission.value;
+    const next: SegmentMap = { ...segments.value };
+    const linked: string[] = [];
+    try {
+        for (const [declUid, polyUid] of pairs) {
+            await linkOne(declUid, polyUid, next);
+            linked.push(declUid);
+        }
+    } catch (err) {
+        statusError.value = true;
+        status.value = err instanceof Error ? err.message : String(err);
+    }
+    try {
+        if (linked.length) {
+            contentHash.value = await saveSegmentsToMission(mission, next, contentHash.value);
+            segments.value = next;
+            try {
+                const sub = mission.mgmt ? await loadSchemaSubscription(mission) : await loadSub();
+                const folder = await ensureMissionFolder(sub, SEGMENTS_FOLDER);
+                await sub.layer.attachFeatures(folder.uid, linked);
+            } catch (attachErr) {
+                console.warn('Failed to file linked segments into Segments folder', attachErr);
+            }
+            if (!statusError.value) {
+                status.value = `Linked segment${linked.length === 1 ? '' : 's'} `
+                    + `${linked.map((uid) => next[uid].callsign).join(', ')} to the drawn polygon${linked.length === 1 ? '' : 's'}.`;
+            }
+        }
+        await loadFeatures();
+    } catch (err) {
+        statusError.value = true;
+        status.value = err instanceof Error ? err.message : String(err);
+    } finally {
+        saving.value = false;
+    }
+}
+
+function onLinkPolygon(declUid: string, polyUid: string | undefined): void {
+    if (polyUid) void linkPolygons([[declUid, polyUid]]);
+}
+
+function onLinkAllSuggested(): void {
+    void linkPolygons(Object.entries(suggestions.value));
 }
 
 // ── ISM segment split ───────────────────────────────────────────────────

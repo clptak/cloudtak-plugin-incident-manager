@@ -52,12 +52,29 @@
                         />
                     </div>
                     <div class='mb-3'>
-                        <TablerInput
-                            :model-value='segmentCount'
-                            label='Number of Segments, (excluding R.O.W.)'
-                            :disabled='true'
-                            title='Count of segments registered in Segmentation'
-                        />
+                        <label class='form-label'>Number of Segments, (excluding R.O.W.)</label>
+                        <input
+                            v-model.number='totalSegments'
+                            type='number'
+                            class='form-control'
+                            :min='Math.max(segmentCount, 1)'
+                            max='99'
+                            :title='`${segmentCount} registered in Segmentation`'
+                        >
+                        <div class='form-hint'>
+                            <template v-if='declareCount > 0'>
+                                {{ declareCount }} new segment{{ declareCount === 1 ? '' : 's' }} will be declared
+                                (numbered, not drawn). They can be used in this consensus only until their
+                                polygons are drawn and linked in Segmentation.
+                            </template>
+                            <template v-else-if='segmentCount'>
+                                {{ segmentCount }} registered in Segmentation. Raise the number to declare
+                                more segments that are not drawn yet.
+                            </template>
+                            <template v-else>
+                                No segments drawn yet: enter how many the group sketched to declare them now.
+                            </template>
+                        </div>
                     </div>
                     <div class='mb-2'>
                         <TablerEnum
@@ -119,6 +136,8 @@ export interface SetupResult {
     filename: string;
     useMyDocuments: boolean;
     respondentCount: number;
+    /** Segments to declare (not drawn) on top of the registered ones (#29). */
+    declareCount: number;
 }
 
 const props = defineProps<{
@@ -145,6 +164,12 @@ const respondentCount = ref(
 );
 const error = ref('');
 
+const totalSegments = ref(props.segmentCount || 3);
+const declareCount = computed(() => {
+    const n = Number(totalSegments.value);
+    return Number.isInteger(n) ? Math.max(0, n - props.segmentCount) : 0;
+});
+
 const respondentCountOptions = Array.from({ length: maxRespondents }, (_, i) => String(i + 1));
 const respondentCountLabel = computed({
     get: () => String(respondentCount.value),
@@ -161,12 +186,20 @@ function onAccept(): void {
         error.value = 'Incident Name is required.';
         return;
     }
+    const total = Number(totalSegments.value);
+    if (!Number.isInteger(total) || total < Math.max(props.segmentCount, 1) || total > 99) {
+        error.value = props.segmentCount
+            ? `Number of Segments must be a whole number from ${props.segmentCount} to 99. Remove segments in Segmentation.`
+            : 'Number of Segments must be a whole number from 1 to 99.';
+        return;
+    }
     error.value = '';
     emit('accept', {
         incidentName: incidentName.value.trim(),
         filename: filename.value.trim(),
         useMyDocuments: useMyDocuments.value,
         respondentCount: respondentCount.value,
+        declareCount: declareCount.value,
     });
 }
 </script>

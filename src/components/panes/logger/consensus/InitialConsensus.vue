@@ -4,6 +4,7 @@
             v-if='view === "table" && consensus'
             :respondents='consensus.respondents'
             :segments='segments'
+            :incident-name='consensus.incident_name || incidentName'
             :saving='saving'
             :status='status'
             :status-error='statusError'
@@ -116,7 +117,15 @@
                                     :key='seg.uid'
                                 >
                                     <td>
+                                        <span v-if='seg.undrawn'>
+                                            Seg. {{ seg.callsign }}
+                                            <span
+                                                class='badge bg-yellow-lt ms-1'
+                                                :title='UNDRAWN_EXPLAINER'
+                                            >Not drawn</span>
+                                        </span>
                                         <button
+                                            v-else
                                             type='button'
                                             class='btn btn-link p-0 border-0 align-baseline text-start'
                                             title='Center the map on this segment'
@@ -150,7 +159,15 @@
                     v-else
                     class='text-muted mb-0'
                 >
-                    No consensus yet. Click "Create Consensus" to begin.
+                    No consensus yet. Click "Create Consensus" to begin. No segments drawn yet?
+                    Enter how many the group sketched and they are declared for you.
+                </p>
+                <p
+                    v-if='!loading && undrawnCount'
+                    class='form-text mb-0 mt-2'
+                >
+                    {{ undrawnCount }} segment{{ undrawnCount === 1 ? ' is' : 's are' }} not drawn yet.
+                    {{ UNDRAWN_EXPLAINER }}
                 </p>
                 <TablerInlineAlert
                     v-if='status && view !== "table"'
@@ -200,6 +217,8 @@ import {
     type InitialConsensusState,
 } from '../../../../lib/consensus.ts';
 import { flyToFeature } from '../../../../lib/flyToFeature.ts';
+import { declareSegments, isUndrawn, nextSegmentNames, UNDRAWN_EXPLAINER } from '../../../../lib/declaredSegments.ts';
+import { saveSegmentsToMission, type SegmentMap } from '../../../../lib/segmentsPersistence.ts';
 import { downloadWc3Zip } from '../../../../lib/wc3Export.ts';
 
 /** ICS segment labels are numeric; sort them numerically for display. */
@@ -220,6 +239,8 @@ const statusError = ref(false);
 const consensus = ref<InitialConsensusState | null>(null);
 const incidentName = ref('');
 const segments = ref<SegmentRef[]>([]);
+const segmentMap = ref<SegmentMap>({});
+const undrawnCount = computed(() => segments.value.filter((s) => s.undrawn).length);
 const contentHash = ref<string | undefined>();
 
 const view = ref<'card' | 'table'>('card');
@@ -284,6 +305,13 @@ async function onFlyTo(uid: string): Promise<void> {
     }
 }
 
+function setSegments(map: SegmentMap): void {
+    segmentMap.value = map;
+    segments.value = Object.entries(map)
+        .map(([uid, rec]) => ({ uid, callsign: rec.callsign || uid, undrawn: isUndrawn(rec) }))
+        .sort((a, b) => compareCallsign(a.callsign, b.callsign));
+}
+
 async function loadAll(): Promise<void> {
     if (!activeMission.value) {
         consensus.value = null;
@@ -297,9 +325,7 @@ async function loadAll(): Promise<void> {
         const loaded = await loadCasieFromMission(activeMission.value);
         incidentName.value = loaded.incidentName;
         contentHash.value = loaded.contentHash;
-        segments.value = Object.entries(loaded.segments)
-            .map(([uid, rec]) => ({ uid, callsign: rec.callsign || uid }))
-            .sort((a, b) => compareCallsign(a.callsign, b.callsign));
+        setSegments(loaded.segments);
 
         if (loaded.consensus) {
             for (const resp of loaded.consensus.respondents) {
@@ -319,11 +345,6 @@ async function loadAll(): Promise<void> {
 
 function openSetup(): void {
     if (!requireActiveMission()) return;
-    if (!segments.value.length) {
-        statusError.value = true;
-        status.value = 'Add segments in Segmentation before creating a consensus.';
-        return;
-    }
     setupIncidentName.value = consensus.value?.incident_name || incidentName.value;
     setupFilename.value = consensus.value?.filename || incidentName.value;
     setupUseMyDocuments.value = consensus.value?.use_my_documents ?? false;
@@ -354,7 +375,28 @@ async function persist(next: InitialConsensusState, incidentNameOverride?: strin
     }
 }
 
+/** Declare the segments the setup asked for (#29) before the consensus uses them. */
+async function declareFromSetup(count: number): Promise<void> {
+    if (count <= 0 || !activeMission.value) return;
+    const names = nextSegmentNames(Object.values(segmentMap.value).map((s) => s.callsign), count);
+    const { segments: next } = declareSegments(segmentMap.value, names);
+    saving.value = true;
+    try {
+        contentHash.value = await saveSegmentsToMission(activeMission.value, next, contentHash.value);
+        setSegments(next);
+    } finally {
+        saving.value = false;
+    }
+}
+
 async function onSetupAccept(result: SetupResult): Promise<void> {
+    try {
+        await declareFromSetup(result.declareCount);
+    } catch (err) {
+        statusError.value = true;
+        status.value = `Could not declare segments: ${err instanceof Error ? err.message : String(err)}`;
+        return;
+    }
     const existing = consensus.value;
     let next: InitialConsensusState;
     if (existing) {
