@@ -14,6 +14,7 @@ import { loadSchemaSubscription, schemaMissionToken } from './incidentSubscripti
 import { loadMissionSchema, saveMissionSchema, type MissionSchema } from './missionSchema.ts';
 import type { IapInputs } from './iapData.ts';
 import { priorPlanFor } from '../domain/iap.ts';
+import { countsInSearchMath, workAssignmentText } from '../domain/assignmentKind.ts';
 
 
 
@@ -425,10 +426,10 @@ export function prefillIapPlan(input: IapInputs, previous?: IapPlan | null): Iap
                 segmentUid: a.segmentUid,
                 label: a.label,
                 supervisor: a.team ?? prior?.supervisor ?? '',
-                workAssignment: prior?.workAssignment
-                    || [`Search segment ${a.label}.`, a.notes ?? ''].filter(Boolean).join(' '),
+                workAssignment: prior?.workAssignment || workAssignmentText(a),
+                // POD and coverage are search-only (#35).
                 specialInstructions: prior?.specialInstructions
-                    ?? 'Report POD and coverage at debrief.',
+                    ?? (countsInSearchMath(a) ? 'Report POD and coverage at debrief.' : ''),
                 resources: resources.length ? resources : (prior?.resources ?? []),
             };
         }),

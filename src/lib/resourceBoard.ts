@@ -7,6 +7,7 @@
 
 import type { DebriefRecord, OpAssignment } from '../domain/entities.ts';
 import { debriefsForAssignment } from '../domain/debrief.ts';
+import { isDebriefable } from '../domain/assignmentKind.ts';
 import {
     isActiveResource,
     type ResourceAssignment,
@@ -122,7 +123,8 @@ export function boardSummary(
     const count = (s: ResourceAssignmentStatus) => mine.filter((r) => r.status === s).length;
     const running = op === null
         ? work.filter(workRunning).length
-        : opAssignments.filter((a) => a.opNumber === op && !debriefsForAssignment(a, debriefs).length).length;
+        : opAssignments.filter((a) => a.opNumber === op && isDebriefable(a)
+            && !debriefsForAssignment(a, debriefs).length).length;
     return {
         need: count('need'),
         requested: count('requested'),

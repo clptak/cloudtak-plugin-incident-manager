@@ -11,7 +11,7 @@
             >
         </div>
         <div class='col-9 col-sm-10 col-lg-6'>
-            <label class='form-label small mb-0'>Map object</label>
+            <label class='form-label small mb-0'>Map object (optional)</label>
             <div class='d-flex gap-1'>
                 <select
                     :value='draft.assignmentUid'
@@ -19,7 +19,7 @@
                     @change='set("assignmentUid", ($event.target as HTMLSelectElement).value)'
                 >
                     <option value=''>
-                        {{ loadingMapObjects ? 'Loading…' : (mapObjects.length ? '— Map object —' : 'No map objects') }}
+                        {{ loadingMapObjects ? 'Loading…' : 'No map object' }}
                     </option>
                     <option
                         v-for='c in mapObjects'
@@ -67,11 +67,13 @@
             </select>
         </div>
         <div class='col-12'>
-            <label class='form-label small mb-0'>Instructions</label>
+            <label class='form-label small mb-0'>
+                Instructions{{ draft.assignmentUid ? '' : ' (required without a map object)' }}
+            </label>
             <input
                 :value='draft.instructions'
                 class='form-control form-control-sm'
-                placeholder='Task instructions'
+                :placeholder='draft.assignmentUid ? "Task instructions" : "e.g. Interview the reporting party"'
                 @input='set("instructions", ($event.target as HTMLInputElement).value)'
             >
         </div>
@@ -97,8 +99,9 @@
             v-if='!mapObjects.length && !loadingMapObjects'
             class='col-12 small text-white-50'
         >
-            Attach the assignment lines and polygons to this DataSync first, or import them
-            (GeoJSON or the CalTopo Sync plugin), then refresh.
+            No map objects yet. Work with no map object (an interview, a records check) only
+            needs instructions. To tie one to the map, attach its line or polygon to this
+            DataSync, or import it (GeoJSON or the CalTopo Sync plugin), then refresh.
         </div>
     </div>
 </template>

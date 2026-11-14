@@ -85,9 +85,10 @@
                 class='flex-shrink-0 mt-1'
             />
             <div class='small flex-grow-1'>
-                You need a map object before making an assignment. Draw or attach the
-                assignment's line or polygon to this DataSync first. If it was drawn in
-                another GIS, import its GeoJSON, or use the CalTopo Sync plugin.
+                To put an assignment on the map, draw or attach its line or polygon to this
+                DataSync first. If it was drawn in another GIS, import its GeoJSON, or use the
+                CalTopo Sync plugin. Work with no map object, such as an interview, just needs
+                instructions.
             </div>
             <button
                 type='button'
@@ -353,7 +354,7 @@
                                     <button
                                         type='button'
                                         class='btn btn-primary btn-sm'
-                                        :disabled='busy || !workDraft.assignmentUid'
+                                        :disabled='busy || !workAssignmentReady(workDraft)'
                                         @click='saveWork(w)'
                                     >
                                         {{ savingWork ? 'Saving…' : 'Save' }}
@@ -421,7 +422,7 @@
                                 <button
                                     type='button'
                                     class='btn btn-primary btn-sm'
-                                    :disabled='busy || !newWork.assignmentUid'
+                                    :disabled='busy || !workAssignmentReady(newWork)'
                                     @click='addWork(r)'
                                 >
                                     {{ savingWork ? 'Saving…' : 'Add assignment' }}
@@ -502,7 +503,7 @@
                                 <button
                                     type='button'
                                     class='btn btn-primary btn-sm'
-                                    :disabled='busy || !workDraft.assignmentUid'
+                                    :disabled='busy || !workAssignmentReady(workDraft)'
                                     @click='saveWork(w)'
                                 >
                                     {{ savingWork ? 'Saving…' : 'Save' }}
@@ -648,7 +649,7 @@ import {
     type ResourceAssignment,
     type ResourceAssignmentStatus,
 } from '../../lib/resourceAssignments.ts';
-import type { WorkAssignment } from '../../lib/workAssignments.ts';
+import { workAssignmentReady, type WorkAssignment } from '../../lib/workAssignments.ts';
 
 const props = defineProps<{
     opRegistry: OpPeriodRegistryEntry[];
@@ -955,7 +956,7 @@ function callsignFor(uid: string): string {
 }
 
 async function addWork(r: ResourceAssignment): Promise<void> {
-    if (!requireActiveMission() || !activeMission.value || !newWork.value.assignmentUid) return;
+    if (!requireActiveMission() || !activeMission.value || !workAssignmentReady(newWork.value)) return;
     await addWorkAssignment(activeMission.value, {
         assignmentNumber: newWork.value.assignmentNumber,
         teamResourceAssignmentId: r.id,
@@ -966,7 +967,7 @@ async function addWork(r: ResourceAssignment): Promise<void> {
         started: newWork.value.started.trim(),
         completed: newWork.value.completed.trim(),
     });
-    await fileIntoAssignmentFolder([newWork.value.assignmentUid]);
+    if (newWork.value.assignmentUid) await fileIntoAssignmentFolder([newWork.value.assignmentUid]);
     assignFor.value = null;
 }
 
@@ -996,7 +997,7 @@ function toggleWork(w: WorkAssignment): void {
 const irTeams = computed(() => resources.value.filter((r) => opOfResource(r) === null && isActiveResource(r)));
 
 async function saveWork(w: WorkAssignment): Promise<void> {
-    if (!requireActiveMission() || !activeMission.value) return;
+    if (!requireActiveMission() || !activeMission.value || !workAssignmentReady(workDraft.value)) return;
     const team = resources.value.find((r) => r.id === workDraft.value.teamResourceAssignmentId);
     const n = Number(workDraft.value.assignmentNumber);
     await updateWorkAssignment(activeMission.value, w.id, {
@@ -1004,12 +1005,17 @@ async function saveWork(w: WorkAssignment): Promise<void> {
         teamResourceAssignmentId: workDraft.value.teamResourceAssignmentId,
         teamLabel: team?.resourceIdentifier ?? w.teamLabel,
         assignmentUid: workDraft.value.assignmentUid,
-        assignmentCallsign: callsignFor(workDraft.value.assignmentUid) || w.assignmentCallsign,
+        // Cleared map object: drop its name too (#35).
+        assignmentCallsign: workDraft.value.assignmentUid
+            ? callsignFor(workDraft.value.assignmentUid) || w.assignmentCallsign
+            : '',
         instructions: workDraft.value.instructions.trim(),
         started: workDraft.value.started.trim(),
         completed: workDraft.value.completed.trim(),
     });
-    if (workDraft.value.assignmentUid !== w.assignmentUid) await fileIntoAssignmentFolder([workDraft.value.assignmentUid]);
+    if (workDraft.value.assignmentUid && workDraft.value.assignmentUid !== w.assignmentUid) {
+        await fileIntoAssignmentFolder([workDraft.value.assignmentUid]);
+    }
     openWork.value = null;
 }
 

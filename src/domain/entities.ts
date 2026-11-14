@@ -189,6 +189,13 @@ export interface DebriefRecord {
  * resource for one operational period. The polygon is re-published INTO the
  * OP sync (new feature uid) so volunteers receive it via their channel.
  */
+/**
+ * What kind of work an OP assignment is (#35). Only search assignments work a
+ * registered segment and feed the POA/POD math; the rest (an investigator's
+ * interviews, a containment post) may have a map feature or none at all.
+ */
+export type AssignmentKind = 'search' | 'investigation' | 'containment' | 'other';
+
 export interface OpAssignment {
     /**
      * Identity of this assignment. Several resources may work one segment in
@@ -198,7 +205,13 @@ export interface OpAssignment {
      */
     id?: string;
     opNumber: number;
+    /**
+     * The segment (search) or map feature worked; '' for work with no map
+     * object (#35). Such an assignment always has an `id`.
+     */
     segmentUid: string;
+    /** Absent on assignments saved before #35: those are search assignments. */
+    kind?: AssignmentKind;
     /** Feature uid of the polygon copy living in the OP sync. */
     opFeatureUid?: string;
     /** Human label shown to volunteers (defaults to the segment callsign). */

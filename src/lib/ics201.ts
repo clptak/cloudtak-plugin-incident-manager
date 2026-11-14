@@ -39,6 +39,8 @@ import { orgChartFromSchemaValue } from './orgChartPersistence.ts';
 import { treeHasContent } from './hastyTeamTree.ts';
 import { loadResourceAssignmentsFromMission } from './resourceAssignmentPersistence.ts';
 import { resourceStatusLabel, type ResourceAssignment } from './resourceAssignments.ts';
+import { workAssignmentsFromSchema } from './workAssignmentPersistence.ts';
+import { workAssignmentTitle, type WorkAssignment } from './workAssignments.ts';
 
 export const ICS201_KEYWORD = 'ics-201';
 export const RESOURCES_KEYWORD = 'resources';
@@ -606,14 +608,23 @@ export function resourcesFromLogs(logs: MissionLogLike[]): Ics201ResourceRow[] {
  * on the Initial Response period (no OP assignment) are included — OP1+
  * resources belong to that period's IAP, not the 201.
  */
-export function resourceRowsFromAssignments(assignments: ResourceAssignment[]): Ics201ResourceRow[] {
+export function resourceRowsFromAssignments(
+    assignments: ResourceAssignment[],
+    work: WorkAssignment[] = [],
+): Ics201ResourceRow[] {
     return assignments
         .filter((a) => a.opNumber == null)
         .slice(0, MAX_RESOURCE_ROWS).map((a) => {
+        // The resource's Initial Response work, with or without a map object (#35).
+        const tasks = work
+            .filter((w) => w.teamResourceAssignmentId === a.id)
+            .map((w) => `#${w.assignmentNumber} ${workAssignmentTitle(w)}`.trim());
         const noteParts = [
             a.agency.trim(),
             a.status !== 'have' ? `Status: ${resourceStatusLabel(a.status)}` : '',
-            a.assignmentCallsign?.trim() ? `Assignment: ${a.assignmentCallsign.trim()}` : '',
+            tasks.length
+                ? `Assignment: ${tasks.join(', ')}`
+                : a.assignmentCallsign?.trim() ? `Assignment: ${a.assignmentCallsign.trim()}` : '',
         ].filter(Boolean);
         return {
             resource: a.resource.trim(),
@@ -959,7 +970,7 @@ export async function loadIcs201FromMission(
     let assignmentRows: Ics201ResourceRow[] = [];
     try {
         const { assignments } = await loadResourceAssignmentsFromMission(schemaTarget);
-        assignmentRows = resourceRowsFromAssignments(assignments);
+        assignmentRows = resourceRowsFromAssignments(assignments, workAssignmentsFromSchema(schema));
     } catch {
         // mission_schema.json may be absent or unreadable; log rows still apply
     }
