@@ -1,13 +1,68 @@
 <template>
+    <div
+        v-if='(state || connectable) && collapsible && !expanded'
+        class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center gap-2 cursor-pointer user-select-none'
+        role='button'
+        tabindex='0'
+        :aria-expanded='false'
+        @click='expanded = true'
+        @keydown.enter.prevent='expanded = true'
+        @keydown.space.prevent='expanded = true'
+    >
+        <p class='text-uppercase text-white-50 small mb-0'>
+            Incident event
+        </p>
+        <span
+            v-if='state'
+            class='small text-truncate'
+        >{{ state.link.name || state.link.id }}</span>
+        <span
+            v-if='state'
+            class='badge'
+            :class='state.active ? "bg-success-lt text-success" : "bg-secondary-lt text-secondary"'
+        >{{ state.active ? 'active' : 'ended' }}</span>
+        <span
+            v-else
+            class='badge bg-yellow-lt'
+        >none - expand to connect one</span>
+        <IconChevronDown
+            class='ms-auto text-white-50'
+            style='transform: rotate(-180deg)'
+            :size='20'
+            stroke='1.5'
+        />
+    </div>
     <TablerBorder
-        v-if='state || connectable'
+        v-else-if='state || connectable'
         class='cloudtak-accent text-white mb-3'
         :fill-height='false'
         :shadow='false'
         gap='sm'
     >
         <template #label>
-            <p class='text-uppercase text-white-50 small mb-0'>
+            <div
+                v-if='collapsible'
+                class='d-flex align-items-center w-100 cursor-pointer user-select-none'
+                role='button'
+                tabindex='0'
+                :aria-expanded='true'
+                @click='expanded = false'
+                @keydown.enter.prevent='expanded = false'
+                @keydown.space.prevent='expanded = false'
+            >
+                <p class='text-uppercase text-white-50 small mb-0'>
+                    Incident event
+                </p>
+                <IconChevronDown
+                    class='ms-auto text-white-50'
+                    :size='20'
+                    stroke='1.5'
+                />
+            </div>
+            <p
+                v-else
+                class='text-uppercase text-white-50 small mb-0'
+            >
                 Incident event
             </p>
         </template>
@@ -147,6 +202,7 @@
  */
 import { computed, ref, watch } from 'vue';
 import { TablerBorder, TablerInlineAlert } from '@tak-ps/vue-tabler';
+import { IconChevronDown } from '@tabler/icons-vue';
 import { useIncident } from '../composables/useIncident.ts';
 import {
     connectIncidentEvent,
@@ -161,7 +217,14 @@ import {
 import { parseCoordinates } from '../lib/coords.ts';
 import { listMissionMarkers, type MissionMarker } from '../lib/missionCots.ts';
 
+const props = defineProps<{
+    /** Collapsed to a one-line header until opened (Initial Information). */
+    collapsible?: boolean;
+}>();
+
 const { activeMission } = useIncident();
+/** Starts collapsed when collapsible. */
+const expanded = ref(!props.collapsible);
 
 const state = ref<{ link: IncidentEventLink; active: boolean } | null>(null);
 /** No event linked and the incident has a management sync: offer to connect one. */
