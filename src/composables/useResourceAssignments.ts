@@ -85,6 +85,7 @@ export function useResourceAssignments() {
             agency: input.agency.trim(),
             timeOrdered: input.timeOrdered.trim(),
             timeArrived: input.timeArrived.trim(),
+            timeDemobilized: input.timeDemobilized?.trim() || undefined,
         };
 
         assignments.value = [...assignments.value, record];

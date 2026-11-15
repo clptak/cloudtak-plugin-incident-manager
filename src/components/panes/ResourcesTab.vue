@@ -214,6 +214,17 @@
                     />
                 </div>
                 <div
+                    v-if='form.status === "demobilized"'
+                    class='col-md-3'
+                >
+                    <TablerInput
+                        v-model='form.timeDemobilized'
+                        label='Time Demobilized'
+                        type='datetime-local'
+                        :disabled='!activeMission || saving'
+                    />
+                </div>
+                <div
                     v-if='opLabelOptions.length > 1'
                     class='col-md-3'
                 >
@@ -290,6 +301,7 @@ import NavHelpButton from '../NavHelpButton.vue';
 import ResourceBoard from './ResourceBoard.vue';
 import {
     buildAgencyOptions,
+    demobTimeFor,
     resolveEffectiveDefaultAgency,
     RESOURCE_ASSIGNMENT_STATUSES,
     RESOURCE_TYPE_OPTIONS,
@@ -444,7 +456,10 @@ const formStatusLabel = computed({
     },
     set(label: string): void {
         const opt = statusOptions.find((entry) => entry.label === label);
-        if (opt) form.value.status = opt.value;
+        if (!opt) return;
+        form.value.status = opt.value;
+        // Demobilized gets its time, filled in now and still editable (#37).
+        form.value.timeDemobilized = demobTimeFor(opt.value, form.value.timeDemobilized, nowDatetimeLocal());
     },
 });
 
@@ -582,6 +597,7 @@ async function createAssignment(): Promise<void> {
         eta,
         status: form.value.status,
         timeArrived: form.value.timeArrived.trim(),
+        timeDemobilized: form.value.status === 'demobilized' ? form.value.timeDemobilized?.trim() || undefined : undefined,
         opNumber: form.value.opNumber ?? null,
     });
 

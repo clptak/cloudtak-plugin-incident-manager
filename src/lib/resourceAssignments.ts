@@ -13,6 +13,8 @@ export interface ResourceAssignment {
     eta: number | null;
     status: ResourceAssignmentStatus;
     timeArrived: string;
+    /** When it was demobilized (datetime-local); set with the Demobilized status (#37). */
+    timeDemobilized?: string;
     /** Mission CoT uuid for assignment linkage (DataSync log entryUid). */
     assignmentUid?: string;
     assignmentCallsign?: string;
@@ -35,6 +37,16 @@ export function resourceStatusLabel(status: ResourceAssignmentStatus): string {
 /** Resources still in play — excludes demobilized and cancelled. */
 export function isActiveResource(a: ResourceAssignment): boolean {
     return a.status !== 'demobilized' && a.status !== 'cancelled';
+}
+
+/**
+ * The demobilization time to keep after a status change (#37): stamped with
+ * `now` when a resource becomes Demobilized without one, dropped when it is
+ * no longer Demobilized.
+ */
+export function demobTimeFor(status: ResourceAssignmentStatus, current: string | undefined, now: string): string {
+    if (status !== 'demobilized') return '';
+    return current?.trim() || now;
 }
 
 export const DEFAULT_AGENCY = '';
@@ -106,6 +118,7 @@ export function blankResourceAssignmentForm(): Omit<ResourceAssignment, 'id'> {
         eta: null,
         status: 'requested',
         timeArrived: '',
+        timeDemobilized: '',
         opNumber: null,
     };
 }
@@ -128,6 +141,7 @@ export function resourceAssignmentToSchemaRecord(a: ResourceAssignment): Resourc
         eta: normalizeEta(a.eta),
         status: normalizeStatus(a.status),
         timeArrived: a.timeArrived.trim(),
+        timeDemobilized: a.timeDemobilized?.trim() || undefined,
         assignmentUid,
         assignmentCallsign: assignmentUid ? assignmentCallsign : undefined,
         opNumber: normalizeOpNumber(a.opNumber),
@@ -179,6 +193,7 @@ export function normalizeResourceAssignment(raw: unknown): ResourceAssignment | 
         eta: normalizeEta(r.eta ?? r.resource_order_expected_arrival_dtg),
         status: normalizeStatus(r.status),
         timeArrived: String(r.timeArrived ?? r.resource_arrived_dtg ?? '').trim(),
+        timeDemobilized: String(r.timeDemobilized ?? '').trim() || undefined,
         assignmentUid: String(r.assignmentUid ?? '').trim() || undefined,
         assignmentCallsign: String(r.assignmentCallsign ?? '').trim() || undefined,
         opNumber: normalizeOpNumber(r.opNumber),
