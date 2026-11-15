@@ -78,6 +78,26 @@
                         {{ event.name }}
                     </option>
                 </select>
+                <select
+                    v-if='!pickedId'
+                    v-model='markerUid'
+                    class='form-select form-select-sm'
+                    style='max-width: 16rem'
+                    aria-label='Use a map marker for the location'
+                    :disabled='busy || loadingMarkers'
+                    @change='onPickMarker'
+                >
+                    <option value=''>
+                        {{ loadingMarkers ? 'Loading markers…' : markers.length ? 'Location from a map marker…' : 'No markers on the map' }}
+                    </option>
+                    <option
+                        v-for='m in markers'
+                        :key='m.uid'
+                        :value='m.uid'
+                    >
+                        {{ m.callsign }} ({{ m.source }})
+                    </option>
+                </select>
                 <input
                     v-if='!pickedId'
                     v-model='coords'
@@ -97,7 +117,8 @@
             </div>
             <div class='form-text'>
                 A new event is shared with this incident's management channels and placed at the
-                location (prefilled from the IPP when there is one).
+                location: prefilled from the IPP when there is one, picked from a marker on the map,
+                or typed as lat, lng.
             </div>
         </template>
 
@@ -120,8 +141,8 @@
 
 <script setup lang='ts'>
 /**
- * The incident's MGMT Core Event (ADR-004): shown on Wrap Up and the
- * Dashboard, where it is ended by hand. An incident without one can connect
+ * The incident's MGMT Core Event (ADR-004): shown on Initial Information
+ * and Wrap Up, where it is ended by hand. An incident without one can connect
  * an existing event or create one here (#39).
  */
 import { computed, ref, watch } from 'vue';
@@ -138,6 +159,7 @@ import {
     type IncidentEventLink,
 } from '../lib/coreEvents.ts';
 import { parseCoordinates } from '../lib/coords.ts';
+import { listMissionMarkers, type MissionMarker } from '../lib/missionCots.ts';
 
 const { activeMission } = useIncident();
 
@@ -155,6 +177,34 @@ const pickedId = ref('');
 const coords = ref('');
 const draft = ref<{ activityNumber: string; incidentName: string } | null>(null);
 const parsedCoords = computed(() => parseCoordinates(coords.value));
+
+const markers = ref<MissionMarker[]>([]);
+const markerUid = ref('');
+const loadingMarkers = ref(false);
+
+function onPickMarker(): void {
+    const m = markers.value.find((x) => x.uid === markerUid.value);
+    if (m) coords.value = `${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}`;
+}
+
+/** Typing a location by hand lets go of the picked marker. */
+watch(coords, (next) => {
+    const m = markers.value.find((x) => x.uid === markerUid.value);
+    if (m && next !== `${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}`) markerUid.value = '';
+});
+
+async function loadMarkers(): Promise<void> {
+    const mission = activeMission.value;
+    if (!mission) return;
+    loadingMarkers.value = true;
+    try {
+        markers.value = await listMissionMarkers(mission);
+    } catch {
+        markers.value = [];
+    } finally {
+        loadingMarkers.value = false;
+    }
+}
 
 /** "wildland-fire" -> "Wildland Fire". */
 function incidentTypeLabel(slug: string): string {
@@ -175,6 +225,7 @@ async function load(): Promise<void> {
     if (!state.value) {
         connectable.value = true;
         void loadConnect();
+        void loadMarkers();
     }
 }
 
@@ -251,6 +302,8 @@ async function onEnd(): Promise<void> {
 watch(() => activeMission.value?.guid, () => {
     pickedId.value = '';
     coords.value = '';
+    markerUid.value = '';
+    markers.value = [];
     error.value = '';
     done.value = '';
     void load();

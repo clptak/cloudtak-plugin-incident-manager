@@ -195,7 +195,7 @@
                         fills Activity Number, Date, Estimated Location (Coordinates) and Subject Profile),
                         or leave it on "Create a new event" to make one from this form on the Management
                         Channels, like "Create event only". It needs the Estimated Location. An event can
-                        also be connected later from the Dashboard.
+                        also be connected later from Initial Information.
                         <span
                             v-if='eventsError'
                             class='text-warning'

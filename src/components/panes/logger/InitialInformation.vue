@@ -1,5 +1,8 @@
 <template>
     <div>
+        <!-- The incident's Core Event: shown, or connected / created here (#39). -->
+        <IncidentEventCard />
+
         <!-- CFS / Call Notes -->
         <div
             v-if='!cfsExpanded'
@@ -393,6 +396,7 @@
 <script setup lang='ts'>
 import { ref, computed, reactive, watch, onMounted } from 'vue';
 import { syncIncidentEventIds } from '../../../lib/coreEvents.ts';
+import IncidentEventCard from '../../IncidentEventCard.vue';
 import { IconChevronDown } from '@tabler/icons-vue';
 import {
     TablerBorder,
