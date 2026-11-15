@@ -1,6 +1,7 @@
 import { ref } from 'vue';
 import type { ActiveMission } from './useIncident.ts';
 import { sendWorkAssignmentLog, type WorkAssignmentPhase } from '../lib/workAssignmentLogs.ts';
+import { nowDatetimeLocal } from '../lib/incidentInfo.ts';
 import {
     loadWorkAssignmentsFromMission,
     saveWorkAssignmentsToMission,
@@ -8,6 +9,7 @@ import {
 import {
     blankWorkAssignmentForm,
     mergeWorkAssignmentPatch,
+    stampPhaseTime,
     type WorkAssignment,
 } from '../lib/workAssignments.ts';
 
@@ -116,7 +118,8 @@ export function useWorkAssignments() {
         const idx = assignments.value.findIndex((a) => a.id === id);
         if (idx < 0) return;
 
-        const current = assignments.value[idx];
+        // Stamp the time now if none was entered (#37), so the card shows it.
+        const current = stampPhaseTime(assignments.value[idx], phase, nowDatetimeLocal());
         sending.value = true;
         statusError.value = false;
         statusMessage.value = phase === 'started' ? 'Sending start…' : 'Sending completion…';
@@ -128,8 +131,8 @@ export function useWorkAssignments() {
             const logId = await sendWorkAssignmentLog(mission, current, phase, existingLogId);
 
             const patch = phase === 'started'
-                ? { startedLogId: logId }
-                : { completedLogId: logId };
+                ? { started: current.started, startedLogId: logId }
+                : { completed: current.completed, completedLogId: logId };
             const updated = mergeWorkAssignmentPatch(current, patch);
             assignments.value = [
                 ...assignments.value.slice(0, idx),

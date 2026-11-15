@@ -212,6 +212,7 @@
                             <select
                                 v-model='resDraft.status'
                                 class='form-select form-select-sm'
+                                @change='onDraftStatus'
                             >
                                 <option
                                     v-for='s in RESOURCE_ASSIGNMENT_STATUSES'
@@ -244,6 +245,17 @@
                             <label class='form-label small mb-0'>Time arrived</label>
                             <input
                                 v-model='resDraft.timeArrived'
+                                type='datetime-local'
+                                class='form-control form-control-sm'
+                            >
+                        </div>
+                        <div
+                            v-if='resDraft.status === "demobilized"'
+                            class='col-sm-6 col-lg-4'
+                        >
+                            <label class='form-label small mb-0'>Time demobilized</label>
+                            <input
+                                v-model='resDraft.timeDemobilized'
                                 type='datetime-local'
                                 class='form-control form-control-sm'
                             >
@@ -644,6 +656,7 @@ import {
 import {
     RESOURCE_ASSIGNMENT_STATUSES,
     RESOURCE_TYPE_OPTIONS,
+    demobTimeFor,
     isActiveResource,
     resourceStatusLabel,
     type ResourceAssignment,
@@ -820,6 +833,7 @@ function statusBadge(status: ResourceAssignmentStatus): string {
 }
 
 function timing(r: ResourceAssignment): string {
+    if (r.status === 'demobilized' && r.timeDemobilized?.trim()) return `Demobilized ${shortLocalTime(r.timeDemobilized)}`;
     if (r.timeArrived.trim()) return `Arrived ${shortLocalTime(r.timeArrived)}`;
     if (r.eta != null && r.status === 'requested') return `ETA ${r.eta} h`;
     if (r.timeOrdered.trim()) return `Ordered ${shortLocalTime(r.timeOrdered)}`;
@@ -839,6 +853,7 @@ interface ResDraft {
     timeOrdered: string;
     eta: string | number;
     timeArrived: string;
+    timeDemobilized: string;
     op: number;
 }
 
@@ -862,8 +877,15 @@ function toggleResource(r: ResourceAssignment): void {
         timeOrdered: r.timeOrdered,
         eta: r.eta ?? '',
         timeArrived: r.timeArrived,
+        timeDemobilized: r.timeDemobilized ?? '',
         op: opOfResource(r) ?? 0,
     };
+}
+
+/** Picking Demobilized fills in the time now; it can still be corrected (#37). */
+function onDraftStatus(): void {
+    const d = resDraft.value;
+    if (d) d.timeDemobilized = demobTimeFor(d.status, d.timeDemobilized, nowDatetimeLocal());
 }
 
 function closeResource(): void {
@@ -884,6 +906,7 @@ async function saveResource(r: ResourceAssignment): Promise<void> {
         timeOrdered: d.timeOrdered,
         eta: etaText === '' || Number.isNaN(Number(etaText)) ? null : Number(etaText),
         timeArrived: d.timeArrived,
+        timeDemobilized: demobTimeFor(d.status, d.timeDemobilized, nowDatetimeLocal()),
         opNumber: d.op > 0 ? d.op : null,
     });
     // Keep the work list's team name in step with a renamed resource.

@@ -101,6 +101,21 @@ export function workAssignmentReady(a: Pick<WorkAssignment, 'assignmentUid' | 'i
     return Boolean(a.assignmentUid.trim() || a.instructions.trim());
 }
 
+/**
+ * Start / Complete on the board (#37): the phase time is filled in with
+ * `now` (datetime-local) when it is still empty, so the card shows it and
+ * the log carries it. A time already entered is kept.
+ */
+export function stampPhaseTime(a: WorkAssignment, phase: 'started' | 'completed', now: string): WorkAssignment {
+    return a[phase].trim() ? a : { ...a, [phase]: now };
+}
+
+/** Where a work assignment stands, from its times. */
+export function workAssignmentState(a: Pick<WorkAssignment, 'started' | 'completed'>): 'not-started' | 'started' | 'completed' {
+    if (a.completed.trim()) return 'completed';
+    return a.started.trim() ? 'started' : 'not-started';
+}
+
 export function mergeWorkAssignmentPatch(
     current: WorkAssignment,
     patch: Partial<Omit<WorkAssignment, 'id'>>,

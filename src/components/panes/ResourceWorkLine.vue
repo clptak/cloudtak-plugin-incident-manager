@@ -18,7 +18,16 @@
                 >{{ ` · ${work.instructions}` }}</span>
             </button>
             <span class='small ms-auto'>{{ times }}</span>
+            <span
+                v-if='state === "completed"'
+                class='badge bg-green-lt'
+            >Completed</span>
+            <span
+                v-else-if='state === "started"'
+                class='badge bg-azure-lt'
+            >In progress</span>
             <button
+                v-if='state !== "completed"'
                 type='button'
                 class='btn btn-outline-green btn-sm py-0'
                 title='Log the start to the FIELD DataSync'
@@ -28,6 +37,7 @@
                 Start
             </button>
             <button
+                v-if='state !== "completed"'
                 type='button'
                 class='btn btn-outline-blue btn-sm py-0'
                 title='Log the completion to the FIELD DataSync'
@@ -45,7 +55,7 @@
 /** One Initial Response work assignment on the board: tap to edit (slot), Start / Complete. */
 import { computed } from 'vue';
 import { shortLocalTime } from '../../lib/resourceBoard.ts';
-import { workAssignmentTitle, type WorkAssignment } from '../../lib/workAssignments.ts';
+import { workAssignmentState, workAssignmentTitle, type WorkAssignment } from '../../lib/workAssignments.ts';
 
 const props = defineProps<{
     work: WorkAssignment;
@@ -59,6 +69,8 @@ const emit = defineEmits<{
     (e: 'start'): void;
     (e: 'complete'): void;
 }>();
+
+const state = computed(() => workAssignmentState(props.work));
 
 const times = computed(() => [
     props.work.started ? `Started ${shortLocalTime(props.work.started)}` : 'Not started',

@@ -174,6 +174,9 @@ export function resourceAssignmentDetailRows(a: ResourceAssignment): IncidentDet
     if (a.timeArrived.trim()) {
         rows.push({ label: 'Time Arrived', value: formatDashboardDatetime(a.timeArrived) });
     }
+    if (a.timeDemobilized?.trim()) {
+        rows.push({ label: 'Time Demobilized', value: formatDashboardDatetime(a.timeDemobilized) });
+    }
     return rows.filter((row) => row.value.trim());
 }
 
