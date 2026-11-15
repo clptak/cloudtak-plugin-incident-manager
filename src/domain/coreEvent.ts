@@ -186,6 +186,58 @@ export function buildMgmtEvent(input: MgmtEventInput): MgmtEventPlan {
     return { body, laterExternalIds };
 }
 
+/** What an incident event is built from when there is no CAD call (#39). */
+export interface IncidentEventInput {
+    /** Activity Number (Case Number or Event ID); names the event. */
+    activityNumber: string;
+    /** Falls back to this when there is no Activity Number (the mission name). */
+    incidentName: string;
+    /** Incident type label, e.g. "Search". */
+    typeLabel?: string;
+    lat: number;
+    lng: number;
+    /** When it started (ISO); omitted means the API's default (now). */
+    started?: string;
+    location?: string;
+    subjectProfile?: string;
+    channels: number[];
+    missions?: EventMission[];
+    iconMap?: EventIconMap;
+}
+
+/**
+ * The MGMT event for an incident created without a CAD call (#39): the same
+ * shape as the CAD one, named from the form. With no CAD id it carries no
+ * CAD external id; the Case Number is added later from Initial Information.
+ */
+export function buildIncidentEvent(input: IncidentEventInput): MgmtEventPlan {
+    if (!input.channels.length) throw new Error('The incident event needs at least one management channel.');
+    if (!Number.isFinite(input.lat) || !Number.isFinite(input.lng)) {
+        throw new Error('The incident event needs a location: enter the Estimated Location (Coordinates).');
+    }
+    const id = input.activityNumber.trim() || input.incidentName.trim();
+    const title = [id, input.typeLabel?.trim()].filter(Boolean).join(' - ') || 'Incident';
+    const style = eventStyleFor(input.iconMap ?? EMPTY_ICON_MAP, null);
+    const metadata: Record<string, unknown> = { role: 'mgmt' satisfies EventRole };
+    if (input.subjectProfile) metadata.subjectProfile = input.subjectProfile;
+    const body: MgmtEventPlan['body'] = {
+        type: style.type,
+        name: title,
+        editable: true,
+        remarks: title,
+        metadata,
+        links: [],
+        style: { ...(style.icon ? { icon: style.icon } : {}), 'marker-color': style['marker-color'] },
+        geometry: { type: 'Point', coordinates: [input.lng, input.lat] },
+        priority: 'none',
+        location: input.location?.trim() ?? '',
+        missions: input.missions ?? [],
+        channels: [...new Set(input.channels)],
+    };
+    if (input.started) body.started = input.started;
+    return { body, laterExternalIds: [] };
+}
+
 export interface FieldEventInput {
     incidentId: string;
     opNumber: number;

@@ -164,7 +164,10 @@
                             @change='onPickEvent'
                         >
                             <option value=''>
-                                {{ eventsLoading ? 'Loading events…' : '— None —' }}
+                                {{ eventsLoading ? 'Loading events…' : 'Create a new event from this form' }}
+                            </option>
+                            <option :value='NO_EVENT'>
+                                No incident event
                             </option>
                             <option
                                 v-for='event in pickerList'
@@ -188,8 +191,11 @@
                         </button>
                     </div>
                     <div class='form-text'>
-                        Optional: an active incident event this mission belongs to. Picking one fills
-                        Activity Number, Date, Estimated Location (Coordinates) and Subject Profile.
+                        The incident event this mission belongs to. Pick an active one to join it (that
+                        fills Activity Number, Date, Estimated Location (Coordinates) and Subject Profile),
+                        or leave it on "Create a new event" to make one from this form on the Management
+                        Channels, like "Create event only". It needs the Estimated Location. An event can
+                        also be connected later from the Dashboard.
                         <span
                             v-if='eventsError'
                             class='text-warning'
@@ -663,7 +669,13 @@ import { pushPointToMission } from '../../lib/missionFeatures.ts';
 import { startSchemaOnProperties } from '../../lib/missionSchema.ts';
 import { importCadText, rememberCadText } from '../../lib/cadImport.ts';
 import { createMissionFieldsFromCfs, parseCfsHeaderFields } from '../../lib/incidentInfo.ts';
-import { createEventOnly, linkIncidentEvent, pickerEvents, type EventSummary } from '../../lib/coreEvents.ts';
+import {
+    createEventOnly,
+    linkIncidentEvent,
+    pickerEvents,
+    type EventSummary,
+    type FormEventInput,
+} from '../../lib/coreEvents.ts';
 import { createFormFromEvent } from '../../domain/coreEvent.ts';
 import { availableDefaults } from '../../lib/channelDefaults.ts';
 import { localDateTimeLabel } from '../../lib/localTime.ts';
@@ -772,6 +784,8 @@ const eventOnlyBusy = ref(false);
 const eventFromCad = computed(() => createEvent.value && !!cadText.value.trim());
 
 const pickerList = ref<EventSummary[]>([]);
+/** '' = create a new event from the form (#39); NO_EVENT = none; else an event id. */
+const NO_EVENT = '__none__';
 const pickedEventId = ref('');
 const eventsLoading = ref(false);
 const eventsError = ref('');
@@ -787,7 +801,8 @@ async function loadPickerEvents(): Promise<void> {
     try {
         pickerList.value = await pickerEvents();
         eventsLoaded = true;
-        if (pickedEventId.value && !pickerList.value.some((e) => e.id === pickedEventId.value)) {
+        if (pickedEventId.value && pickedEventId.value !== NO_EVENT
+            && !pickerList.value.some((e) => e.id === pickedEventId.value)) {
             pickedEventId.value = '';
         }
     } catch (err) {
@@ -807,6 +822,24 @@ function onPickEvent(): void {
     if (fields.coords) form.coords = fields.coords;
     const profile = event.metadata?.subjectProfile;
     if (typeof profile === 'string' && profile) form.subjectProfile = profile;
+}
+
+/** The new incident event from this form, when none is picked and no CAD call is used (#39). */
+function formEventInput(missionName: string): FormEventInput {
+    const coords = parsedCoords.value;
+    const backdated = form.date && form.date !== localDateString();
+    const started = backdated ? new Date(`${form.date}T00:00`) : null;
+    return {
+        activityNumber: form.activityNumber,
+        incidentName: missionName,
+        typeLabel: INCIDENT_TYPE_OPTIONS.find((o) => o.value === form.incidentType)?.label,
+        lat: coords?.lat ?? Number.NaN,
+        lng: coords?.lng ?? Number.NaN,
+        ...(started && !Number.isNaN(started.getTime()) ? { started: started.toISOString() } : {}),
+        location: form.locationInfo,
+        subjectProfile: form.subjectProfile || undefined,
+        channelNames: form.mgmtGroups,
+    };
 }
 
 async function onCreateEventOnly(): Promise<void> {
@@ -1213,7 +1246,9 @@ async function createMission(): Promise<void> {
         // is none), or the one picked. Non-fatal: the mission is created.
         const eventSource = eventFromCad.value
             ? { cadText: cadText.value, subjectProfile: form.subjectProfile || undefined, channelNames: form.mgmtGroups }
-            : pickedEventId.value ? { eventId: pickedEventId.value } : null;
+            : pickedEventId.value === NO_EVENT ? null
+                : pickedEventId.value ? { eventId: pickedEventId.value }
+                    : { form: formEventInput(res.data.name) };
         if (eventSource && mgmt) {
             try {
                 const { event, created } = await linkIncidentEvent({
