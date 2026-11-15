@@ -46,7 +46,7 @@
             class='mb-3'
             severity='info'
             title='Mission required'
-            description='Select a mission in Create | Open before creating resource assignments.'
+            description='Select a mission in Create | Open before adding resources.'
         />
 
         <TablerInlineAlert
@@ -144,7 +144,7 @@
         >
             <template #label>
                 <p class='text-uppercase text-white-50 small mb-0 d-flex align-items-center gap-2 w-100'>
-                    <span>New Resource Assignment</span>
+                    <span>Add Resource</span>
                     <span
                         class='ms-auto d-inline-flex'
                         @click.stop
@@ -233,7 +233,7 @@
                     :disabled='!canCreate || saving'
                     @click='createAssignment'
                 >
-                    {{ saving ? 'Saving…' : 'Create assignment' }}
+                    {{ saving ? 'Saving…' : 'Add resource' }}
                 </button>
                 <button
                     type='button'
