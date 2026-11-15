@@ -17,6 +17,7 @@ import type { ActiveMission } from '../composables/useIncident.ts';
 import {
     DEFAULT_CAD_UTC_OFFSET,
     buildFieldEvent,
+    buildIncidentEvent,
     buildMgmtEvent,
     columnsToNominate,
     eventIconMapFromValue,
@@ -30,10 +31,12 @@ import {
     type EventMission,
     type EventPriority,
     type EventSummary,
+    type IncidentEventInput,
 } from '../domain/coreEvent.ts';
 import type { OpPeriodRegistryEntry } from '../domain/entities.ts';
 import { upsertRegistryEntry } from '../domain/registry.ts';
 import { loadDeploymentBundle } from './deploymentDefaults.ts';
+import { schemaIppLatLng } from './defaultIpp.ts';
 import { loadSchemaSubscription, schemaMissionToken } from './incidentSubscription.ts';
 import { parseCadImport } from './mpsParser.ts';
 import { loadMissionSchema, saveMissionSchema, type MissionSchema } from './missionSchema.ts';
@@ -212,6 +215,28 @@ async function createMgmtEvent(input: CadEventInput, missions: EventMission[]): 
     return event;
 }
 
+/** What a form-built incident event needs (#39): the builder input before channels resolve. */
+export type FormEventInput = Omit<IncidentEventInput, 'channels' | 'missions' | 'iconMap'> & {
+    /** Management channel names; the event is shared with these only. */
+    channelNames: string[];
+};
+
+/** Create the MGMT event from the incident's own details (no CAD call), nominated. */
+async function createFormEvent(input: FormEventInput, missions: EventMission[]): Promise<EventSummary> {
+    const { channelNames, ...rest } = input;
+    const plan = buildIncidentEvent({
+        ...rest,
+        channels: await channelBitpos(channelNames),
+        missions,
+        iconMap: eventIconMap(),
+    });
+    const res = await server.POST('/api/core/event', { body: plan.body as never });
+    if (res.error) fail('Could not create the event', res.error);
+    const event = await getEvent((res.data as unknown as EventSummary).id);
+    await nominate(event);
+    return event;
+}
+
 /** "Create event only": a MGMT event with no mission yet. */
 export async function createEventOnly(input: CadEventInput): Promise<{ event: EventSummary; existing: boolean }> {
     const cadId = parseCadImport(input.cadText).activityNumber;
@@ -227,12 +252,16 @@ export async function createEventOnly(input: CadEventInput): Promise<{ event: Ev
  */
 export async function linkIncidentEvent(
     mission: ActiveMission,
-    source: { eventId: string } | CadEventInput,
+    source: { eventId: string } | CadEventInput | { form: FormEventInput },
 ): Promise<{ event: EventSummary; created: boolean }> {
     let event: EventSummary;
     let created = false;
     if ('eventId' in source) {
         event = await attachMissions(source.eventId, incidentMissions(mission));
+    } else if ('form' in source) {
+        // No event picked and no CAD call: build one from the incident (#39).
+        event = await createFormEvent(source.form, incidentMissions(mission));
+        created = true;
     } else {
         const cadId = parseCadImport(source.cadText).activityNumber;
         const existing = findEventForCad(await listEvents(), cadId);
@@ -245,6 +274,49 @@ export async function linkIncidentEvent(
     }
     await saveIncidentEventLink(mission, { id: event.id, name: event.name, cad: event.external_ids?.CAD });
     return { event, created };
+}
+
+/** The management channels of an incident's MGMT sync (what its event is shared with). */
+export async function managementChannelNames(mission: ActiveMission): Promise<string[]> {
+    if (!mission.mgmt) return [];
+    const res = await server.GET('/api/marti/missions/{:guid}', {
+        params: { path: { ':guid': mission.mgmt.guid }, query: { changes: false, logs: false } },
+    });
+    if (res.error) fail('Could not read the management sync', res.error);
+    const groups = (res.data as { groups?: string | string[] } | undefined)?.groups;
+    return Array.isArray(groups) ? groups : typeof groups === 'string' && groups ? [groups] : [];
+}
+
+/** What the incident itself says about a new event: name and location, for the Connect form (#39). */
+export async function incidentEventDraft(mission: ActiveMission): Promise<{
+    activityNumber: string;
+    incidentName: string;
+    coords: string;
+}> {
+    const sub = await loadSchemaSubscription(mission);
+    const { schema } = await loadMissionSchema(sub);
+    const ipp = schemaIppLatLng(schema as unknown as Parameters<typeof schemaIppLatLng>[0]);
+    return {
+        activityNumber: String(schema.incident_id || schema.event_id || schema.cad_data?.activity_number || '').trim(),
+        incidentName: schema.incident_response?.incident_name?.trim() || mission.name,
+        coords: ipp ? `${ipp.lat.toFixed(5)}, ${ipp.lng.toFixed(5)}` : '',
+    };
+}
+
+/**
+ * Connect an event to an incident created without one (#39): the picked
+ * event, or a new one built from the incident. The MGMT sync, the common map
+ * and every OP sync not yet closed go on it; the incident links to it.
+ */
+export async function connectIncidentEvent(
+    mission: ActiveMission,
+    source: { eventId: string } | { form: FormEventInput },
+): Promise<{ event: EventSummary; created: boolean; ops: number }> {
+    const linked = await linkIncidentEvent(mission, source);
+    const ops = (await createRegistryStore(mission).load()).filter((op) => op.status !== 'closed');
+    let event = linked.event;
+    if (ops.length) event = await attachMissions(event.id, ops.map((op) => ({ guid: op.guid, name: op.name })));
+    return { event, created: linked.created, ops: ops.length };
 }
 
 /** Active MGMT events for the Create Mission picker. */

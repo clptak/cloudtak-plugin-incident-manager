@@ -153,3 +153,22 @@ test('externalIdChanges: only what differs; blank removes', () => {
     assert.deepEqual(externalIdChanges({ Case_Number: 'C1' }, { Case_Number: '' }),
         [{ system: 'Case_Number', value: '' }]);
 });
+
+test('an incident event without a CAD call is named from the form (#39)', async () => {
+    const { buildIncidentEvent } = await import('./coreEvent.ts');
+    const plan = buildIncidentEvent({
+        activityNumber: '26-1234', incidentName: 'Hiker', typeLabel: 'Search',
+        lat: 39.5, lng: -105.1, location: 'Ridge TH', subjectProfile: 'hiker',
+        channels: [3, 3, 5], missions: [{ guid: 'g', name: 'Hiker' }],
+    });
+    assert.equal(plan.body.name, '26-1234 - Search');
+    assert.deepEqual(plan.body.geometry.coordinates, [-105.1, 39.5]);
+    assert.deepEqual(plan.body.channels, [3, 5]);
+    assert.equal(plan.body.metadata.role, 'mgmt');
+    assert.equal(plan.body.metadata.subjectProfile, 'hiker');
+    assert.equal(plan.body.external_id, undefined);
+    assert.equal(plan.body.started, undefined);
+    assert.equal(buildIncidentEvent({ activityNumber: '', incidentName: 'Hiker', lat: 1, lng: 2, channels: [1] }).body.name, 'Hiker');
+    assert.throws(() => buildIncidentEvent({ activityNumber: 'x', incidentName: '', lat: Number.NaN, lng: 2, channels: [1] }), /location/);
+    assert.throws(() => buildIncidentEvent({ activityNumber: 'x', incidentName: '', lat: 1, lng: 2, channels: [] }), /channel/);
+});
