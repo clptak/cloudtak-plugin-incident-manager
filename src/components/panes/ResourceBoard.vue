@@ -968,7 +968,7 @@ function startAssign(r: ResourceAssignment): void {
         teamResourceAssignmentId: r.id,
         assignmentUid: '',
         instructions: '',
-        started: nowDatetimeLocal(),
+        started: '',
         completed: '',
     };
     if (!missionCots.value.length) void refreshMissionCots();
