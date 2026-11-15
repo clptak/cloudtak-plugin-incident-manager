@@ -38,9 +38,10 @@ import {
 import { orgChartFromSchemaValue } from './orgChartPersistence.ts';
 import { treeHasContent } from './hastyTeamTree.ts';
 import { loadResourceAssignmentsFromMission } from './resourceAssignmentPersistence.ts';
-import { resourceStatusLabel, type ResourceAssignment } from './resourceAssignments.ts';
+import type { ResourceAssignment } from './resourceAssignments.ts';
 import { workAssignmentsFromSchema } from './workAssignmentPersistence.ts';
-import { workAssignmentTitle, type WorkAssignment } from './workAssignments.ts';
+import type { WorkAssignment } from './workAssignments.ts';
+import { legacyResourceNotes, refreshAutoNotes, resourceNotes } from './ics201ResourceNotes.ts';
 
 export const ICS201_KEYWORD = 'ics-201';
 export const RESOURCES_KEYWORD = 'resources';
@@ -74,6 +75,8 @@ export interface Ics201ResourceRow {
     eta: string;
     arrived: boolean;
     notes: string;
+    /** The notes as pre-filled; unchanged notes follow the board on refresh (#38). */
+    autoNotes?: string;
 }
 
 export interface Ics201Form {
@@ -407,6 +410,7 @@ function padResources(rows: Ics201ResourceRow[] | undefined): Ics201ResourceRow[
             eta: String(r?.eta ?? ''),
             arrived: Boolean(r?.arrived),
             notes: String(r?.notes ?? ''),
+            ...(typeof r?.autoNotes === 'string' ? { autoNotes: r.autoNotes } : {}),
         };
     }
     return out;
@@ -615,24 +619,16 @@ export function resourceRowsFromAssignments(
     return assignments
         .filter((a) => a.opNumber == null)
         .slice(0, MAX_RESOURCE_ROWS).map((a) => {
-        // The resource's Initial Response work, with or without a map object (#35).
-        const tasks = work
-            .filter((w) => w.teamResourceAssignmentId === a.id)
-            .map((w) => `#${w.assignmentNumber} ${workAssignmentTitle(w)}`.trim());
-        const noteParts = [
-            a.agency.trim(),
-            a.status !== 'have' ? `Status: ${resourceStatusLabel(a.status)}` : '',
-            tasks.length
-                ? `Assignment: ${tasks.join(', ')}`
-                : a.assignmentCallsign?.trim() ? `Assignment: ${a.assignmentCallsign.trim()}` : '',
-        ].filter(Boolean);
+        // Assignments and their status first, then status and agency (#38).
+        const notes = resourceNotes(a, work);
         return {
             resource: a.resource.trim(),
             identifier: a.resourceIdentifier.trim(),
             dateTimeOrdered: formatResourceOrdered(a.timeOrdered),
             eta: a.eta != null ? String(a.eta) : '',
             arrived: !!a.timeArrived.trim(),
-            notes: noteParts.join('; '),
+            notes,
+            autoNotes: notes,
         };
     });
 }
@@ -968,9 +964,14 @@ export async function loadIcs201FromMission(
     // Resource Summary: mission resource assignments (Resources screen →
     // mission_schema.json) first, then legacy `resources`-tagged logs.
     let assignmentRows: Ics201ResourceRow[] = [];
+    const legacyNotes = new Map<string, string>();
     try {
         const { assignments } = await loadResourceAssignmentsFromMission(schemaTarget);
-        assignmentRows = resourceRowsFromAssignments(assignments, workAssignmentsFromSchema(schema));
+        const work = workAssignmentsFromSchema(schema);
+        assignmentRows = resourceRowsFromAssignments(assignments, work);
+        for (const a of assignments) {
+            legacyNotes.set(a.resourceIdentifier.trim().toLowerCase(), legacyResourceNotes(a, work));
+        }
     } catch {
         // mission_schema.json may be absent or unreadable; log rows still apply
     }
@@ -1058,6 +1059,9 @@ export async function loadIcs201FromMission(
         // Saved forms serialize blank resource rows; don't let them wipe auto-fill.
         if (!resourceRowsHaveContent(form.resources)) {
             form.resources = autoResources;
+        } else {
+            // Untouched notes follow the board; edited notes stay (#38).
+            form.resources = refreshAutoNotes(form.resources, autoResources, legacyNotes);
         }
     }
 
@@ -1113,7 +1117,9 @@ export function mergeIcs201Sources(current: Ics201Form, loaded: Ics201Form, keep
             normalizeActionContinuationPages(loaded.actionContinuationPages),
         ),
         actions: actionRowsHaveContent(current.actions) ? current.actions : loaded.actions,
-        resources: resourceRowsHaveContent(current.resources) ? current.resources : loaded.resources,
+        resources: resourceRowsHaveContent(current.resources)
+            ? refreshAutoNotes(current.resources, loaded.resources)
+            : loaded.resources,
         logId: current.logId ?? loaded.logId,
     };
     ensureActionRowCapacity(merged);
