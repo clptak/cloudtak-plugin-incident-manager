@@ -994,6 +994,7 @@ import {
     saveTacticAssessmentsToMission,
 } from '../../../lib/tacticRiskPersistence.ts';
 import { loadIncidentSubscription } from '../../../lib/incidentSubscription.ts';
+import { timelineLog } from '../../../lib/eventTimeline.ts';
 import { riskFieldLogEntry, type RiskModel, type RiskLogRespondent } from '../../../lib/riskFieldLog.ts';
 
 const { activeMission, requireActiveMission } = useIncident();
@@ -1433,10 +1434,12 @@ async function persist(
         if (fieldLog) {
             try {
                 const sub = await loadIncidentSubscription(activeMission.value);
-                await sub.log.create({
+                const body = {
                     dtg: new Date().toISOString(),
                     ...riskFieldLogEntry(which as RiskModel, fieldLog.tacticLabel, fieldLog.respondent),
-                });
+                };
+                const created = await sub.log.create(body);
+                void timelineLog(activeMission.value, sub.guid, { ...body, id: created.id }, { type: 'status' });
                 message += ` Added to the FIELD DataSync Log on ${activeMission.value.name}.`;
             } catch (logErr) {
                 const why = logErr instanceof Error ? logErr.message : String(logErr);

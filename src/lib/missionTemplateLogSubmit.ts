@@ -56,9 +56,12 @@ export async function submitMissionTemplateLog(opts: {
         subscribed: true,
         reload: false,
     });
-    await sub.log.create({
+    const body = {
         content: stringify(opts.values),
         keywords: [...opts.log.keywords, `template:${opts.log.id}`],
-    });
+    };
+    const created = await sub.log.create(body);
+    const { timelineLog } = await import('./eventTimeline.ts');
+    void timelineLog(opts.mission, target.guid, { ...body, id: created.id }, { title: opts.log.name });
     return target;
 }

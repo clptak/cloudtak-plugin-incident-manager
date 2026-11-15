@@ -324,6 +324,7 @@ import { ref, computed, reactive, onMounted, watch } from 'vue';
 import { IconChevronDown } from '@tabler/icons-vue';
 import { TablerBorder, TablerInput, TablerEnum, TablerInlineAlert } from '@tak-ps/vue-tabler';
 import { loadSchemaSubscription, schemaMission } from '../../../lib/incidentSubscription.ts';
+import { timelineLog } from '../../../lib/eventTimeline.ts';
 import { saveIncidentPostToMission } from '../../../lib/incidentPostPersistence.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import ObjectiveStrategies from './ObjectiveStrategies.vue';
@@ -639,10 +640,12 @@ async function upsertCell(
         if (id) {
             await sub.log.update(id, body);
             counters.updated++;
+            void timelineLog(activeMission.value, sub.guid, { ...body, id });
             return id;
         }
         const res = await sub.log.create(body);
         counters.created++;
+        void timelineLog(activeMission.value, sub.guid, { ...body, id: res.id });
         return String(res.id);
     } catch {
         counters.failed++;

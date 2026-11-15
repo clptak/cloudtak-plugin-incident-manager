@@ -177,28 +177,35 @@ function clueLogWriter(sub: Subscription): {
     return sub.log as unknown as ReturnType<typeof clueLogWriter>;
 }
 
+/** What was written, for the Core Event timeline. */
+export interface ClueLogWrite extends ClueLogBody {
+    id: string;
+}
+
 export async function createClueLog(
     target: { guid: string; token?: string },
     entry: ClueLogEntry,
-): Promise<void> {
+): Promise<ClueLogWrite> {
     const sub = await Subscription.load(target.guid, {
         missiontoken: target.token || undefined,
         subscribed: true,
         reload: false,
     });
-    await clueLogWriter(sub).create({
+    const body: ClueLogBody = {
         dtg: new Date().toISOString(),
         content: buildClueContent(entry),
         keywords: buildClueKeywords(entry),
         entryUid: entry.markerUid,
-    });
+    };
+    const created = await clueLogWriter(sub).create(body);
+    return { ...body, id: String(created.id) };
 }
 
 /** Update validation/disposition on an existing clue log (full body rewrite). */
 export async function updateClueLog(clue: TrackedClue, patch: {
     validation?: ClueValidation;
     disposition?: ClueDisposition | '';
-}): Promise<void> {
+}): Promise<ClueLogWrite> {
     const next: ClueLogEntry = {
         ...clue,
         validation: patch.validation ?? clue.validation,
@@ -208,10 +215,12 @@ export async function updateClueLog(clue: TrackedClue, patch: {
         missiontoken: clue.sourceToken || undefined,
         reload: false,
     });
-    await clueLogWriter(sub).update(clue.logId, {
+    const body: ClueLogBody = {
         dtg: clue.at || new Date().toISOString(),
         content: buildClueContent(next),
         keywords: buildClueKeywords(next),
         entryUid: next.markerUid,
-    });
+    };
+    await clueLogWriter(sub).update(clue.logId, body);
+    return { ...body, id: clue.logId };
 }

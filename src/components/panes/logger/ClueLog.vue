@@ -268,6 +268,7 @@ import {
     type TrackedClue,
 } from '../../../lib/clueLog.ts';
 import { clueSources } from '../../../lib/clueLog.ts';
+import { timelineLog } from '../../../lib/eventTimeline.ts';
 import { flyToFeature } from '../../../lib/flyToFeature.ts';
 import { createRegistryStore } from '../../../lib/registryPersistence.ts';
 import { localDateTimeLabel } from '../../../lib/localTime.ts';
@@ -366,7 +367,7 @@ async function onSaveLog(): Promise<void> {
         const target = currentOp.value
             ? { guid: currentOp.value.guid, token: currentOp.value.ownerToken }
             : { guid: mission.guid, token: mission.missionToken };
-        await createClueLog(target, {
+        const written = await createClueLog(target, {
             number: newNumber.value,
             validation: form.validation,
             disposition: form.disposition,
@@ -375,6 +376,7 @@ async function onSaveLog(): Promise<void> {
             markerCallsign: marker?.callsign,
             notes: form.notes,
         });
+        void timelineLog(mission, target.guid, written, { type: 'location' });
         notice.value = `Clue #${newNumber.value} logged to ${logTargetLabel.value}.`;
         form.validation = 'Pending';
         form.disposition = '';
@@ -392,7 +394,8 @@ async function onValidationChange(clue: TrackedClue, event: Event): Promise<void
     const validation = (event.target as HTMLSelectElement).value as ClueValidation;
     busy.value = true;
     try {
-        await updateClueLog(clue, { validation });
+        const written = await updateClueLog(clue, { validation });
+        void timelineLog(activeMission.value, clue.sourceGuid, written, { type: 'location' });
         clue.validation = validation;
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);
@@ -405,7 +408,8 @@ async function onDispositionChange(clue: TrackedClue, event: Event): Promise<voi
     const disposition = (event.target as HTMLSelectElement).value as ClueDisposition | '';
     busy.value = true;
     try {
-        await updateClueLog(clue, { disposition });
+        const written = await updateClueLog(clue, { disposition });
+        void timelineLog(activeMission.value, clue.sourceGuid, written, { type: 'location' });
         clue.disposition = disposition;
     } catch (err) {
         error.value = err instanceof Error ? err.message : String(err);

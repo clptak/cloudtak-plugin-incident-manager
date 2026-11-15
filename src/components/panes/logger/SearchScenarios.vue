@@ -400,6 +400,7 @@ import Sortable from 'sortablejs';
 import type { SortableEvent } from 'sortablejs';
 import { TablerBorder, TablerInput, TablerInlineAlert } from '@tak-ps/vue-tabler';
 import { loadSchemaSubscription, schemaMission } from '../../../lib/incidentSubscription.ts';
+import { timelineLog } from '../../../lib/eventTimeline.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import { loadIcs201FromMission } from '../../../lib/ics201.ts';
 import { nowBriefingDate, nowBriefingTime } from '../../../lib/irBriefing.ts';
@@ -915,13 +916,15 @@ async function send(): Promise<void> {
                 keywords: buildKeywords(key, d),
             };
             try {
-                if (d.logId) {
-                    await sub.log.update(d.logId, body);
+                let logId = d.logId;
+                if (logId) {
+                    await sub.log.update(logId, body);
                     updated++;
                 } else {
-                    await sub.log.create(body);
+                    logId = String((await sub.log.create(body)).id);
                     created++;
                 }
+                void timelineLog(activeMission.value, sub.guid, { ...body, id: logId }, { title: 'Search Scenario' });
                 Object.assign(drafts[key], blankDraft());
                 editingKeys.value = editingKeys.value.filter((k) => k !== key);
                 didWrite = true;

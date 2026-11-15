@@ -1,6 +1,7 @@
 import { ref } from 'vue';
 import type { ActiveMission } from './useIncident.ts';
 import { sendWorkAssignmentLog, type WorkAssignmentPhase } from '../lib/workAssignmentLogs.ts';
+import { timelineWorkAssignment } from '../lib/eventTimeline.ts';
 import { nowDatetimeLocal } from '../lib/incidentInfo.ts';
 import {
     loadWorkAssignmentsFromMission,
@@ -85,6 +86,7 @@ export function useWorkAssignments() {
             (a, b) => a.assignmentNumber - b.assignmentNumber,
         );
         await persist(mission);
+        void timelineWorkAssignment(mission, record, 'created');
         return record;
     }
 
@@ -144,6 +146,7 @@ export function useWorkAssignments() {
                 assignments.value,
                 schemaHash.value,
             );
+            void timelineWorkAssignment(mission, updated, phase);
             statusMessage.value = phase === 'started'
                 ? `Assignment ${current.assignmentNumber} start logged to the FIELD DataSync`
                 : `Assignment ${current.assignmentNumber} completion logged to the FIELD DataSync`;

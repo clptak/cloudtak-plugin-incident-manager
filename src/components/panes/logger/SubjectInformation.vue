@@ -438,6 +438,7 @@ import {
 } from '../../../lib/subjectsPersistence.ts';
 import { loadMissionSchema } from '../../../lib/missionSchema.ts';
 import { loadIncidentSubscription, loadSchemaSubscription } from '../../../lib/incidentSubscription.ts';
+import { timelineLog } from '../../../lib/eventTimeline.ts';
 
 const { activeMission, requireActiveMission } = useIncident();
 const { enumOptions: subjectProfileEnumOptions } = usePluginSettings();
@@ -863,14 +864,16 @@ async function send(): Promise<void> {
                 keywords: buildSubjectKeywords(f),
             };
             try {
-                if (f.logId || existing?.id) {
-                    await sub.log.update(f.logId || existing!.id, body);
+                let logId = f.logId || existing?.id;
+                if (logId) {
+                    await sub.log.update(logId, body);
                     updated++;
                 } else {
                     const createdLog = await sub.log.create(body);
-                    f.logId = String(createdLog.id);
+                    logId = f.logId = String(createdLog.id);
                     created++;
                 }
+                void timelineLog(activeMission.value, sub.guid, { ...body, id: logId }, { title: 'Subject Information' });
                 succeeded.push({ ...f });
             } catch {
                 failed++;

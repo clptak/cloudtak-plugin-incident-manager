@@ -9,6 +9,8 @@ import {
     mergeResourceAssignmentPatch,
     type ResourceAssignment,
 } from '../lib/resourceAssignments.ts';
+import { timelineResource } from '../lib/eventTimeline.ts';
+import { resourceStatusChanged } from '../domain/eventTimeline.ts';
 
 const assignments = ref<ResourceAssignment[]>([]);
 const defaultAgency = ref('');
@@ -90,6 +92,7 @@ export function useResourceAssignments() {
 
         assignments.value = [...assignments.value, record];
         await persist(mission);
+        void timelineResource(mission, record, 'added');
         return record;
     }
 
@@ -106,13 +109,15 @@ export function useResourceAssignments() {
         const idx = assignments.value.findIndex((a) => a.id === id);
         if (idx < 0) return;
 
-        const updated = mergeResourceAssignmentPatch(assignments.value[idx], patch);
+        const before = assignments.value[idx];
+        const updated = mergeResourceAssignmentPatch(before, patch);
         assignments.value = [
             ...assignments.value.slice(0, idx),
             updated,
             ...assignments.value.slice(idx + 1),
         ];
         await persist(mission);
+        if (resourceStatusChanged(before, updated)) void timelineResource(mission, updated, 'status');
     }
 
     async function updateDefaultAgency(mission: ActiveMission, value: string): Promise<void> {

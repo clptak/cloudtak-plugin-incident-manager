@@ -335,6 +335,7 @@ import { reactive, ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { IconInfoCircle, IconChevronDown } from '@tabler/icons-vue';
 import { TablerBorder, TablerInput, TablerInlineAlert } from '@tak-ps/vue-tabler';
 import { loadSchemaSubscription, schemaMission } from '../../../lib/incidentSubscription.ts';
+import { timelineLog } from '../../../lib/eventTimeline.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
 import { loadIcs201FromMission } from '../../../lib/ics201.ts';
 import { nowBriefingDate, nowBriefingTime } from '../../../lib/irBriefing.ts';
@@ -627,10 +628,9 @@ async function send(): Promise<void> {
         const breakdown = factors.map((f) => `${f.label}: ${f.value}`).join('; ');
         const content = `Search Urgency: ${level.value.label} (total ${total.value}/21). ${breakdown}`;
         const sub = await loadSchemaSubscription(activeMission.value);
-        await sub.log.create({
-            content,
-            keywords: ['search-urgency', `urgency:${level.value.label}`, `total:${total.value}`],
-        });
+        const body = { content, keywords: ['search-urgency', `urgency:${level.value.label}`, `total:${total.value}`] };
+        const created = await sub.log.create(body);
+        void timelineLog(activeMission.value, sub.guid, { ...body, id: created.id }, { type: 'status' });
         status.value = `Added urgency rating (${level.value.label}) to the MGMT DataSync Log (${schemaMission(activeMission.value).name}).`;
     } catch (err) {
         statusError.value = true;

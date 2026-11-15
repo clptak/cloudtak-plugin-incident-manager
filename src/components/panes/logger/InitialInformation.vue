@@ -393,6 +393,7 @@
 <script setup lang='ts'>
 import { ref, computed, reactive, watch, onMounted } from 'vue';
 import { syncIncidentEventIds } from '../../../lib/coreEvents.ts';
+import { timelineLog } from '../../../lib/eventTimeline.ts';
 import { IconChevronDown } from '@tabler/icons-vue';
 import {
     TablerBorder,
@@ -679,6 +680,7 @@ async function sendIncidentInfoToDataSync(): Promise<void> {
             const created = await sub.log.create(body);
             incidentForm.logId = String(created.id);
         }
+        void timelineLog(activeMission.value, sub.guid, { ...body, id: incidentForm.logId }, { title: 'Incident Information' });
         incidentStatus.value = `Added incident information to the FIELD DataSync Log on ${activeMission.value.name}.`;
     } catch (err) {
         incidentStatusError.value = true;
@@ -811,11 +813,9 @@ async function postLogs(): Promise<void> {
                 const keywords = ['source:CAD'];
                 if (r.uid) keywords.push(`uid:${r.uid}`);
                 try {
-                    await sub.log.create({
-                        dtg: toDtg(r.dtg),
-                        content: callNoteContent(r),
-                        keywords,
-                    });
+                    const body = { dtg: toDtg(r.dtg), content: callNoteContent(r), keywords };
+                    const created = await sub.log.create(body);
+                    void timelineLog(activeMission.value, sub.guid, { ...body, id: created.id }, { title: 'CAD Call Note' });
                     counts[target]++;
                 } catch {
                     failed++;
