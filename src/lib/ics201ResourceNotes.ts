@@ -1,7 +1,7 @@
 /**
  * ICS 201 Resource Summary notes (#38): pre-filled from the resource's
- * assignments and status, most useful first (the column is narrow), and
- * still editable.
+ * assignments (with their instructions and status) and the resource status,
+ * and still editable. The agency is left off.
  *
  * Notes the user has not touched follow the board when the form is
  * reloaded or refreshed; notes they edited are kept. A row remembers the
@@ -43,16 +43,26 @@ function workFor(a: ResourceAssignment, work: WorkAssignment[]): WorkAssignment[
         .sort((x, y) => x.assignmentNumber - y.assignmentNumber);
 }
 
-/** The pre-filled notes: assignments with their status, the resource status, then the agency. */
+/**
+ * One assignment for the notes: number, map object, instructions and where
+ * it stands, e.g. "#4 02 - Go looking over there. (Completed 11/15 08:39)".
+ * Work with no map object is named by its instructions, so they show once.
+ */
+export function workNoteText(w: WorkAssignment): string {
+    const map = w.assignmentCallsign.trim();
+    const instructions = w.instructions.trim();
+    const what = map && instructions ? `${map} - ${instructions}` : workAssignmentTitle(w);
+    return `#${w.assignmentNumber} ${what} (${workStatusText(w)})`.replace(/\s+/g, ' ');
+}
+
+/** The pre-filled notes: assignments with instructions and status, then the resource status. */
 export function resourceNotes(a: ResourceAssignment, work: WorkAssignment[]): string {
-    const tasks = workFor(a, work)
-        .map((w) => `#${w.assignmentNumber} ${workAssignmentTitle(w)} (${workStatusText(w)})`.replace(/\s+/g, ' '));
+    const tasks = workFor(a, work).map(workNoteText);
     return [
         tasks.length
             ? tasks.join('; ')
             : a.assignmentCallsign?.trim() ? `Assignment: ${a.assignmentCallsign.trim()}` : '',
         a.status !== 'have' ? `Status: ${resourceStatusLabel(a.status)}` : '',
-        a.agency.trim(),
     ].filter(Boolean).join('; ');
 }
 

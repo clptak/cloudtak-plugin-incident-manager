@@ -34,13 +34,15 @@ test('work status reads Completed / In progress / Not started with the time', ()
     assert.equal(workStatusText(work()), 'Not started');
 });
 
-test('notes lead with the assignment and its status; agency last (#38)', () => {
+test('notes carry each assignment with its instructions and status, no agency (#38)', () => {
     const done = work({ started: '2026-11-15T08:38', completed: '2026-11-15T08:39' });
-    assert.equal(resourceNotes(res(), [done]), `#4 02 (Completed 11/15 08:39); ${AGENCY}`);
+    assert.equal(resourceNotes(res(), [done]), '#4 02 - Go looking over there. (Completed 11/15 08:39)');
     const needed = res({ id: 'r2', status: 'need', resourceIdentifier: 'Investigator' });
-    assert.equal(resourceNotes(needed, [done]), `Status: Need; ${AGENCY}`);
+    assert.equal(resourceNotes(needed, [done]), 'Status: Need');
     const noMap = work({ assignmentCallsign: '', assignmentUid: '', instructions: 'Interview the RP' });
-    assert.equal(resourceNotes(res(), [noMap]), `#4 Interview the RP (Not started); ${AGENCY}`);
+    assert.equal(resourceNotes(res(), [noMap]), '#4 Interview the RP (Not started)');
+    const mapOnly = work({ instructions: '', assignmentNumber: 5 });
+    assert.equal(resourceNotes(res(), [mapOnly, done]), '#4 02 - Go looking over there. (Completed 11/15 08:39); #5 02 (Not started)');
 });
 
 test('untouched notes follow the board; edited notes are kept', () => {
