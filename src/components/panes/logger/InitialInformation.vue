@@ -1,8 +1,5 @@
 <template>
     <div>
-        <!-- The incident's Core Event: shown, or connected / created here (#39). -->
-        <IncidentEventCard />
-
         <!-- CFS / Call Notes -->
         <div
             v-if='!cfsExpanded'
@@ -89,6 +86,9 @@
                 :description='status'
             />
         </TablerBorder>
+
+        <!-- The incident's Core Event: shown, or connected / created here (#39). Collapsed by default. -->
+        <IncidentEventCard collapsible />
 
         <!-- Incident Information -->
         <TablerBorder
