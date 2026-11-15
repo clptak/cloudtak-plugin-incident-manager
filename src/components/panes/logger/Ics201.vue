@@ -495,7 +495,16 @@
             </template>
 
             <div class='table-responsive'>
-                <table class='table table-sm table-bordered mb-0 small'>
+                <table class='table table-sm table-bordered mb-0 small ics201-resources'>
+                    <!-- Narrow ETA / Arrived, wide wrapping Notes (#38). -->
+                    <colgroup>
+                        <col style='width: 15%'>
+                        <col style='width: 15%'>
+                        <col style='width: 14%'>
+                        <col style='width: 4.5rem'>
+                        <col style='width: 5rem'>
+                        <col>
+                    </colgroup>
                     <thead>
                         <tr>
                             <th>Resource</th>
@@ -531,7 +540,12 @@
                                 >
                             </td>
                             <td>
-                                <TablerInput v-model='row.notes' />
+                                <textarea
+                                    v-model='row.notes'
+                                    class='form-control form-control-sm ics201-notes'
+                                    :rows='noteRows(row.notes)'
+                                    :aria-label='`Notes for ${row.identifier || `resource ${i + 1}`}`'
+                                />
                             </td>
                         </tr>
                     </tbody>
@@ -741,6 +755,11 @@ import {
 } from '../../../lib/ics201Pdf.ts';
 import { currentPrintView, renderPrintMap, type PrintMapImage } from '../../../lib/printMap.ts';
 import { downloadPdfBytes, uploadMissionFile } from '../../../lib/missionUpload.ts';
+
+/** Notes wrap; rows grow with the text so it can be read and edited in place (#38). */
+function noteRows(text: string): number {
+    return Math.min(6, Math.max(1, Math.ceil(text.trim().length / 45)));
+}
 
 const { activeMission, requireActiveMission } = useIncident();
 
@@ -1136,6 +1155,14 @@ watch(() => activeMission.value?.guid, () => { void loadAll(false); });
 </script>
 
 <style scoped>
+.ics201-resources {
+    table-layout: fixed;
+    min-width: 760px;
+}
+.ics201-notes {
+    resize: vertical;
+    min-height: 2.25rem;
+}
 .rotate-180 {
     transform: rotate(-180deg);
 }
