@@ -5,6 +5,7 @@ import {
     NAV_SECTIONS,
     navGroupHeading,
     sectionKeyForNavItem,
+    visibleIncidentNavItems,
     visibleNavSections,
 } from './incidentNav.ts';
 import { SEARCH_ONLY_NAV_KEYS } from './incidentType.ts';
@@ -79,4 +80,24 @@ test('help pop-outs show only for search incidents (#42)', () => {
         assert.equal(section.helpKey, undefined, section.key);
         assert.ok(section.items.every((i) => i.helpKey === undefined), section.key);
     }
+});
+
+test('the former horizontal tabs are pinned incident items; Clues only for search (#44)', () => {
+    assert.deepEqual(visibleIncidentNavItems(true).map((i) => i.label), [
+        'Dashboard', 'Incident Summary', 'Logs', 'Tasks & Checklists', 'Personnel', 'Clues',
+    ]);
+    assert.deepEqual(visibleIncidentNavItems(false).map((i) => i.key), [
+        'dashboard', 'incident-summary', 'logs', 'task', 'organization',
+    ]);
+});
+
+test('CASIE sits in Area Search; Risk Management follows it for every type (#44)', () => {
+    const search = visibleNavSections(true);
+    const area = search.findIndex((s) => s.key === 'h-area');
+    assert.deepEqual(search[area].items.map((i) => i.key), ['operational-periods', 'casie']);
+    assert.equal(search[area + 1].label, 'Risk Management');
+    const other = visibleNavSections(false);
+    const ops = other.find((s) => s.key === 'h-area');
+    assert.deepEqual(ops?.items.map((i) => i.key), ['operational-periods']);
+    assert.deepEqual(other.find((s) => s.key === 'h-risk')?.items.map((i) => i.key), ['risk-assessment']);
 });

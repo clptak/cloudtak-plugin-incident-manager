@@ -13,9 +13,9 @@ import {
     touchesPrefixes,
 } from './screenKeys.ts';
 
-test('screenId: nav key on Main, htab:<key> elsewhere', () => {
-    assert.equal(screenId('subject-info', 'main'), 'subject-info');
-    assert.equal(screenId('subject-info', 'casie'), 'htab:casie');
+test('screenId is the left-nav key (#44)', () => {
+    assert.equal(screenId('subject-info'), 'subject-info');
+    assert.equal(screenId('casie'), 'casie');
 });
 
 test('every screen key is a key the codec can produce from the shipped template', () => {
@@ -49,7 +49,7 @@ test('screenChangedKeys: only what the open screen edits', () => {
     const changed = ['s.incident-response.subjects', 'op.1.debrief.x.y', 's.cad-data'];
     assert.deepEqual(screenChangedKeys('subject-info', changed), ['s.incident-response.subjects']);
     assert.deepEqual(screenChangedKeys('initial-information', changed), ['s.cad-data']);
-    assert.deepEqual(screenChangedKeys('htab:dashboard', changed), []);
+    assert.deepEqual(screenChangedKeys('incident-summary', changed), []);
 });
 
 test('screenChangedKeys: collection prefixes match their records; IAP timestamps alone do not', () => {

@@ -412,14 +412,14 @@ const {
     activeMission,
     casieExpandRequested,
     requireActiveMission,
-    selectHTabGuarded,
+    selectKeyGuarded,
 } = useIncident();
 
-/** Jump to the CASIE tab with the Expand Search Area form opened. */
+/** Jump to CASIE with the Expand Search Area form opened. */
 function goToExpand(): void {
     if (!requireActiveMission()) return;
     casieExpandRequested.value = true;
-    selectHTabGuarded('casie');
+    selectKeyGuarded('casie');
 }
 
 const missionPolygons = ref<MissionFeatureRef[]>([]);

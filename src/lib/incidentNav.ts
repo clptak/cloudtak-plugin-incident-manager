@@ -34,6 +34,20 @@ export const SETTINGS_NAV: NavSectionItem = {
     label: 'Settings',
 };
 
+/**
+ * Incident-wide views, pinned under Open Incident (not scrolled) and shown
+ * for every incident type except where marked search-only (#44). These were
+ * the horizontal tabs.
+ */
+export const INCIDENT_NAV_ITEMS: NavSectionItem[] = [
+    { key: 'dashboard', label: 'Dashboard' },
+    { key: 'incident-summary', label: 'Incident Summary' },
+    { key: 'logs', label: 'Logs' },
+    { key: 'task', label: 'Tasks & Checklists' },
+    { key: 'organization', label: 'Personnel' },
+    { key: 'clues', label: 'Clues', searchOnly: true },
+];
+
 export const NAV_SECTIONS: NavSection[] = [
     {
         key: 'h-initial',
@@ -72,6 +86,15 @@ export const NAV_SECTIONS: NavSection[] = [
         helpKey: 'area-search',
         items: [
             { key: 'operational-periods', label: 'Operational Periods' },
+            { key: 'casie', label: 'CASIE', searchOnly: true },
+        ],
+    },
+    {
+        // Risk runs with every incident type (#44).
+        key: 'h-risk',
+        label: 'Risk Management',
+        items: [
+            { key: 'risk-assessment', label: 'Risk Assessment' },
         ],
     },
     {
@@ -86,6 +109,7 @@ export const NAV_SECTIONS: NavSection[] = [
 export const ALL_NAV_ITEMS: NavSectionItem[] = [
     CREATE_OPEN_NAV,
     SETTINGS_NAV,
+    ...INCIDENT_NAV_ITEMS,
     ...NAV_SECTIONS.flatMap((section) => section.items),
 ];
 
@@ -111,7 +135,7 @@ export function visibleNavSections(isSearch: boolean): NavSection[] {
             helpKey: undefined,
             label: section.nonSearchLabel ?? section.label,
             items: section.items
-                .filter((item) => !item.searchOnly && !SEARCH_ONLY_NAV_KEYS.has(item.key))
+                .filter((item) => !hiddenForNonSearch(item))
                 .map((item) => {
                     const flat = { ...item };
                     delete flat.group;
@@ -120,6 +144,15 @@ export function visibleNavSections(isSearch: boolean): NavSection[] {
                 }),
         }))
         .filter((section) => section.items.length > 0);
+}
+
+function hiddenForNonSearch(item: NavSectionItem): boolean {
+    return !!item.searchOnly || SEARCH_ONLY_NAV_KEYS.has(item.key);
+}
+
+/** The pinned incident-wide items for this incident type. */
+export function visibleIncidentNavItems(isSearch: boolean): NavSectionItem[] {
+    return isSearch ? INCIDENT_NAV_ITEMS : INCIDENT_NAV_ITEMS.filter((item) => !hiddenForNonSearch(item));
 }
 
 /** Sub-heading to draw above items[index], or null when it continues the previous group. */

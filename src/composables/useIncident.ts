@@ -5,7 +5,6 @@ import Subscription from '../../../../src/base/subscription.ts';
 import {
     isSearchIncidentType,
     parseIncidentTypeFromRecord,
-    SEARCH_ONLY_HTAB_KEYS,
     SEARCH_ONLY_NAV_KEYS,
 } from '../lib/incidentType.ts';
 import { resolveIncidentTypeFromFamily } from '../lib/incidentTypeResolve.ts';
@@ -43,7 +42,6 @@ export interface ActiveMission {
 
 export interface PaneNavState {
     activeKey: string;
-    activeHTab: string;
 }
 
 export const SESSION_MISSION_KEY = 'incident-manager:active-mission';
@@ -67,71 +65,56 @@ const VALID_NAV_KEYS = new Set([
     'operational-periods',
     'incident-post',
     'generate-closing-package',
+    // Former horizontal tabs, now left-nav items (#44).
+    'dashboard',
+    'incident-summary',
+    'logs',
+    'task',
+    'organization',
+    'clues',
+    'casie',
+    'risk-assessment',
 ]);
 
-const VALID_HTAB_KEYS = new Set(['main', 'dashboard', 'task', 'clues', 'casie', 'organization', 'risk-assessment']);
+/** Where an old horizontal tab now lives in the left nav (#44). */
+const LEGACY_HTAB_KEYS: Record<string, string> = {
+    'dashboard': 'incident-summary',
+    'task': 'task',
+    'clues': 'clues',
+    'casie': 'casie',
+    'organization': 'organization',
+    'assignments': 'organization',
+    'risk-assessment': 'risk-assessment',
+    'resources': 'resources',
+    'work-assignments': 'resources',
+    'lpb': 'lpb-distances',
+};
 
 function loadNavFromSession(): PaneNavState {
+    const fallback: PaneNavState = { activeKey: 'create-open' };
     try {
         const raw = sessionStorage.getItem(SESSION_NAV_KEY);
-        if (!raw) return { activeKey: 'create-open', activeHTab: 'main' };
+        if (!raw) return fallback;
         const parsed: unknown = JSON.parse(raw);
-        if (!parsed || typeof parsed !== 'object') {
-            return { activeKey: 'create-open', activeHTab: 'main' };
-        }
-        let key = (parsed as PaneNavState).activeKey;
-        let htab = (parsed as PaneNavState).activeHTab;
-        // Legacy: org chart tab was stored as `assignments` before Organization / work-assignments split.
-        if (htab === 'assignments') htab = 'organization';
-        // Resources moved from horizontal tab into Main vertical nav.
-        if (htab === 'resources') {
-            htab = 'main';
-            key = 'resources';
-        }
-        // Assignments moved from horizontal tab into Main vertical nav.
-        if (htab === 'work-assignments') {
-            htab = 'main';
-            key = 'resources';
-        }
+        if (!parsed || typeof parsed !== 'object') return fallback;
+        let key = String((parsed as Record<string, unknown>).activeKey ?? '');
+        // Sessions saved while the horizontal tabs existed (#44).
+        const htab = String((parsed as Record<string, unknown>).activeHTab ?? 'main');
+        if (htab !== 'main' && LEGACY_HTAB_KEYS[htab]) key = LEGACY_HTAB_KEYS[htab];
         // Assignments merged into Resources & Assignments (#6).
         if (key === 'work-assignments') key = 'resources';
         // Wrap Up split into section header + Generate Closing Package sub-pane.
         if (key === 'wrapup') key = 'generate-closing-package';
-        // Risk Assessment moved from Main vertical nav into a horizontal tab.
-        if (key === 'risk-assessment') {
-            key = 'create-open';
-            if (htab === 'main') htab = 'risk-assessment';
-        }
-        // CASIE moved from Main vertical nav into a horizontal tab.
-        if (key === 'casie') {
-            key = 'create-open';
-            if (htab === 'main') htab = 'casie';
-        }
-        // Clue Log moved from the Area Search nav into its own horizontal tab.
-        if (key === 'clue-log') {
-            key = 'create-open';
-            if (htab === 'main') htab = 'clues';
-        }
-        // LPB distance table moved from its horizontal tab into Containment on Main.
-        if (htab === 'lpb') {
-            htab = 'main';
-            key = 'lpb-distances';
-        }
-        return {
-            activeKey: VALID_NAV_KEYS.has(key) ? key : 'create-open',
-            activeHTab: VALID_HTAB_KEYS.has(htab) ? htab : 'main',
-        };
+        if (key === 'clue-log') key = 'clues';
+        return { activeKey: VALID_NAV_KEYS.has(key) ? key : 'create-open' };
     } catch {
-        return { activeKey: 'create-open', activeHTab: 'main' };
+        return fallback;
     }
 }
 
-function saveNavToSession(activeKey: string, activeHTab: string): void {
+function saveNavToSession(activeKey: string): void {
     try {
-        sessionStorage.setItem(
-            SESSION_NAV_KEY,
-            JSON.stringify({ activeKey, activeHTab }),
-        );
+        sessionStorage.setItem(SESSION_NAV_KEY, JSON.stringify({ activeKey }));
     } catch {
         // ignore quota / private-mode errors
     }
@@ -191,7 +174,6 @@ function saveMissionToSession(m: ActiveMission | null): void {
 const activeMission = ref<ActiveMission | null>(loadMissionFromSession());
 const savedNav = loadNavFromSession();
 const activeKey = ref(savedNav.activeKey);
-const activeHTab = ref(savedNav.activeHTab);
 /** Create Mission dropdown while no mission is active. */
 const draftIncidentType = ref('');
 
@@ -203,23 +185,21 @@ const isSearchIncident = computed(() => isSearchIncidentType(effectiveIncidentTy
 /** Selected DataSync is `search` — ignores Create-form draft type. */
 const isSearchMission = computed(() => isSearchIncidentType(activeMission.value?.incidentType));
 
-const MISSION_EXEMPT_NAV_KEYS = new Set(['create-open', 'settings']);
+/** Views that open without an active incident. */
+const MISSION_EXEMPT_NAV_KEYS = new Set(['create-open', 'settings', 'dashboard', 'task', 'casie']);
 
 const noMissionModalOpen = ref(false);
 
-/** One-shot signal: open the CASIE tab with the Expand Search Area form open. */
+/** One-shot signal: open CASIE with the Expand Search Area form open. */
 const casieExpandRequested = ref(false);
 
-export function isMissionRequiredView(key: string, htab: string): boolean {
-    if (htab === 'dashboard' || htab === 'organization' || htab === 'risk-assessment' || htab === 'clues') return true;
-    if (htab !== 'main') return false;
+export function isMissionRequiredView(key: string): boolean {
     return !MISSION_EXEMPT_NAV_KEYS.has(key);
 }
 
 function selectKey(key: string): void {
     // Assignments merged into Resources & Assignments (#6).
     activeKey.value = key === 'work-assignments' ? 'resources' : key;
-    activeHTab.value = 'main';
 }
 
 function openNoMissionModal(): void {
@@ -237,15 +217,9 @@ function requireActiveMission(): boolean {
 }
 
 function bounceHiddenSearchViews(): void {
-    let key = activeKey.value;
-    let htab = activeHTab.value;
-    if (!isSearchMission.value && SEARCH_ONLY_HTAB_KEYS.has(htab)) htab = 'main';
-    if (!isSearchIncident.value && SEARCH_ONLY_NAV_KEYS.has(key)) {
-        key = 'create-open';
-        htab = 'main';
+    if (!isSearchIncident.value && SEARCH_ONLY_NAV_KEYS.has(activeKey.value)) {
+        activeKey.value = 'create-open';
     }
-    if (key !== activeKey.value) activeKey.value = key;
-    if (htab !== activeHTab.value) activeHTab.value = htab;
 }
 
 function selectKeyGuarded(key: string): void {
@@ -253,20 +227,8 @@ function selectKeyGuarded(key: string): void {
         selectKey('create-open');
         return;
     }
-    if (activeMission.value || !isMissionRequiredView(key, 'main')) {
+    if (activeMission.value || !isMissionRequiredView(key)) {
         selectKey(key);
-        return;
-    }
-    openNoMissionModal();
-}
-
-function selectHTabGuarded(htab: string): void {
-    if (!isSearchMission.value && SEARCH_ONLY_HTAB_KEYS.has(htab)) {
-        activeHTab.value = 'main';
-        return;
-    }
-    if (activeMission.value || !isMissionRequiredView(activeKey.value, htab)) {
-        activeHTab.value = htab;
         return;
     }
     openNoMissionModal();
@@ -277,8 +239,8 @@ function goToCreateOpen(): void {
     selectKey('create-open');
 }
 
-watch([activeKey, activeHTab], ([key, htab]) => {
-    saveNavToSession(key, htab);
+watch(activeKey, (key) => {
+    saveNavToSession(key);
 });
 
 watch(activeMission, (m) => {
@@ -383,7 +345,6 @@ export function useIncident() {
     return {
         activeMission,
         activeKey,
-        activeHTab,
         casieExpandRequested,
         noMissionModalOpen,
         isSearchIncident,
@@ -393,7 +354,6 @@ export function useIncident() {
         setDraftIncidentType,
         selectKey,
         selectKeyGuarded,
-        selectHTabGuarded,
         requireActiveMission,
         openNoMissionModal,
         closeNoMissionModal,

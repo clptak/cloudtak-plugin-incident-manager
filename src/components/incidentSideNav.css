@@ -60,6 +60,16 @@
     color: var(--tblr-body-color, var(--bs-body-color));
 }
 
+.incident-side-nav .incident-nav-fixed {
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--tblr-border-color, rgba(255, 255, 255, 0.12));
+    padding-bottom: 0.35rem;
+}
+
+.incident-side-nav .incident-nav-fixed .incident-nav-section-header {
+    margin-top: 0.5rem;
+}
+
 .incident-side-nav .incident-nav-item.incident-nav-settings {
     border-top: 1px solid var(--tblr-border-color, rgba(255, 255, 255, 0.12));
     border-radius: 0;
@@ -185,10 +195,6 @@
     background: transparent;
     color: color-mix(in srgb, var(--tblr-body-color, var(--bs-body-color)) 75%, transparent);
     line-height: 1;
-}
-
-.incident-h-tabs {
-    flex-shrink: 0;
 }
 
 .incident-mobile-nav-label {

@@ -13,9 +13,9 @@ import { isVolatileKey } from './schemaCollections.ts';
 
 const IR = 's.incident-response.';
 
-/** Screen id: the nav key on the Main tab, `htab:<key>` on the other tabs. */
-export function screenId(activeKey: string, activeHTab: string): string {
-    return activeHTab === 'main' ? activeKey : `htab:${activeHTab}`;
+/** Screen id: the left-nav key (the horizontal tabs are gone, #44). */
+export function screenId(activeKey: string): string {
+    return activeKey;
 }
 
 /**
@@ -44,10 +44,9 @@ export const SCREEN_EDIT_KEYS: Record<string, string[]> = {
     ],
     // The IAP builder lives on this screen; its lists refresh by themselves.
     'operational-periods': [`${IR}iap-plans`, 'c.iap.'],
-    'htab:casie': [`${IR}casie`, `${IR}casie-scenarios`],
-    'htab:organization': ['s.assignments-org-chart', `${IR}resource-assignments`, 'c.resources.'],
-    'htab:clues': [`${IR}clues`, 'c.clues.'],
-    'htab:risk-assessment': ['s.risk', `${IR}work-assignments`, 'c.work-assignments.'],
+    'casie': [`${IR}casie`, `${IR}casie-scenarios`],
+    'organization': ['s.assignments-org-chart', `${IR}resource-assignments`, 'c.resources.'],
+    'clues': [`${IR}clues`, 'c.clues.'],
 };
 
 const LABELS: Record<string, string> = {

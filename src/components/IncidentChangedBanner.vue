@@ -36,8 +36,8 @@ import { keyLabels, screenChangedKeys, screenId } from '../lib/screenKeys.ts';
 
 const emit = defineEmits<{ (e: 'reload'): void }>();
 
-const { activeKey, activeHTab } = useIncident();
-const screen = computed(() => screenId(activeKey.value, activeHTab.value));
+const { activeKey } = useIncident();
+const screen = computed(() => screenId(activeKey.value));
 const changed = reactive(new Set<string>());
 const changedLabels = computed(() => keyLabels(changed));
 

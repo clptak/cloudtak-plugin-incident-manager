@@ -14,10 +14,10 @@ import TaskbarChipButton from './TaskbarChipButton.vue';
 import { openDesktopPane } from '../lib/floatMinimize.ts';
 import { useIncident } from '../composables/useIncident.ts';
 
-const { selectHTabGuarded, isSearchIncident } = useIncident();
+const { selectKeyGuarded, isSearchIncident } = useIncident();
 
 function openClueLog(): void {
     openDesktopPane();
-    selectHTabGuarded('clues');
+    selectKeyGuarded('clues');
 }
 </script>
