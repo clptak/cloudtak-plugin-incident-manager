@@ -4,7 +4,7 @@
             v-if='!activeMission'
             severity='warning'
             title='Mission Required'
-            description='Select or create an incident in Create | Open first.'
+            description='Select or create an incident in New Incident first.'
         />
         <TablerInlineAlert
             v-else-if='!activeMission.mgmt'

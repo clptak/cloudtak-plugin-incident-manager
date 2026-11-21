@@ -22,7 +22,7 @@
             v-if='!activeMission'
             class='form-text text-muted'
         >
-            Select or create an incident in Create | Open first.
+            Select or create an incident in New Incident first.
         </div>
         <template v-else>
             <select

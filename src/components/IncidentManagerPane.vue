@@ -234,7 +234,7 @@ const activeNavLabel = computed(() => {
         return tab?.label ?? 'Main';
     }
     const item = ALL_NAV_ITEMS.find((entry) => entry.key === activeKey.value);
-    return item?.label ?? 'Create | Open';
+    return item?.label ?? 'New Incident';
 });
 
 watch(sectionExpanded, (state) => {
