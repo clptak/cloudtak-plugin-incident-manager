@@ -31,7 +31,7 @@
             v-if='!activeMission'
             class='text-muted small'
         >
-            Select a mission in New Incident to load the combined log table.
+            Select a mission in Open Incident to load the combined log table.
         </div>
 
         <template v-else>

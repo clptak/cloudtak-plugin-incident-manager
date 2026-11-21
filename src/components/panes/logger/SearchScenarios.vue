@@ -237,7 +237,7 @@
                 class='mt-2'
                 severity='warning'
                 title='No Active Mission'
-                description='Select one in New Incident first.'
+                description='Select one in Open Incident first.'
             />
             <DataSyncDestination
                 v-else

@@ -1,4 +1,4 @@
-/** Default and user-editable Subject Profile labels (New Incident + Subject Information). */
+/** Default and user-editable Subject Profile labels (Open Incident + Subject Information). */
 
 export const MAX_SUBJECT_PROFILES = 80;
 export const MAX_AIDING_AGENCIES = 80;

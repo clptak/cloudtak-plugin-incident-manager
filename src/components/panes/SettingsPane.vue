@@ -697,7 +697,7 @@
             </template>
 
             <p class='text-muted small mb-3'>
-                These labels appear in New Incident and Subject Information.
+                These labels appear in Open Incident and Subject Information.
                 Changes apply in this browser only.
             </p>
 

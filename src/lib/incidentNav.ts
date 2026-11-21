@@ -26,7 +26,7 @@ export interface NavSection {
 
 export const CREATE_OPEN_NAV: NavSectionItem = {
     key: 'create-open',
-    label: 'New Incident',
+    label: 'Open Incident',
 };
 
 export const SETTINGS_NAV: NavSectionItem = {

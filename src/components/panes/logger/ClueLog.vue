@@ -4,7 +4,7 @@
             v-if='!activeMission'
             severity='warning'
             title='Mission Required'
-            description='Select or create an incident in New Incident first.'
+            description='Select or create an incident in Open Incident first.'
         />
 
         <template v-else>

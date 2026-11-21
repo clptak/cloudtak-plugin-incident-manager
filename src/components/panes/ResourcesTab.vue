@@ -46,7 +46,7 @@
             class='mb-3'
             severity='info'
             title='Mission required'
-            description='Select a mission in New Incident before adding resources.'
+            description='Select a mission in Open Incident before adding resources.'
         />
 
         <TablerInlineAlert
