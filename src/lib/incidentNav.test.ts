@@ -70,3 +70,13 @@ test('navGroupHeading handles ungrouped items and bounds', () => {
     assert.deepEqual(items.map((_, i) => navGroupHeading(items, i)), [null, 'G', null]);
     assert.equal(navGroupHeading(items, 5), null);
 });
+
+test('help pop-outs show only for search incidents (#42)', () => {
+    const search = visibleNavSections(true);
+    assert.equal(search.find((s) => s.key === 'h-initial')?.helpKey, 'route-location-search');
+    assert.ok(search.some((s) => s.helpKey === 'area-search'));
+    for (const section of visibleNavSections(false)) {
+        assert.equal(section.helpKey, undefined, section.key);
+        assert.ok(section.items.every((i) => i.helpKey === undefined), section.key);
+    }
+});
