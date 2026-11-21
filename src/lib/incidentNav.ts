@@ -101,19 +101,21 @@ export function sectionKeyForNavItem(key: string): string | null {
 /**
  * Drop search-only items (and empty section headers) when the incident is not
  * Search. Non-search incidents also lose the sub-headings (`group`), so their
- * list stays flat as before.
+ * list stays flat as before, and the search-method help pop-outs (#42).
  */
 export function visibleNavSections(isSearch: boolean): NavSection[] {
     if (isSearch) return NAV_SECTIONS;
     return NAV_SECTIONS
         .map((section) => ({
             ...section,
+            helpKey: undefined,
             label: section.nonSearchLabel ?? section.label,
             items: section.items
                 .filter((item) => !item.searchOnly && !SEARCH_ONLY_NAV_KEYS.has(item.key))
                 .map((item) => {
                     const flat = { ...item };
                     delete flat.group;
+                    delete flat.helpKey;
                     return flat;
                 }),
         }))
