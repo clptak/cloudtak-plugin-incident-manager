@@ -26,7 +26,6 @@
                     mobile
                     :section-expanded='sectionExpanded'
                     :active-key='activeKey'
-                    :active-h-tab='activeHTab'
                     @toggle-section='toggleSection'
                 />
             </div>
@@ -41,7 +40,6 @@
                 <IncidentNavList
                     :section-expanded='sectionExpanded'
                     :active-key='activeKey'
-                    :active-h-tab='activeHTab'
                     @toggle-section='toggleSection'
                 />
             </div>
@@ -67,14 +65,6 @@
                     </span>
                 </div>
 
-                <div class='incident-h-tabs flex-shrink-0 mb-2 mb-md-3 overflow-auto'>
-                    <TablerPillGroup
-                        :model-value='activeHTab'
-                        :options='hTabOptions'
-                        @update:model-value='selectHTabGuarded'
-                    />
-                </div>
-
                 <IncidentChangedBanner
                     class='flex-shrink-0'
                     @reload='screenNonce++'
@@ -83,14 +73,37 @@
                 <div
                     :key='screenNonce'
                     class='tab-content flex-grow-1 min-height-0'
-                    :class='activeHTab === "organization"
+                    :class='activeKey === "organization"
                         ? "overflow-hidden d-flex flex-column"
                         : "overflow-auto"'
                 >
-                    <!-- Main: shows the active vertical pane -->
-                    <div v-if='activeHTab === "main"'>
+                    <!-- The active left-nav view (#44: no horizontal tabs). -->
+                    <OrganizationTab
+                        v-if='activeKey === "organization"'
+                        class='h-100 min-height-0'
+                    />
+                    <div v-else>
                         <CreateOpenPane v-if='activeKey === "create-open"' />
                         <SettingsPane v-else-if='activeKey === "settings"' />
+                        <div v-else-if='activeKey === "dashboard"'>
+                            <h3 class='mb-2'>
+                                Dashboard
+                            </h3>
+                            <p class='text-muted mb-0'>
+                                Coming soon.
+                            </p>
+                        </div>
+                        <DashboardTab
+                            v-else-if='activeKey === "incident-summary"'
+                            view='summary'
+                        />
+                        <DashboardTab
+                            v-else-if='activeKey === "logs"'
+                            view='logs'
+                        />
+                        <TaskTab v-else-if='activeKey === "task"' />
+                        <ClueLog v-else-if='activeKey === "clues"' />
+                        <CasiePane v-else-if='activeKey === "casie"' />
                         <ResourcesTab v-else-if='activeKey === "resources"' />
                         <WrapUpPane v-else-if='activeKey === "generate-closing-package"' />
                         <LoggerPane
@@ -98,19 +111,6 @@
                             :sub='activeKey'
                         />
                     </div>
-
-                    <DashboardTab v-if='activeHTab === "dashboard"' />
-                    <TaskTab v-if='activeHTab === "task" && isSearchMission' />
-                    <ClueLog v-if='activeHTab === "clues" && isSearchMission' />
-                    <CasiePane v-if='activeHTab === "casie" && isSearchMission' />
-                    <OrganizationTab
-                        v-if='activeHTab === "organization"'
-                        class='h-100 min-height-0'
-                    />
-                    <LoggerPane
-                        v-if='activeHTab === "risk-assessment"'
-                        sub='risk-assessment'
-                    />
                 </div>
             </div>
         </div>
@@ -120,7 +120,7 @@
 
 <script setup lang='ts'>
 import { onMounted, defineAsyncComponent, computed, ref, watch } from 'vue';
-import { TablerIconButton, TablerPillGroup } from '@tak-ps/vue-tabler';
+import { TablerIconButton } from '@tak-ps/vue-tabler';
 import { IconMenu2 } from '@tabler/icons-vue';
 import IncidentNavList from './IncidentNavList.vue';
 import MissionRequiredModal from './MissionRequiredModal.vue';
@@ -132,7 +132,6 @@ import {
     NAV_SECTIONS,
     sectionKeyForNavItem,
 } from '../lib/incidentNav.ts';
-import { SEARCH_ONLY_HTAB_KEYS } from '../lib/incidentType.ts';
 import { useIncident } from '../composables/useIncident.ts';
 
 const CreateOpenPane = defineAsyncComponent(() => import('./panes/CreateOpenPane.vue'));
@@ -182,33 +181,13 @@ function saveSectionExpandedToSession(state: Record<string, boolean>): void {
     }
 }
 
-const hTabs = [
-    { key: 'main', label: 'Main' },
-    { key: 'dashboard', label: 'Dashboard' },
-    { key: 'task', label: 'Checklists' },
-    { key: 'clues', label: 'Clues' },
-    { key: 'casie', label: 'CASIE' },
-    { key: 'organization', label: 'Organization' },
-    { key: 'risk-assessment', label: 'Risk Assessment' },
-] as const;
-
 const {
     activeKey,
-    activeHTab,
     activeMission,
-    isSearchMission,
-    selectHTabGuarded,
     openNoMissionModal,
     isMissionRequiredView,
     restoreActiveMissionOnMap,
 } = useIncident();
-
-const hTabOptions = computed(() => hTabs
-    .filter((tab) => isSearchMission.value || !SEARCH_ONLY_HTAB_KEYS.has(tab.key))
-    .map((tab) => ({
-        value: tab.key,
-        label: tab.label,
-    })));
 
 const sectionExpanded = ref(loadSectionExpandedFromSession());
 
@@ -229,10 +208,6 @@ function expandSectionForActiveKey(key: string): void {
 }
 
 const activeNavLabel = computed(() => {
-    if (activeHTab.value !== 'main') {
-        const tab = hTabs.find((item) => item.key === activeHTab.value);
-        return tab?.label ?? 'Main';
-    }
     const item = ALL_NAV_ITEMS.find((entry) => entry.key === activeKey.value);
     return item?.label ?? 'Open Incident';
 });
@@ -245,9 +220,9 @@ watch(activeKey, (key) => {
     expandSectionForActiveKey(key);
 }, { immediate: true });
 
-watch([activeKey, activeHTab], () => {
+watch(activeKey, () => {
     if (activeMission.value) return;
-    if (!isMissionRequiredView(activeKey.value, activeHTab.value)) return;
+    if (!isMissionRequiredView(activeKey.value)) return;
     openNoMissionModal();
 });
 
@@ -262,7 +237,7 @@ onMounted(() => {
 
 <style scoped>
 .incident-manager-pane {
-    /* Keep raised children (the active Main pill, chip bar, popovers) inside the
+    /* Keep raised children (chip bar, popovers) inside the
      * pane so CloudTAK floating windows (video, attachments) sit on top (#43). */
     isolation: isolate;
     /* Match Mission Info insets; Tabler form surfaces are primary-tinted */

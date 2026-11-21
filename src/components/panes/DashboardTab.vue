@@ -2,7 +2,7 @@
     <div>
         <div class='d-flex flex-wrap align-items-center gap-2 mb-2'>
             <h3 class='mb-0'>
-                Dashboard
+                {{ isLogs ? 'Logs' : 'Incident Summary' }}
             </h3>
             <button
                 class='btn btn-outline-secondary btn-sm ms-auto'
@@ -31,12 +31,15 @@
             v-if='!activeMission'
             class='text-muted small'
         >
-            Select a mission in Open Incident to load the combined log table.
+            Select a mission in Open Incident to load {{ isLogs ? 'the combined log table' : 'the summary' }}.
         </div>
 
         <template v-else>
             <!-- Keyword filter -->
-            <div class='d-flex flex-wrap align-items-center gap-2 mb-2'>
+            <div
+                v-if='isLogs'
+                class='d-flex flex-wrap align-items-center gap-2 mb-2'
+            >
                 <span class='small text-muted me-1'>Filter:</span>
                 <label
                     v-for='f in FILTERS'
@@ -74,11 +77,15 @@
             </div>
 
             <SchemaStorageCard
+                v-if='!isLogs'
                 :mission='activeMission'
                 @migrated='refresh'
             />
 
-            <div class='small text-muted mb-2'>
+            <div
+                v-if='isLogs'
+                class='small text-muted mb-2'
+            >
                 {{ activeMission.name }} — showing {{ displayRows.length }} of {{ rows.length }} entr{{ rows.length === 1 ? 'y' : 'ies' }}
             </div>
             <TablerInlineAlert
@@ -90,7 +97,7 @@
             />
 
             <div
-                v-if='showInfoPanels'
+                v-if='!isLogs && showInfoPanels'
                 class='row mb-3'
             >
                 <div
@@ -171,7 +178,7 @@
             </div>
 
             <TablerBorder
-                v-if='trackedClues.length'
+                v-if='!isLogs && trackedClues.length'
                 class='cloudtak-accent text-white mb-3'
                 :fill-height='false'
                 :shadow='false'
@@ -224,7 +231,7 @@
                 </div>
             </TablerBorder>
 
-            <template v-if='teams.length'>
+            <template v-if='!isLogs && teams.length'>
                 <div
                     v-if='!teamsExpanded'
                     class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
@@ -313,7 +320,7 @@
                 </TablerBorder>
             </template>
 
-            <template v-if='resourceAssignments.length'>
+            <template v-if='!isLogs && resourceAssignments.length'>
                 <div
                     v-if='!resourceAssignmentsExpanded'
                     class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
@@ -388,7 +395,7 @@
                 </TablerBorder>
             </template>
 
-            <template v-if='workAssignments.length'>
+            <template v-if='!isLogs && workAssignments.length'>
                 <div
                     v-if='!workAssignmentsExpanded'
                     class='cloudtak-accent border rounded-3 text-white mb-3 px-3 py-2 d-flex align-items-center cursor-pointer user-select-none'
@@ -467,7 +474,18 @@
                 </TablerBorder>
             </template>
 
-            <div class='table-responsive'>
+            <div
+                v-if='!isLogs && !showInfoPanels && !trackedClues.length && !teams.length
+                    && !resourceAssignments.length && !workAssignments.length && !loading'
+                class='text-muted small'
+            >
+                Nothing to summarise yet.
+            </div>
+
+            <div
+                v-if='isLogs'
+                class='table-responsive'
+            >
                 <table class='table table-sm table-vcenter table-striped table-hover mb-0 dashboard-log-table'>
                     <colgroup>
                         <col class='dashboard-log-col-time'>
@@ -527,6 +545,7 @@
 
 <script setup lang='ts'>
 import { ref, reactive, computed, watch, onMounted } from 'vue';
+
 import { useIncidentChanges } from '../../composables/useIncidentChanges.ts';
 import { IconChevronDown } from '@tabler/icons-vue';
 import { TablerBorder, TablerInlineAlert } from '@tak-ps/vue-tabler';
@@ -570,6 +589,14 @@ import type { WorkAssignment } from '../../lib/workAssignments.ts';
 import { entryHasRespondents, type TacticRiskMap } from '../../lib/tacticRisk.ts';
 import { localDateTimeLabel } from '../../lib/localTime.ts';
 import { tacticAssessmentsFromSchema } from '../../lib/tacticRiskPersistence.ts';
+
+/**
+ * The old Dashboard tab, split in the left nav (#44): `summary` is
+ * Incident Summary (everything but the log entries), `logs` is the log table.
+ * Both export the full report.
+ */
+const props = withDefaults(defineProps<{ view?: 'summary' | 'logs' }>(), { view: 'summary' });
+const isLogs = computed(() => props.view === 'logs');
 
 const { activeMission, requireActiveMission } = useIncident();
 

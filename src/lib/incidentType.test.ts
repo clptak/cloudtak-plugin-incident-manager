@@ -7,7 +7,6 @@ import {
     parentIncidentCandidateNames,
     parseIncidentTypeFromKeywords,
     parseIncidentTypeFromRecord,
-    SEARCH_ONLY_HTAB_KEYS,
     SEARCH_ONLY_NAV_KEYS,
 } from './incidentType.ts';
 
@@ -52,12 +51,12 @@ test('incident stem treats OP DataSyncs as the same incident', () => {
 });
 
 test('search-only key sets cover the planned chrome', () => {
-    for (const key of ['search-urgency', 'search-scenarios', 'physical-wisar', 'lpb-distances', 'search-area', 'segmentation', 'initial-consensus']) {
+    for (const key of ['search-urgency', 'search-scenarios', 'physical-wisar', 'lpb-distances', 'search-area',
+        'segmentation', 'initial-consensus', 'clues', 'casie']) {
         assert.ok(SEARCH_ONLY_NAV_KEYS.has(key), key);
     }
-    for (const key of ['task', 'clues', 'casie']) {
-        assert.ok(SEARCH_ONLY_HTAB_KEYS.has(key), key);
-    }
+    // Tasks & Checklists runs with every incident type (#44).
+    assert.ok(!SEARCH_ONLY_NAV_KEYS.has('task'));
 });
 
 test('operational periods are available to every incident type', () => {
@@ -66,7 +65,6 @@ test('operational periods are available to every incident type', () => {
     // demob are all type-agnostic. Only POD and CASIE are search-specific, and
     // they are gated inside the pane, not by hiding it.
     assert.ok(!SEARCH_ONLY_NAV_KEYS.has('operational-periods'));
-    assert.ok(SEARCH_ONLY_HTAB_KEYS.has('casie'), 'the rollup itself stays search-only');
-    assert.ok(!SEARCH_ONLY_HTAB_KEYS.has('lpb'), 'LPB distances is a Main nav item');
+    assert.ok(SEARCH_ONLY_NAV_KEYS.has('casie'), 'the rollup itself stays search-only');
     assert.ok(SEARCH_ONLY_NAV_KEYS.has('lpb-distances'), 'LPB distances stays search-only');
 });

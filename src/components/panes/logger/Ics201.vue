@@ -476,7 +476,7 @@
                 </div>
             </div>
             <div class='form-text mt-1'>
-                Prefills from the Organization tab chart: positions fill the officer/chief
+                Prefills from the Personnel chart: positions fill the officer/chief
                 boxes and each section&apos;s teams appear under its Section Chief on the PDF.
                 Anything not under a Section Chief goes to Organization Notes.
             </div>

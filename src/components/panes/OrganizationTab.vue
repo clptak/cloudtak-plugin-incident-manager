@@ -2,7 +2,7 @@
     <div class='d-flex flex-column h-100 min-height-0 overflow-hidden'>
         <div class='d-flex flex-wrap align-items-center gap-2 mb-2 flex-shrink-0'>
             <h3 class='mb-0'>
-                Organizational Status
+                Personnel
             </h3>
             <span
                 v-if='useD4hPersonnel && meta?.fetchedAt'
@@ -46,7 +46,7 @@
         </div>
 
         <p class='text-muted small mb-2 flex-shrink-0'>
-            Create resource teams in the <strong>Resources</strong> tab, then drag them onto the chart
+            Create resource teams in <strong>Resources &amp; Assignments</strong>, then drag them onto the chart
             with incident command and rescue roles. Add personnel from the palette. The org chart
             auto-saves to the MGMT DataSync. <strong>Sync org chart to FIELD DataSync Log</strong>
             posts the positions as log lines field teams see (ICS 201 reads them too); teams with a selected
@@ -104,7 +104,7 @@
                             >
                                 <span v-if='!activeMission'>Select a mission in Open Incident.</span>
                                 <span v-else-if='!resourceAssignments.length'>
-                                    No resource teams yet — create them in the <strong>Resources</strong> tab.
+                                    No resource teams yet — create them in <strong>Resources &amp; Assignments</strong>.
                                 </span>
                                 <span v-else>No resource teams match your search.</span>
                             </div>

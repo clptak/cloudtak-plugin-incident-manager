@@ -3,7 +3,7 @@
     <button
         type='button'
         class='incident-nav-item incident-nav-primary'
-        :class='{ active: activeKey === createOpenNav.key && activeHTab === "main" }'
+        :class='{ active: activeKey === createOpenNav.key }'
         :data-bs-dismiss='mobile ? "offcanvas" : undefined'
         :data-bs-target='mobile ? "#incident-manager-nav" : undefined'
         title='Create a new incident or open an existing one'
@@ -15,6 +15,25 @@
         />
         <span>{{ createOpenNav.label }}</span>
     </button>
+
+    <!-- Incident-wide views, pinned (not scrolled); formerly the horizontal tabs (#44). -->
+    <div class='incident-nav-fixed'>
+        <div class='incident-nav-section-header'>
+            Incident
+        </div>
+        <button
+            v-for='item in incidentItems'
+            :key='item.key'
+            type='button'
+            class='incident-nav-item incident-nav-sub'
+            :class='{ active: activeKey === item.key }'
+            :data-bs-dismiss='mobile ? "offcanvas" : undefined'
+            :data-bs-target='mobile ? "#incident-manager-nav" : undefined'
+            @click='onSelect(item.key)'
+        >
+            {{ item.label }}
+        </button>
+    </div>
 
     <div class='incident-nav-scroll'>
         <template
@@ -45,7 +64,7 @@
                         <button
                             type='button'
                             class='incident-nav-item incident-nav-sub'
-                            :class='{ active: activeKey === item.key && activeHTab === "main" }'
+                            :class='{ active: activeKey === item.key }'
                             :data-bs-dismiss='mobile ? "offcanvas" : undefined'
                             :data-bs-target='mobile ? "#incident-manager-nav" : undefined'
                             @click='onSelect(item.key)'
@@ -66,7 +85,7 @@
     <button
         type='button'
         class='incident-nav-item incident-nav-settings'
-        :class='{ active: activeKey === settingsNav.key && activeHTab === "main" }'
+        :class='{ active: activeKey === settingsNav.key }'
         :data-bs-dismiss='mobile ? "offcanvas" : undefined'
         :data-bs-target='mobile ? "#incident-manager-nav" : undefined'
         @click='onSelect(settingsNav.key)'
@@ -88,6 +107,7 @@ import {
     CREATE_OPEN_NAV,
     SETTINGS_NAV,
     navGroupHeading,
+    visibleIncidentNavItems,
     visibleNavSections,
 } from '../lib/incidentNav.ts';
 import { useIncident } from '../composables/useIncident.ts';
@@ -96,7 +116,6 @@ defineProps<{
     mobile?: boolean;
     sectionExpanded: Record<string, boolean>;
     activeKey: string;
-    activeHTab: string;
 }>();
 
 const emit = defineEmits<{
@@ -107,6 +126,7 @@ const createOpenNav = CREATE_OPEN_NAV;
 const settingsNav = SETTINGS_NAV;
 const { selectKeyGuarded, isSearchIncident } = useIncident();
 const navSections = computed(() => visibleNavSections(isSearchIncident.value));
+const incidentItems = computed(() => visibleIncidentNavItems(isSearchIncident.value));
 
 function onSelect(key: string): void {
     selectKeyGuarded(key);

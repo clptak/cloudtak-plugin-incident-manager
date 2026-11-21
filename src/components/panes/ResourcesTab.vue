@@ -83,8 +83,8 @@
                 Utilize the
                 <a
                     href='#'
-                    @click.prevent='selectHTabGuarded("organization")'
-                >Organization Tab</a>
+                    @click.prevent='selectKeyGuarded("organization")'
+                >Personnel</a>
                 to create your ICS 201 Organizational Chart and Team Assignments
             </p>
             <button
@@ -312,7 +312,7 @@ import type { OpPeriodRegistryEntry } from '../../domain/entities.ts';
 import { currentOpPeriod } from '../../domain/registry.ts';
 import { createRegistryStore } from '../../lib/registryPersistence.ts';
 
-const { activeMission, requireActiveMission, selectHTabGuarded } = useIncident();
+const { activeMission, requireActiveMission, selectKeyGuarded } = useIncident();
 const {
     assignments,
     defaultAgency,

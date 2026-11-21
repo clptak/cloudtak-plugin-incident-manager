@@ -1,7 +1,7 @@
 <template>
     <div>
         <h3 class='mb-3'>
-            Checklists
+            Tasks &amp; Checklists
         </h3>
 
         <!-- Initial Actions -->
