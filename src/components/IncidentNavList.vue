@@ -1,5 +1,5 @@
 <template>
-    <!-- New Incident (Create | Open) pinned at the top (#41). -->
+    <!-- Open Incident (Create | Open) pinned at the top (#41). -->
     <button
         type='button'
         class='incident-nav-item incident-nav-primary'

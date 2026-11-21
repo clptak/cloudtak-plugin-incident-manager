@@ -32,7 +32,7 @@
                     class='mt-2'
                     severity='warning'
                     title='Mission Required'
-                    description='No active mission. Select one in New Incident first.'
+                    description='No active mission. Select one in Open Incident first.'
                 />
                 <p
                     v-else
