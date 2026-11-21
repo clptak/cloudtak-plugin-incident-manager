@@ -262,6 +262,9 @@ onMounted(() => {
 
 <style scoped>
 .incident-manager-pane {
+    /* Keep raised children (the active Main pill, chip bar, popovers) inside the
+     * pane so CloudTAK floating windows (video, attachments) sit on top (#43). */
+    isolation: isolate;
     /* Match Mission Info insets; Tabler form surfaces are primary-tinted */
     --tabler-input-bg: var(--cloudtak-inset-bg);
     --tblr-bg-forms: var(--cloudtak-inset-bg);
