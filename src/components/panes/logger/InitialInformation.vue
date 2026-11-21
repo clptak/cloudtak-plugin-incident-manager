@@ -69,7 +69,7 @@
                 class='mt-3'
                 severity='warning'
                 title='Mission Required'
-                description='No active mission. Select one in Create | Open first.'
+                description='No active mission. Select one in New Incident first.'
             />
             <p
                 v-else
@@ -170,7 +170,7 @@
                 class='mt-3'
                 severity='warning'
                 title='Mission Required'
-                description='No active mission. Select one in Create | Open first.'
+                description='No active mission. Select one in New Incident first.'
             />
             <p
                 v-else
@@ -362,7 +362,7 @@
                             v-if='!activeMission'
                             class='form-text text-warning mt-2'
                         >
-                            No active mission. Select one in Create | Open first.
+                            No active mission. Select one in New Incident first.
                         </div>
                     </div>
                     <div class='modal-footer'>

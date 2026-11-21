@@ -1,5 +1,5 @@
 /**
- * DataSync mission templates: list, SAR default, and Create | Open-style keywords.
+ * DataSync mission templates: list, SAR default, and New Incident-style keywords.
  */
 
 export const SAR_TEMPLATE_NAME = 'SAR';
@@ -60,7 +60,7 @@ export function resolveSearchOpTemplate(
     return findSarTemplate(items);
 }
 
-/** Template keywords plus `template:<id>`, matching Create | Open (skip fake Default). */
+/** Template keywords plus `template:<id>`, matching New Incident (skip fake Default). */
 export function buildTemplateKeywords(
     template: MissionTemplateItem | undefined | null,
 ): string[] {

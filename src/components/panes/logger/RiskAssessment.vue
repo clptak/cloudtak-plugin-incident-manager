@@ -311,7 +311,7 @@
                     class='mb-3'
                     severity='info'
                     title='No Active Mission'
-                    description='Select a mission in Create | Open before saving assessments.'
+                    description='Select a mission in New Incident before saving assessments.'
                 />
 
                 <div class='row g-2 mb-2'>

@@ -318,7 +318,7 @@
                 v-if='!activeMission'
                 severity='warning'
                 title='Mission Required'
-                description='No active mission. Select one in Create | Open first.'
+                description='No active mission. Select one in New Incident first.'
             />
             <div
                 v-else

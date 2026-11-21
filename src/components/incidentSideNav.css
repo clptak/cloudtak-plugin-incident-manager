@@ -16,8 +16,43 @@
 .incident-side-nav--desktop {
     align-self: stretch;
     max-height: 100%;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* New Incident on top, sections scroll, Settings at the bottom (#41). */
+.incident-side-nav .incident-nav-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
+    margin: 0.35rem 0;
+}
+
+.incident-side-nav .incident-nav-item.incident-nav-primary,
+.incident-side-nav .incident-nav-item.incident-nav-settings {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.incident-side-nav .incident-nav-item.incident-nav-primary {
+    background: var(--bs-primary, #206bc4);
+    color: #fff;
+    font-weight: 600;
+}
+
+.incident-side-nav .incident-nav-item.incident-nav-primary:hover,
+.incident-side-nav .incident-nav-item.incident-nav-primary:focus-visible {
+    background: color-mix(in srgb, var(--bs-primary, #206bc4) 85%, #000);
+    color: #fff;
+}
+
+.incident-side-nav .incident-nav-item.incident-nav-settings {
+    border-top: 1px solid var(--tblr-border-color, rgba(255, 255, 255, 0.12));
+    border-radius: 0;
+    padding-top: 0.5rem;
 }
 
 .incident-side-nav .incident-nav-item,

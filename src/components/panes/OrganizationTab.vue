@@ -102,7 +102,7 @@
                                 v-if='!filteredResourceAssignments.length'
                                 class='text-muted small px-1 mb-2'
                             >
-                                <span v-if='!activeMission'>Select a mission in Create | Open.</span>
+                                <span v-if='!activeMission'>Select a mission in New Incident.</span>
                                 <span v-else-if='!resourceAssignments.length'>
                                     No resource teams yet — create them in the <strong>Resources</strong> tab.
                                 </span>
@@ -566,7 +566,7 @@ const filteredRescueGroupLabels = computed(() =>
 );
 
 const assignmentSelectLabel = computed(() => {
-    if (!activeMission.value) return 'Select a mission in Create | Open';
+    if (!activeMission.value) return 'Select a mission in New Incident';
     if (loadingCots.value) return 'Loading CoTs…';
     if (!missionCots.value.length) return 'No CoTs on this DataSync';
     return '— CoT assignment —';

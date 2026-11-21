@@ -1,7 +1,7 @@
 <template>
     <div>
         <h3 class='mb-3'>
-            Create | Open
+            New Incident
         </h3>
 
         <!-- ══ Create Mission ══ -->

@@ -582,7 +582,7 @@
             class='mb-2'
             severity='warning'
             title='No active mission'
-            description='Select one in Create | Open first.'
+            description='Select one in New Incident first.'
         />
         <DataSyncDestination
             v-else

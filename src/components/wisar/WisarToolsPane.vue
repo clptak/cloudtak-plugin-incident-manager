@@ -31,7 +31,7 @@
 
         <template v-if='!activeMission'>
             <p class='text-muted small mt-3'>
-                Select or create an incident in Incident Manager (Create | Open) first.
+                Select or create an incident in Incident Manager (New Incident) first.
             </p>
         </template>
         <template v-else>
