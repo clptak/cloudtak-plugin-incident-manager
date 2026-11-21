@@ -45,6 +45,7 @@ export const INCIDENT_NAV_ITEMS: NavSectionItem[] = [
     { key: 'logs', label: 'Logs' },
     { key: 'task', label: 'Tasks & Checklists' },
     { key: 'organization', label: 'Personnel' },
+    { key: 'resources', label: 'Resources & Assignments' },
     { key: 'clues', label: 'Clues', searchOnly: true },
 ];
 
@@ -62,7 +63,6 @@ export const NAV_SECTIONS: NavSection[] = [
             { key: 'lpb-distances', label: 'LPB Distances', searchOnly: true, group: 'Containment' },
             { key: 'ir-briefing', label: 'IR Briefing', group: 'Search' },
             { key: 'incident-post', label: 'Incident POST', group: 'Search' },
-            { key: 'resources', label: 'Resources & Assignments', group: 'Search' },
             { key: 'ics-201', label: 'ICS 201', group: 'Search' },
         ],
     },

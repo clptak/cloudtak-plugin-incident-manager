@@ -26,11 +26,10 @@ test('search incidents: Initial Response has Investigation / Containment / Searc
         ['Containment', 'lpb-distances'],
         ['Search', 'ir-briefing'],
         ['Search', 'incident-post'],
-        ['Search', 'resources'],
         ['Search', 'ics-201'],
     ]);
     assert.deepEqual(headings(initial.items), [
-        'Investigation', null, null, null, 'Containment', null, 'Search', null, null, null,
+        'Investigation', null, null, null, 'Containment', null, 'Search', null, null,
     ]);
     assert.equal(initial.items.find((i) => i.key === 'physical-wisar')?.label, 'Motion Model Tools');
     assert.equal(initial.items.find((i) => i.key === 'lpb-distances')?.label, 'LPB Distances');
@@ -40,7 +39,7 @@ test('non-search incidents: same flat Initial Response list as before, no sub-he
     const initial = visibleNavSections(false).find((s) => s.key === 'h-initial');
     assert.ok(initial);
     assert.deepEqual(initial.items.map((i) => i.key), [
-        'initial-information', 'subject-info', 'ir-briefing', 'incident-post', 'resources', 'ics-201',
+        'initial-information', 'subject-info', 'ir-briefing', 'incident-post', 'ics-201',
     ]);
     assert.ok(initial.items.every((i) => i.group === undefined));
     assert.ok(headings(initial.items).every((h) => h === null));
@@ -49,7 +48,7 @@ test('non-search incidents: same flat Initial Response list as before, no sub-he
 test('non-search filtering does not alter the shared NAV_SECTIONS', () => {
     visibleNavSections(false);
     const initial = NAV_SECTIONS.find((s) => s.key === 'h-initial');
-    assert.equal(initial?.items.find((i) => i.key === 'resources')?.group, 'Search');
+    assert.equal(initial?.items.find((i) => i.key === 'ir-briefing')?.group, 'Search');
 });
 
 test('only Initial Response is grouped; other sections are unchanged', () => {
@@ -84,11 +83,13 @@ test('help pop-outs show only for search incidents (#42)', () => {
 
 test('the former horizontal tabs are pinned incident items; Clues only for search (#44)', () => {
     assert.deepEqual(visibleIncidentNavItems(true).map((i) => i.label), [
-        'Dashboard', 'Incident Summary', 'Logs', 'Tasks & Checklists', 'Personnel', 'Clues',
+        'Dashboard', 'Incident Summary', 'Logs', 'Tasks & Checklists', 'Personnel', 'Resources & Assignments', 'Clues',
     ]);
     assert.deepEqual(visibleIncidentNavItems(false).map((i) => i.key), [
-        'dashboard', 'incident-summary', 'logs', 'task', 'organization',
+        'dashboard', 'incident-summary', 'logs', 'task', 'organization', 'resources',
     ]);
+    // Resources & Assignments moved out of Initial Response.
+    assert.ok(visibleNavSections(true).every((s) => s.items.every((i) => i.key !== 'resources')));
 });
 
 test('CASIE sits in Area Search; Risk Management follows it for every type (#44)', () => {
