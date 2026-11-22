@@ -636,7 +636,7 @@ const FILTERS: KeywordFilter[] = [
     { id: 'urgency', label: 'Search Urgency', test: (k) => k.includes('search-urgency') },
     { id: 'area', label: 'Search Area', test: (k) => k.includes('search-area') },
     { id: 'segment', label: 'Area Segment', test: (k) => k.some((w) => /^area:segment:/.test(w)) },
-    { id: 'post', label: 'Incident POST', test: (k) => k.includes('incident-post') },
+    { id: 'post', label: 'Obj | Strategy | Tactics', test: (k) => k.includes('incident-post') },
     {
         id: '201',
         label: '201',

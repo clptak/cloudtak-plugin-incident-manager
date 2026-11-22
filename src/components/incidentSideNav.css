@@ -139,6 +139,22 @@
     color: var(--bs-nav-link-hover-color, var(--bs-link-hover-color));
 }
 
+/* Nav items with an icon (#46): icon and label on one line. */
+.incident-side-nav .incident-nav-item:has(> .incident-nav-icon) {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.incident-side-nav .incident-nav-icon {
+    flex-shrink: 0;
+    opacity: 0.85;
+}
+
+.incident-side-nav .incident-nav-item.active > .incident-nav-icon {
+    opacity: 1;
+}
+
 /* The view you are on: the whole button gets a subtle blue tint, not just bold (#45). */
 .incident-side-nav .incident-nav-sub.active,
 .incident-side-nav .incident-nav-sub.active:hover,

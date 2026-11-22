@@ -295,7 +295,7 @@
                 </button>
             </div>
             <div class='form-text mt-2'>
-                Prefills from Incident POST objectives tagged Current / Planned.
+                Prefills from Obj | Strategy | Tactics objectives tagged Current / Planned.
                 PDF groups planned rows by date (e.g. “Planned Objectives for 7/5/12:”).
             </div>
         </TablerBorder>
@@ -375,7 +375,7 @@
             <div class='form-text mt-1'>
                 Prefills from mission logs tagged <code>201</code> or <code>#201</code>
                 (time = log date/timestamp, actions = remarks with line breaks collapsed), then
-                <code>planned</code> / <code>current</code>, then Incident POST as separate
+                <code>planned</code> / <code>current</code>, then Obj | Strategy | Tactics as separate
                 Objective / strategy (<code>1.</code>) / tactic (<code>1.1</code>) rows.
                 Overflow spills onto §8 continuation pages (header + Time/Actions, no §7).
             </div>
