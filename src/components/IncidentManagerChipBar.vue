@@ -38,9 +38,6 @@
             <div class='incident-chip-bar-chips d-flex align-items-center gap-2'>
                 <IncidentManagerTaskbarChip />
                 <LpbTaskbarChip />
-                <ResourcesTaskbarChip />
-                <SegmentsTaskbarChip />
-                <ClueTaskbarChip />
             </div>
             <TablerDropdown>
                 <TaskbarChipButton
@@ -111,9 +108,6 @@ import { TablerDropdown } from '@tak-ps/vue-tabler';
 import { useMapStore } from '../../../../src/stores/map.ts';
 import IncidentManagerTaskbarChip from './IncidentManagerTaskbarChip.vue';
 import LpbTaskbarChip from './LpbTaskbarChip.vue';
-import ResourcesTaskbarChip from './ResourcesTaskbarChip.vue';
-import SegmentsTaskbarChip from './SegmentsTaskbarChip.vue';
-import ClueTaskbarChip from './ClueTaskbarChip.vue';
 import TaskbarChipButton from './TaskbarChipButton.vue';
 import MissionTemplateLogModal from './MissionTemplateLogModal.vue';
 import { useIncident } from '../composables/useIncident.ts';

@@ -1,15 +1,15 @@
 <template>
     <TaskbarChipButton
         v-if='isSearchMission'
-        :icon='IconRuler2'
+        :icon='IconMan'
         label='LPB'
-        title='Open LPB distance table'
+        title='Open Lost Person Behavior'
         @click='openLpb'
     />
 </template>
 
 <script setup lang='ts'>
-import { IconRuler2 } from '@tabler/icons-vue';
+import { IconMan } from '@tabler/icons-vue';
 import TaskbarChipButton from './TaskbarChipButton.vue';
 import { openDesktopPane } from '../lib/floatMinimize.ts';
 import { useIncident } from '../composables/useIncident.ts';
