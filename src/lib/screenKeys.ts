@@ -70,7 +70,7 @@ const LABELS: Record<string, string> = {
     [`${IR}scenarios`]: 'Search Scenarios',
     's.risk': 'Risk Assessment',
     [`${IR}work-assignments`]: 'Work Assignments',
-    [`${IR}incident-post`]: 'Incident POST',
+    [`${IR}incident-post`]: 'Obj | Strategy | Tactics',
     [`${IR}resource-assignments`]: 'Resources',
     's.default-agency': 'Resources',
     [`${IR}iap-plans`]: 'IAP',

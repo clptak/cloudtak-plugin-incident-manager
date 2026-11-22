@@ -65,9 +65,9 @@ const labels: Record<string, string> = {
     'ics-201': 'ICS 201',
     'search-scenarios': 'Search Scenarios',
     'physical-wisar': 'Motion Model Tools',
-    'lpb-distances': 'LPB Distances',
+    'lpb-distances': 'Lost Person Behavior',
     'risk-assessment': 'Risk Assessment',
-    'incident-post': 'Incident POST',
+    'incident-post': 'Obj | Strategy | Tactics',
     'operational-periods': 'Operational Periods',
 };
 

@@ -32,7 +32,7 @@ test('search incidents: Initial Response has Investigation / Containment / Searc
         'Investigation', null, null, null, 'Containment', null, 'Search', null, null,
     ]);
     assert.equal(initial.items.find((i) => i.key === 'physical-wisar')?.label, 'Motion Model Tools');
-    assert.equal(initial.items.find((i) => i.key === 'lpb-distances')?.label, 'LPB Distances');
+    assert.equal(initial.items.find((i) => i.key === 'lpb-distances')?.label, 'Lost Person Behavior');
 });
 
 test('non-search incidents: same flat Initial Response list as before, no sub-headings or WiSAR', () => {

@@ -31,7 +31,14 @@
             :data-bs-target='mobile ? "#incident-manager-nav" : undefined'
             @click='onSelect(item.key)'
         >
-            {{ item.label }}
+            <component
+                :is='NAV_ICONS[item.key]'
+                v-if='NAV_ICONS[item.key]'
+                class='incident-nav-icon'
+                :size='18'
+                stroke='1.75'
+            />
+            <span>{{ item.label }}</span>
         </button>
     </div>
 
@@ -69,7 +76,14 @@
                             :data-bs-target='mobile ? "#incident-manager-nav" : undefined'
                             @click='onSelect(item.key)'
                         >
-                            {{ item.label }}
+                            <component
+                                :is='NAV_ICONS[item.key]'
+                                v-if='NAV_ICONS[item.key]'
+                                class='incident-nav-icon'
+                                :size='18'
+                                stroke='1.75'
+                            />
+                            <span>{{ item.label }}</span>
                         </button>
                         <NavHelpButton
                             v-if='item.helpKey'
@@ -100,7 +114,34 @@
 
 <script setup lang='ts'>
 import { computed } from 'vue';
-import { IconFolderOpen, IconSettings } from '@tabler/icons-vue';
+import type { Component } from 'vue';
+import {
+    IconAlertCircle,
+    IconChecklist,
+    IconClockRecord,
+    IconColumns3,
+    IconDashboard,
+    IconFilePercent,
+    IconFileText,
+    IconFileZip,
+    IconFolderOpen,
+    IconHelpCircle,
+    IconInfoHexagon,
+    IconInfoSquare,
+    IconLogs,
+    IconMan,
+    IconMapSearch,
+    IconPolygon,
+    IconPresentation,
+    IconRoute2,
+    IconSettings,
+    IconTarget,
+    IconUsers,
+    IconUrgent,
+    IconUserSearch,
+    IconUsersCog,
+    IconWalk,
+} from '@tabler/icons-vue';
 import NavSectionHeader from './NavSectionHeader.vue';
 import NavHelpButton from './NavHelpButton.vue';
 import {
@@ -121,6 +162,33 @@ defineProps<{
 const emit = defineEmits<{
     toggleSection: [key: string];
 }>();
+
+/** Icons beside nav items so they're quick to spot (#46). Every nav item has one. */
+const NAV_ICONS: Record<string, Component> = {
+    'dashboard': IconDashboard,
+    'incident-summary': IconInfoHexagon,
+    'logs': IconLogs,
+    'task': IconChecklist,
+    'organization': IconUsers,
+    'resources': IconUsersCog,
+    'clues': IconHelpCircle,
+    'initial-information': IconInfoSquare,
+    'subject-info': IconUserSearch,
+    'search-urgency': IconUrgent,
+    'search-scenarios': IconRoute2,
+    'physical-wisar': IconWalk,
+    'lpb-distances': IconMan,
+    'ir-briefing': IconPresentation,
+    'incident-post': IconColumns3,
+    'ics-201': IconFileText,
+    'search-area': IconMapSearch,
+    'segmentation': IconPolygon,
+    'initial-consensus': IconFilePercent,
+    'operational-periods': IconClockRecord,
+    'casie': IconTarget,
+    'risk-assessment': IconAlertCircle,
+    'generate-closing-package': IconFileZip,
+};
 
 const createOpenNav = CREATE_OPEN_NAV;
 const settingsNav = SETTINGS_NAV;
