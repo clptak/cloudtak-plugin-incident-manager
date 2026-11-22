@@ -197,12 +197,15 @@
                         :disabled='!activeMission || saving'
                     />
                 </div>
-                <div class='col-md-3'>
-                    <TablerEnum
-                        v-model='formStatusLabel'
+                <div class='col-12'>
+                    <ChoiceToggle
+                        :model-value='form.status'
                         label='Status'
-                        :options='statusLabelOptions'
+                        :options='STATUS_CHOICES'
                         :disabled='!activeMission || saving'
+                        required
+                        compact
+                        @update:model-value='setFormStatus'
                     />
                 </div>
                 <div class='col-md-3'>
@@ -284,7 +287,16 @@
 
 <script setup lang='ts'>
 import { computed, onMounted, ref, watch } from 'vue';
-import { IconChevronDown, IconInfoCircle } from '@tabler/icons-vue';
+import {
+    IconAlertCircle,
+    IconCheck,
+    IconChevronDown,
+    IconInfoCircle,
+    IconLogout,
+    IconSend,
+    IconX,
+} from '@tabler/icons-vue';
+import ChoiceToggle, { type ChoiceToggleOption } from '../ChoiceToggle.vue';
 import {
     TablerBorder,
     TablerInput,
@@ -380,7 +392,6 @@ const form = ref<Omit<ResourceAssignment, 'id'>>({
 
 const resourceTypeOptions = RESOURCE_TYPE_OPTIONS;
 const statusOptions = RESOURCE_ASSIGNMENT_STATUSES;
-const statusLabelOptions = statusOptions.map((opt) => opt.label);
 
 // ── Operational periods (Area Search phase) ────────────────────────────────
 const OP_NONE_LABEL = 'Initial Response';
@@ -450,18 +461,27 @@ const formAgencyLabel = computed({
     },
 });
 
-const formStatusLabel = computed({
-    get(): string {
-        return statusLabelFor(form.value.status);
-    },
-    set(label: string): void {
-        const opt = statusOptions.find((entry) => entry.label === label);
-        if (!opt) return;
-        form.value.status = opt.value;
-        // Demobilized gets its time, filled in now and still editable (#37).
-        form.value.timeDemobilized = demobTimeFor(opt.value, form.value.timeDemobilized, nowDatetimeLocal());
-    },
-});
+/** Status as buttons, styled like Incident Type (#47). */
+const STATUS_LOOK: Record<ResourceAssignmentStatus, Pick<ChoiceToggleOption, 'tone' | 'icon'>> = {
+    requested: { tone: 'azure', icon: IconSend },
+    have: { tone: 'green', icon: IconCheck },
+    need: { tone: 'orange', icon: IconAlertCircle },
+    demobilized: { tone: 'secondary', icon: IconLogout },
+    cancelled: { tone: 'red', icon: IconX },
+};
+const STATUS_CHOICES: ChoiceToggleOption[] = statusOptions.map((opt) => ({
+    value: opt.value,
+    label: opt.label,
+    ...STATUS_LOOK[opt.value],
+}));
+
+function setFormStatus(value: string): void {
+    const opt = statusOptions.find((entry) => entry.value === value);
+    if (!opt) return;
+    form.value.status = opt.value;
+    // Demobilized gets its time, filled in now and still editable (#37).
+    form.value.timeDemobilized = demobTimeFor(opt.value, form.value.timeDemobilized, nowDatetimeLocal());
+}
 
 const formEtaString = computed({
     get(): string {
@@ -512,9 +532,6 @@ const canCreate = computed(() =>
     && form.value.agency.trim().length > 0,
 );
 
-function statusLabelFor(status: ResourceAssignmentStatus): string {
-    return statusOptions.find((opt) => opt.value === status)?.label ?? 'Requested';
-}
 
 function rebuildAgencyOptions(): void {
     const aidingNames = useD4hAidingAgencies.value

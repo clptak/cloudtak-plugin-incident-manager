@@ -119,10 +119,12 @@
                 </div>
 
                 <div class='mt-3'>
-                    <TablerEnum
-                        v-model='ippTypeLabel'
+                    <ChoiceToggle
+                        v-model='ippTypeChoice'
                         label='IPP Type'
                         :options='IPP_TYPE_OPTIONS'
+                        required
+                        compact
                     />
                 </div>
 
@@ -1107,7 +1109,8 @@
 
 <script setup lang='ts'>
 import { ref, computed, reactive, watch, onMounted } from 'vue';
-import { IconPlus, IconX, IconChevronDown, IconLock } from '@tabler/icons-vue';
+import { IconPlus, IconX, IconChevronDown, IconLock, IconMapPin, IconEye } from '@tabler/icons-vue';
+import ChoiceToggle, { type ChoiceToggleOption } from '../../ChoiceToggle.vue';
 import { TablerBorder, TablerInput, TablerEnum, TablerInlineAlert } from '@tak-ps/vue-tabler';
 import type { Feature } from '../../../../../../src/types.ts';
 import { parseCoordinates } from '../../../lib/coords.ts';
@@ -1148,7 +1151,11 @@ const LPB_RING_STYLE: RingStyle = {
 };
 const AZ_LPB_SOURCE = 'AZ';
 const MAX_CUSTOM_RANGES = 4;
-const IPP_TYPE_OPTIONS = ['LKP — Last Known Position', 'PLS — Point Last Seen'];
+/** IPP Type as buttons, styled like Incident Type (#47). */
+const IPP_TYPE_OPTIONS: ChoiceToggleOption[] = [
+    { value: 'LKP', label: 'LKP — Last Known Position', tone: 'azure', icon: IconMapPin },
+    { value: 'PLS', label: 'PLS — Point Last Seen', tone: 'azure', icon: IconEye },
+];
 
 type LpbDistanceUnit = 'mi' | 'me';
 
@@ -1215,12 +1222,12 @@ const ippInput = ref('');
 const ipp = computed(() => parseCoordinates(ippInput.value));
 
 const ippType = ref<'LKP' | 'PLS'>('LKP');
-const ippTypeLabel = computed({
+const ippTypeChoice = computed({
     get(): string {
-        return ippType.value === 'PLS' ? IPP_TYPE_OPTIONS[1] : IPP_TYPE_OPTIONS[0];
+        return ippType.value;
     },
-    set(label: string): void {
-        ippType.value = label === IPP_TYPE_OPTIONS[1] ? 'PLS' : 'LKP';
+    set(value: string): void {
+        ippType.value = value === 'PLS' ? 'PLS' : 'LKP';
     },
 });
 const selectedObjectUid = ref('');

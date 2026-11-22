@@ -8,7 +8,7 @@
         </div>
         <div
             class='choice-toggle'
-            :class='{ "choice-toggle-wrap": wrap }'
+            :class='{ "choice-toggle-wrap": wrap && !compact, "choice-toggle-compact": compact }'
             role='radiogroup'
             :aria-label='label'
             @keydown='onKey'
@@ -20,19 +20,19 @@
                 type='button'
                 role='radio'
                 class='btn choice-toggle-btn'
-                :class='[`choice-tone-${o.tone}`, { "is-selected": o.value === modelValue }]'
+                :class='[`choice-tone-${o.tone}`, { "is-selected": o.value === modelValue, "btn-sm": compact }]'
                 :aria-checked='o.value === modelValue'
                 :tabindex='o.value === modelValue || (!hasValue && i === 0) ? 0 : -1'
-                :title='o.value === modelValue ? `${o.label} (click again to clear)` : o.label'
+                :title='o.value === modelValue && !required ? `${o.label} (click again to clear)` : o.label'
                 :disabled='disabled'
                 @click='pick(o.value)'
             >
                 <component
                     :is='o.icon'
                     v-if='o.icon'
-                    :size='20'
+                    :size='compact ? 16 : 20'
                     stroke='1.75'
-                    class='me-2 flex-shrink-0'
+                    :class='compact ? "me-1 flex-shrink-0" : "me-2 flex-shrink-0"'
                 />
                 <span class='fw-bold'>{{ o.label }}</span>
             </button>
@@ -61,10 +61,16 @@ const props = withDefaults(defineProps<{
     disabled?: boolean;
     /** Let many options flow onto more lines instead of squeezing one row. */
     wrap?: boolean;
+    /** Always keep a value: clicking the selected button does not clear it. */
+    required?: boolean;
+    /** Small buttons sized to their label; they wrap onto more lines, labels never do (#47). */
+    compact?: boolean;
 }>(), {
     label: '',
     disabled: false,
     wrap: false,
+    required: false,
+    compact: false,
 });
 
 const emit = defineEmits<{ (e: 'update:modelValue', value: string): void }>();
@@ -73,6 +79,7 @@ const buttons = ref<HTMLButtonElement[]>([]);
 const hasValue = computed(() => props.options.some((o) => o.value === props.modelValue));
 
 function pick(value: string): void {
+    if (value === props.modelValue && props.required) return;
     emit('update:modelValue', value === props.modelValue ? '' : value);
 }
 
@@ -99,6 +106,15 @@ function onKey(e: KeyboardEvent): void {
     min-width: 0;
     justify-content: center;
     white-space: nowrap;
+}
+
+.choice-toggle-compact {
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.choice-toggle-compact .choice-toggle-btn {
+    flex: 1 1 auto;
 }
 
 /* Even columns, so a last odd button keeps the same width as the rest. */
