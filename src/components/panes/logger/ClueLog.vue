@@ -47,44 +47,31 @@
                             Auto-assigned
                         </div>
                     </div>
-                    <div class='col-md-2'>
-                        <label class='form-label'>Clue Validation</label>
-                        <select
-                            v-model='form.validation'
-                            class='form-select form-select-sm'
-                        >
-                            <option
-                                v-for='v in CLUE_VALIDATIONS'
-                                :key='v'
-                                :value='v'
-                            >
-                                {{ v }}
-                            </option>
-                        </select>
+                    <!-- Validation and Disposition as buttons, styled like Incident Type (#47). -->
+                    <div class='col-md-4'>
+                        <ChoiceToggle
+                            :model-value='form.validation'
+                            label='Clue Validation'
+                            :options='VALIDATION_CHOICES'
+                            required
+                            compact
+                            @update:model-value='(v: string) => form.validation = v as ClueValidation'
+                        />
                     </div>
-                    <div class='col-md-3'>
-                        <label class='form-label'>Clue Disposition</label>
-                        <select
-                            v-model='form.disposition'
-                            class='form-select form-select-sm'
-                        >
-                            <option value=''>
-                                —
-                            </option>
-                            <option
-                                v-for='d in CLUE_DISPOSITIONS'
-                                :key='d'
-                                :value='d'
-                            >
-                                {{ d }}
-                            </option>
-                        </select>
-                    </div>
-                    <div class='col-md-5'>
+                    <div class='col-md-6'>
                         <TablerInput
                             v-model='form.finder'
                             label='Clue Finder (Team or Person)'
                             placeholder='Auto-filled from your callsign'
+                        />
+                    </div>
+                    <div class='col-12'>
+                        <ChoiceToggle
+                            :model-value='form.disposition'
+                            label='Clue Disposition'
+                            :options='DISPOSITION_CHOICES'
+                            compact
+                            @update:model-value='(v: string) => form.disposition = v as ClueDisposition | ""'
                         />
                     </div>
                     <div class='col-md-7'>
@@ -198,39 +185,23 @@
                                     >—</span>
                                 </td>
                                 <td>
-                                    <select
-                                        :value='clue.validation'
-                                        class='form-select form-select-sm w-auto'
+                                    <ChoiceToggle
+                                        :model-value='clue.validation'
+                                        :options='VALIDATION_CHOICES'
                                         :disabled='busy'
-                                        @change='onValidationChange(clue, $event)'
-                                    >
-                                        <option
-                                            v-for='v in CLUE_VALIDATIONS'
-                                            :key='v'
-                                            :value='v'
-                                        >
-                                            {{ v }}
-                                        </option>
-                                    </select>
+                                        required
+                                        compact
+                                        @update:model-value='(v: string) => onValidationChange(clue, v as ClueValidation)'
+                                    />
                                 </td>
                                 <td>
-                                    <select
-                                        :value='clue.disposition'
-                                        class='form-select form-select-sm w-auto'
+                                    <ChoiceToggle
+                                        :model-value='clue.disposition'
+                                        :options='DISPOSITION_CHOICES'
                                         :disabled='busy'
-                                        @change='onDispositionChange(clue, $event)'
-                                    >
-                                        <option value=''>
-                                            —
-                                        </option>
-                                        <option
-                                            v-for='d in CLUE_DISPOSITIONS'
-                                            :key='d'
-                                            :value='d'
-                                        >
-                                            {{ d }}
-                                        </option>
-                                    </select>
+                                        compact
+                                        @update:model-value='(v: string) => onDispositionChange(clue, v as ClueDisposition | "")'
+                                    />
                                 </td>
                                 <td>{{ clue.finder || '—' }}</td>
                                 <td class='text-muted'>
@@ -251,6 +222,8 @@
 <script setup lang='ts'>
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { TablerBorder, TablerInlineAlert, TablerInput } from '@tak-ps/vue-tabler';
+import { IconBan, IconCamera, IconCheck, IconFlag, IconHourglass, IconPackage, IconX } from '@tabler/icons-vue';
+import ChoiceToggle, { type ChoiceToggleOption } from '../../ChoiceToggle.vue';
 import Subscription from '../../../../../../src/base/subscription.ts';
 import ProfileConfig from '../../../../../../src/base/profile.ts';
 import { useIncident } from '../../../composables/useIncident.ts';
@@ -290,6 +263,24 @@ const form = reactive({
     markerUid: '',
     notes: '',
 });
+
+const VALIDATION_LOOK: Record<ClueValidation, Pick<ChoiceToggleOption, 'tone' | 'icon'>> = {
+    Pending: { tone: 'secondary', icon: IconHourglass },
+    Yes: { tone: 'green', icon: IconCheck },
+    No: { tone: 'red', icon: IconX },
+};
+const VALIDATION_CHOICES: ChoiceToggleOption[] = CLUE_VALIDATIONS.map((v) => ({
+    value: v, label: v, ...VALIDATION_LOOK[v],
+}));
+const DISPOSITION_ICONS: Record<ClueDisposition, ChoiceToggleOption['icon']> = {
+    'Take Photo and Mark': IconCamera,
+    'Collect': IconPackage,
+    'Mark Only': IconFlag,
+    'Invalidated': IconBan,
+};
+const DISPOSITION_CHOICES: ChoiceToggleOption[] = CLUE_DISPOSITIONS.map((d) => ({
+    value: d, label: d, tone: 'azure', icon: DISPOSITION_ICONS[d],
+}));
 
 const newNumber = computed(() => nextClueNumber(clues.value));
 const currentOp = computed(() => currentOpPeriod(registry.value));
@@ -388,8 +379,7 @@ async function onSaveLog(): Promise<void> {
     }
 }
 
-async function onValidationChange(clue: TrackedClue, event: Event): Promise<void> {
-    const validation = (event.target as HTMLSelectElement).value as ClueValidation;
+async function onValidationChange(clue: TrackedClue, validation: ClueValidation): Promise<void> {
     busy.value = true;
     try {
         await updateClueLog(clue, { validation });
@@ -401,8 +391,7 @@ async function onValidationChange(clue: TrackedClue, event: Event): Promise<void
     }
 }
 
-async function onDispositionChange(clue: TrackedClue, event: Event): Promise<void> {
-    const disposition = (event.target as HTMLSelectElement).value as ClueDisposition | '';
+async function onDispositionChange(clue: TrackedClue, disposition: ClueDisposition | ''): Promise<void> {
     busy.value = true;
     try {
         await updateClueLog(clue, { disposition });

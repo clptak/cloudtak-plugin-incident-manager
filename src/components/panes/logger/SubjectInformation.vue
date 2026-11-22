@@ -168,11 +168,12 @@
                             </div>
                         </div>
                         <div class='col-md-4'>
-                            <TablerEnum
-                                :model-value='genderLabel(draft.form.subjectGender)'
+                            <ChoiceToggle
+                                :model-value='draft.form.subjectGender'
                                 label='Gender'
-                                :options='GENDER_OPTIONS'
-                                @update:model-value='onGenderLabelChange(draft, $event)'
+                                :options='GENDER_CHOICES'
+                                compact
+                                @update:model-value='(v: string) => draft.form.subjectGender = v'
                             />
                         </div>
                         <div class='col-md-4'>
@@ -407,7 +408,8 @@
 
 <script setup lang='ts'>
 import { ref, computed, onMounted, watch } from 'vue';
-import { IconChevronDown } from '@tabler/icons-vue';
+import { IconChevronDown, IconDots, IconGenderFemale, IconGenderMale } from '@tabler/icons-vue';
+import ChoiceToggle, { type ChoiceToggleOption } from '../../ChoiceToggle.vue';
 import {
     TablerBorder,
     TablerInput,
@@ -458,7 +460,12 @@ const REPORTED_BY = [
     'Other',
 ] as const;
 
-const GENDER_OPTIONS = ['Select Gender', 'Male', 'Female', 'Other'];
+/** Gender as buttons, styled like Incident Type (#47). Click the selected one to clear it. */
+const GENDER_CHOICES: ChoiceToggleOption[] = [
+    { value: 'male', label: 'Male', tone: 'azure', icon: IconGenderMale },
+    { value: 'female', label: 'Female', tone: 'azure', icon: IconGenderFemale },
+    { value: 'other', label: 'Other', tone: 'azure', icon: IconDots },
+];
 const YES_NO_OPTIONS = ['—', 'Yes', 'No'];
 const REPORTED_BY_OPTIONS = ['Select Who Reported Subject Missing', ...REPORTED_BY];
 const PHOTO_PLACEHOLDER = 'Select Photo From DataSync';
@@ -551,19 +558,6 @@ function onSubjectNumberLabelChange(draft: SubjectDraft, label: string): void {
     if (match) draft.form.subjectCaseID = match;
 }
 
-function genderLabel(value: string): string {
-    if (value === 'male') return 'Male';
-    if (value === 'female') return 'Female';
-    if (value === 'other') return 'Other';
-    return 'Select Gender';
-}
-
-function onGenderLabelChange(draft: SubjectDraft, label: string): void {
-    if (label === 'Male') draft.form.subjectGender = 'male';
-    else if (label === 'Female') draft.form.subjectGender = 'female';
-    else if (label === 'Other') draft.form.subjectGender = 'other';
-    else draft.form.subjectGender = '';
-}
 
 function subjectProfileOptionsFor(current: string): string[] {
     return subjectProfileEnumOptions(current);
