@@ -94,10 +94,10 @@
                             <button
                                 type='button'
                                 class='btn btn-outline-primary btn-sm'
-                                :disabled='!cadText.trim()'
+                                :disabled='!cadText.trim() || cadGeocoding'
                                 @click='fillFromCad'
                             >
-                                Fill form
+                                {{ cadGeocoding ? 'Finding address…' : 'Fill form' }}
                             </button>
                             <TablerToggle
                                 v-model='createEvent'
@@ -668,7 +668,9 @@ import { flyToCoords } from '../../lib/flyToFeature.ts';
 import { pushPointToMission } from '../../lib/missionFeatures.ts';
 import { startSchemaOnProperties } from '../../lib/missionSchema.ts';
 import { importCadText, rememberCadText } from '../../lib/cadImport.ts';
-import { createMissionFieldsFromCfs, parseCfsHeaderFields } from '../../lib/incidentInfo.ts';
+import { createMissionFieldsFromCfs, parseCfsHeaderFields, type CfsHeaderFields } from '../../lib/incidentInfo.ts';
+import { cadGeocodeQuery, formatMatchCoords } from '../../lib/cadGeocode.ts';
+import { geocodeAddress } from '../../lib/geocodeAddress.ts';
 import {
     createEventOnly,
     linkIncidentEvent,
@@ -751,12 +753,58 @@ const cadExpanded = ref(false);
 const cadText = ref('');
 const cadResult = ref('');
 const cadResultError = ref(false);
+const cadGeocoding = ref(false);
+
+/**
+ * No Address LL(...) in the call: geocode its address (#50) and, on confirm,
+ * return the coordinates. `note` says what happened, for the status line.
+ */
+async function geocodeCadAddress(header: CfsHeaderFields): Promise<{ coords: string | null; note: string }> {
+    const query = cadGeocodeQuery(header.fields);
+    if (!query) return { coords: null, note: '' };
+    cadGeocoding.value = true;
+    try {
+        const match = await geocodeAddress(query);
+        if (!match) return { coords: null, note: `No map match for "${query}".` };
+        const ok = window.confirm(
+            `The call has no coordinates. Use the address match?\n\n${match.matched}\n(${formatMatchCoords(match)})`,
+        );
+        return ok
+            ? { coords: formatMatchCoords(match), note: `Coordinates are from the address: ${match.matched}.` }
+            : { coords: null, note: '' };
+    } catch (err) {
+        return { coords: null, note: err instanceof Error ? err.message : String(err) };
+    } finally {
+        cadGeocoding.value = false;
+    }
+}
+
+/**
+ * Before an event is made from the pasted call: when the call has no
+ * Address LL(...) and Estimated Location is blank, fill it from the address.
+ * Returns a note for the status line ('' when nothing was needed).
+ */
+async function ensureCadEventLocation(): Promise<string> {
+    if (!cadText.value.trim() || parsedCoords.value) return '';
+    const header = parseCfsHeaderFields(cadText.value);
+    if (header.callLocation) return '';
+    const { coords, note } = await geocodeCadAddress(header);
+    if (coords) form.coords = coords;
+    return note;
+}
 
 /** Fill Activity Number, Date and Location Coordinates from the pasted call. */
-function fillFromCad(): void {
-    const fields = createMissionFieldsFromCfs(parseCfsHeaderFields(cadText.value));
+async function fillFromCad(): Promise<void> {
+    const header = parseCfsHeaderFields(cadText.value);
+    const fields = createMissionFieldsFromCfs(header);
     const filled: string[] = [];
     const missing: string[] = [];
+    let geocodeNote = '';
+    if (!fields.coords) {
+        const res = await geocodeCadAddress(header);
+        fields.coords = res.coords;
+        geocodeNote = res.note;
+    }
     if (fields.activityNumber) {
         form.activityNumber = fields.activityNumber;
         filled.push('Activity Number');
@@ -773,6 +821,7 @@ function fillFromCad(): void {
     cadResult.value = [
         filled.length ? `Filled: ${filled.join(', ')}.` : '',
         missing.length ? `Not found: ${missing.join(', ')}.` : '',
+        geocodeNote,
     ].filter(Boolean).join(' ');
 }
 
@@ -852,14 +901,18 @@ async function onCreateEventOnly(): Promise<void> {
     }
     eventOnlyBusy.value = true;
     try {
+        const locationNote = await ensureCadEventLocation();
+        if (locationNote) status.value = locationNote;
         const { event, existing } = await createEventOnly({
             cadText: cadText.value,
             subjectProfile: form.subjectProfile || undefined,
             channelNames: form.mgmtGroups,
+            fallbackLocation: parsedCoords.value,
         });
         status.value = existing
             ? `An active event for this call already exists: "${event.name}". Nothing was created.`
             : `Created event "${event.name}". Create a mission later and pick it under Incident event.`;
+        if (locationNote) status.value += ` ${locationNote}`;
         eventsLoaded = false;
     } catch (err) {
         statusError.value = true;
@@ -1138,6 +1191,8 @@ async function createMission(): Promise<void> {
         if (eventFromCad.value && !form.mgmtGroups.length) {
             throw new Error('Create Event needs Management Channels - pick them, or turn Create Event off.');
         }
+        // The event needs a location: from the address when the call has none (#50).
+        const locationNote = eventFromCad.value ? await ensureCadEventLocation() : '';
         // Incident common map: field channels + management channels, so the IMT
         // always sees it even with the field channel toggled off (Phase 0 T3/T4).
         const commonGroups = [...new Set([...form.groups, ...form.mgmtGroups])];
@@ -1208,6 +1263,7 @@ async function createMission(): Promise<void> {
         status.value = mgmt
             ? `Created DataSyncs "${res.data.name}" + "${mgmt.name}" (planning).`
             : `Created DataSync "${res.data.name}" — no management channels selected; planning data will be visible on the field channels.`;
+        if (locationNote) status.value += ` ${locationNote}`;
 
         // TAK Server 5.9+: keep planning data as Mission Properties on the
         // management sync from the start. Non-fatal - on failure or an older
@@ -1245,7 +1301,12 @@ async function createMission(): Promise<void> {
         // Incident Core Event: the one for this CAD call (created when there
         // is none), or the one picked. Non-fatal: the mission is created.
         const eventSource = eventFromCad.value
-            ? { cadText: cadText.value, subjectProfile: form.subjectProfile || undefined, channelNames: form.mgmtGroups }
+            ? {
+                cadText: cadText.value,
+                subjectProfile: form.subjectProfile || undefined,
+                channelNames: form.mgmtGroups,
+                fallbackLocation: parsedCoords.value,
+            }
             : pickedEventId.value === NO_EVENT ? null
                 : pickedEventId.value ? { eventId: pickedEventId.value }
                     : { form: formEventInput(res.data.name) };
