@@ -413,6 +413,8 @@ import {
     type CallNoteDuplicate,
 } from '../../../lib/callNoteRouting.ts';
 import { applyCadToSchema, takeCadText } from '../../../lib/cadImport.ts';
+import { cadGeocodeQuery } from '../../../lib/cadGeocode.ts';
+import { geocodeAddress } from '../../../lib/geocodeAddress.ts';
 import {
     applyParsedCadToForm,
     blankIncidentInfoForm,
@@ -763,14 +765,29 @@ async function maybeAddCallLocation(
     header: CfsHeaderFields,
     activityNumber: string | null,
 ): Promise<string | null> {
-    if (!header.callLocation || !activeMission.value) return null;
+    if (!activeMission.value) return null;
     const callsign = (activityNumber || incidentForm.eventId || 'CFS').trim();
-    const { lat, lng } = header.callLocation;
+    let where = header.callLocation;
+    let matched = '';
+    if (!where) {
+        // No Address LL(...): geocode the address instead (#50).
+        const query = cadGeocodeQuery(header.fields);
+        if (!query) return null;
+        try {
+            const match = await geocodeAddress(query);
+            if (!match) return `No map match for the address "${query}".`;
+            where = match;
+            matched = match.matched;
+        } catch (err) {
+            return err instanceof Error ? err.message : String(err);
+        }
+    }
+    const { lat, lng } = where;
     const latStr = lat.toFixed(6);
     const lngStr = lng.toFixed(6);
-    const ok = window.confirm(
-        `Add call location ${callsign} at ${latStr}, ${lngStr} to the mission map?`,
-    );
+    const ok = window.confirm(matched
+        ? `The call has no coordinates. Add call location ${callsign} at the address match to the mission map?\n\n${matched}\n(${latStr}, ${lngStr})`
+        : `Add call location ${callsign} at ${latStr}, ${lngStr} to the mission map?`);
     if (!ok) return null;
     try {
         await pushPointToMission({
@@ -781,7 +798,9 @@ async function maybeAddCallLocation(
             type: '13064000001100000000',
             icon: '2525E:13064000001100000000',
         });
-        return `Added call location ${callsign} to the map.`;
+        return matched
+            ? `Added call location ${callsign} to the map (from the address: ${matched}).`
+            : `Added call location ${callsign} to the map.`;
     } catch (err) {
         statusError.value = true;
         status.value = err instanceof Error ? err.message : String(err);

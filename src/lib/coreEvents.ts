@@ -14,6 +14,7 @@
 
 import { server } from '../../../../src/std.ts';
 import type { ActiveMission } from '../composables/useIncident.ts';
+import type { LatLng } from './coords.ts';
 import {
     DEFAULT_CAD_UTC_OFFSET,
     buildFieldEvent,
@@ -187,13 +188,17 @@ export interface CadEventInput {
     subjectProfile?: string;
     /** Management channel names; the event is shared with these only. */
     channelNames: string[];
+    /** Where to place the event when the call has no Address LL(...) (#50). */
+    fallbackLocation?: LatLng | null;
 }
 
 /** Create the MGMT event for a CAD call, nominate it and set its Case Number. */
 async function createMgmtEvent(input: CadEventInput, missions: EventMission[]): Promise<EventSummary> {
     const cad = parseCadImport(input.cadText);
-    const loc = cad.header.callLocation;
-    if (!loc) throw new Error('The CAD call has no Address LL(...) coordinates to place the event.');
+    const loc = cad.header.callLocation ?? input.fallbackLocation ?? null;
+    if (!loc) {
+        throw new Error('The CAD call has no Address LL(...) coordinates and the form has no Estimated Location to place the event.');
+    }
     const plan = buildMgmtEvent({
         fields: cad.header.fields,
         cadId: cad.activityNumber,
