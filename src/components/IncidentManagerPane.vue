@@ -1,11 +1,24 @@
 <template>
     <div class='incident-manager-pane d-flex flex-column gap-2 px-3 py-3 h-100 w-100 overflow-hidden min-height-0'>
-        <!-- Mobile: offcanvas nav -->
+        <!--
+            Narrow width: slide-out nav (#51). Opened and closed by Vue, not
+            Bootstrap's JS - CloudTAK doesn't load it, so data-bs-toggle did nothing.
+        -->
+        <div
+            v-if='navOpen'
+            class='offcanvas-backdrop fade show d-md-none'
+            @click='navOpen = false'
+        />
         <div
             id='incident-manager-nav'
             class='offcanvas offcanvas-start d-md-none'
+            :class='{ show: navOpen }'
             tabindex='-1'
+            role='dialog'
+            :aria-modal='navOpen ? "true" : undefined'
+            :aria-hidden='navOpen ? undefined : "true"'
             aria-labelledby='incident-manager-nav-label'
+            @keydown.esc='navOpen = false'
         >
             <div class='offcanvas-header'>
                 <h5
@@ -17,16 +30,16 @@
                 <button
                     type='button'
                     class='btn-close'
-                    data-bs-dismiss='offcanvas'
                     aria-label='Close navigation'
+                    @click='navOpen = false'
                 />
             </div>
             <div class='offcanvas-body p-2 incident-side-nav'>
                 <IncidentNavList
-                    mobile
                     :section-expanded='sectionExpanded'
                     :active-key='activeKey'
                     @toggle-section='toggleSection'
+                    @picked='navOpen = false'
                 />
             </div>
         </div>
@@ -52,8 +65,9 @@
                 <div class='d-md-none d-flex align-items-center mb-1'>
                     <TablerIconButton
                         title='Open navigation'
-                        data-bs-toggle='offcanvas'
-                        data-bs-target='#incident-manager-nav'
+                        :aria-expanded='navOpen ? "true" : "false"'
+                        aria-controls='incident-manager-nav'
+                        @click='navOpen = true'
                     >
                         <IconMenu2
                             :size='24'
@@ -190,6 +204,8 @@ const {
 } = useIncident();
 
 const sectionExpanded = ref(loadSectionExpandedFromSession());
+/** The narrow-width slide-out nav (#51). */
+const navOpen = ref(false);
 
 function toggleSection(key: string): void {
     sectionExpanded.value = {

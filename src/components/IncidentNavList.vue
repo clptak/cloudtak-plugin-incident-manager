@@ -4,8 +4,6 @@
         type='button'
         class='incident-nav-item incident-nav-primary'
         :class='{ active: activeKey === createOpenNav.key }'
-        :data-bs-dismiss='mobile ? "offcanvas" : undefined'
-        :data-bs-target='mobile ? "#incident-manager-nav" : undefined'
         title='Create a new incident or open an existing one'
         @click='onSelect(createOpenNav.key)'
     >
@@ -27,8 +25,6 @@
             type='button'
             class='incident-nav-item incident-nav-sub'
             :class='{ active: activeKey === item.key }'
-            :data-bs-dismiss='mobile ? "offcanvas" : undefined'
-            :data-bs-target='mobile ? "#incident-manager-nav" : undefined'
             @click='onSelect(item.key)'
         >
             <component
@@ -72,8 +68,6 @@
                             type='button'
                             class='incident-nav-item incident-nav-sub'
                             :class='{ active: activeKey === item.key }'
-                            :data-bs-dismiss='mobile ? "offcanvas" : undefined'
-                            :data-bs-target='mobile ? "#incident-manager-nav" : undefined'
                             @click='onSelect(item.key)'
                         >
                             <component
@@ -100,8 +94,6 @@
         type='button'
         class='incident-nav-item incident-nav-settings'
         :class='{ active: activeKey === settingsNav.key }'
-        :data-bs-dismiss='mobile ? "offcanvas" : undefined'
-        :data-bs-target='mobile ? "#incident-manager-nav" : undefined'
         @click='onSelect(settingsNav.key)'
     >
         <IconSettings
@@ -154,13 +146,14 @@ import {
 import { useIncident } from '../composables/useIncident.ts';
 
 defineProps<{
-    mobile?: boolean;
     sectionExpanded: Record<string, boolean>;
     activeKey: string;
 }>();
 
 const emit = defineEmits<{
     toggleSection: [key: string];
+    /** A nav item was clicked (the narrow-width menu closes on it). */
+    picked: [key: string];
 }>();
 
 /** Icons beside nav items so they're quick to spot (#46). Every nav item has one. */
@@ -198,5 +191,6 @@ const incidentItems = computed(() => visibleIncidentNavItems(isSearchIncident.va
 
 function onSelect(key: string): void {
     selectKeyGuarded(key);
+    emit('picked', key);
 }
 </script>
